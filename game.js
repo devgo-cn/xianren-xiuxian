@@ -200,6 +200,8 @@ const TOTAL_SEGS = BIGS.reduce((s, b) => s + b.segs, 0);   // 54 段(凡人1 + �
  * 境界体系: 每大境 1 段(凡人)~13 段(炼气), 其余各 4 段。后期境界不够用 → 在 BIGS/MON_NAMES/
  *   REALM_DAYS/bigSub 各追加一境即可向上续接, 无需改动本注释或任何达成天数约定。
  * SEG_SCALE : 修为需求系数锚点(调大可压慢全盘, 调小加快全盘; 当前=4)
+ * v2.0 数值平衡: 需求指数2.05→3.0; 聚灵阵满级4.9x→3.0x; 法宝系数0.35→0.12; 丹药最高倍率15x→3.5x
+ *   核心目标: 需求增长快于产出增长, 杜绝后期境界倒挂(化神比炼气快); 满配毕业登顶约30~40天
  * arrMult   : 聚灵阵收益 前10级+22%/11~20级+12%/21~30级+5%, 30级封顶(v1.9.9 削: 原35/18/8% 与装备倍率叠乘失控)
  * SPIRIT_RATE/ARRAY_COST: 灵石秒产与阵升级花费, 约束阵等级节奏
  */
@@ -208,7 +210,7 @@ const SEG_SCALE = 4;
 const ARRAY_MAX_LV = 32;   // v1.7.42: 聚灵阵收益封顶级(arrMult 33+ 不再增长), 防灵石无底洞
 const arrMult = lv => {
   let m = 1;
-  for (let k = 2; k <= lv; k++) m += k <= 11 ? 0.22 : (k <= 21 ? 0.12 : (k <= 31 ? 0.05 : 0));
+  for (let k = 2; k <= lv; k++) m += k <= 11 ? 0.12 : (k <= 21 ? 0.06 : (k <= 31 ? 0.02 : 0));
   return m;
 };
 const SPIRIT_RATE = lv => 0.5 + 0.34 * lv;
@@ -238,7 +240,7 @@ const SEG_META = [];
       }
       // 凡人: 新手入门, 几分钟即可渡入炼气; 其余按目标时长 × 大境强度
       const need = big.n === "凡人" ? 2500
-        : Math.max(120, Math.round(SEG_SCALE * Math.pow(bi + 1, 2.05) * dsecTotal * ws[q] / sw));
+        : Math.max(120, Math.round(SEG_SCALE * Math.pow(bi + 1, 3.0) * dsecTotal * ws[q] / sw));
       SEG_META.push({ bigIdx: bi, big: big.n, label, need, isBigEnd,
         color: big.color, c: big.c, segNo: q + 1,
         sub: bigSub(bi) });
@@ -1116,27 +1118,27 @@ const RECIPES = {   // 丹方 v4 (v1.9.0) —— 覆盖 12 大境(0凡→11天�
  *   古方(h:1)为纵向毕业向，dur 8~12 时辰，配合上限即可一剂近顶。
  * ==================== 残页古方(隐藏丹, h:1; 云游拾残页解锁; 纵向毕业向强力 buff) ==================== */
   tianyuan: { big: 1, h: 1, n: "天元聚气丹", d: "镜州古丹残篇：两时辰内修为 +200%",
-            need: { shexian: 8, huangjing: 6, lingru: 2 }, eff: { k: "buff", mult: 3, dur: 7200 } },
+            need: { shexian: 8, huangjing: 6, lingru: 2 }, eff: { k: "buff", mult: 2.0, dur: 7200 } },
   jiuzhuan: { big: 2, h: 1, n: "九转玉髓丹", d: "乱星海沉船古方：三时辰内修为 +300%",
-            need: { zihou: 9, shexian: 5, lingxue: 4, lingru: 3 }, eff: { k: "buff", mult: 4, dur: 10800 } },
+            need: { zihou: 9, shexian: 5, lingxue: 4, lingru: 3 }, eff: { k: "buff", mult: 2.2, dur: 10800 } },
   taishang: { big: 3, h: 1, n: "太上凝金丹", d: "虚天殿壁刻残方：三时辰内修为 +400%",
-            need: { xuancan: 10, zihou: 4, lingxue: 5, yaodan: 3 }, eff: { k: "buff", mult: 5, dur: 10800 } },
+            need: { xuancan: 10, zihou: 4, lingxue: 5, yaodan: 3 }, eff: { k: "buff", mult: 2.3, dur: 10800 } },
   jiutian: { big: 4, h: 1, n: "九天婴华丹", d: "灵界裂隙飘来的丹道：四时辰内修为 +500%",
-            need: { jiuyou: 11, xuancan: 4, yaopo: 5, lingru: 6 }, eff: { k: "buff", mult: 6, dur: 14400 } },
+            need: { jiuyou: 11, xuancan: 4, yaopo: 5, lingru: 6 }, eff: { k: "buff", mult: 2.4, dur: 14400 } },
   hunwu: { big: 5, h: 1, n: "混元无极丹", d: "飞升台前人界第一丹：六时辰内修为 +700%",
-            need: { wenxin: 12, jiuyou: 4, yaopo: 5, dihuo: 6 }, eff: { k: "buff", mult: 8, dur: 21600 } },
+            need: { wenxin: 12, jiuyou: 4, yaopo: 5, dihuo: 6 }, eff: { k: "buff", mult: 2.6, dur: 21600 } },
   guixu: { big: 6, h: 1, n: "归墟炼神丹", d: "沉灵谷残方：五时辰内修为 +600%",
-            need: { longxue: 11, wenxin: 4, jiaojiao: 5, lingru: 7 }, eff: { k: "buff", mult: 7, dur: 18000 } },
+            need: { longxue: 11, wenxin: 4, jiaojiao: 5, lingru: 7 }, eff: { k: "buff", mult: 2.5, dur: 18000 } },
   feiling: { big: 7, h: 1, n: "飞灵圣丹", d: "千羽台遗刻古方：六时辰内修为 +700%",
-            need: { qianyu: 11, longxue: 4, jiaojiao: 5, dihuo: 7 }, eff: { k: "buff", mult: 8, dur: 21600 } },
+            need: { qianyu: 11, longxue: 4, jiaojiao: 5, dihuo: 7 }, eff: { k: "buff", mult: 2.6, dur: 21600 } },
   zhenyuan: { big: 8, h: 1, n: "镇元渡厄丹", d: "镇魔碑下镇压的古方：六时辰内修为 +800%",
-            need: { duen: 11, qianyu: 4, mogu: 5, taiqing: 4 }, eff: { k: "buff", mult: 9, dur: 21600 } },
+            need: { duen: 11, qianyu: 4, mogu: 5, taiqing: 4 }, eff: { k: "buff", mult: 2.8, dur: 21600 } },
   jiulei: { big: 9, h: 1, n: "九转雷纹丹", d: "焦雷原雷击石中藏方：六时辰内修为 +900%",
-            need: { zilei: 11, duen: 4, mogu: 5, taiqing: 5 }, eff: { k: "buff", mult: 10, dur: 21600 } },
+            need: { zilei: 11, duen: 4, mogu: 5, taiqing: 5 }, eff: { k: "buff", mult: 3.0, dur: 21600 } },
   xiansui: { big: 10, h: 1, n: "太清仙髓丹", d: "北寒仙宫旧档丹方：八时辰内修为 +1100%",
-            need: { hanpo: 11, zilei: 4, qiongjing: 5, taiqing: 7 }, eff: { k: "buff", mult: 12, dur: 28800 } },
+            need: { hanpo: 11, zilei: 4, qiongjing: 5, taiqing: 7 }, eff: { k: "buff", mult: 3.2, dur: 28800 } },
   wanji: { big: 11, h: 1, n: "万界归元丹", d: "万界天墟尽头的终极丹方：十二时辰内修为 +1400%",
-            need: { hongmeng: 11, hanpo: 4, qiongjing: 6, taiqing: 8 }, eff: { k: "buff", mult: 15, dur: 43200 } },
+            need: { hongmeng: 11, hanpo: 4, qiongjing: 6, taiqing: 8 }, eff: { k: "buff", mult: 3.5, dur: 43200 } },
 
   /* ---- 凡人(0)：v1.9.0 起不设丹方 ----
    * 凡人境只停留约 3.6 小时(REALM_DAYS[0]=0.15 天), 化身上路不到半日便渡入炼气,
@@ -1147,79 +1149,79 @@ const RECIPES = {   // 丹方 v4 (v1.9.0) —— 覆盖 12 大境(0凡→11天�
   buqi:  { big: 1, n: "补气丹", d: "炼气常备：立时回复约半个时辰修为",
             need: { shexian: 6, huangjing: 4 }, eff: { k: "inst", sec: 1800 } },
   hlong: { big: 1, n: "黄龙丹", d: "药力绵长：一时辰内修为 +50%",
-            need: { shexian: 7, huangjing: 5 }, eff: { k: "buff", mult: 1.5, dur: 3600 } },
+            need: { shexian: 7, huangjing: 5 }, eff: { k: "buff", mult: 1.3, dur: 3600 } },
   jinzui:{ big: 1, n: "金髓丸", d: "冲境烈药：一时辰内修为 +120%",
-            need: { shexian: 8, huangjing: 5, dihuo: 2 }, eff: { k: "buff", mult: 2.2, dur: 3600 } },
+            need: { shexian: 8, huangjing: 5, dihuo: 2 }, eff: { k: "buff", mult: 1.6, dur: 3600 } },
   zhuji: { big: 1, n: "筑基丹", d: "炼气圆满的叩门砖：立获约三时辰修为，此后两时辰修为翻倍",
-            need: { shexian: 12, huangjing: 8, lingru: 3, yaodan: 2 }, eff: { k: "grand", sec: 10800, mult: 2, dur: 7200 } },
+            need: { shexian: 12, huangjing: 8, lingru: 3, yaodan: 2 }, eff: { k: "grand", sec: 10800, mult: 1.8, dur: 7200 } },
   /* ---- 筑基(海外丹道：紫猴为主，灵血/灵乳辅) ---- */
   xisui: { big: 2, n: "洗髓丹", d: "洗髓伐脉：十二时辰内离线收益 +30%",
             need: { zihou: 8, shexian: 5, lingxue: 3 }, eff: { k: "offline", dur: 43200, boost: .3 } },
   yuqing:{ big: 2, n: "玉清丹", d: "筑基培元：立时回复约两时辰修为",
             need: { zihou: 9, shexian: 5, lingxue: 4 }, eff: { k: "inst", sec: 7200 } },
   jiangchen: { big: 2, n: "降尘丹", d: "筑基圆满感结丹机缘：立获约六时辰修为，此后三时辰修为 +120%",
-            need: { zihou: 13, lingxue: 6, dihuo: 3, lingru: 5 }, eff: { k: "grand", sec: 21600, mult: 2.2, dur: 10800 } },
+            need: { zihou: 13, lingxue: 6, dihuo: 3, lingru: 5 }, eff: { k: "grand", sec: 21600, mult: 1.8, dur: 10800 } },
   /* ---- 结丹(寒域丹道：玄参为主，灵血/妖丹辅) ---- */
   guyuan:{ big: 3, n: "固元丹", d: "金丹固本：立时回复约两时辰修为",
             need: { xuancan: 9, zihou: 5, lingxue: 5 }, eff: { k: "inst", sec: 7200 } },
   ningyuan: { big: 3, n: "凝元丹", d: "三时辰内修为 +200%，冲击金丹后期",
-            need: { xuancan: 11, zihou: 5, lingxue: 6, yaodan: 4 }, eff: { k: "buff", mult: 3, dur: 10800 } },
+            need: { xuancan: 11, zihou: 5, lingxue: 6, yaodan: 4 }, eff: { k: "buff", mult: 2.0, dur: 10800 } },
   yingbian: { big: 3, n: "婴变丹", d: "结丹圆满窥元婴大道：立获约六时辰修为，此后四时辰修为 +150%",
-            need: { xuancan: 15, lingxue: 7, dihuo: 6, lingru: 6 }, eff: { k: "grand", sec: 21600, mult: 2.5, dur: 14400 } },
+            need: { xuancan: 15, lingxue: 7, dihuo: 6, lingru: 6 }, eff: { k: "grand", sec: 21600, mult: 2.0, dur: 14400 } },
   /* ---- 元婴(幽域丹道：九幽为主，妖魄辅) ---- */
   yuying:{ big: 4, n: "育婴丹", d: "滋养元婴：立时回复约四时辰修为",
             need: { jiuyou: 9, xuancan: 5, yaopo: 5 }, eff: { k: "inst", sec: 14400 } },
   yinghua: { big: 4, n: "婴华丹", d: "四时辰内修为 +250%，元婴期冲关利器",
-            need: { jiuyou: 11, xuancan: 5, yaopo: 6, dihuo: 5 }, eff: { k: "buff", mult: 3.5, dur: 14400 } },
+            need: { jiuyou: 11, xuancan: 5, yaopo: 6, dihuo: 5 }, eff: { k: "buff", mult: 2.2, dur: 14400 } },
   tongshen: { big: 4, n: "通神丹", d: "元婴圆满感化神天劫：立获约八时辰修为，此后六时辰修为 +200%",
-            need: { jiuyou: 16, yaopo: 7, lingru: 7, dihuo: 6 }, eff: { k: "grand", sec: 28800, mult: 3, dur: 21600 } },
+            need: { jiuyou: 16, yaopo: 7, lingru: 7, dihuo: 6 }, eff: { k: "grand", sec: 28800, mult: 2.2, dur: 21600 } },
   /* ---- 化神(巅峰丹道，静候飞升；v1.9.0 起不再用妖丹，改为妖魄) ---- */
   wendao:{ big: 5, n: "问道丹", d: "化神问道：立时回复约四时辰修为",
             need: { wenxin: 9, jiuyou: 5, yaopo: 5 }, eff: { k: "inst", sec: 14400 } },
   hunyuan: { big: 5, n: "混元一气丹", d: "六时辰内修为 +300%，人界绝巅的一口气",
-            need: { wenxin: 11, jiuyou: 5, yaopo: 6, dihuo: 6 }, eff: { k: "buff", mult: 4, dur: 21600 } },
+            need: { wenxin: 11, jiuyou: 5, yaopo: 6, dihuo: 6 }, eff: { k: "buff", mult: 2.4, dur: 21600 } },
   taiyi: { big: 5, n: "太一虚元丹", d: "化神圆满静候飞升的底蕴：立获约十二时辰修为，此后六时辰修为 +250%",
-            need: { wenxin: 16, yaopo: 7, lingru: 8, dihuo: 7 }, eff: { k: "grand", sec: 43200, mult: 3.5, dur: 21600 } },
+            need: { wenxin: 16, yaopo: 7, lingru: 8, dihuo: 7 }, eff: { k: "grand", sec: 43200, mult: 2.5, dur: 21600 } },
   /* ---- 炼虚(蛮荒丹道：龙血为主，蛟角辅) ---- */
   yuxu: { big: 6, n: "元虚丹", d: "炼虚固本：立时回复约五时辰修为",
             need: { longxue: 9, wenxin: 5, jiaojiao: 5 }, eff: { k: "inst", sec: 18000 } },
   xuling: { big: 6, n: "虚灵丹", d: "三时辰内修为 +200%，稳固虚境",
-            need: { longxue: 11, wenxin: 5, jiaojiao: 6, dihuo: 6 }, eff: { k: "buff", mult: 3, dur: 10800 } },
+            need: { longxue: 11, wenxin: 5, jiaojiao: 6, dihuo: 6 }, eff: { k: "buff", mult: 2.0, dur: 10800 } },
   polv: { big: 6, n: "破虚丹", d: "炼虚圆满窥合体：立获约六时辰修为，此后四时辰修为 +150%",
-            need: { longxue: 16, jiaojiao: 7, lingru: 8, dihuo: 7 }, eff: { k: "grand", sec: 21600, mult: 2.5, dur: 14400 } },
+            need: { longxue: 16, jiaojiao: 7, lingru: 8, dihuo: 7 }, eff: { k: "grand", sec: 21600, mult: 2.0, dur: 14400 } },
   /* ---- 合体(飞灵丹道：千羽为主，蛟角辅) ---- */
   linghe: { big: 7, n: "灵合丹", d: "灵肉相合：立时回复约五时辰修为",
             need: { qianyu: 9, longxue: 5, jiaojiao: 5 }, eff: { k: "inst", sec: 18000 } },
   shengyu: { big: 7, n: "圣羽丹", d: "三时辰内修为 +300%，圣域真灵之气",
-            need: { qianyu: 11, longxue: 5, jiaojiao: 6, dihuo: 7 }, eff: { k: "buff", mult: 4, dur: 10800 } },
+            need: { qianyu: 11, longxue: 5, jiaojiao: 6, dihuo: 7 }, eff: { k: "buff", mult: 2.4, dur: 10800 } },
   hedao: { big: 7, n: "合道丹", d: "合体圆满感大乘道韵：立获约六时辰修为，此后四时辰修为 +200%",
-            need: { qianyu: 16, jiaojiao: 7, lingru: 8, dihuo: 7 }, eff: { k: "grand", sec: 21600, mult: 3, dur: 14400 } },
+            need: { qianyu: 16, jiaojiao: 7, lingru: 8, dihuo: 7 }, eff: { k: "grand", sec: 21600, mult: 2.2, dur: 14400 } },
   /* ---- 大乘(镇魔丹道：渡厄为主，魔骨/太清辅) ---- */
   jingmo: { big: 8, n: "净魔丹", d: "涤荡心魔：立时回复约六时辰修为",
             need: { duen: 9, qianyu: 5, mogu: 5 }, eff: { k: "inst", sec: 21600 } },
   duemo: { big: 8, n: "渡厄丹", d: "三时辰内修为 +350%，厄难不侵",
-            need: { duen: 11, qianyu: 5, mogu: 5, taiqing: 5 }, eff: { k: "buff", mult: 4.5, dur: 10800 } },
+            need: { duen: 11, qianyu: 5, mogu: 5, taiqing: 5 }, eff: { k: "buff", mult: 2.6, dur: 10800 } },
   zhenmo: { big: 8, n: "镇魔丹", d: "大乘圆满镇压魔渊：立获约八时辰修为，此后五时辰修为 +250%",
-            need: { duen: 16, mogu: 7, taiqing: 6, dihuo: 7 }, eff: { k: "grand", sec: 28800, mult: 3.5, dur: 18000 } },
+            need: { duen: 16, mogu: 7, taiqing: 6, dihuo: 7 }, eff: { k: "grand", sec: 28800, mult: 2.5, dur: 18000 } },
   /* ---- 渡劫(劫雷丹道：紫雷为主，魔骨/太清辅) ---- */
   yinlei: { big: 9, n: "引雷丹", d: "引雷淬体：立时回复约六时辰修为",
             need: { zilei: 9, duen: 5, mogu: 5 }, eff: { k: "inst", sec: 21600 } },
   cuilei: { big: 9, n: "淬雷丹", d: "三时辰内修为 +400%，紫霄淬体",
-            need: { zilei: 11, duen: 5, mogu: 6, taiqing: 6 }, eff: { k: "buff", mult: 5, dur: 10800 } },
+            need: { zilei: 11, duen: 5, mogu: 6, taiqing: 6 }, eff: { k: "buff", mult: 2.8, dur: 10800 } },
   yingjie: { big: 9, n: "应劫丹", d: "渡劫圆满直面天威：立获约十时辰修为，此后五时辰修为 +300%",
-            need: { zilei: 16, mogu: 7, taiqing: 7, dihuo: 7 }, eff: { k: "grand", sec: 36000, mult: 4, dur: 18000 } },
+            need: { zilei: 16, mogu: 7, taiqing: 7, dihuo: 7 }, eff: { k: "grand", sec: 36000, mult: 2.8, dur: 18000 } },
   /* ---- 真仙(北寒丹道：寒魄为主，琼晶/太清辅) ---- */
   ningxian: { big: 10, n: "凝仙丹", d: "凝聚仙元：立时回复约八时辰修为",
             need: { hanpo: 9, zilei: 5, qiongjing: 6 }, eff: { k: "inst", sec: 28800 } },
   xianpo: { big: 10, n: "寒魄仙丹", d: "四时辰内修为 +500%，北寒仙气",
-            need: { hanpo: 11, zilei: 5, qiongjing: 6, taiqing: 8 }, eff: { k: "buff", mult: 6, dur: 14400 } },
+            need: { hanpo: 11, zilei: 5, qiongjing: 6, taiqing: 8 }, eff: { k: "buff", mult: 3.0, dur: 14400 } },
   yinxian: { big: 10, n: "引仙丹", d: "真仙圆满叩问天仙：立获约十二时辰修为，此后六时辰修为 +400%",
-            need: { hanpo: 16, qiongjing: 7, taiqing: 8, lingru: 8 }, eff: { k: "grand", sec: 43200, mult: 5, dur: 21600 } },
+            need: { hanpo: 16, qiongjing: 7, taiqing: 8, lingru: 8 }, eff: { k: "grand", sec: 43200, mult: 3.0, dur: 21600 } },
   /* ---- 天仙(天墟丹道；终境无破境，重离线与长时) ---- */
   guiyuan: { big: 11, n: "归元丹", d: "万法归一：立时回复约十二时辰修为",
             need: { hongmeng: 9, hanpo: 5, qiongjing: 6 }, eff: { k: "inst", sec: 43200 } },
   taichu: { big: 11, n: "太初丹", d: "六时辰内修为 +700%，一点太初之气",
-            need: { hongmeng: 11, hanpo: 5, qiongjing: 7, taiqing: 8 }, eff: { k: "buff", mult: 8, dur: 21600 } },
+            need: { hongmeng: 11, hanpo: 5, qiongjing: 7, taiqing: 8 }, eff: { k: "buff", mult: 3.2, dur: 21600 } },
   bianhua: { big: 11, n: "天仙蜕变丹", d: "脱胎换骨：三十六时辰内离线收益 +50%",
             need: { hongmeng: 16, qiongjing: 8, taiqing: 9, lingru: 9 }, eff: { k: "offline", dur: 129600, boost: .5 } },
 }
@@ -1731,7 +1733,7 @@ async function bootCloud() {
 /* ============ 数值 ============ */
 function realmMult() { return Math.pow(bigIdx() + 1, 2.05); } // 大境界指数
 function artMult() { /* v1.9.9 累乘→弱化加算: 4件玄天级(3.8)从 55x 压到 3.5x, 6件从 3011x 压到 6.9x —— 累乘乘区随装备成长指数爆炸(实测 42h 炼气→化神圆满), 需求曲线追不上; 同式已同步服务端 game-core.js rateNowOf */
-  return 1 + state.arts.reduce((m, a) => m + ((a.mult || 1) - 1), 0) * 0.35;
+  return 1 + state.arts.reduce((m, a) => m + ((a.mult || 1) - 1), 0) * 0.12;
 }
 function buffMult() {
   const t = Date.now();
