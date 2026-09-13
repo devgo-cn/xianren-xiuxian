@@ -212,7 +212,7 @@ const TOTAL_SEGS = BIGS.reduce((s, b) => s + b.segs, 0);   // 54 段(凡人1 + �
  * arrMult   : 聚灵阵收益 前10级+22%/11~20级+12%/21~30级+5%, 30级封顶(v1.9.9 削: 原35/18/8% 与装备倍率叠乘失控)
  * SPIRIT_RATE/ARRAY_COST: 灵石秒产与阵升级花费, 约束阵等级节奏
  */
-const REALM_DAYS = [0.15, 5, 4.8, 6, 6.8, 7.25, 9.5, 11.5, 14, 17, 21, 26]; // 与 BIGS 一一对应(共12境), 权重自 凡人→天仙
+const REALM_DAYS = [0.15, 2.5, 3.5, 5, 6.5, 8.5, 11, 14, 17.5, 21.5, 26, 32]; // 与 BIGS 一一对应(共12境), 前期短促轻快、后期绵长稳妥(v2.5 炼气5→2.5天)
 const SEG_SCALE = 4;
 const ARRAY_MAX_LV = 32;   // v1.7.42: 聚灵阵收益封顶级(arrMult 33+ 不再增长), 防灵石无底洞
 const arrMult = lv => {
@@ -232,7 +232,7 @@ const SEG_META = [];
     const s = big.segs;
     const dsecTotal = REALM_DAYS[bi] * 86400;
     const ws = [];
-    for (let j = 0; j < s; j++) ws.push(s <= 1 ? 1 : 0.25 + Math.pow(j / (s - 1), 1.35));
+    for (let j = 0; j < s; j++) ws.push(s <= 1 ? 1 : 0.05 + Math.pow(j / (s - 1), 3.0));  // v2.5 段内前快后慢更极端(原1.35→3.0)
     const sw = ws.reduce((a, b) => a + b, 0);
     for (let q = 0; q < s; q++, cum++) {
       let label, isBigEnd = false;
@@ -1879,18 +1879,22 @@ function updateHUD() {
   $("spirit").textContent = fmt(_dsp.spirit);
   $("rateText").textContent = fmt(rateNow());
   $("arrayLv").textContent = state.arrayLv;
-  // 可渡劫: 处于大境界末尾且修为圆满
-  const can = state.exp >= r.need && r.isBigEnd && state.realmIdx < TOTAL_SEGS - 1;
+  // v2.5: 所有境界突破均手动 —— 修为圆满即可点突破(小境简版/大境天劫)
+  const can = state.exp >= r.need && state.realmIdx < TOTAL_SEGS - 1;
   const btn = $("btnBreak");
   btn.disabled = !can;
   // 注意：绝不能 btn.textContent=...（会删除按钮内嵌的 SVG 墨块皮肤）→ 只更新文字标签
   const bt = btn.querySelector(".label");
-  if (bt) bt.innerHTML = can ? "☯ 渡劫突破" : "☯ 立即突破";
+  if (bt) bt.innerHTML = can ? (r.isBigEnd ? "☯ 渡劫突破" : "☯ 突破") : "☯ 修为未圆满";
   btn.classList.toggle("ready", can);
   if (can && !lastReadyHint) {
     lastReadyHint = true;
-    const nextBig = seg(state.realmIdx + 1).big;
-    pushMsg("main", `<span class="r">${r.big}·${段名(r)}已圆满</span>——你随时可亲手渡劫，踏入<span class="g">${nextBig}</span>`);
+    if (r.isBigEnd) {
+      const nextBig = seg(state.realmIdx + 1).big;
+      pushMsg("main", `<span class="r">${r.big}·${段名(r)}已圆满</span>——你随时可亲手渡劫，踏入<span class="g">${nextBig}</span>`);
+    } else {
+      pushMsg("main", `<span class="g">${r.label} 修为圆满</span>——点击「突破」更进一层`);
+    }
   }
   if (!can) lastReadyHint = false;
   /* v1.6.0-A: 离散增益飘字 — 单帧变化远超平滑增速阈值才视为一次获得/花费, 自动覆盖所有获得点(adventure/邮件/离线/精进) */
@@ -1934,44 +1938,63 @@ function 段名(r) {
   return r.label.split("·")[1];
 }
 
-/* 大境界突破(手动) */
+/* 境界突破(全手动 v2.5): 小境界简版金光, 大境界天劫蓄力 */
 function doBreak() {
   if (breaking) return;
   const r = realm();
-  if (state.exp < r.need || !r.isBigEnd || state.realmIdx >= TOTAL_SEGS - 1) return;
+  if (state.exp < r.need || state.realmIdx >= TOTAL_SEGS - 1) return;
   breaking = true;
   const next = seg(state.realmIdx + 1);
-  // v1.6.0-C: 雷劫蓄力段 — 先 1.0s 天劫将至(屏幕电框 + 主角灵光蓄力), 再破境
-  pushMsg("main", `<span class="r">天劫将至……</span>${r.label} 将渡 ${next.label}`);
-  const trib = $("trib"); if (trib) { trib.classList.remove("show"); void trib.offsetWidth; trib.classList.add("show"); }
-  const cult = $("cult"); if (cult) { cult.classList.remove("trib-glow"); void cult.offsetWidth; cult.classList.add("trib-glow"); }
-  setTimeout(() => {
-    if (trib) trib.classList.remove("show");
-    if (cult) cult.classList.remove("trib-glow");
-    // 破境: 金光闪 + 境界名弹字 + 粒子爆发
-    const fl = $("flash"); fl.style.transition = "none"; fl.style.opacity = .95;
-    requestAnimationFrame(() => { fl.style.transition = "opacity 1.8s ease-out"; fl.style.opacity = 0; });
-    const up = $("realmUp");
-    $("realmUpT").textContent = next.big;
-    $("realmUpT").style.fontSize = next.big.length > 2 ? "30px" : "40px";
-    up.classList.remove("show"); void up.offsetWidth; up.classList.add("show");
-    burstBoom();
-    pushMsg("main", `<span class="r">天劫降临！</span>${r.label} → <span class="r">${next.label}</span>`);
-    setTimeout(() => {
-      state.realmIdx++;
-      state.exp = 0;
-      breaking = false;
-      updateRealmUI(); updateHUD(); save();
-      cloudFlush();   // v1.5.1: 渡劫突破是不可逆的关键跃迁 → 立即上云
-      const nr = realm();
+  const isBigBreak = r.isBigEnd;   // 大境界突破(跨大境) → 天劫; 小境界 → 简版金光
+
+  const finishBreak = () => {
+    state.realmIdx++;
+    state.exp = isBigBreak ? 0 : Math.max(0, state.exp - r.need);  // 大境清零, 小境扣需
+    breaking = false;
+    updateRealmUI(); updateHUD(); save();
+    cloudFlush();
+    const nr = realm();
+    if (isBigBreak) {
       const GREET_BY_BIG = { 1: "洗髓易骨，踏入炼气！", 2: "踏入筑基！", 3: "金丹凝形！", 4: "元婴出窍！",
         5: "化神之姿！", 6: "虚室生白，炼神返虚！", 7: "法相天地，合道归真！", 8: "返璞归真，大乘无上！",
         9: "度劫化凡，一步登仙！", 10: "羽化登仙，仙界之门！", 11: "位列仙班，天仙永寿！" };
       const greet = GREET_BY_BIG[nr.bigIdx] || "";
       pushMsg("main", `<span class="g">${nr.big}</span>！${greet || "修行又进一步"}`);
-      realmPlot();
-    }, 950);
-  }, 1000);
+    } else {
+      pushMsg("main", `修为精进 → <span class="g">${nr.big === "炼气" ? "炼气" + cnNum(nr.segNo) + "层" : nr.label}</span>`);
+    }
+    realmPlot();
+  };
+
+  // 通用破境特效: 金光闪 + 境界名弹字 + 粒子爆发
+  const boomFx = () => {
+    const fl = $("flash"); fl.style.transition = "none"; fl.style.opacity = .95;
+    requestAnimationFrame(() => { fl.style.transition = "opacity 1.8s ease-out"; fl.style.opacity = 0; });
+    const up = $("realmUp");
+    $("realmUpT").textContent = isBigBreak ? next.big : next.label;
+    $("realmUpT").style.fontSize = (isBigBreak ? next.big.length > 2 : next.label.length > 4) ? "26px" : "38px";
+    up.classList.remove("show"); void up.offsetWidth; up.classList.add("show");
+    burstBoom();
+  };
+
+  if (isBigBreak) {
+    /* 大境界: 天劫蓄力1s → 破境特效 → 0.95s后落地 */
+    pushMsg("main", `<span class="r">天劫将至……</span>${r.label} 将渡 ${next.label}`);
+    const trib = $("trib"); if (trib) { trib.classList.remove("show"); void trib.offsetWidth; trib.classList.add("show"); }
+    const cult = $("cult"); if (cult) { cult.classList.remove("trib-glow"); void cult.offsetWidth; cult.classList.add("trib-glow"); }
+    setTimeout(() => {
+      if (trib) trib.classList.remove("show");
+      if (cult) cult.classList.remove("trib-glow");
+      boomFx();
+      pushMsg("main", `<span class="r">天劫降临！</span>${r.label} → <span class="r">${next.label}</span>`);
+      setTimeout(finishBreak, 950);
+    }, 1000);
+  } else {
+    /* 小境界: 直接破境特效 → 0.6s后落地 */
+    boomFx();
+    pushMsg("main", `突破！${r.label} → <span class="g">${next.label}</span>`);
+    setTimeout(finishBreak, 600);
+  }
 }
 function manualBreak() { doBreak(); }
 
@@ -3729,18 +3752,8 @@ function loop(dt) {
        真正的账由服务端按自己的钟结算。 */
     const _g = rateNow() * dt;
     state.exp += _g; _pred.exp += _g;
-    // 小层/同大境自动精进; 每轮重取 realm() —— 修为只可升小段, 遇'圆满'必须停手等手动渡劫(防大额增益一次越过跨大境门槛)
-    let guard = 0;
-    while (!breaking && state.realmIdx < TOTAL_SEGS - 1 && guard++ < 8) {
-      const r = realm();
-      if (state.exp < r.need || r.isBigEnd) break;
-      state.exp -= r.need;
-      state.realmIdx++;
-      const nr = realm();
-      pushMsg("main", `修为精进 → <span class="g">${nr.big === "炼气" ? "炼气" + cnNum(nr.segNo) + "层" : nr.label}</span>`);
-      updateRealmUI();
-    }
-    realmPlot(); // 到新小层即推进当前卷剧情(跨大境须手动渡劫 → 剧情也绝不越卷)
+    /* v2.5: 所有境界突破均改为手动 —— 移除自动小境界升级循环, 修为满后玩家点"突破"按钮 */
+    realmPlot(); // 剧情推进(幂等, 手动突破后也会调)
   }
   tickDsp(dt);
   tickAura(dt);
@@ -5232,7 +5245,7 @@ class CanvasHpBar {
     this.dispPct += (this.targetPct - this.dispPct) * 0.12;
     this.wave += 0.05;
     this.flash *= 0.85;
-    const isLow = this.targetPct < 0.3;
+    const isLow = this.targetPct > 0 && this.targetPct < 0.3;
     this.lowGlow += ((isLow ? 1 : 0) - this.lowGlow) * 0.06;
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
@@ -5254,7 +5267,7 @@ class CanvasHpBar {
     // 填充(液态波动)
     const pct = this.dispPct;
     if (pct > 0.005) {
-      const fillW = Math.max(2, w * pct);
+      const fillW = w * pct;
       const grad = ctx.createLinearGradient(0, 0, fillW, 0);
       if (this.side === "foe") {
         if (pct < 0.3) { grad.addColorStop(0, "#a82820"); grad.addColorStop(1, "#ff5a42"); }
