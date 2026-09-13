@@ -1491,6 +1491,17 @@ const CLD_API = cldApiBase();
 const CLD_KEY = "dongtian_cloud_id";
 const CLD_ALPH = "abcdefghjkmnpqrstuvwxyz23456789";
 const cld = { id: "", ready: false, dirty: false, lastOkTs: 0, lastOkLocal: 0, lastPushTs: 0, lastErr: "" };
+/* v2.3 单点登录: 每设备/浏览器唯一标识, 服务端据此判定同账号多端在线并踢掉旧端 */
+const DEV_KEY = "dt_device_id";
+function deviceId() {
+  let d = "";
+  try { d = localStorage.getItem(DEV_KEY) || ""; } catch (e) {}
+  if (!d) {
+    d = "dev-" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+    try { localStorage.setItem(DEV_KEY, d); } catch (e) {}
+  }
+  return d;
+}
 
 /* ==================== v1.8.0 服务端唯一账本 ====================
  * 第一性原理: 游戏状态是「时间」的函数, 而唯一可信的时间只有服务端的钟。
@@ -1553,7 +1564,7 @@ function cldId() {
 function cldApi(method, body, extraQ) {
   const ctl = new AbortController();
   const tm = setTimeout(() => ctl.abort(), 6000);   // 6s 超时, 弱网不阻塞启动/离线结算
-  return fetch(CLD_API + "?id=" + encodeURIComponent(cldId()) + (extraQ ? "&" + extraQ : ""), {
+  return fetch(CLD_API + "?id=" + encodeURIComponent(cldId()) + "&device=" + encodeURIComponent(deviceId()) + (extraQ ? "&" + extraQ : ""), {
     method,
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -1699,6 +1710,19 @@ function cloudBind() {
   cld.id = v; cld.ready = false; cld.dirty = false;
   const idEl = $("cloudId"); if (idEl) idEl.textContent = v;
   cldPull(true);                     // v1.7.29: 主动绑定=导入, 以云端为权威(防止新设备本地新档覆盖云端存档)
+}
+/* v2.3 新建存档: 生成新玩家码, 清空本地档, 重新开始。需二次确认防误操作 */
+function cloudNew() {
+  if (!confirm("确定要新建存档吗？\n\n当前玩家码和本地进度将被清空，新玩家码会自动生成。\n原玩家码仍可通过「换存档」重新绑定找回。")) return;
+  let s = "";
+  for (let i = 0; i < 12; i++) s += CLD_ALPH[Math.floor(Math.random() * CLD_ALPH.length)];
+  const newId = "dt-" + s;
+  try {
+    localStorage.setItem(CLD_KEY, newId);
+    localStorage.removeItem(SAVE_KEY);
+  } catch (e) {}
+  cld.id = newId; cld.ready = false; cld.dirty = false;
+  location.reload();
 }
 function cloudInit() {
   cldId();
@@ -4366,7 +4390,7 @@ async function cloudSettle() {
   const ctl = new AbortController();
   const tm = setTimeout(() => ctl.abort(), 8000);
   try {
-    const r = await fetch(CLD_API + "?id=" + encodeURIComponent(cld.id) + "&settle=1", {
+    const r = await fetch(CLD_API + "?id=" + encodeURIComponent(cld.id) + "&device=" + encodeURIComponent(deviceId()) + "&settle=1", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ __z: await g1Pack(snap) }),
@@ -4375,6 +4399,8 @@ async function cloudSettle() {
     clearTimeout(tm);
     if (!r.ok) throw new Error("http" + r.status);
     const j = await r.json();
+    /* v2.3 单点登录: 服务端判定其他设备在线 → 踢掉本端, 停止一切操作 */
+    if (j && j.kicked) { handleKicked(); return null; }
     if (j && j.ok && j.data) {
       const t1 = Date.now();
       /* 时钟校准(NTP 式): 用往返中点估计服务端"此刻"的时间, 抵消一半网络延迟。
@@ -4401,6 +4427,25 @@ async function cloudSettle() {
     cldFail(e);
     return null;
   }
+}
+/* v2.3 单点登录: 被其他设备顶下线 → 全屏提示, 停止游戏循环和心跳, 禁止操作 */
+let _kicked = false;
+function handleKicked() {
+  if (_kicked) return;
+  _kicked = true;
+  try {
+    const ov = document.createElement("div");
+    ov.id = "kickedOverlay";
+    ov.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(8,10,16,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e8ecf5;text-align:center;padding:40px;";
+    ov.innerHTML = '<div style="font-size:48px;margin-bottom:16px">⚠️</div>'
+      + '<div style="font-size:20px;font-weight:bold;margin-bottom:12px;color:#ffb36b">账号已在其他设备登录</div>'
+      + '<div style="font-size:14px;color:#a7b0c4;line-height:1.8;max-width:320px">同一玩家码只允许一端在线。<br>如需在本设备继续游玩，请刷新页面重新登录。</div>'
+      + '<button onclick="location.reload()" style="margin-top:24px;padding:12px 36px;font-size:16px;background:#67c9ab;color:#0a0e14;border:none;border-radius:8px;cursor:pointer;font-weight:bold">重新登录</button>';
+    document.body.appendChild(ov);
+  } catch (e) {}
+  /* 停止心跳和主循环: 不再上传, 防止旧端覆盖新端存档 */
+  cld.ready = false;
+  try { SND.suspend(); } catch (e) {}
 }
 function presentSettle(r) {
   const gg = (r && r.gains) || {};
