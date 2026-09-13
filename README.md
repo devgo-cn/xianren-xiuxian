@@ -52,8 +52,8 @@
 **方式二：本地跑（任意静态服务器即可）**
 
 ```bash
-git clone https://github.com/xvguanglei1-oss/dongtian-idle-xiuxian.git
-cd dongtian-idle-xiuxian
+git clone https://github.com/xvguanglei1-oss/xianren-xiuxian.git
+cd xianren-xiuxian
 python3 -m http.server 8080
 # 打开 http://localhost:8080
 ```
