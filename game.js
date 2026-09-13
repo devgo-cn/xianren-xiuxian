@@ -1609,7 +1609,7 @@ async function cldPush() {
   const r = await cloudSettle();
   return !!r;
 }
-async function cldPull(forceImport) {        // v1.7.29 forceImport: 用户主动绑定玩家码=导入云端档(以云为权威, 防新设备本地空档覆盖云端)
+async function cldPull(forceImport, silent) {        // v2.1 forceImport:以云为权威; silent=true时静默覆盖(启动时服务器权威模式用, 不弹"已导入"提示)
   if (!window.fetch) { cldUI("off"); return; }
   cldUI("sync");
   try {
@@ -1629,7 +1629,7 @@ async function cldPull(forceImport) {        // v1.7.29 forceImport: 用户主�
         state._cloudTs = cs;
         try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}
         cld.ready = true; cld.lastOkTs = Date.now();
-        if (forceImport) {
+        if (forceImport && !silent) {
           cldFlash("已导入云端存档");
           pushMsg("main", `<span class="b">云存</span>已绑定玩家码并导入云端存档。`);
         } else if (adopted && hadLocal) {
@@ -1720,7 +1720,7 @@ function cloudInit() {
 /* v1.8.0 启动门禁: 拉云端档 → 请服务端权威结算一次 → 返回是否通过。
  * 返回 false 表示连不上服务器 —— 调用方必须停在失败页, 不得进入游戏。 */
 async function bootCloud() {
-  await cldPull();
+  await cldPull(true, true);   // v2.1 服务器权威模式: 启动时强制以云端存档为准覆盖本地, 静默不弹"已导入"提示
   let sr = null;
   try { sr = await cloudSettle(); } catch (e) { sr = null; }
   if (!sr) return false;                       // 门禁不通过
