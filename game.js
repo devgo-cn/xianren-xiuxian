@@ -4976,7 +4976,7 @@ async function btlHeroAct() {
   } else {
     BTL.mhp = Math.max(0, BTL.mhp - st.dmg);
     SND.crit();   // 命中统一"扎实"音(区分度已由画面/文案承担)
-    barHitFlash("foe");
+    if (BTL.barFoe) BTL.barFoe.hit();
     /* 演出: 伤害飘字 + 震屏 + 命中停顿(暴击才冻帧, 强化打击感) */
     const dmgCls = st.kind === "critB" ? "critb" : st.kind === "crit" ? "crit" : "normal";
     const shakeLv = st.kind === "critB" ? "heavy" : st.kind === "crit" ? "mid" : "light";
@@ -4988,7 +4988,7 @@ async function btlHeroAct() {
     let suck = "";
     if (BTL.life > 0) {
       const heal = Math.round(st.dmg * BTL.life / 100);
-      if (heal > 0) { BTL.php = Math.min(BTL.phpMax, BTL.php + heal); suck = ` <b class="suck">（吸血 +${heal}）</b>`; spawnDmg("hero", heal, "heal"); }
+      if (heal > 0) { BTL.php = Math.min(BTL.phpMax, BTL.php + heal); suck = ` <b class="suck">（吸血 +${heal}）</b>`; spawnDmg("hero", heal, "heal"); if (BTL.barHero) BTL.barHero.heal(); }
     }
     fieldLine();
     /* v1.7.17 吸血并进伤害行括号, 不再独占一行 */
@@ -5010,7 +5010,7 @@ async function btlFoeAct() {
     btlNow(`${monNm} 反扑而至！`); SND.swing();               // 敌袭也先有声有影
     if (!BTL.skip) await slp(240);
     BTL.php = Math.max(0, BTL.php - st.dmg); SND.hurt();      // 受击反馈(瞬时)
-    barHitFlash("hero");
+    if (BTL.barHero) BTL.barHero.hit();
     /* 演出: 受击红闪 + 伤害飘字 + 震屏 + 命中停顿 */
     hitFlash();
     const dmgCls = st.kind === "critB" ? "critb" : st.kind === "crit" ? "crit" : "normal";
@@ -5023,7 +5023,7 @@ async function btlFoeAct() {
     let suck = "";
     if (BTL.ms.life > 0) {                                   // 妖吸血词缀: 并进其伤害行
       const heal = Math.round(st.dmg * BTL.ms.life / 100);
-      if (heal > 0) { BTL.mhp = Math.min(BTL.mhpMax, BTL.mhp + heal); suck = ` <b class="suck">（吸血 +${heal}）</b>`; spawnDmg("foe", heal, "heal"); }
+      if (heal > 0) { BTL.mhp = Math.min(BTL.mhpMax, BTL.mhp + heal); suck = ` <b class="suck">（吸血 +${heal}）</b>`; spawnDmg("foe", heal, "heal"); if (BTL.barFoe) BTL.barFoe.heal(); }
     }
     fieldLine();
     btlLog(`　${lead ? lead + " " : ""}打出 <b class="r">${st.dmg}</b> 伤害${suck}。`);
@@ -5089,28 +5089,13 @@ function _typeNext() {
 
 /* 实时血条: 妖(赤,左) / 主身(青碧,右), 数值叠条显示, 每合即时刷新
    残影条(.bar-ghost): 掉血时白色幽灵条停留 180ms 后缓缓追上, 直观展示"掉了多少" */
-function setHpBar(bid, gid, tid, cur, max, lab) {
-  const bar = $(bid), ghost = $(gid), tx = $(tid);
-  const pct = Math.max(0, Math.min(100, (cur / (max || 1)) * 100)).toFixed(2) + "%";
-  if (bar) bar.style.width = pct;
-  if (ghost) ghost.style.width = pct;   /* 同帧更新, 靠 CSS transition-delay 实现残影滞后 */
-  if (tx) tx.textContent = `${lab} ${cur}/${max}`;
-}
 function fieldLine() {
   if (!BTL) return;
-  setHpBar("barFoe", "barFoeGhost", "txFoe", BTL.mhp, BTL.mhpMax, "妖");
-  setHpBar("barHero", "barHeroGhost", "txHero", BTL.php, BTL.phpMax, "主");
+  /* Canvas 血条: setHP 触发缓动填充 + 渐变变色 + 低血红光(组件内部处理) */
+  if (BTL.barFoe) BTL.barFoe.setHP(BTL.mhp, BTL.mhpMax);
+  if (BTL.barHero) BTL.barHero.setHP(BTL.php, BTL.phpMax);
   const t = $("tfTurn"); if (t) t.textContent = BTL.round ? `${BTL.round}合` : "";
   const row = $("warHpRow"); if (row) row.style.display = "flex";
-  /* 动态变色: 主身 安全(>60%青) / 预警(30~60%黄) / 危险(<30%红); 妖低血增亮 */
-  const heroPct = BTL.php / BTL.phpMax;
-  const hpHero = $("hpHero");
-  if (hpHero) {
-    hpHero.classList.toggle("hp-mid", heroPct > 0.3 && heroPct <= 0.6);
-    hpHero.classList.toggle("hp-low", heroPct <= 0.3);
-  }
-  const hpFoe = $("hpFoe");
-  if (hpFoe) hpFoe.classList.toggle("hp-low", BTL.mhp / BTL.mhpMax <= 0.3);
 }
 
 /* ============ 战斗演出函数 ============ */
@@ -5168,6 +5153,192 @@ function barHitFlash(side) {
   bar.classList.add("hit-flash");
   setTimeout(() => bar.classList.remove("hit-flash"), 300);
 }
+
+/* ============ Canvas 水墨血条组件 ============
+   水墨笔触外形(遮罩) + 液态波动填充 + 渐变变色 + 受击墨滴粒子 + 低血红光 + 分段刻度 */
+const HP_MASK_IMG = new Image();
+HP_MASK_IMG.src = "assets/hpbar-ink-mask.png?v=" + CACHE_VER;
+let HP_MASK_READY = false;
+HP_MASK_IMG.onload = () => { HP_MASK_READY = true; };
+const HP_BG_IMG = new Image();
+HP_BG_IMG.src = "assets/hpbar-ink-bg.png?v=" + CACHE_VER;
+let HP_BG_READY = false;
+HP_BG_IMG.onload = () => { HP_BG_READY = true; };
+
+class CanvasHpBar {
+  constructor(canvas, side) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d");
+    this.side = side;            // "foe" | "hero"
+    this.cur = 100; this.max = 100;
+    this.targetPct = 1;          // 目标填充比
+    this.dispPct = 1;            // 动画填充比(缓动)
+    this.particles = [];
+    this.flash = 0;              // 受击白闪 0~1
+    this.lowGlow = 0;            // 低血红光 0~1
+    this.wave = 0;               // 波动相位
+    this.running = false;
+    this._lastW = 0; this._lastH = 0;
+  }
+  _fit() {
+    const rect = this.canvas.getBoundingClientRect();
+    const w = Math.max(2, rect.width), h = Math.max(2, rect.height);
+    if (w !== this._lastW || h !== this._lastH) {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      this.canvas.width = w * dpr; this.canvas.height = h * dpr;
+      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this._lastW = w; this._lastH = h;
+    }
+    this.w = w; this.h = h;
+  }
+  setHP(cur, max) {
+    this.cur = cur; this.max = max || 1;
+    this.targetPct = Math.max(0, Math.min(1, cur / this.max));
+  }
+  hit() {
+    this.flash = 1;
+    const x = this.w * this.targetPct;
+    for (let i = 0; i < 10; i++) {
+      this.particles.push({
+        x: x + (Math.random() - 0.5) * 8,
+        y: this.h * (0.25 + Math.random() * 0.5),
+        vx: (Math.random() - 0.5) * 2.5,
+        vy: -Math.random() * 2 - 0.5,
+        life: 1, size: 1.5 + Math.random() * 2.5,
+        r: 180 + Math.random() * 60, g: 50 + Math.random() * 30, b: 30
+      });
+    }
+  }
+  heal() {
+    for (let i = 0; i < 8; i++) {
+      this.particles.push({
+        x: this.w * (0.25 + Math.random() * 0.5),
+        y: this.h * (0.3 + Math.random() * 0.4),
+        vx: (Math.random() - 0.5) * 1.2,
+        vy: -Math.random() * 1.2 - 0.3,
+        life: 1, size: 1 + Math.random() * 1.8,
+        r: 80, g: 200 + Math.random() * 40, b: 120
+      });
+    }
+  }
+  start() { if (!this.running) { this.running = true; this._loop(); } }
+  stop() { this.running = false; }
+  _loop() {
+    if (!this.running) return;
+    this._update(); this._draw();
+    requestAnimationFrame(() => this._loop());
+  }
+  _update() {
+    this.dispPct += (this.targetPct - this.dispPct) * 0.12;
+    this.wave += 0.05;
+    this.flash *= 0.85;
+    const isLow = this.targetPct < 0.3;
+    this.lowGlow += ((isLow ? 1 : 0) - this.lowGlow) * 0.06;
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.06; p.life -= 0.022;
+      if (p.life <= 0) this.particles.splice(i, 1);
+    }
+  }
+  _draw() {
+    this._fit();
+    const ctx = this.ctx, w = this.w, h = this.h;
+    ctx.clearRect(0, 0, w, h);
+    if (w < 4 || h < 4) return;
+
+    /* ---- 层1: 暗底 + 填充 + 高光 + 刻度 + 文字(全部先画, 最后用水墨遮罩裁剪) ---- */
+    // 暗底(宣纸纹理优先, 纯色兜底)
+    if (HP_BG_READY) { ctx.drawImage(HP_BG_IMG, 0, 0, w, h); }
+    else { ctx.fillStyle = "rgba(8,12,20,0.88)"; this._roundRect(ctx, 1, 1, w - 2, h - 2, h / 2 - 1); ctx.fill(); }
+
+    // 填充(液态波动)
+    const pct = this.dispPct;
+    if (pct > 0.005) {
+      const fillW = Math.max(2, w * pct);
+      const grad = ctx.createLinearGradient(0, 0, fillW, 0);
+      if (this.side === "foe") {
+        if (pct < 0.3) { grad.addColorStop(0, "#a82820"); grad.addColorStop(1, "#ff5a42"); }
+        else { grad.addColorStop(0, "#7a2018"); grad.addColorStop(1, "#c44a3a"); }
+      } else {
+        if (pct > 0.6) { grad.addColorStop(0, "#1a5e3c"); grad.addColorStop(1, "#4ac48a"); }
+        else if (pct > 0.3) { grad.addColorStop(0, "#7a5e18"); grad.addColorStop(1, "#e0b84a"); }
+        else { grad.addColorStop(0, "#7a1812"); grad.addColorStop(1, "#ff5a42"); }
+      }
+      const amp = h * 0.07, len = w * 0.12;
+      ctx.beginPath();
+      ctx.moveTo(0, h); ctx.lineTo(0, h * 0.25);
+      for (let x = 0; x <= fillW; x += 2) {
+        ctx.lineTo(x, h * 0.25 + Math.sin(x / len + this.wave) * amp);
+      }
+      ctx.lineTo(fillW, h); ctx.closePath();
+      ctx.fillStyle = grad; ctx.fill();
+      // 顶部高光
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.25);
+      for (let x = 0; x <= fillW; x += 2) {
+        ctx.lineTo(x, h * 0.25 + Math.sin(x / len + this.wave) * amp);
+      }
+      ctx.strokeStyle = "rgba(255,255,255,0.28)"; ctx.lineWidth = 1; ctx.stroke();
+    }
+
+    // 受击白闪(在遮罩内)
+    if (this.flash > 0.02) {
+      ctx.fillStyle = "rgba(255,255,255," + (0.35 * this.flash) + ")";
+      this._roundRect(ctx, 1, 1, w - 2, h - 2, h / 2 - 1); ctx.fill();
+    }
+
+    // 分段刻度
+    ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 1;
+    for (let i = 1; i < 4; i++) {
+      const x = w * i / 4;
+      ctx.beginPath(); ctx.moveTo(x, h * 0.2); ctx.lineTo(x, h * 0.8); ctx.stroke();
+    }
+
+    // 文字
+    ctx.font = "bold 9.5px ui-monospace,SFMono-Regular,monospace";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = "rgba(0,0,0,0.85)"; ctx.lineWidth = 2.5;
+    const txt = (this.side === "foe" ? "妖 " : "主 ") + Math.round(this.cur) + "/" + Math.round(this.max);
+    ctx.strokeText(txt, w / 2, h / 2); ctx.fillText(txt, w / 2, h / 2);
+
+    /* ---- 层2: 水墨遮罩裁剪 ---- */
+    if (HP_MASK_READY) {
+      ctx.globalCompositeOperation = "destination-in";
+      ctx.drawImage(HP_MASK_IMG, 0, 0, w, h);
+      ctx.globalCompositeOperation = "source-over";
+    }
+
+    /* ---- 层3: 遮罩外效果(粒子/低血光, 可超出血条外形) ---- */
+    // 低血红光晕
+    if (this.lowGlow > 0.02) {
+      ctx.save();
+      ctx.shadowColor = "rgba(255,50,30," + (0.5 * this.lowGlow) + ")";
+      ctx.shadowBlur = 10 + Math.sin(this.wave * 2.5) * 5;
+      ctx.fillStyle = "rgba(255,50,30," + (0.12 * this.lowGlow) + ")";
+      this._roundRect(ctx, 0, 0, w, h, h / 2); ctx.fill();
+      ctx.restore();
+    }
+    // 粒子
+    for (const p of this.particles) {
+      ctx.save();
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = "rgb(" + p.r + "," + p.g + "," + p.b + ")";
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+  _roundRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+}
+
 function traceSay(txt) {
   const el = $("traceArea"); if (!el) return;
   el.dataset.k = "fight";
@@ -5180,11 +5351,16 @@ function warStart(title, lead) {
   el.style.display = "flex";
   SND.setStage(true);                    // v1.7.9: 横幅上台 → 允许该场音效出声(有声必有画)
   el.innerHTML = `<div class="war-hd"><span class="war-t">${title}</span><span class="war-turn" id="tfTurn"></span><button class="war-skip" id="warSkipBtn" onclick="warSkip()">⚡</button></div>` +
-    `<div class="hprow" id="warHpRow"><span class="hpbar foe" id="hpFoe"><i class="bar-ghost" id="barFoeGhost"></i><i class="bar" id="barFoe"></i><em id="txFoe">妖 —</em></span>` +
-    `<span class="hpbar hero" id="hpHero"><i class="bar-ghost" id="barHeroGhost"></i><i class="bar" id="barHero"></i><em id="txHero">主 —</em></span></div>` +
+    `<div class="hprow" id="warHpRow"><canvas class="hpbar-canvas" id="cvFoe"></canvas><canvas class="hpbar-canvas" id="cvHero"></canvas></div>` +
     `<div class="war-bd" id="warBd"><div class="dmg-layer" id="dmgLayer"></div><div id="warLog"></div></div>`;
   const hpRow = $("warHpRow");
   if (hpRow) hpRow.style.display = (title === "秘境") ? "none" : "flex";   // 秘境无对战, 不摆血条
+  /* 创建 Canvas 血条实例 */
+  if (BTL) {
+    BTL.barFoe = new CanvasHpBar($("cvFoe"), "foe");
+    BTL.barHero = new CanvasHpBar($("cvHero"), "hero");
+    BTL.barFoe.start(); BTL.barHero.start();
+  }
   fieldLine();
   if (lead) warAppend(lead, "lead");
 }
@@ -5194,7 +5370,7 @@ function warEnd(finalTxt, cls, extra) {
   const wb = $("warBanner");
   /* v1.7.7: 战斗结算驻留更久留复盘(8s), 秘境维持; 轻触战报任意处可提前关闭 */
   const wait = (BTL && BTL.skip) ? 2100 : (MYST ? 2600 : 8000);
-  const close = () => { if (wb) { wb.style.display = "none"; wb.removeEventListener("click", close); } SND.setStage(false); };
+  const close = () => { if (wb) { wb.style.display = "none"; wb.removeEventListener("click", close); } SND.setStage(false); if (BTL) { if (BTL.barFoe) BTL.barFoe.stop(); if (BTL.barHero) BTL.barHero.stop(); } };
   if (wb) { wb.style.pointerEvents = "auto"; wb.addEventListener("click", close);
     setTimeout(() => { wb.removeEventListener("click", close); if (wb) wb.style.display = "none"; SND.setStage(false); }, wait); }
 }
