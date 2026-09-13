@@ -1,8 +1,14 @@
 /* 闲人修仙 —— game.js (双栏叙事) */
 "use strict";
-/* 版本号单一来源: 首页右上角小字 verTag 与缓存参数(game.js?v=)手工保持一致 */
-const GAME_VER = "v1.10.2";
-(function () { const t = document.getElementById("verTag"); if (t) t.textContent = GAME_VER; })();
+/* v2.3 版本号统一管理: 唯一来源是 index.html head 里的 window.APP_VER,
+   此处只读不写; 所有资源缓存参数(?v=)和界面显示版本都引用 GAME_VER。 */
+const GAME_VER = "v" + (window.APP_VER || "dev");
+const CACHE_VER = window.APP_VER || "dev";   /* 所有静态资源 ?v= 缓存参数统一用此值 */
+(function () {
+  const vt = document.getElementById("verTag"); if (vt) vt.textContent = GAME_VER;
+  const sv = document.getElementById("spVer"); if (sv) sv.textContent = GAME_VER;
+  document.title = "闲人修仙 " + GAME_VER;
+})();
 
 /* ============ v1.7.9 声音系统(免费素材 + 合成兜底) ============
  * 音效素材(assets/sound/*.mp3, 来自 Mixkit 免费许可, 可商用无需署名):
@@ -34,7 +40,7 @@ const SND = (function () {
     try { return document.hidden; } catch (e) { return false; }
   }
   /* v1.9.0: 胜利结算音换素材(号角+和声) —— 递增缓存戳强制客户端重拉 */
-  const SFX_V = "10";                // 音效缓存戳: 换素材后递增, 强制重新拉取
+  const SFX_V = CACHE_VER;                // v2.3: 音效缓存戳统一用全局版本号
   const files = { hit: 1, crit: 1, hurt: 1, alert: 1, swing: 1, myst: 1, win: 1, lose: 1 };
   const vol = { hit: 0.5, crit: 0.55, hurt: 0.42, alert: 0.6, swing: 0.42, myst: 0.5, win: 0.6, lose: 0.5 };
   const buf = {};            // name -> AudioBuffer | null(缺素材)
@@ -108,7 +114,7 @@ const SND = (function () {
   }
   function _armBgm() {
     try {
-      bgmEl = new Audio("assets/music/bgm.mp3?v=1.7.53");   // v1.7.53: 素材已响度归一化, 带版本参数强刷缓存
+      bgmEl = new Audio("assets/music/bgm.mp3?v=" + CACHE_VER);   // v2.3: BGM 缓存戳统一用全局版本号
       bgmEl.loop = true; bgmEl.volume = 0.9; bgmEl.preload = "auto";   // v1.7.53: 0.32→0.9(手机最大音量仍偏小的反馈)
       bgmEl.addEventListener("error", () => {          // 文件不存在/解码失败: 放弃, 不反复打扰
         bgmEl = null;
@@ -3613,7 +3619,7 @@ function initFxLayer() {
   cv.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;"
     + "pointer-events:none;z-index:3;animation:breath 4.6s ease-in-out infinite";
   cult.appendChild(cv);
-  import("./fx2d.js?v=50539d64")
+  import("./fx2d.js?v=" + CACHE_VER)
     .then(m => { try { m.initFx(cv); } catch (e) { console.error("[fx2d] init:", e); } })
     .catch(e => console.error("[fx2d] load:", e));
 }
@@ -3648,7 +3654,7 @@ async function initBg() {
 /* v1.7.20: bg.js 已重写为纯 Canvas 2D(无 WebGL/无 Three), 移动端低端机更稳 */
 async function initBg2D() {
   const canvas = $("bg");
-  const mod = await import("./bg.js?v=1.7.60");
+  const mod = await import("./bg.js?v=" + CACHE_VER);
   window.__bgCtrl = await mod.initDeepSpace(canvas);
 }
 /* v1.7.20 PERF-2: 渲染 DPR 自适应 —— 触屏/小内存低端设备收敛到 1.5(帧缓冲像素约 -44%), 桌面保留 2 */
