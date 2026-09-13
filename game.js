@@ -1610,7 +1610,7 @@ async function cldPush() {
   return !!r;
 }
 async function cldPull(forceImport, silent) {        // v2.1 forceImport:以云为权威; silent=true时静默覆盖(启动时服务器权威模式用, 不弹"已导入"提示)
-  if (!window.fetch) { cldUI("off"); return; }
+  if (!window.fetch) { cldUI("off"); return false; }
   cldUI("sync");
   try {
     const r = await cldApi("GET");
@@ -1626,6 +1626,7 @@ async function cldPull(forceImport, silent) {        // v2.1 forceImport:以云�
         let hadLocal = false;
         try { hadLocal = !!localStorage.getItem(SAVE_KEY); } catch (e) {}
         const adopted = cldAdoptCloud(r.data);
+        if (!adopted) { cldUI("off"); return false; }   // v2.3 FIX: 云端档采纳失败不得标记同步, 否则后续 cloudSettle 会用本地旧档覆盖服务器
         state._cloudTs = cs;
         try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}
         cld.ready = true; cld.lastOkTs = Date.now();
@@ -1636,22 +1637,23 @@ async function cldPull(forceImport, silent) {        // v2.1 forceImport:以云�
           pushMsg("main", `<span class="b">云存</span>检测到云端进度更新，已采用云端存档（请勿同一玩家码多设备同时游玩）。`);
         }
         cldUI("on");
-        return;
+        return true;
       }
       if (cs < ls || cld.dirty) {       // 本地有未上传进度 → 上传
         if (!forceImport) await cldPush();
         cld.dirty = false;
-        return;
+        return true;
       }
       // 已同步一致
       cld.ready = true; cld.lastOkTs = Date.now(); cld.lastOkLocal = state.lastTs;
       cldUI("on");
-      return;
+      return true;
     }
     // 云端还没有此玩家码 → 建档上传
     await cldPush();
     cld.dirty = false;
-  } catch (e) { cldFail(e); }
+    return true;
+  } catch (e) { cldFail(e); return false; }
 }
 function cloudPushNow() {
   if (!window.fetch) return;
@@ -1720,7 +1722,8 @@ function cloudInit() {
 /* v1.8.0 启动门禁: 拉云端档 → 请服务端权威结算一次 → 返回是否通过。
  * 返回 false 表示连不上服务器 —— 调用方必须停在失败页, 不得进入游戏。 */
 async function bootCloud() {
-  await cldPull(true, true);   // v2.1 服务器权威模式: 启动时强制以云端存档为准覆盖本地, 静默不弹"已导入"提示
+  const pulled = await cldPull(true, true);   // v2.1 服务器权威模式: 启动时强制以云端存档为准覆盖本地, 静默不弹"已导入"提示
+  if (!pulled) return false;                  // v2.3 FIX: 拉云端失败(网络/采纳失败)直接门禁不通过, 绝不能带着本地旧档去 cloudSettle —— 那会用旧档覆盖服务器
   let sr = null;
   try { sr = await cloudSettle(); } catch (e) { sr = null; }
   if (!sr) return false;                       // 门禁不通过
