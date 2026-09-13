@@ -580,6 +580,88 @@
     border-radius:999px;cursor:pointer;font-family:inherit;transition:transform .12s,opacity .25s}
   .war-skip:active{transform:scale(.92)}
 
+  /* ============ 战斗演出: 伤害飘字 ============ */
+  .dmg-layer{position:absolute;left:0;right:0;top:0;height:40px;pointer-events:none;z-index:2;overflow:visible}
+  .dmg-num{position:absolute;font-weight:800;line-height:1;white-space:nowrap;
+    text-shadow:0 2px 6px rgba(0,0,0,.95),0 0 12px rgba(0,0,0,.7);
+    animation:dmgFloat .9s cubic-bezier(.22,.61,.36,1) forwards;will-change:transform,opacity}
+  .dmg-num.normal{font-size:18px;color:#e8ecf4}
+  .dmg-num.crit{font-size:24px;color:#ffd76a;text-shadow:0 2px 8px rgba(0,0,0,.95),0 0 16px rgba(255,190,80,.6)}
+  .dmg-num.critb{font-size:28px;color:#ff8a3d;text-shadow:0 2px 10px rgba(0,0,0,.95),0 0 20px rgba(255,120,50,.7);
+    animation:dmgFloatCrit 1.1s cubic-bezier(.22,.61,.36,1) forwards}
+  .dmg-num.dodge{font-size:15px;color:#9db4cc;font-style:italic;font-weight:500}
+  .dmg-num.heal{font-size:17px;color:#7fe0a8;text-shadow:0 2px 6px rgba(0,0,0,.95),0 0 12px rgba(80,220,140,.5)}
+  @keyframes dmgFloat{
+    0%{opacity:0;transform:translateY(8px) scale(.6)}
+    15%{opacity:1;transform:translateY(-2px) scale(1.15)}
+    30%{transform:translateY(-10px) scale(1)}
+    100%{opacity:0;transform:translateY(-38px) scale(.92)}
+  }
+  @keyframes dmgFloatCrit{
+    0%{opacity:0;transform:translateY(10px) scale(.4) rotate(-6deg)}
+    12%{opacity:1;transform:translateY(-4px) scale(1.4) rotate(2deg)}
+    25%{transform:translateY(-12px) scale(1.15) rotate(-1deg)}
+    45%{transform:translateY(-20px) scale(1.05)}
+    100%{opacity:0;transform:translateY(-48px) scale(.9)}
+  }
+
+  /* ============ 战斗演出: 屏幕震动 ============ */
+  .war-banner.shake-light{animation:shakeL .18s ease}
+  .war-banner.shake-mid{animation:shakeM .25s ease}
+  .war-banner.shake-heavy{animation:shakeH .32s ease}
+  @keyframes shakeL{
+    0%,100%{transform:translate(0,0)}
+    25%{transform:translate(-2px,1px)}
+    50%{transform:translate(2px,-1px)}
+    75%{transform:translate(-1px,2px)}
+  }
+  @keyframes shakeM{
+    0%,100%{transform:translate(0,0)}
+    20%{transform:translate(-4px,2px)}
+    40%{transform:translate(4px,-2px)}
+    60%{transform:translate(-3px,3px)}
+    80%{transform:translate(3px,-1px)}
+  }
+  @keyframes shakeH{
+    0%,100%{transform:translate(0,0)}
+    15%{transform:translate(-7px,3px)}
+    30%{transform:translate(7px,-4px)}
+    45%{transform:translate(-6px,4px)}
+    60%{transform:translate(6px,-3px)}
+    75%{transform:translate(-4px,2px)}
+    90%{transform:translate(3px,-1px)}
+  }
+
+  /* ============ 战斗演出: 血条残影 ============ */
+  .hpbar .bar-ghost{position:absolute;left:0;top:0;bottom:0;width:100%;border-radius:6px;
+    background:rgba(255,255,255,.35);transition:width .55s ease .18s;will-change:width;z-index:0}
+  .hpbar .bar{z-index:1}
+  .hpbar.low .bar{animation:hpPulse 1.1s ease-in-out infinite}
+  @keyframes hpPulse{
+    0%,100%{filter:brightness(1)}
+    50%{filter:brightness(1.45)}
+  }
+
+  /* ============ 战斗演出: 出招光效 ============ */
+  .cast-flash{position:absolute;left:0;right:0;top:0;height:3px;pointer-events:none;z-index:3;
+    background:linear-gradient(90deg,transparent,rgba(168,226,255,.85),transparent);
+    transform:scaleX(0);transform-origin:center;animation:castSweep .45s ease-out forwards}
+  @keyframes castSweep{
+    0%{transform:scaleX(0);opacity:0}
+    30%{opacity:1}
+    100%{transform:scaleX(1);opacity:0}
+  }
+
+  /* ============ 战斗演出: 受击红闪 ============ */
+  .hit-flash{position:absolute;inset:0;pointer-events:none;z-index:1;border-radius:12px;
+    background:radial-gradient(ellipse at center,rgba(255,80,60,.18),transparent 70%);
+    opacity:0;animation:hitFlash .3s ease-out forwards}
+  @keyframes hitFlash{
+    0%{opacity:0}
+    20%{opacity:1}
+    100%{opacity:0}
+  }
+
 /* ============ v1.5.0 搜寻妖踪提示(自动战斗开启时, 行迹正下方; 开关在顶部资源栏) ============ */
   .hunt-bar{position:static;width:100%;z-index:auto;
     display:flex;align-items:center;justify-content:center;gap:10px;pointer-events:none}

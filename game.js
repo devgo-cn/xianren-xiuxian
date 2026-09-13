@@ -4965,21 +4965,29 @@ async function btlHeroAct() {
   const si = (BTL.turn++ % 2), pool = SKILLS[BTL.big] || SKILLS[SKILLS.length - 1], name = pool[si];
   const monNm = BTL.monNm;
   /* ① 出招瞬现 + 呼啸即刻起(不等文字), ② 稍顿 ③ 命中判定与音效/受创文字 */
-  btlNow(`⚡ 你使出「${name}」`, "cast"); SND.swing();   // cast: 技能行专属色
+  btlNow(`⚡ 你使出「${name}」`, "cast"); SND.swing(); castFlash();   // cast: 技能行专属色 + 顶部光束扫过
   if (!BTL.skip) await slp(300);
   const st = tryStrike(BTL.patk, BTL, BTL.ms.def, BTL.ms.dodge);
   if (st.miss) {
+    spawnDmg("foe", 0, "dodge");
     btlLog(st.dodge
       ? `「<b class="dodge">闪避!</b>」${monNm} 身形一晃，你这一击落空。`
       : `…… ${monNm} 侧身一闪，你落空了。`);
   } else {
     BTL.mhp = Math.max(0, BTL.mhp - st.dmg);
     SND.crit();   // 命中统一"扎实"音(区分度已由画面/文案承担)
+    /* 演出: 伤害飘字 + 震屏 + 命中停顿(暴击才冻帧, 强化打击感) */
+    const dmgCls = st.kind === "critB" ? "critb" : st.kind === "crit" ? "crit" : "normal";
+    const shakeLv = st.kind === "critB" ? "heavy" : st.kind === "crit" ? "mid" : "light";
+    spawnDmg("foe", st.dmg, dmgCls);
+    shakeBanner(shakeLv);
+    if (!BTL.skip && st.kind === "critB") await slp(80);
+    else if (!BTL.skip && st.kind === "crit") await slp(50);
     const lead = st.kind === "critB" ? `<b class="critb">暴击!</b>` : st.kind === "crit" ? `<b class="crit">会心!</b>` : st.pen ? `<b class="w">破甲</b>` : "";
     let suck = "";
     if (BTL.life > 0) {
       const heal = Math.round(st.dmg * BTL.life / 100);
-      if (heal > 0) { BTL.php = Math.min(BTL.phpMax, BTL.php + heal); suck = ` <b class="suck">（吸血 +${heal}）</b>`; }
+      if (heal > 0) { BTL.php = Math.min(BTL.phpMax, BTL.php + heal); suck = ` <b class="suck">（吸血 +${heal}）</b>`; spawnDmg("hero", heal, "heal"); }
     }
     fieldLine();
     /* v1.7.17 吸血并进伤害行括号, 不再独占一行 */
@@ -4993,6 +5001,7 @@ async function btlFoeAct() {
   const monNm = BTL.monNm;
   const st = tryStrike(BTL.ms.atk, BTL.ms, BTL.pdef, BTL.dodge);
   if (st.miss) {
+    spawnDmg("hero", 0, "dodge");
     btlLog(st.dodge
       ? `「<b class="dodge">闪避!</b>」你侧身一晃，${monNm} 扑了个空。`
       : `${monNm} 猛地扑来，你侧身避开，溅起一地尘土。`);
@@ -5000,11 +5009,19 @@ async function btlFoeAct() {
     btlNow(`${monNm} 反扑而至！`); SND.swing();               // 敌袭也先有声有影
     if (!BTL.skip) await slp(240);
     BTL.php = Math.max(0, BTL.php - st.dmg); SND.hurt();      // 受击反馈(瞬时)
+    /* 演出: 受击红闪 + 伤害飘字 + 震屏 + 命中停顿 */
+    hitFlash();
+    const dmgCls = st.kind === "critB" ? "critb" : st.kind === "crit" ? "crit" : "normal";
+    const shakeLv = st.kind === "critB" ? "heavy" : st.kind === "crit" ? "mid" : "light";
+    spawnDmg("hero", st.dmg, dmgCls);
+    shakeBanner(shakeLv);
+    if (!BTL.skip && st.kind === "critB") await slp(80);
+    else if (!BTL.skip && st.kind === "crit") await slp(50);
     const lead = st.kind === "critB" ? `<b class="critb">暴击!</b>` : st.kind === "crit" ? `<b class="crit">会心!</b>` : st.pen ? `<b class="w">破甲</b>` : "";
     let suck = "";
     if (BTL.ms.life > 0) {                                   // 妖吸血词缀: 并进其伤害行
       const heal = Math.round(st.dmg * BTL.ms.life / 100);
-      if (heal > 0) { BTL.mhp = Math.min(BTL.mhpMax, BTL.mhp + heal); suck = ` <b class="suck">（吸血 +${heal}）</b>`; }
+      if (heal > 0) { BTL.mhp = Math.min(BTL.mhpMax, BTL.mhp + heal); suck = ` <b class="suck">（吸血 +${heal}）</b>`; spawnDmg("foe", heal, "heal"); }
     }
     fieldLine();
     btlLog(`　${lead ? lead + " " : ""}打出 <b class="r">${st.dmg}</b> 伤害${suck}。`);
@@ -5068,18 +5085,69 @@ function _typeNext() {
   nextToken();
 }
 
-/* v1.7.11 实时血条: 妖(赤,左) / 主身(青碧,右), 数值叠条显示, 每合即时刷新 */
-function setHpBar(bid, tid, cur, max, lab) {
-  const bar = $(bid), tx = $(tid);
-  if (bar) bar.style.width = Math.max(0, Math.min(100, (cur / (max || 1)) * 100)).toFixed(2) + "%";
+/* 实时血条: 妖(赤,左) / 主身(青碧,右), 数值叠条显示, 每合即时刷新
+   残影条(.bar-ghost): 掉血时白色幽灵条停留 180ms 后缓缓追上, 直观展示"掉了多少" */
+function setHpBar(bid, gid, tid, cur, max, lab) {
+  const bar = $(bid), ghost = $(gid), tx = $(tid);
+  const pct = Math.max(0, Math.min(100, (cur / (max || 1)) * 100)).toFixed(2) + "%";
+  if (bar) bar.style.width = pct;
+  if (ghost) ghost.style.width = pct;   /* 同帧更新, 靠 CSS transition-delay 实现残影滞后 */
   if (tx) tx.textContent = `${lab} ${cur}/${max}`;
 }
 function fieldLine() {
   if (!BTL) return;
-  setHpBar("barFoe", "txFoe", BTL.mhp, BTL.mhpMax, "妖");
-  setHpBar("barHero", "txHero", BTL.php, BTL.phpMax, "主");
+  setHpBar("barFoe", "barFoeGhost", "txFoe", BTL.mhp, BTL.mhpMax, "妖");
+  setHpBar("barHero", "barHeroGhost", "txHero", BTL.php, BTL.phpMax, "主");
   const t = $("tfTurn"); if (t) t.textContent = BTL.round ? `${BTL.round}合` : "";
   const row = $("warHpRow"); if (row) row.style.display = "flex";
+  /* 低血量脉动: 主身 <30% 时血条呼吸闪烁 */
+  const hpHero = $("hpHero"); if (hpHero) hpHero.classList.toggle("low", BTL.php / BTL.phpMax < 0.3);
+}
+
+/* ============ 战斗演出函数 ============ */
+
+/* 伤害飘字: side='foe'(打在妖身上, 左侧) / 'hero'(打在主身, 右侧)
+   kind: normal / crit / critb / dodge / heal
+   飘字从血条下方弹出, 带物理上升+淡出, 暴击放大弹跳 */
+function spawnDmg(side, num, kind) {
+  const layer = $("dmgLayer"); if (!layer) return;
+  const el = document.createElement("div");
+  el.className = "dmg-num " + (kind || "normal");
+  el.textContent = (kind === "heal" ? "+" : (kind === "dodge" ? "闪避" : num));
+  /* 定位: foe 偏左 22%, hero 偏右 72%, 各加 ±6% 随机偏移避免重叠 */
+  const baseX = side === "foe" ? 22 : 72;
+  const jitter = (Math.random() - 0.5) * 12;
+  el.style.left = (baseX + jitter) + "%";
+  el.style.top = (2 + Math.random() * 6) + "px";
+  layer.appendChild(el);
+  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 1200);
+}
+
+/* 横幅震动: light(普通命中) / mid(会心) / heavy(暴击) */
+function shakeBanner(level) {
+  const wb = $("warBanner"); if (!wb) return;
+  const cls = "shake-" + (level || "light");
+  wb.classList.remove("shake-light", "shake-mid", "shake-heavy");
+  void wb.offsetWidth;   /* 强制重排, 允许同帧重复触发动画 */
+  wb.classList.add(cls);
+}
+
+/* 出招光效: 横幅顶部一道天青光束扫过, 与技能行(camp)颜色呼应 */
+function castFlash() {
+  const wb = $("warBanner"); if (!wb) return;
+  const el = document.createElement("div");
+  el.className = "cast-flash";
+  wb.appendChild(el);
+  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 500);
+}
+
+/* 受击红闪: 主身被击中时横幅内层径向红光, 0.3s 淡出 */
+function hitFlash() {
+  const bd = $("warBd"); if (!bd) return;
+  const el = document.createElement("div");
+  el.className = "hit-flash";
+  bd.appendChild(el);
+  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 350);
 }
 function traceSay(txt) {
   const el = $("traceArea"); if (!el) return;
@@ -5093,9 +5161,9 @@ function warStart(title, lead) {
   el.style.display = "flex";
   SND.setStage(true);                    // v1.7.9: 横幅上台 → 允许该场音效出声(有声必有画)
   el.innerHTML = `<div class="war-hd"><span class="war-t">${title}</span><span class="war-turn" id="tfTurn"></span><button class="war-skip" id="warSkipBtn" onclick="warSkip()">⚡</button></div>` +
-    `<div class="hprow" id="warHpRow"><span class="hpbar foe"><i class="bar" id="barFoe"></i><em id="txFoe">妖 —</em></span>` +
-    `<span class="hpbar hero"><i class="bar" id="barHero"></i><em id="txHero">主 —</em></span></div>` +
-    `<div class="war-bd" id="warLog"></div>`;
+    `<div class="hprow" id="warHpRow"><span class="hpbar foe" id="hpFoe"><i class="bar-ghost" id="barFoeGhost"></i><i class="bar" id="barFoe"></i><em id="txFoe">妖 —</em></span>` +
+    `<span class="hpbar hero" id="hpHero"><i class="bar-ghost" id="barHeroGhost"></i><i class="bar" id="barHero"></i><em id="txHero">主 —</em></span></div>` +
+    `<div class="war-bd" id="warBd"><div class="dmg-layer" id="dmgLayer"></div><div id="warLog"></div></div>`;
   const hpRow = $("warHpRow");
   if (hpRow) hpRow.style.display = (title === "秘境") ? "none" : "flex";   // 秘境无对战, 不摆血条
   fieldLine();
