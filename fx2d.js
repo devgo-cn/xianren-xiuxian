@@ -61,6 +61,9 @@ let cx = 0, cy = 0, R = 0;
 let t = 0, eraT = 0, last = 0, raf = 0, resizeT = 0;   // eraT: 当前境界时长(金丹成长用)
 let fxRunning = false;                                 // 可见性守卫: 后台暂停绘制(省电)
 let sprites = {};
+/* v2.2 省电: 粒子旋臂为缓动动画, 30fps 观感无损 → GPU负载减半, 与 bg.js 背景层同帧率 */
+let _lastPaint = 0;
+const FX_FRAME_MS = 33;   // ≈30fps
 
 function curBig() {
   try {
@@ -171,6 +174,8 @@ function applyRealm(recreate) {
 function loop(now) {
   if (!fxRunning) return;                              // 后台不续帧
   raf = requestAnimationFrame(loop);
+  if (now - _lastPaint < FX_FRAME_MS) return;         // v2.2 限帧: 不足33ms跳过绘制(仍续帧), 粒子动画30fps观感无损
+  _lastPaint = now;
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   if (dt <= 0) return;
