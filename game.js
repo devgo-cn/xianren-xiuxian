@@ -4976,6 +4976,7 @@ async function btlHeroAct() {
   } else {
     BTL.mhp = Math.max(0, BTL.mhp - st.dmg);
     SND.crit();   // 命中统一"扎实"音(区分度已由画面/文案承担)
+    barHitFlash("foe");
     /* 演出: 伤害飘字 + 震屏 + 命中停顿(暴击才冻帧, 强化打击感) */
     const dmgCls = st.kind === "critB" ? "critb" : st.kind === "crit" ? "crit" : "normal";
     const shakeLv = st.kind === "critB" ? "heavy" : st.kind === "crit" ? "mid" : "light";
@@ -5009,6 +5010,7 @@ async function btlFoeAct() {
     btlNow(`${monNm} 反扑而至！`); SND.swing();               // 敌袭也先有声有影
     if (!BTL.skip) await slp(240);
     BTL.php = Math.max(0, BTL.php - st.dmg); SND.hurt();      // 受击反馈(瞬时)
+    barHitFlash("hero");
     /* 演出: 受击红闪 + 伤害飘字 + 震屏 + 命中停顿 */
     hitFlash();
     const dmgCls = st.kind === "critB" ? "critb" : st.kind === "crit" ? "crit" : "normal";
@@ -5100,8 +5102,15 @@ function fieldLine() {
   setHpBar("barHero", "barHeroGhost", "txHero", BTL.php, BTL.phpMax, "主");
   const t = $("tfTurn"); if (t) t.textContent = BTL.round ? `${BTL.round}合` : "";
   const row = $("warHpRow"); if (row) row.style.display = "flex";
-  /* 低血量脉动: 主身 <30% 时血条呼吸闪烁 */
-  const hpHero = $("hpHero"); if (hpHero) hpHero.classList.toggle("low", BTL.php / BTL.phpMax < 0.3);
+  /* 动态变色: 主身 安全(>60%青) / 预警(30~60%黄) / 危险(<30%红); 妖低血增亮 */
+  const heroPct = BTL.php / BTL.phpMax;
+  const hpHero = $("hpHero");
+  if (hpHero) {
+    hpHero.classList.toggle("hp-mid", heroPct > 0.3 && heroPct <= 0.6);
+    hpHero.classList.toggle("hp-low", heroPct <= 0.3);
+  }
+  const hpFoe = $("hpFoe");
+  if (hpFoe) hpFoe.classList.toggle("hp-low", BTL.mhp / BTL.mhpMax <= 0.3);
 }
 
 /* ============ 战斗演出函数 ============ */
@@ -5149,6 +5158,15 @@ function hitFlash() {
   el.className = "hit-flash";
   bd.appendChild(el);
   setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 350);
+}
+
+/* 血条受击白闪: side='foe'(妖血条) / 'hero'(主身血条), 命中时条内白光一闪 */
+function barHitFlash(side) {
+  const bar = $(side === "foe" ? "hpFoe" : "hpHero"); if (!bar) return;
+  bar.classList.remove("hit-flash");
+  void bar.offsetWidth;
+  bar.classList.add("hit-flash");
+  setTimeout(() => bar.classList.remove("hit-flash"), 300);
 }
 function traceSay(txt) {
   const el = $("traceArea"); if (!el) return;
