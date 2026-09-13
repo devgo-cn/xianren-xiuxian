@@ -3636,7 +3636,8 @@ const AURA_COLORS = [
   [103,201,171], [103,201,171], [91,143,214], [233,196,126],
   [180,138,214], [207,232,224], [207,232,224]
 ];
-let _auraCv, _auraCtx, _auraP = [], _auraT = 0, _auraColor = AURA_COLORS[0].slice();
+let _auraCv, _auraCtx, _auraP = [], _auraT = 0, _auraColor = AURA_COLORS[0].slice(), _auraAcc = 0;
+const AURA_FPS = 30;   // v2.3 PERF: 灵气层限帧 30fps(与 fx2d 统一), 每帧 4 径向渐变+36 粒子在 60fps 下是持续耗电大头
 function auraColorNow() { return AURA_COLORS[Math.min(bigIdx(), AURA_COLORS.length - 1)]; }
 function initAura() {
   _auraCv = $("aura"); if (!_auraCv) return;
@@ -3652,9 +3653,12 @@ function initAura() {
 }
 function tickAura(dt) {
   if (!_auraCtx) return;
-  _auraT += dt;
+  _auraAcc += dt;
+  if (_auraAcc < 1 / AURA_FPS) return;          // 限帧 30fps: 不足一帧间隔直接跳过(粒子位置用累计 realDt 补偿, 不丢物理)
+  const realDt = _auraAcc; _auraAcc = 0;
+  _auraT += realDt;
   const W = innerWidth, H = innerHeight, c = auraColorNow();
-  for (let i = 0; i < 3; i++) _auraColor[i] += (c[i] - _auraColor[i]) * Math.min(1, dt * 1.5);
+  for (let i = 0; i < 3; i++) _auraColor[i] += (c[i] - _auraColor[i]) * Math.min(1, realDt * 1.5);
   const [r,g,b] = _auraColor.map(v => Math.round(v));
   _auraCtx.clearRect(0, 0, W, H);
   _auraCtx.globalCompositeOperation = "lighter";
@@ -3667,7 +3671,7 @@ function tickAura(dt) {
     _auraCtx.fillStyle = grd; _auraCtx.beginPath(); _auraCtx.arc(cx, cy, rad, 0, 7); _auraCtx.fill();
   }
   for (const p of _auraP) {
-    p.y -= p.s*dt; p.x += Math.sin(_auraT*0.6 + p.ph)*6*dt;
+    p.y -= p.s*realDt; p.x += Math.sin(_auraT*0.6 + p.ph)*6*realDt;
     if (p.y < -10) { p.y = H + 10; p.x = Math.random()*W; }
     const a = p.a * (0.5 + 0.5*Math.sin(_auraT*1.2 + p.ph));
     _auraCtx.fillStyle = `rgba(${r},${g},${b},${a*0.5})`;
@@ -3706,9 +3710,7 @@ function loop(dt) {
   }
   tickDsp(dt);
   tickAura(dt);
-  _hudAcc += dt; if (_hudAcc >= 0.1) { _hudAcc = 0; updateHUD(); realmPlot(); checkMilestones(); }   // PERF-1: HUD ~10FPS; PERF-2: realmPlot/checkMilestones 自每帧 60fps 降到 10fps(内部 reduce+journal 遍历每帧纯烧 CPU)
-  if (Math.random() < dt * 0.35) adventure();
-  if (Math.random() < dt * 0.06) mainMoment();
+  _hudAcc += dt; if (_hudAcc >= 0.1) { _hudAcc = 0; updateHUD(); realmPlot(); checkMilestones(); if (Math.random() < 0.035) adventure(); if (Math.random() < 0.006) mainMoment(); }   // PERF-1: HUD ~10FPS; PERF-3: adventure/mainMoment 从每帧 60 次随机检查降到 10fps(概率等价换算: 0.35*0.1 / 0.06*0.1)
   tickBurst(dt);
 }
 
@@ -3747,7 +3749,7 @@ function startGame() {
       addJournal({ key: o0.key, big: o0.big, kind: o0.kind, title: o0.title, text: o0.text }); // 老档补记起点
     }
   }
-  setInterval(save, 8000);
+  setInterval(save, 30000);   // v2.3 PERF: 自动存档 8s→30s(pagehide/visibilitychange 已保证退出即存, 挂机期 30s 足够防崩溃丢档)
   /* v1.9.9d 法宝图标空闲预热解码(4 部位×6 品质 24 张 webp):
      安卓 WebView 首开法宝窗才现解码 4 张图, 与弹窗全卡首光栅化同帧挤爆 → 开窗卡死/掉帧闪屏;
      启动低谷期逐张 decode() 预热, 开窗只剩合成 */
@@ -4819,6 +4821,7 @@ function warZone() {                   // 斗法地界 = 主身当前大境地�
 /* ---------- 节拍: 行迹句 2.5 分钟一换; 主身巡猎按固定波次周期(与离线同频) ---------- */
 function traceBeat() {
   if (!state) return;
+  if (document.hidden) return;    // v2.3 PERF: 后台不跑巡猎节拍(回前台会走离线结算/强制刷新, 不需要后台持续触发)
   if (!BTL && !MYST) {
     if (autoHuntOn()) {
       if (!_encNext) { _encNext = Date.now() + searchMs(); seekPick(); }
