@@ -5123,13 +5123,14 @@ function spawnDmg(side, num, kind) {
   setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 1200);
 }
 
-/* 横幅震动: light(普通命中) / mid(会心) / heavy(暴击) */
+/* 血条震动: 只震 hprow(血条行), 不震文字日志 — 震整个横幅会导致阅读困难
+   light(普通命中) / mid(会心) / heavy(暴击) */
 function shakeBanner(level) {
-  const wb = $("warBanner"); if (!wb) return;
+  const row = $("warHpRow"); if (!row) return;
   const cls = "shake-" + (level || "light");
-  wb.classList.remove("shake-light", "shake-mid", "shake-heavy");
-  void wb.offsetWidth;   /* 强制重排, 允许同帧重复触发动画 */
-  wb.classList.add(cls);
+  row.classList.remove("shake-light", "shake-mid", "shake-heavy");
+  void row.offsetWidth;   /* 强制重排, 允许同帧重复触发动画 */
+  row.classList.add(cls);
 }
 
 /* 出招光效: 横幅顶部一道天青光束扫过, 与技能行(camp)颜色呼应 */

@@ -605,10 +605,10 @@
     100%{opacity:0;transform:translateY(-48px) scale(.9)}
   }
 
-  /* ============ 战斗演出: 屏幕震动 ============ */
-  .war-banner.shake-light{animation:shakeL .18s ease}
-  .war-banner.shake-mid{animation:shakeM .25s ease}
-  .war-banner.shake-heavy{animation:shakeH .32s ease}
+  /* ============ 战斗演出: 血条震动(只震血条行, 文字不动) ============ */
+  .hprow.shake-light{animation:shakeL .18s ease}
+  .hprow.shake-mid{animation:shakeM .25s ease}
+  .hprow.shake-heavy{animation:shakeH .32s ease}
   @keyframes shakeL{
     0%,100%{transform:translate(0,0)}
     25%{transform:translate(-2px,1px)}
