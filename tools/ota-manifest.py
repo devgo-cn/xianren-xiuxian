@@ -46,9 +46,13 @@ def sha256(path):
 
 
 def read_version():
+    """从 index.html 的 window.APP_VER 读取当前版本号（唯一来源）。
+
+    支持 主.次（如 2.3）和 主.次.修（如 2.3.1）两种格式。
+    """
     try:
         with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as fp:
-            m = re.search(r"v(\d+\.\d+\.\d+)", fp.read(6000))
+            m = re.search(r'window\.APP_VER\s*=\s*"(\d+\.\d+(?:\.\d+)?)"', fp.read(6000))
             return m.group(1) if m else "0.0.0"
     except OSError:
         return "0.0.0"

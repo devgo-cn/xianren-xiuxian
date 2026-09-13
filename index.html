@@ -693,7 +693,7 @@
 </div>
 
 <script>
-  /* v2.3 版本号统一管理: 只改 head 里的 window.APP_VER, 所有资源缓存参数和显示版本自动同步 */
+  /* 版本号管理: 唯一来源是上方 window.APP_VER。改版本号只跑 tools/bump-version.py。 */
   (function(){
     var v = window.APP_VER || "dev";
     var s = document.createElement("script");

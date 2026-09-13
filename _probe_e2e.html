@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>闲人修仙 v1.9.8</title>
+<title>闲人修仙</title>
 <meta name="description" content="闲人修仙：主身巡猎斗法、分身云游寻宝，离线亦在成长。">
+<script>window.APP_VER="2.3";</script>
 <link rel="icon" href="data:,">
 <style>
   :root{
@@ -744,7 +745,14 @@ function g1pack(o){
   document.body.appendChild(pre);
 })();
 </script>
-<script src="game.js?v=v1.10.0"></script>
+<script>
+  (function(){
+    var v = window.APP_VER || "dev";
+    var s = document.createElement("script");
+    s.src = "game.js?v=" + v;
+    document.body.appendChild(s);
+  })();
+</script>
 
 </body>
 </html>

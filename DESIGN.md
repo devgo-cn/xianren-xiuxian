@@ -90,9 +90,11 @@
 
 ## 7. 版本号与防缓存
 
-- 主题独立文件 `dt-theme.css?v=X.Y.Z`；JS 改动后 bump `game.js?v=X.Y.Z`
-- 版本角标：左上 `剧情纲目` 旁 `.ver-tag` + `<title>` 同步
+- **唯一来源**：`index.html` 的 `window.APP_VER`；改版本号只跑 `python3 tools/bump-version.py X.Y`，禁止手动逐个文件改
+- 所有静态资源缓存戳（`game.js?v=` / `bg.js?v=` / `fx2d.js?v=` / `dt-theme.css` / 音效/BGM）由 `CACHE_VER` 自动派生，不需要手动 bump
+- 版本角标（`.ver-tag`）和 `<title>` 由 `GAME_VER` 自动同步
 - **每次视觉/逻辑改动必须升版本**（用户手机缓存难缠，别赌 CDN）
+- 详见 `docs/versioning.md`
 
 ## 8. 历史坑清单（回退检查用）
 

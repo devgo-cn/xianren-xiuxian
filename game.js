@@ -1,9 +1,10 @@
 /* 闲人修仙 —— game.js (双栏叙事) */
 "use strict";
-/* v2.3 版本号统一管理: 唯一来源是 index.html head 里的 window.APP_VER,
+/* 版本号管理: 唯一来源是 index.html 的 window.APP_VER。
+   改版本号只跑 tools/bump-version.py，禁止手动改此处或其他文件。
    此处只读不写; 所有资源缓存参数(?v=)和界面显示版本都引用 GAME_VER。 */
 const GAME_VER = "v" + (window.APP_VER || "dev");
-const CACHE_VER = window.APP_VER || "dev";   /* 所有静态资源 ?v= 缓存参数统一用此值 */
+const CACHE_VER = window.APP_VER || "dev";   /* 所有静态资源 ?v= 缓存戳统一用此值 */
 (function () {
   const vt = document.getElementById("verTag"); if (vt) vt.textContent = GAME_VER;
   const sv = document.getElementById("spVer"); if (sv) sv.textContent = GAME_VER;
