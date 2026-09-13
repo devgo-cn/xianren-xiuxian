@@ -121,11 +121,11 @@
     "assets/sound/swing.mp3": "90d43e97f4c03c4578368fe927152d0dd587fbe7cd4d54963320c54d68609066",
     "assets/sound/win.mp3": "ffdf24c675745017a997f0d65686feb5eef373b42a44aab8747e3b7c79f1b0bc",
     "bg.js": "d61cf11f268274f8bcdbea5aac1da08eb3f58b59e82b650b0d1f178803343954",
-    "dt-theme.css": "853dc2a328653820bda4bbfe907ed2380148cfc9ff55bce88524fd7e60995e84",
+    "dt-theme.css": "b54ef1da14bfce625ef0b7c34f44e99154515cc3e9b0196a78b1c79653e0f344",
     "fx2d.js": "a2a094eda63597f16245e2f2d421fcc05c0955b4239650e62c63887bc352a9ea",
-    "game.js": "67dbf605a22cb9beecbde46cab305a988e16558d770e45d12ba5bdd7285851b5",
+    "game.js": "8d13a7b6cee7f3ea046af0c39fd7e940d6d0ff8a25f1ad13f2b47ba811c380aa",
     "index.html": "988d7aacf0ace6fbfbfc42fe91a7d513b17d7513b7fbdb4f05233244ed2af8f7"
   },
-  "rev": "2ce60426659232c3",
+  "rev": "51089e24c2cbfcb6",
   "version": "2.4"
 }
