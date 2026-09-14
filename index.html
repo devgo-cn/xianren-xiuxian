@@ -1080,10 +1080,15 @@
         const footOffset = 120 * (drawH / SLIME_SPRITE.fh);
         ctx.save();
         ctx.translate(sx, sy);
+        /* 变形纠正: 轻微垂直压缩(scaleY=0.92)让底部变平贴合地板, 同时补偿高度 */
+        const scaleY = 0.92;
+        const compensatedH = drawH / scaleY;
+        ctx.translate(0, -footOffset * (1 - scaleY));
+        ctx.scale(1, scaleY);
         if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
         if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
         /* 史莱姆面朝左, 素材本身就是面朝左, 不需要翻转 */
-        ctx.drawImage(G.slimeSprite, srcX, srcY, SLIME_SPRITE.fw, SLIME_SPRITE.fh, -drawW*0.5, -footOffset, drawW, drawH);
+        ctx.drawImage(G.slimeSprite, srcX, srcY, SLIME_SPRITE.fw, SLIME_SPRITE.fh, -drawW*0.5, -footOffset, drawW, compensatedH);
         ctx.restore();
         if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp);
       } else if (G.waterReady && G.waterSprite && e.type === 'water') {
@@ -1108,10 +1113,17 @@
         const footOffset = 118 * (drawH / WATER_SPRITE.fh);
         ctx.save();
         ctx.translate(sx, sy);
+        /* 变形纠正: 轻微垂直压缩(scaleY=0.92)让底部变平贴合地板 + 轻微倾斜校正 */
+        const scaleY = 0.92;
+        const compensatedH = drawH / scaleY;
+        ctx.translate(0, -footOffset * (1 - scaleY));
+        /* 水精灵身体微微向右倾斜, 用skew校正(-0.03弧度约-1.7度) */
+        ctx.transform(1, 0, -0.03, 1, 0, 0);
+        ctx.scale(1, scaleY);
         if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
         if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
         /* 水精灵面朝左, 素材本身就是面朝左, 不需要翻转 */
-        ctx.drawImage(G.waterSprite, srcX, srcY, WATER_SPRITE.fw, WATER_SPRITE.fh, -drawW*0.5, -footOffset, drawW, drawH);
+        ctx.drawImage(G.waterSprite, srcX, srcY, WATER_SPRITE.fw, WATER_SPRITE.fh, -drawW*0.5, -footOffset, drawW, compensatedH);
         ctx.restore();
         if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp);
       } else {
