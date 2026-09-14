@@ -125,7 +125,14 @@
   /* 战斗区UI图标层：大图标(地板右下) + 小图标(右上角) */
   .battle-ui{position:fixed;left:0;right:0;top:92px;bottom:calc(44vh + 84px);z-index:4;pointer-events:none}
   .battle-ui .big-icons{position:absolute;bottom:6px;right:10px;display:flex;gap:7px;pointer-events:auto}
-  .battle-ui .small-icons{position:fixed;top:6px;right:8px;display:grid;grid-template-columns:repeat(2,1fr);gap:4px;pointer-events:auto;z-index:50}
+  .small-icons{position:fixed;top:6px;right:8px;display:grid;grid-template-columns:repeat(2,1fr);gap:4px;pointer-events:auto;z-index:100}
+  .small-icons .icon-btn{position:relative;width:28px;height:28px;border-radius:3px;overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .3s;border:1px solid rgba(232,197,107,.25);background:transparent;flex:none}
+  .small-icons .icon-btn img{width:100%;height:100%;display:block;pointer-events:none}
+  .small-icons #cloudChip{display:block;width:28px;height:28px;max-width:none;padding:0;overflow:hidden}
+  .small-icons .icon-btn:active{transform:scale(.9)}
+  .small-icons .icon-btn .mail-dot{position:absolute;top:-1px;right:-1px;width:7px;height:7px;background:#ff4a4a;border-radius:50%;border:1px solid #fff;display:none;z-index:2}
+  .small-icons .icon-btn.has-mail .mail-dot{display:block;animation:dotBlink 1.2s ease-in-out infinite}
+  .small-icons .icon-btn.has-mail{box-shadow:0 0 8px rgba(232,197,107,.8);border-color:#e8c56b}
   .battle-ui .icon-btn{position:relative;width:42px;height:42px;border-radius:5px;overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .3s;border:1px solid rgba(232,197,107,.25);background:#000;flex:none}
   .battle-ui .icon-btn img{width:100%;height:100%;display:block;pointer-events:none}
   .battle-ui .icon-btn.small{width:28px;height:28px;border-radius:3px}
@@ -517,14 +524,16 @@
   </div>
 </div>
 
-<!-- 战斗区UI图标层：大图标(地板右下) + 小图标(右上角) -->
+<!-- 右上角小图标(独立层级, 不受battle-ui pointer-events影响) -->
+<div class="small-icons" id="smallIcons">
+  <button class="icon-btn small" id="btnSet" onclick="openSettings()" title="设置" aria-label="设置"><img src="assets/ui_icons/icon_settings.webp" alt="设置"></button>
+  <div class="icon-btn small" id="cloudChip" onclick="cloudTogglePanel(event)" title="云存档"><img src="assets/ui_icons/icon_cloud.webp" alt="云存档"><span class="dot" style="display:none"></span><span id="cloudTxt" style="display:none">云存</span></div>
+  <div class="icon-btn small" id="mailChip" onclick="openMail()" title="鸿雁信匣"><img src="assets/ui_icons/icon_mail.webp" alt="邮件"><span class="mail-dot" id="mailDot"></span></div>
+  <button class="icon-btn small" id="storyBtn" onclick="openStory()" title="剧情纲目"><img src="assets/ui_icons/icon_story.webp" alt="剧情"></button>
+</div>
+
+<!-- 战斗区UI图标层：大图标(地板右下) -->
 <div class="battle-ui" id="battleUI">
-  <div class="small-icons">
-    <button class="icon-btn small" id="btnSet" onclick="openSettings()" title="设置" aria-label="设置"><img src="assets/ui_icons/icon_settings.webp" alt="设置"></button>
-    <div class="icon-btn small" id="cloudChip" onclick="cloudTogglePanel(event)" title="云存档"><img src="assets/ui_icons/icon_cloud.webp" alt="云存档"><span class="dot" style="display:none"></span><span id="cloudTxt" style="display:none">云存</span></div>
-    <div class="icon-btn small" id="mailChip" onclick="openMail()" title="鸿雁信匣"><img src="assets/ui_icons/icon_mail.webp" alt="邮件"><span class="mail-dot" id="mailDot"></span></div>
-    <button class="icon-btn small" id="storyBtn" onclick="openStory()" title="剧情纲目"><img src="assets/ui_icons/icon_story.webp" alt="剧情"></button>
-  </div>
   <div class="big-icons">
     <div class="icon-btn" id="equipChip" onclick="openEquip()" title="法宝·装备"><img src="assets/ui_icons/icon_treasure.webp" alt="宝物"></div>
     <div class="icon-btn" id="alchemyChip" onclick="openAlchemy()" title="丹房·炼丹"><img src="assets/ui_icons/icon_alchemy.webp" alt="丹房"><span class="lg"></span></div>
