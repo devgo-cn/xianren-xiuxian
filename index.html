@@ -724,6 +724,7 @@
     spawnInterval: 1.4, enemySpawnOffset: 40,
     enemies: {
       slime:  { name:'妖卒', role:'melee', atkRange:30,  speed:120, hp:1, atk:3,  color:'#6fe0a8' },
+      water:  { name:'水灵', role:'melee', atkRange:35,  speed:80,  hp:2, atk:4,  color:'#6fd0e8' },
       demon:  { name:'妖将', role:'melee', atkRange:35,  speed:95,  hp:1, atk:5,  color:'#e87060' },
       raptor: { name:'妖弓', role:'range', atkRange:110, speed:70,  hp:1, atk:4,  color:'#c59bff' },
     },
@@ -747,11 +748,17 @@
   const slimeImg = new Image();
   slimeImg.onload = function() { G.slimeSprite = slimeImg; G.slimeReady = true; };
   slimeImg.src = 'assets/monster_001_green_slime.png';
+  /* 怪物素材: 水精灵 */
+  const waterSpriteImg = new Image();
+  waterSpriteImg.onload = function() { G.waterSprite = waterSpriteImg; G.waterReady = true; };
+  waterSpriteImg.src = 'assets/monster_002_water_sprite.png';
 
   /* Sprite 帧配置: 玩家 */
   const SPRITE = { cols:9, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:40, fps:24 };
   /* 史莱姆帧配置: 12列8行, walk32+attack51+hurt11 */
   const SLIME_SPRITE = { cols:12, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:51, hurtStart:83, hurtCount:11, fps:24 };
+  /* 水精灵帧配置: 10列8行, walk32+attack33+hurt13 */
+  const WATER_SPRITE = { cols:10, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:33, hurtStart:65, hurtCount:13, fps:24 };
 
   window.BattleAPI = {
     getKills: () => G.kills,
@@ -1077,6 +1084,34 @@
         if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
         /* 史莱姆面朝左, 素材本身就是面朝左, 不需要翻转 */
         ctx.drawImage(G.slimeSprite, srcX, srcY, SLIME_SPRITE.fw, SLIME_SPRITE.fh, -drawW*0.5, -footOffset, drawW, drawH);
+        ctx.restore();
+        if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp);
+      } else if (G.waterReady && G.waterSprite && e.type === 'water') {
+        /* 水精灵真实 sprite 渲染 */
+        let frameIdx;
+        if (e.hurtT > 0) {
+          const hurtProgress = 1 - (e.hurtT / 0.25);
+          frameIdx = WATER_SPRITE.hurtStart + Math.min(Math.floor(hurtProgress * WATER_SPRITE.hurtCount), WATER_SPRITE.hurtCount-1);
+        } else if (e.anim > 0) {
+          const atkProgress = 1 - e.anim;
+          frameIdx = WATER_SPRITE.attackStart + Math.min(Math.floor(atkProgress * WATER_SPRITE.attackCount), WATER_SPRITE.attackCount-1);
+        } else {
+          frameIdx = WATER_SPRITE.walkStart + (Math.floor(G.t * WATER_SPRITE.fps) % WATER_SPRITE.walkCount);
+        }
+        const col = frameIdx % WATER_SPRITE.cols;
+        const row = Math.floor(frameIdx / WATER_SPRITE.cols);
+        const srcX = col * WATER_SPRITE.fw;
+        const srcY = row * WATER_SPRITE.fh;
+        const drawH = Math.min(CH * 0.5, 70);
+        const drawW = drawH * (WATER_SPRITE.fw / WATER_SPRITE.fh);
+        /* 脚底在帧中的y=118(距底部10px) */
+        const footOffset = 118 * (drawH / WATER_SPRITE.fh);
+        ctx.save();
+        ctx.translate(sx, sy);
+        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
+        if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
+        /* 水精灵面朝左, 素材本身就是面朝左, 不需要翻转 */
+        ctx.drawImage(G.waterSprite, srcX, srcY, WATER_SPRITE.fw, WATER_SPRITE.fh, -drawW*0.5, -footOffset, drawW, drawH);
         ctx.restore();
         if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp);
       } else {

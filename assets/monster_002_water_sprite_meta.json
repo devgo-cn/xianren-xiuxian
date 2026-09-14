@@ -1,0 +1,47 @@
+{
+  "id": "monster_002",
+  "serial": 2,
+  "name": "水精灵",
+  "name_en": "Water Sprite",
+  "type": "monster",
+  "role": "melee",
+  "facing": "left",
+  "tier": 2,
+  "description": "蓝色凝胶状水精灵，有小尾巴，通过下盘皮筋往前拉伸弹跳移动，原地不动",
+  "sprite": "assets/monster_002_water_sprite.png",
+  "walk": {
+    "start": 0,
+    "count": 32,
+    "fps": 24,
+    "loop": true,
+    "note": "拉伸帧(4-20) + 倒放恢复帧(19-5) 构成完整循环",
+    "src_frames": [4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5]
+  },
+  "attack": {
+    "start": 32,
+    "count": 33,
+    "fps": 24,
+    "loop": false,
+    "src_frames": [56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88]
+  },
+  "hurt": {
+    "start": 65,
+    "count": 13,
+    "fps": 24,
+    "loop": false,
+    "src_frames": [96,97,98,99,100,101,102,103,104,105,106,107,108]
+  },
+  "frame_size": [240, 128],
+  "cols": 10,
+  "rows": 8,
+  "total_frames": 78,
+  "base_stats": {
+    "hp": 2,
+    "atk": 4,
+    "speed": 50,
+    "atkRange": 30,
+    "aspd": 0.7
+  },
+  "pipeline": "24fps + flood fill去背景(保护眼睛) + 统一裁剪窗口 + 身体中心x对齐(中值滤波) + 脚底y对齐 + walk用拉伸帧+倒放恢复帧构成循环",
+  "created_at": "2026-09-14"
+}
