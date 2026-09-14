@@ -5608,7 +5608,9 @@ const _equipQueue = [];
 let _equipId = 0;
 function requestEquipDrop(info) {
   if (!state || !info) return null;
-  if (Math.random() >= DROP_CFG.equipChance * (info.elite ? DROP_CFG.eliteEquipMul : 1)) return null;
+  /* v2.5 BOSS(info.boss)必掉一件; 普通怪/精英按概率 roll。品质一律照常 pickQ——
+   * BOSS 刷新频繁(bossSpawnEvery=10), 品质保底会让金装泛滥 */
+  if (!info.boss && Math.random() >= DROP_CFG.equipChance * (info.elite ? DROP_CFG.eliteEquipMul : 1)) return null;
   const a = makeArt();
   const id = ++_equipId;
   _equipQueue.push({ id, a, elite: !!info.elite });

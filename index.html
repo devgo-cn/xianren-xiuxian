@@ -779,7 +779,7 @@
        * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。 */
       slime: { name:'妖卒', role:'melee', w:60, atkRange:30, speed:120, hpK:1.0, atkK:0.55, defK:0.35, color:'#6fe0a8' },
       water: { name:'水灵', role:'melee', w:40, atkRange:35, speed:80,  hpK:1.6, atkK:0.75, defK:0.60, color:'#6fd0e8' },
-      boss:  { name:'史莱姆王', role:'ranged', w:5,  atkRange:80, speed:40, hpK:80.0, atkK:3.0, defK:3.0, color:'#a0ff80', isBoss:true, floatHeight:20, sizeMult:2.0 },
+      boss:  { name:'史莱姆王', role:'ranged', w:5,  atkRange:70, speed:40, hpK:80.0, atkK:3.0, defK:3.0, color:'#a0ff80', isBoss:true, floatHeight:10, sizeMult:2.0 },
     },
   };
 
@@ -874,7 +874,7 @@
   /* 水精灵帧配置: 10列8行, walk32+attack33+hurt13 */
   const WATER_SPRITE = { cols:10, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:33, hurtStart:65, hurtCount:13, fps:24 };
   /* BOSS史莱姆王: 飘着的, 2倍大, 帧0-17漂浮, 帧18-39攻击, 帧40-47恢复 */
-  const BOSS_SPRITE = { cols:8, fw:240, fh:200, walkStart:0, walkCount:18, attackStart:18, attackCount:22, hurtStart:0, hurtCount:0, fps:8, isBoss:true, floatHeight:20, sizeMult:2.0 };
+  const BOSS_SPRITE = { cols:8, fw:240, fh:200, walkStart:0, walkCount:18, attackStart:18, attackCount:22, hurtStart:0, hurtCount:0, fps:8, isBoss:true, floatHeight:10, sizeMult:2.0 };
 
   function fmtNum(n) {
     n = Math.round(n || 0);
@@ -1007,8 +1007,9 @@
   }
   /* ---------- 击杀结算: 灵石 + (装备由主游戏 roll) + 技能经验 + 追猎/加速 ---------- */
   function onKill(e) {
+    const isBoss = e.type === 'boss';
     /* BOSS/小怪击杀计数 */
-    if (e.type === 'boss') {
+    if (isBoss) {
       G.bossActive = false;
       G.smallKillsSinceBoss = 0;
     } else {
@@ -1016,15 +1017,17 @@
     }
     const mul = e.elite ? DROP.eliteMul : 1;
     const jitter = 1 - DROP.spiritRand + Math.random()*DROP.spiritRand*2;
-    const sp = Math.max(1, Math.round((DROP.spiritBase + DROP.spiritPerLv*(PST.lv||1)) * jitter * mul));
+    /* v2.5 BOSS 专属产出: 灵石在精英倍率上再 ×8 */
+    const sp = Math.max(1, Math.round((DROP.spiritBase + DROP.spiritPerLv*(PST.lv||1)) * jitter * mul * (isBoss ? 8 : 1)));
     spawnSpiritDrop(e, sp, e.elite);                       // 灵石落在地板, 隔1~2秒飞向顶部统计区
-    /* 装备掉落: 先在游戏侧 roll 出具体部件(图标/品质), 由飞行宠物飞去拾取入包 */
+    /* 装备掉落: 先在游戏侧 roll 出具体部件(图标/品质), 由飞行宠物飞去拾取入包
+     * v2.5 BOSS 必掉一件(品质照常按境界权重 roll, 不保底——BOSS 刷新频繁, 保底会灌金装) */
     try {
       const eq = (window.BattleAPI && window.BattleAPI.requestEquipDrop)
-        ? window.BattleAPI.requestEquipDrop({ elite: !!e.elite, enemy: e.name }) : null;
+        ? window.BattleAPI.requestEquipDrop({ elite: !!e.elite, boss: isBoss, enemy: e.name }) : null;
       if (eq) spawnEquipDrop(e, eq);
     } catch (err) {}
-    skExpAll(2);                       // 每杀全体技能 +2: 不触发也在慢慢长
+    skExpAll(isBoss ? 30 : 2);         // 每杀全体技能+2; BOSS 击杀全体+30
     rollSpeedSkill('jifeng');
     rollSpeedSkill('suodi');
     const zl = skVal('zhuilie');       // 追猎: 击杀后立刻再出手一次, 衔尾一击暴击率大增
