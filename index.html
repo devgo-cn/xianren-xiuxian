@@ -900,6 +900,9 @@
         G.player.atk = PST.atk;
         G.player.maxHp = PST.hp;
         if (G.player.hp > PST.hp) G.player.hp = PST.hp;
+        /* v2.5 功法攻速词条: 面板攻速(基础1.1×词条乘区, 主游戏侧已封顶3.0) → 同步进玩家,
+         * 战斗节奏 atkT=1/aspd 随之加快; 无词条旧档回落 BC.playerAspd */
+        G.player.aspd = Math.min(3, PST.aspd || BC.playerAspd);
       }
     },
     getStats: () => Object.assign({}, PST),

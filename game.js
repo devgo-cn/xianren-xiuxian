@@ -1461,6 +1461,7 @@ function load() {
       state = c; trimJournal();
       /* 载入时先把存档里的原始 lastTs 存进 _lastTs0, 离线结算以它为基准 */
       state._lastTs0 = (s && s.lastTs) || c.lastTs || 0;
+      ensureScrollFx();         // v2.5: 旧档功法补攻速词条
     }
   } catch (e) {}
 }
@@ -1612,6 +1613,7 @@ function cldAdoptCloud(s) {
   if (!c) return false;
   state = c;
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}
+  ensureScrollFx();             // v2.5: 云端旧档的功法可能没有攻速词条 → 补齐
   updateRealmUI(); updateHUD(); updateArts(); realmPlot();
   /* v1.5.0: 云端档可能没有 autoHunt / travel 字段(老档), 采纳后按钮与行迹要跟着重绘,
      否则会出现"state 已变、开关还停在旧态"的错看 */
@@ -5175,6 +5177,7 @@ function artScore(a) {                    /* v1.9.6 品质锚定: 星品主导�
     else if (f.k === "pen") fx += p * c.atkRef * 0.35;
     else if (f.k === "dodge") fx += p * c.defRef * 1.4;
     else if (f.k === "life") fx += p * c.atkRef * 0.5;
+    else if (f.k === "aspd") fx += p * c.atkRef * 0.8;   // v2.5 功法攻速: 全程 DPS 线性增益, 权重介于暴击与暴伤乘区之间
   }
   /* 星级锚: 相邻星差 ×境界逐级放宽; 三维+词条压缩成浮分且封顶在本档步长内
      → 同星内比 roll 肥瘦, 跨星看锚差 —— 2星防血装 roll 再肥也压不过 4星古宝,
@@ -5194,6 +5197,19 @@ function equipBonus() {                 // 装备数值加总 + 词条聚合(v1.
     if (typeof a.h === "number") hp += a.h;
   }
   return { atk, def, hp, agg: fxAgg(arts) };
+}
+/* v2.5 旧档功法补攻速词条: rollFx 加"功法必带攻速"规则前获得的功法, 启动/换档时按品质补一条 */
+function ensureScrollFx() {
+  if (!Array.isArray(state.arts)) return false;
+  let changed = false;
+  for (const a of state.arts) {
+    if (a && a.slot === 3 && !(a.fx || []).some(f => f.k === "aspd")) {
+      (a.fx = a.fx || []).push({ k: "aspd", v: fxValue("aspd", a.q) });
+      changed = true;
+    }
+  }
+  if (changed) { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} }
+  return changed;
 }
 function smartEquip(a) {
   const arts = state.arts || [];
@@ -5319,8 +5335,8 @@ function renderEquip() {                 // v1.9.8 十字格工作台: 四正方
     const hs = finalStats({ hp: 100 + 330 * lv, atk: 10 + 46 * lv, def: 5 + 26 * lv },
       { hp: eb.hp || 0, atk: eb.atk || 0, def: eb.def || 0 }, eb.agg);
     const ag = eb.agg || {};
-    const rn = ["会心", "暴击", "爆伤", "破甲", "闪避", "吸血"];
-    const rk = ["crit", "critB", "critD", "pen", "dodge", "life"];
+    const rn = ["会心", "暴击", "爆伤", "破甲", "闪避", "吸血", "攻速"];
+    const rk = ["crit", "critB", "critD", "pen", "dodge", "life", "aspd"];
     var _detRows =
       `<div class="sr"><span>气 血</span><b>${fmt(hs.hp)}</b></div>` +
       `<div class="sr"><span>攻 击</span><b>${fmt(hs.atk)}</b></div>` +
@@ -5380,7 +5396,7 @@ function artName(kind, q) {
  * 主身裸身基础已收小, 输出面以"装备数值 + 词条乘区"为主 —— 跨境界由怪攻系数带校准。 */
 const FX_TXT = {
   atk: "攻击", hp: "生命", dfn: "防御", crit: "会心", critB: "暴击",
-  critD: "爆伤", pen: "破甲", dodge: "闪避", life: "吸血",
+  critD: "爆伤", pen: "破甲", dodge: "闪避", life: "吸血", aspd: "攻速",
 };
 const FX_POOL = {
   w: ["atk", "crit", "critB", "critD", "pen", "life"],
@@ -5398,13 +5414,17 @@ function fxValue(key, q) {
   if (key === "critD") return (t ? 10 : 6) + ((r() * 5) | 0);                                  // 6~14%
   if (key === "pen") return (t ? 4 : 2) + ((r() * 3) | 0);                                     // 2~6%
   if (key === "dodge") return (t ? 2 : 1) + ((r() * 2) | 0);                                   // 1~3
+  if (key === "aspd") return (t ? 5 : 3) + ((r() * 3) | 0);                                    // 功法攻速: 低品 3~5% · 高品 5~7%
   return (t ? 2 : 1) + (r() < 0.5 ? 1 : 0);                                                    // 1~2
 }
 function rollFx(kind, q) {                          // 装备词条(同槽不重复)
   const pool = (FX_POOL[kind] || FX_POOL.w).slice();
   const n = fxCount(q);
   const f = [];
-  for (let i = 0; i < n && pool.length; i++) {
+  /* v2.5 功法(s)必带攻速词条: 数值随品质分档(低品 3~5% / 高品 5~7%), 其余词条照常 roll;
+   * 其他部位(兵/护/佩)不出攻速 */
+  if (kind === "s") f.push({ k: "aspd", v: fxValue("aspd", q) });
+  for (let i = f.length; i < n && pool.length; i++) {
     const key = pool.splice((Math.random() * pool.length) | 0, 1)[0];
     f.push({ k: key, v: fxValue(key, q) });
   }
@@ -5422,7 +5442,7 @@ function rollMonFx(big) {                           // 词缀妖兽: ~12% 带 1~
   return f;
 }
 function fxAgg(fxs) {                               // 汇总多条装备(或怪物)词条为总属性增量
-  const o = { atk: 0, hp: 0, dfn: 0, crit: 0, critB: 0, critD: 0, pen: 0, dodge: 0, life: 0 };
+  const o = { atk: 0, hp: 0, dfn: 0, crit: 0, critB: 0, critD: 0, pen: 0, dodge: 0, life: 0, aspd: 0 };
   for (const a of (fxs || [])) for (const f of (a.fx || [])) if (o[f.k] != null) o[f.k] += f.v;
   return o;
 }
@@ -5438,6 +5458,8 @@ function finalStats(base, flat, agg) {
     crit: (agg && agg.crit) || 0, critB: (agg && agg.critB) || 0,
     critD: (agg && agg.critD) || 0, pen: (agg && agg.pen) || 0,
     dodge: cap((agg && agg.dodge) || 0, 45), life: (agg && agg.life) || 0,
+    /* v2.5 攻速(次/秒): 基础 1.1 × 功法攻速词条乘区, 全局封顶 3.0 */
+    aspd: Math.min(3, 1.1 * (1 + ((agg && agg.aspd) || 0) / 100)),
   };
 }
 function attrAssign(art, kind, q, lv) {          // 装备数值(随境界级×品质乘子) + 词条
