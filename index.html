@@ -719,7 +719,7 @@
  * ============================================================ */
 (function(){
   const BC = {
-    playerAtk: 2, playerHp: 200, playerAtkRange: 55, playerAspd: 1.1, playerSpeed: 28,
+    playerAtk: 2, playerHp: 200, playerAtkRange: 75, playerAspd: 1.1, playerSpeed: 28,
     spawnInterval: 1.4, enemySpawnOffset: 40,
     enemies: {
       slime:  { name:'妖卒', role:'melee', atkRange:30,  speed:120, hp:1, atk:3,  color:'#6fe0a8' },
@@ -768,7 +768,7 @@
   };
 
   function makePlayer() {
-    return { x:0,y:0, hp:BC.playerHp,maxHp:BC.playerHp, atk:BC.playerAtk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0,stun:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false };
+    return { x:0,y:0, hp:BC.playerHp,maxHp:BC.playerHp, atk:BC.playerAtk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0,stun:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false, attackTarget:null, hit1:false, hit2:false };
   }
   function makeEnemy(type) {
     const def = BC.enemies[type] || BC.enemies.slime;
@@ -801,36 +801,46 @@
     const p = G.player;
     if (!p.alive) return;
     p.atkT -= dt; p.anim = Math.max(0, p.anim-dt*1.5); p.hurtT = Math.max(0, p.hurtT-dt); p.stun = Math.max(0, p.stun-dt*3);
-    /* 动画帧更新 */
+    /* 动画帧更新 + 双段攻击伤害判定 */
     p.animTimer += dt;
     const frameDur = 1 / SPRITE.fps;
     if (p.animTimer >= frameDur) {
       p.animTimer -= frameDur;
       if (p.attackAnim) {
         p.animFrame++;
-        if (p.animFrame >= SPRITE.attackCount) { p.attackAnim = false; p.animFrame = 0; }
+        /* 双段攻击: 第一段刺剑在帧10, 第二段刺剑在帧26 */
+        if (p.animFrame === 10 && !p.hit1 && p.attackTarget && p.attackTarget.alive) {
+          p.hit1 = true;
+          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
+            const crit = Math.random()<0.08;
+            const dmg = p.atk*(0.9+Math.random()*0.2)*(crit?1.8:1);
+            dealDamage(p.attackTarget, dmg, '#7fe0ff', crit);
+            /* 正儿八经的网游死亡判定: 第一段刺死就中断, 不刺第二下 */
+            if (!p.attackTarget.alive) { p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false; }
+          }
+        }
+        if (p.animFrame === 26 && !p.hit2 && p.attackTarget && p.attackTarget.alive) {
+          p.hit2 = true;
+          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
+            const crit = Math.random()<0.1;
+            const dmg = p.atk*(0.95+Math.random()*0.25)*(crit?2.0:1);
+            dealDamage(p.attackTarget, dmg, '#a0e8ff', crit);
+          }
+        }
+        if (p.animFrame >= SPRITE.attackCount) { p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false; }
       } else {
         p.animFrame = (p.animFrame + 1) % SPRITE.walkCount;
       }
     }
     const near = findNearestEnemy(p.x, p.atkRange+200);
-    /* 攻击动画播放期间不中断，保持攻击状态（修复抽搐） */
+    /* 攻击动画播放期间不中断，保持攻击状态 */
     if (p.attackAnim) {
       p.moving = 0;
-      if (p.atkT <= 0 && near && Math.abs(near.x-p.x) <= p.atkRange+25) {
-        p.anim = 1; p.atkT = 1/p.aspd; p.attackAnim = true; p.animFrame = 0; p.animTimer = 0;
-        const crit = Math.random()<0.08;
-        const dmg = p.atk*(0.9+Math.random()*0.2)*(crit?1.8:1);
-        dealDamage(near, dmg, '#7fe0ff', crit);
-      }
     } else if (near && Math.abs(near.x-p.x) <= p.atkRange+5) {
-      /* 进入攻击范围，开始攻击 */
+      /* 进入攻击范围，开始攻击（触发时不立即造成伤害，伤害在动画帧中触发） */
       p.moving = 0;
       if (p.atkT <= 0) {
-        p.anim = 1; p.atkT = 1/p.aspd; p.attackAnim = true; p.animFrame = 0; p.animTimer = 0;
-        const crit = Math.random()<0.08;
-        const dmg = p.atk*(0.9+Math.random()*0.2)*(crit?1.8:1);
-        dealDamage(near, dmg, '#7fe0ff', crit);
+        p.anim = 1; p.atkT = 1/p.aspd; p.attackAnim = true; p.animFrame = 0; p.animTimer = 0; p.attackTarget = near; p.hit1 = false; p.hit2 = false;
       }
     } else if (near) {
       /* 有怪但不在攻击范围，向怪移动 */
