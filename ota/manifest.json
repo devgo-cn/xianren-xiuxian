@@ -5,7 +5,7 @@
     "assets/cultivator_meta.json": "5ea21a40843b6fa40d875d8f10bc86b5bc9f1172e15f41690fc1bd92b77c1670",
     "assets/cultivator_robe.webp": "30b6bdf27221803a1a91d901e9c691b884c70287002bb0b5688d9684e34faf59",
     "assets/cultivator_sheet.webp": "ed72ed2f3440483c79b6626a588452a0455d29a71147102f0a3baa92f83fecbb",
-    "assets/cultivator_skill_sheet.webp": "6c3c98fb343e0a7689162c2337d93953124d3c91db123dc689aa930c2033d31a",
+    "assets/cultivator_skill_sheet.webp": "8239309b8f998a365daa0ea5a53320111ca9868db30fa6f994e6b12854c03057",
     "assets/hpbar-ink-bg.png": "9c4d59566fea202e116fe53702df50b7ce9257891a9bb55b1b6f3a58e754faed",
     "assets/hpbar-ink-mask.png": "f7b2802c5d93ab447300c15d5ccaf035cd9c37eef292ec83910b0aef3394c8e2",
     "assets/main-bg.jpg": "30bda2c355760f1364da3a11f01f31cd7928babeb565ed064d0c41f66b8fb0d8",
@@ -159,6 +159,6 @@
     "game.js": "6be3618bf2fbc0e478b8cbad068d1146994a04c2e99f7d43a7b55ec3e2f873de",
     "index.html": "b3ad64dd2c08b8aff793ce74f013094a332b9b2f9631aef7da46e529fd2eeef7"
   },
-  "rev": "f7565ff3d7994d77",
+  "rev": "baa47699f4fe9832",
   "version": "2.4"
 }
