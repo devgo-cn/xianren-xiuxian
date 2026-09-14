@@ -910,34 +910,11 @@
   function worldToScreen(wx) { return wx - G.camX; }
 
   function drawBg() {
-    /* 真实背景图半透明叠加 */
-    if (G.bgReady && G.bgImg) {
-      ctx.globalAlpha = 0.25;
-      ctx.drawImage(G.bgImg, 0, 0, CW, CH);
-      ctx.globalAlpha = 1;
-    }
-    /* 渐变遮罩 */
-    const sky = ctx.createLinearGradient(0, 0, 0, CH);
-    sky.addColorStop(0, 'rgba(10,8,20,0.5)');
-    sky.addColorStop(0.5, 'rgba(20,15,35,0.3)');
-    sky.addColorStop(1, 'rgba(10,15,25,0.6)');
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, CW, CH);
-    /* 远山视差 */
-    const mtOffset = (G.camX*0.3) % 400;
-    ctx.fillStyle = 'rgba(30,25,50,0.4)';
-    for (let i=-1; i<CW/400+2; i++) {
-      const bx = i*400 - mtOffset;
-      ctx.beginPath();
-      ctx.moveTo(bx, CH*0.6); ctx.lineTo(bx+100, CH*0.35); ctx.lineTo(bx+200, CH*0.5);
-      ctx.lineTo(bx+300, CH*0.3); ctx.lineTo(bx+400, CH*0.55); ctx.lineTo(bx+400, CH); ctx.lineTo(bx, CH);
-      ctx.fill();
-    }
-    /* 地面 */
+    /* 战斗区背景完全透明，直接叠加在原游戏墨夜星空(canvas#bg)上
+       只画一条 2px 地板线作为行走基准 */
     const fy = floorY();
-    const ground = ctx.createLinearGradient(0, fy, 0, CH);
-    ground.addColorStop(0, 'rgba(40,50,40,0.7)'); ground.addColorStop(1, 'rgba(20,30,20,0.8)');
-    ctx.fillStyle = ground; ctx.fillRect(0, fy, CW, CH-fy);
-    ctx.strokeStyle = 'rgba(150,200,150,0.15)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(180,170,140,0.25)';
+    ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(0, fy); ctx.lineTo(CW, fy); ctx.stroke();
   }
 
