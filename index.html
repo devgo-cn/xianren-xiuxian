@@ -114,9 +114,16 @@
 
   /* 修为进度 */
 
-  /* 主角 */
+  /* 战斗区（无尽边界式横向推进战斗） */
+  .battle-stage{position:fixed;left:0;right:0;top:92px;bottom:calc(44vh + 84px);z-index:6;pointer-events:none;overflow:hidden}
+  .battle-stage canvas{display:block;width:100%;height:100%}
+  .battle-hud{position:absolute;left:0;right:0;top:0;z-index:7;display:flex;justify-content:space-between;align-items:center;padding:3px 10px;font-size:10px;color:#c8d4e8;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+  .battle-hud .kills{color:#e8c56b;font-weight:700}
+  .battle-hud .speed{color:#ff8a4a;font-weight:700}
+
+  /* 主角（略微缩小以腾出战斗区空间） */
   .stage{position:fixed;inset:0;z-index:5;display:flex;align-items:flex-end;justify-content:center;pointer-events:none}
-  .cult{position:relative;height:min(54vh,430px);aspect-ratio:825/835}
+  .cult{position:relative;height:min(44vh,350px);aspect-ratio:825/835}
   .cult img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;transform-origin:50% 88%}
   /* v1.7.40: 三图层胸腔呼吸 + 辉光呼吸(收放); 头部层(.hair-top)不发辉光 */
   .cult .bodyL{animation:bodyBreath 5.4s ease-in-out infinite, cultGlow 3.6s ease-in-out infinite}
@@ -497,6 +504,16 @@
 
 <div class="artifacts" style="display:none"><div class="art-row" id="artRow"></div></div>
 
+<!-- 战斗区（无尽边界式横向推进战斗） -->
+<div class="battle-stage" id="battleStage">
+  <canvas id="battleCanvas"></canvas>
+  <div class="battle-hud">
+    <span class="kills">击杀 <b id="battleKills">0</b></span>
+    <span class="speed" id="battleSpeed" style="display:none">×2 倍速</span>
+    <span id="battleState">推进中</span>
+  </div>
+</div>
+
 <div class="stage">
   <div class="cult" id="cult">
     <img class="bodyL" src="assets/cultivator_body.webp" alt="">
@@ -702,5 +719,401 @@
   })();
 </script>
 
+<script>
+/* ============================================================
+ *  战斗系统（无尽边界式横向推进战斗）
+ *  接入真实素材: cultivator_sheet.png(玩家) + main-bg.jpg(背景)
+ * ============================================================ */
+(function(){
+  const BC = {
+    playerAtk: 2, playerHp: 200, playerAtkRange: 55, playerAspd: 1.1, playerSpeed: 28,
+    spawnInterval: 1.4, enemySpawnOffset: 40,
+    enemies: {
+      slime:  { name:'妖卒', role:'melee', atkRange:30,  speed:120, hp:1, atk:3,  color:'#6fe0a8' },
+      demon:  { name:'妖将', role:'melee', atkRange:35,  speed:95,  hp:1, atk:5,  color:'#e87060' },
+      raptor: { name:'妖弓', role:'range', atkRange:110, speed:70,  hp:1, atk:4,  color:'#c59bff' },
+    },
+    speedSkills: { double:{mult:2,duration:5,chance:0.08}, triple:{mult:3,duration:3,chance:0.03} },
+  };
+
+  const G = {
+    t:0, kills:0, speedMult:1, speedMultTimer:0, state:'walk', camX:0,
+    player:null, pets:[], enemies:[], fx:[], dmg:[], spawnT:BC.spawnInterval,
+    sprite:null, bgImg:null, spriteReady:false, bgReady:false,
+  };
+
+  /* 加载素材 */
+  const spriteImg = new Image();
+  spriteImg.onload = function() { G.sprite = spriteImg; G.spriteReady = true; };
+  spriteImg.src = 'assets/cultivator_sheet.png';
+  const bgImg = new Image();
+  bgImg.onload = function() { G.bgImg = bgImg; G.bgReady = true; };
+  bgImg.src = 'assets/main-bg.jpg';
+
+  /* Sprite 帧配置: 8列7行, 每帧240x128, walk=0-15, attack=16-55 */
+  const SPRITE = { cols:8, fw:240, fh:128, walkStart:0, walkCount:16, attackStart:16, attackCount:40, fps:24 };
+
+  window.BattleAPI = {
+    getKills: () => G.kills,
+    resetKills: () => { G.kills = 0; },
+    triggerSpeedSkill: (mult, duration) => { if (mult<=1) return false; G.speedMult=mult; G.speedMultTimer=duration||5; return true; },
+    trySpeedSkill: () => {
+      for (const [name, sk] of Object.entries(BC.speedSkills)) {
+        if (Math.random() < sk.chance) { window.BattleAPI.triggerSpeedSkill(sk.mult, sk.duration); return {name, mult:sk.mult, duration:sk.duration}; }
+      }
+      return null;
+    },
+    getSpeedMult: () => G.speedMult,
+    addPet: (petDef) => {
+      const pet = { id:petDef.id||'pet_'+Date.now(), name:petDef.name||'宠物', atk:petDef.atk||5, aspd:petDef.aspd||1.0, atkRange:petDef.atkRange||50, hp:petDef.hp||80, maxHp:petDef.hp||80, color:petDef.color||'#ffd76b', offsetX:petDef.offsetX||-30, offsetY:petDef.offsetY||0, x:0,y:0, atkT:Math.random()*0.5, anim:0, hurtT:0, alive:true };
+      G.pets.push(pet); return pet;
+    },
+    removePet: (petId) => { G.pets = G.pets.filter(p => p.id !== petId); },
+    getPets: () => G.pets,
+    spawnWave: () => spawnWave(),
+    getState: () => ({ kills:G.kills, speedMult:G.speedMult, state:G.state, playerHp:G.player?G.player.hp:0, pets:G.pets.length, enemies:G.enemies.filter(e=>e.alive).length }),
+  };
+
+  function makePlayer() {
+    return { x:0,y:0, hp:BC.playerHp,maxHp:BC.playerHp, atk:BC.playerAtk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0,stun:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false };
+  }
+  function makeEnemy(type) {
+    const def = BC.enemies[type] || BC.enemies.slime;
+    return { type,name:def.name,role:def.role, x:0,y:0, hp:def.hp,maxHp:def.hp, atk:def.atk,atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2), color:def.color, atkT:Math.random()*0.6, anim:0,hurtT:0,stun:0, alive:true,dying:0,reach:1 };
+  }
+  function spawnWave() {
+    const types = Object.keys(BC.enemies);
+    const type = types[(Math.random()*types.length)|0];
+    const e = makeEnemy(type);
+    e.x = G.camX + stageW() + BC.enemySpawnOffset;
+    G.enemies.push(e);
+  }
+  function findNearestEnemy(fromX, maxDist) {
+    let best=null, bestD=maxDist||Infinity;
+    for (const e of G.enemies) { if (!e.alive||e.dying>0) continue; const d=Math.abs(e.x-fromX); if (d<bestD){bestD=d;best=e;} }
+    return best;
+  }
+  function dealDamage(target, amount, color, crit) {
+    target.hp -= amount; target.hurtT = 0.25;
+    G.dmg.push({ x:target.x,y:target.y-40, val:Math.round(amount), crit:crit||false, color:color||'#e8f2fa', t:0 });
+    G.fx.push({ kind:'hitSpark', x:target.x,y:target.y-20, color:color||'#fff', t:0,dur:0.3 });
+    if (target.hp <= 0) {
+      target.hp=0; target.alive=false; target.dying=0.4;
+      G.kills++;
+      G.fx.push({ kind:'death', x:target.x,y:target.y-15, color:target.color, t:0,dur:0.4 });
+      updateHUD();
+    }
+  }
+  function updatePlayer(dt) {
+    const p = G.player;
+    if (!p.alive) return;
+    p.atkT -= dt; p.anim = Math.max(0, p.anim-dt*1.5); p.hurtT = Math.max(0, p.hurtT-dt); p.stun = Math.max(0, p.stun-dt*3);
+    /* 动画帧更新 */
+    p.animTimer += dt;
+    const frameDur = 1 / SPRITE.fps;
+    if (p.animTimer >= frameDur) {
+      p.animTimer -= frameDur;
+      if (p.attackAnim) {
+        p.animFrame++;
+        if (p.animFrame >= SPRITE.attackCount) { p.attackAnim = false; p.animFrame = 0; }
+      } else {
+        p.animFrame = (p.animFrame + 1) % SPRITE.walkCount;
+      }
+    }
+    const near = findNearestEnemy(p.x, p.atkRange+200);
+    if (near && Math.abs(near.x-p.x) <= p.atkRange+5) {
+      p.moving = 0;
+      if (p.atkT <= 0) {
+        p.anim = 1; p.atkT = 1/p.aspd; p.attackAnim = true; p.animFrame = 0; p.animTimer = 0;
+        const crit = Math.random()<0.08;
+        const dmg = p.atk*(0.9+Math.random()*0.2)*(crit?1.8:1);
+        dealDamage(near, dmg, '#7fe0ff', crit);
+      }
+    } else if (near) {
+      p.moving = 1; p.walkT += dt*8; p.attackAnim = false;
+      const targetX = near.x - p.atkRange*0.85;
+      p.x += Math.sign(targetX-p.x)*Math.min(Math.abs(targetX-p.x), BC.playerSpeed*1.5*dt);
+    } else {
+      p.moving = 1; p.walkT += dt*8; p.attackAnim = false; p.x += BC.playerSpeed*dt;
+    }
+  }
+  function updatePets(dt) {
+    const p = G.player;
+    for (const pet of G.pets) {
+      if (!pet.alive) continue;
+      pet.atkT -= dt; pet.anim = Math.max(0, pet.anim-dt*1.5); pet.hurtT = Math.max(0, pet.hurtT-dt);
+      const targetX = p.x + pet.offsetX;
+      pet.x += (targetX-pet.x)*Math.min(1, dt*8); pet.y = p.y + pet.offsetY;
+      const near = findNearestEnemy(pet.x, pet.atkRange+100);
+      if (near && Math.abs(near.x-pet.x) <= pet.atkRange+5 && pet.atkT <= 0) {
+        pet.anim = 1; pet.atkT = 1/pet.aspd;
+        const crit = Math.random()<0.05;
+        const dmg = pet.atk*(0.9+Math.random()*0.2)*(crit?1.6:1);
+        dealDamage(near, dmg, pet.color, crit);
+      }
+    }
+  }
+  function updateEnemies(dt) {
+    const p = G.player;
+    for (const e of G.enemies) {
+      if (e.dying>0) { e.dying-=dt; continue; }
+      if (!e.alive) continue;
+      e.atkT -= dt; e.anim = Math.max(0, e.anim-dt*1.5); e.hurtT = Math.max(0, e.hurtT-dt);
+      const stopX = p.x + e.atkRange;
+      if (e.x > stopX+2) e.x = Math.max(stopX, e.x-e.speed*dt);
+      if (Math.abs(e.x-p.x) <= e.atkRange+5 && e.atkT <= 0) {
+        e.anim = 1; e.atkT = 1/(0.8+Math.random()*0.5);
+        p.hp -= e.atk*(0.85+Math.random()*0.3); p.hurtT = 0.25; p.stun = 0.5;
+        G.dmg.push({ x:p.x,y:p.y-40, val:Math.round(e.atk), crit:false, color:'#ff8a7a', t:0 });
+        G.fx.push({ kind:'hitSpark', x:p.x,y:p.y-20, color:'#ff8a7a', t:0,dur:0.3 });
+        if (p.hp <= 0) p.hp = p.maxHp;
+      }
+    }
+    G.enemies = G.enemies.filter(e => e.alive || e.dying>0);
+  }
+  function updateFx(dt) {
+    for (const f of G.fx) f.t += dt;
+    G.fx = G.fx.filter(f => f.t < f.dur);
+    for (const d of G.dmg) d.t += dt;
+    G.dmg = G.dmg.filter(d => d.t < 0.9);
+  }
+  function updateCamera(dt) {
+    const targetCam = G.player.x - stageW()*0.28;
+    G.camX += (targetCam-G.camX)*Math.min(1, dt*6);
+  }
+  function update(dt) {
+    if (G.speedMultTimer > 0) { G.speedMultTimer -= dt; if (G.speedMultTimer <= 0) { G.speedMult=1; G.speedMultTimer=0; } updateHUD(); }
+    const sdt = dt * G.speedMult;
+    G.t += sdt;
+    const aliveEnemies = G.enemies.filter(e => e.alive && e.dying<=0);
+    const newState = aliveEnemies.length > 0 ? 'fight' : 'walk';
+    if (newState !== G.state) { G.state = newState; updateHUD(); }
+    G.spawnT -= sdt;
+    if (G.spawnT <= 0) { spawnWave(); G.spawnT = BC.spawnInterval; }
+    updatePlayer(sdt); updatePets(sdt); updateEnemies(sdt); updateFx(sdt); updateCamera(sdt);
+  }
+
+  /* 渲染 */
+  let cv, ctx, CW, CH;
+  function stageW() { return CW; }
+  function stageH() { return CH; }
+  function floorY() { return CH * 0.82; }
+  function initCanvas() {
+    cv = document.getElementById('battleCanvas');
+    if (!cv) return false;
+    ctx = cv.getContext('2d');
+    resize();
+    window.addEventListener('resize', resize);
+    return true;
+  }
+  function resize() {
+    const rect = cv.parentElement.getBoundingClientRect();
+    CW = rect.width; CH = rect.height;
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = CW*dpr; cv.height = CH*dpr;
+    cv.style.width = CW+'px'; cv.style.height = CH+'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function worldToScreen(wx) { return wx - G.camX; }
+
+  function drawBg() {
+    /* 真实背景图半透明叠加 */
+    if (G.bgReady && G.bgImg) {
+      ctx.globalAlpha = 0.25;
+      ctx.drawImage(G.bgImg, 0, 0, CW, CH);
+      ctx.globalAlpha = 1;
+    }
+    /* 渐变遮罩 */
+    const sky = ctx.createLinearGradient(0, 0, 0, CH);
+    sky.addColorStop(0, 'rgba(10,8,20,0.5)');
+    sky.addColorStop(0.5, 'rgba(20,15,35,0.3)');
+    sky.addColorStop(1, 'rgba(10,15,25,0.6)');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, CW, CH);
+    /* 远山视差 */
+    const mtOffset = (G.camX*0.3) % 400;
+    ctx.fillStyle = 'rgba(30,25,50,0.4)';
+    for (let i=-1; i<CW/400+2; i++) {
+      const bx = i*400 - mtOffset;
+      ctx.beginPath();
+      ctx.moveTo(bx, CH*0.6); ctx.lineTo(bx+100, CH*0.35); ctx.lineTo(bx+200, CH*0.5);
+      ctx.lineTo(bx+300, CH*0.3); ctx.lineTo(bx+400, CH*0.55); ctx.lineTo(bx+400, CH); ctx.lineTo(bx, CH);
+      ctx.fill();
+    }
+    /* 地面 */
+    const fy = floorY();
+    const ground = ctx.createLinearGradient(0, fy, 0, CH);
+    ground.addColorStop(0, 'rgba(40,50,40,0.7)'); ground.addColorStop(1, 'rgba(20,30,20,0.8)');
+    ctx.fillStyle = ground; ctx.fillRect(0, fy, CW, CH-fy);
+    ctx.strokeStyle = 'rgba(150,200,150,0.15)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, fy); ctx.lineTo(CW, fy); ctx.stroke();
+  }
+
+  function drawHpBar(x, y, w, hp, maxHp) {
+    const p = Math.max(0, hp/maxHp); const h = 3;
+    ctx.fillStyle = 'rgba(8,12,20,0.6)';
+    roundRect(x-w/2, y, w, h, 1.5); ctx.fill();
+    const grad = ctx.createLinearGradient(x-w/2, y, x+w/2, y);
+    if (p>0.5) { grad.addColorStop(0,'#6fe0a8'); grad.addColorStop(1,'#3ab878'); }
+    else if (p>0.25) { grad.addColorStop(0,'#f0d070'); grad.addColorStop(1,'#d8a838'); }
+    else { grad.addColorStop(0,'#ff8070'); grad.addColorStop(1,'#e84030'); }
+    ctx.fillStyle = grad; roundRect(x-w/2, y, w*p, h, 1.5); ctx.fill();
+  }
+  function roundRect(x, y, w, h, r) {
+    r = Math.min(r, w/2, h/2);
+    ctx.beginPath(); ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath();
+  }
+
+  function drawPlayerSprite() {
+    const p = G.player;
+    if (!G.spriteReady || !G.sprite) {
+      /* 素材未加载时用占位图形 */
+      const sx = worldToScreen(p.x); const sy = floorY();
+      ctx.save(); ctx.translate(sx, sy);
+      if (p.hurtT > 0) { ctx.globalAlpha = 0.5+0.5*Math.sin(p.hurtT*40); ctx.filter = 'brightness(2.2) saturate(0.3)'; }
+      const bodyH = Math.min(40, CH*0.3);
+      ctx.fillStyle = '#e8eef5';
+      ctx.beginPath(); ctx.moveTo(-10,-bodyH); ctx.lineTo(10,-bodyH); ctx.lineTo(13,-4); ctx.lineTo(-13,-4); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#f0d8c0'; ctx.beginPath(); ctx.arc(0,-bodyH-6,7,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+      drawHpBar(sx, sy-bodyH-20, 32, p.hp, p.maxHp);
+      return;
+    }
+    /* 真实 sprite 渲染 */
+    const sx = worldToScreen(p.x);
+    const sy = floorY();
+    /* 计算帧索引和位置 */
+    let frameIdx;
+    if (p.attackAnim) frameIdx = SPRITE.attackStart + Math.min(p.animFrame, SPRITE.attackCount-1);
+    else frameIdx = SPRITE.walkStart + (p.animFrame % SPRITE.walkCount);
+    const col = frameIdx % SPRITE.cols;
+    const row = Math.floor(frameIdx / SPRITE.cols);
+    const srcX = col * SPRITE.fw;
+    const srcY = row * SPRITE.fh;
+    /* 渲染尺寸: 适配战斗区高度 */
+    const drawH = Math.min(CH * 0.55, 80);
+    const drawW = drawH * (SPRITE.fw / SPRITE.fh);
+    ctx.save();
+    ctx.translate(sx, sy);
+    if (p.hurtT > 0) { ctx.globalAlpha = 0.5+0.5*Math.sin(p.hurtT*40); ctx.filter = 'brightness(2.2) saturate(0.3)'; }
+    ctx.drawImage(G.sprite, srcX, srcY, SPRITE.fw, SPRITE.fh, -drawW*0.35, -drawH, drawW, drawH);
+    ctx.restore();
+    /* 血条 */
+    drawHpBar(sx, sy - drawH - 8, 36, p.hp, p.maxHp);
+  }
+
+  function drawPets() {
+    for (const pet of G.pets) {
+      const sx = worldToScreen(pet.x); const sy = floorY()+pet.offsetY;
+      ctx.save(); ctx.translate(sx, sy);
+      if (pet.hurtT > 0) { ctx.globalAlpha = 0.6; ctx.filter = 'brightness(2)'; }
+      const r = Math.min(8, CH*0.07);
+      ctx.fillStyle = pet.color; ctx.beginPath(); ctx.arc(0,-r,r,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#1a1a2a'; ctx.beginPath(); ctx.arc(-2.5,-r-1,1.2,0,Math.PI*2); ctx.arc(2.5,-r-1,1.2,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+      drawHpBar(sx, sy-2*r-5, 18, pet.hp, pet.maxHp);
+    }
+  }
+
+  function drawEnemies() {
+    for (const e of G.enemies) {
+      if (!e.alive && e.dying <= 0) continue;
+      const sx = worldToScreen(e.x); const sy = floorY();
+      ctx.save(); ctx.translate(sx, sy);
+      if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
+      if (e.hurtT > 0) { ctx.globalAlpha *= 0.6; ctx.filter = 'brightness(2)'; }
+      if (e.type === 'slime') {
+        const w = Math.min(20, CH*0.15), h = Math.min(15, CH*0.12);
+        ctx.fillStyle = e.color; ctx.beginPath(); ctx.ellipse(0,-h/2,w/2,h/2,0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#1a2a1a'; ctx.beginPath(); ctx.arc(-4,-h/2-1,2,0,Math.PI*2); ctx.arc(4,-h/2-1,2,0,Math.PI*2); ctx.fill();
+      } else if (e.type === 'demon') {
+        const bodyH = Math.min(28, CH*0.22);
+        ctx.fillStyle = e.color; ctx.beginPath(); ctx.moveTo(-8,-bodyH); ctx.lineTo(8,-bodyH); ctx.lineTo(10,-4); ctx.lineTo(-10,-4); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#8a4030'; ctx.beginPath(); ctx.arc(0,-bodyH-4,6,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#4a2010';
+        ctx.beginPath(); ctx.moveTo(-5,-bodyH-8); ctx.lineTo(-8,-bodyH-15); ctx.lineTo(-2,-bodyH-10); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(5,-bodyH-8); ctx.lineTo(8,-bodyH-15); ctx.lineTo(2,-bodyH-10); ctx.fill();
+        ctx.fillStyle = '#ffdd44'; ctx.beginPath(); ctx.arc(-2,-bodyH-4,1.2,0,Math.PI*2); ctx.arc(2,-bodyH-4,1.2,0,Math.PI*2); ctx.fill();
+      } else {
+        const bodyH = Math.min(25, CH*0.2);
+        ctx.fillStyle = e.color; ctx.beginPath(); ctx.moveTo(-7,-bodyH); ctx.lineTo(7,-bodyH); ctx.lineTo(9,-4); ctx.lineTo(-9,-4); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#6a4a8a'; ctx.beginPath(); ctx.arc(0,-bodyH-3,5.5,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#8a6a4a'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(8,-bodyH*0.4,9,-Math.PI/2,Math.PI/2); ctx.stroke();
+      }
+      ctx.restore();
+      if (e.alive) drawHpBar(sx, sy-35, 24, e.hp, e.maxHp);
+    }
+  }
+
+  function drawFx() {
+    for (const f of G.fx) {
+      const k = f.t/f.dur; const sx = worldToScreen(f.x);
+      if (f.kind === 'hitSpark') {
+        ctx.save(); ctx.translate(sx, f.y); ctx.rotate(f.t*3);
+        ctx.strokeStyle = f.color; ctx.globalAlpha = 1-k; ctx.lineWidth = 1.2;
+        for (let i=0; i<4; i++) { ctx.rotate(Math.PI/4); ctx.beginPath(); ctx.moveTo(0,2); ctx.lineTo(0,6); ctx.stroke(); }
+        ctx.restore();
+      } else if (f.kind === 'death') {
+        ctx.save(); ctx.translate(sx, f.y);
+        for (let i=0; i<8; i++) {
+          const ang = i/8*6.28, r = k*15;
+          ctx.fillStyle = f.color; ctx.globalAlpha = (1-k)*0.9;
+          ctx.beginPath(); ctx.arc(Math.cos(ang)*r, Math.sin(ang)*r, 1.8*(1-k)+0.5, 0, 6.28); ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+  }
+
+  function drawDmg() {
+    for (const d of G.dmg) {
+      const a = 1-d.t/0.9; const sx = worldToScreen(d.x); const sy = d.y-d.t*20;
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.font = (d.crit ? 'bold 13px ' : 'bold 10px ') + 'ui-monospace, monospace';
+      ctx.textAlign = 'center'; ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(8,12,18,0.9)';
+      const scale = d.crit ? 1+Math.min(0.25, d.t*2) : 1;
+      ctx.translate(sx, sy); ctx.scale(scale, scale);
+      ctx.strokeText(d.val, 0, 0); ctx.fillStyle = d.color; ctx.fillText(d.val, 0, 0);
+      ctx.restore();
+    }
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, CW, CH);
+    drawBg(); drawEnemies(); drawPets(); drawPlayerSprite(); drawFx(); drawDmg();
+  }
+
+  function updateHUD() {
+    const killsEl = document.getElementById('battleKills');
+    const speedEl = document.getElementById('battleSpeed');
+    const stateEl = document.getElementById('battleState');
+    if (killsEl) killsEl.textContent = G.kills;
+    if (speedEl) {
+      if (G.speedMult > 1) { speedEl.style.display = ''; speedEl.textContent = '×'+G.speedMult+' 倍速 ('+G.speedMultTimer.toFixed(1)+'s)'; }
+      else speedEl.style.display = 'none';
+    }
+    if (stateEl) stateEl.textContent = G.state === 'fight' ? '战斗中' : '推进中';
+  }
+
+  let lastT = 0;
+  function loop(t) {
+    const dt = Math.min(0.05, (t-lastT)/1000); lastT = t;
+    update(dt); render();
+    requestAnimationFrame(loop);
+  }
+
+  function init() {
+    if (!initCanvas()) { setTimeout(init, 200); return; }
+    G.player = makePlayer(); G.player.x = 100;
+    updateHUD();
+    requestAnimationFrame(loop);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+
 </body>
 </html>
