@@ -779,6 +779,7 @@
        * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。 */
       slime: { name:'妖卒', role:'melee', w:60, atkRange:30, speed:120, hpK:1.0, atkK:0.55, defK:0.35, color:'#6fe0a8' },
       water: { name:'水灵', role:'melee', w:40, atkRange:35, speed:80,  hpK:1.6, atkK:0.75, defK:0.60, color:'#6fd0e8' },
+      boss:  { name:'史莱姆王', role:'ranged', w:5,  atkRange:160, speed:40, hpK:8.0, atkK:1.5, defK:1.2, color:'#a0ff80', isBoss:true, floatHeight:60, sizeMult:2.0 },
     },
   };
 
@@ -799,9 +800,10 @@
     t:0, kills:0, spirit:0, speedMult:1, speedMultTimer:0, state:'walk', camX:0, paused:false,
     player:null, pets:[], enemies:[], fx:[], dmg:[], drops:[], spawnT:BC.spawnInterval,
     sprite:null, bgImg:null, spriteReady:false, bgReady:false, extraStrike:false,
-    speedDodge:0, nextStrikeCrit:0,     // 身法期间的闪避加成 / 追猎连击的暴击加成
+    speedDodge:0, nextStrikeCrit:0,
     petFoxSprite:null, petFoxReady:false,
     skillSprite:null, skillReady:false,
+    smallKillsSinceBoss:0, bossActive:false, bossSpawnEvery:60,
   };
 
   /* 加载素材 */
@@ -819,6 +821,10 @@
   const waterSpriteImg = new Image();
   waterSpriteImg.onload = function() { G.waterSprite = waterSpriteImg; G.waterReady = true; };
   waterSpriteImg.src = 'assets/monster_002_water_sprite.webp';
+  /* BOSS素材: 史莱姆王(飘着, 2倍大) */
+  const bossSpriteImg = new Image();
+  bossSpriteImg.onload = function() { G.bossSprite = bossSpriteImg; G.bossReady = true; };
+  bossSpriteImg.src = 'assets/monster_003_slime_king.webp';
   /* 宠物素材: 灵狐 */
   const petFoxImg = new Image();
   petFoxImg.onload = function() { G.petFoxSprite = petFoxImg; G.petFoxReady = true; };
@@ -840,11 +846,12 @@
     water_footstep: new Audio('assets/sfx/water_footstep.ogg'),
     water_attack: new Audio('assets/sfx/water_attack.ogg'),
     water_hurt: new Audio('assets/sfx/water_hurt.ogg'),
+    boss_attack: new Audio('assets/sfx/boss_attack.ogg'),
     ready: false
   };
   let sfxLoaded = 0;
-  const sfxTotal = 10;
-  for (const key of ['footstep', 'attack1', 'attack2', 'skill_attack', 'slime_footstep', 'slime_attack', 'slime_hurt', 'water_footstep', 'water_attack', 'water_hurt']) {
+  const sfxTotal = 11;
+  for (const key of ['footstep', 'attack1', 'attack2', 'skill_attack', 'slime_footstep', 'slime_attack', 'slime_hurt', 'water_footstep', 'water_attack', 'water_hurt', 'boss_attack']) {
     sfx[key].addEventListener('canplaythrough', () => {
       sfxLoaded++;
       if (sfxLoaded >= sfxTotal) sfx.ready = true;
@@ -866,6 +873,8 @@
   const SLIME_SPRITE = { cols:12, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:51, hurtStart:83, hurtCount:11, fps:24 };
   /* 水精灵帧配置: 10列8行, walk32+attack33+hurt13 */
   const WATER_SPRITE = { cols:10, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:33, hurtStart:65, hurtCount:13, fps:24 };
+  /* BOSS史莱姆王: 飘着的, 2倍大, 帧0-17漂浮, 帧18-39攻击, 帧40-47恢复 */
+  const BOSS_SPRITE = { cols:8, fw:240, fh:200, walkStart:0, walkCount:18, attackStart:18, attackCount:22, hurtStart:0, hurtCount:0, fps:8, isBoss:true, floatHeight:60, sizeMult:2.0 };
 
   function fmtNum(n) {
     n = Math.round(n || 0);
@@ -947,7 +956,20 @@
       atkT:Math.random()*0.6, anim:0,hurtT:0,stun:0, alive:true,dying:0,reach:1, animFrame:0, animTimer:0, moving:false };
   }
   function spawnWave() {
-    const types = Object.keys(BC.enemies);
+    /* BOSS活跃时不刷新小怪 */
+    if (G.bossActive) return null;
+    /* 每60只小怪刷一只BOSS */
+    if (G.smallKillsSinceBoss >= G.bossSpawnEvery) {
+      if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= BC.maxAlive) return null;
+      const e = makeEnemy('boss');
+      e.x = G.camX + stageW() + BC.enemySpawnOffset;
+      e.elite = true;  /* BOSS标记为精英 */
+      G.enemies.push(e);
+      G.bossActive = true;
+      G.smallKillsSinceBoss = 0;
+      return e;
+    }
+    const types = Object.keys(BC.enemies).filter(t => t !== 'boss');
     const tw = types.reduce((s,t) => s + (BC.enemies[t].w || 1), 0);
     let r = Math.random()*tw, type = types[0];
     for (const t of types) { r -= (BC.enemies[t].w || 1); if (r <= 0) { type = t; break; } }
@@ -985,6 +1007,13 @@
   }
   /* ---------- 击杀结算: 灵石 + (装备由主游戏 roll) + 技能经验 + 追猎/加速 ---------- */
   function onKill(e) {
+    /* BOSS/小怪击杀计数 */
+    if (e.type === 'boss') {
+      G.bossActive = false;
+      G.smallKillsSinceBoss = 0;
+    } else {
+      G.smallKillsSinceBoss++;
+    }
     const mul = e.elite ? DROP.eliteMul : 1;
     const jitter = 1 - DROP.spiritRand + Math.random()*DROP.spiritRand*2;
     const sp = Math.max(1, Math.round((DROP.spiritBase + DROP.spiritPerLv*(PST.lv||1)) * jitter * mul));
@@ -1427,6 +1456,7 @@
         if (!wasAttacking) {
           if (e.type === 'slime') playSfx('slime_attack', 0.5);
           else if (e.type === 'water') playSfx('water_attack', 0.5);
+          else if (e.type === 'boss') playSfx('boss_attack', 0.8);
         }
         /* 闪避判定(装备词条 + 身法技能时效加成) —— 落空则不进伤害 */
         if (Math.random()*100 < ((PST.dodge || 0) + G.speedDodge)) {
@@ -1795,6 +1825,32 @@
         ctx.restore();
         if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
         if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp);
+      } else if (G.bossReady && G.bossSprite && e.type === 'boss') {
+        /* BOSS史莱姆王: 飘着的, 2倍大, 攻击/漂浮分帧 */
+        let frameIdx;
+        if (e.anim > 0) {
+          const atkProgress = 1 - e.anim;
+          frameIdx = BOSS_SPRITE.attackStart + Math.min(Math.floor(atkProgress * BOSS_SPRITE.attackCount), BOSS_SPRITE.attackCount-1);
+        } else {
+          frameIdx = BOSS_SPRITE.walkStart + (Math.floor(G.t * BOSS_SPRITE.fps) % BOSS_SPRITE.walkCount);
+        }
+        const col = frameIdx % BOSS_SPRITE.cols;
+        const row = Math.floor(frameIdx / BOSS_SPRITE.cols);
+        const srcX = col * BOSS_SPRITE.fw;
+        const srcY = row * BOSS_SPRITE.fh;
+        /* BOSS 2倍大, 漂浮不踩地板 */
+        const drawH = Math.min(CH * 0.7, 140);
+        const drawW = drawH * (BOSS_SPRITE.fw / BOSS_SPRITE.fh);
+        const floatY = BOSS_SPRITE.floatHeight + Math.sin(G.t * 1.5) * 8;  /* 漂浮上下浮动 */
+        ctx.save();
+        ctx.translate(sx, sy - floatY);  /* 漂浮在地板上方 */
+        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
+        if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
+        /* BOSS面朝左, 素材本身就是面朝左 */
+        ctx.drawImage(G.bossSprite, srcX, srcY, BOSS_SPRITE.fw, BOSS_SPRITE.fh, -drawW*0.5, -drawH, drawW, drawH);
+        ctx.restore();
+        /* BOSS血条在头顶 */
+        if (e.alive) drawHpBar(sx, sy - floatY - drawH - 8, 50, e.hp, e.maxHp);
       } else {
         /* 素材未就绪时的兜底占位(正常不会走到这里) */
         ctx.save(); ctx.translate(sx, sy);
