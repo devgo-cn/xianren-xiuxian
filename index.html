@@ -1220,7 +1220,9 @@
             /* 一段刺死就中断, 不刺第二下 */
             if (!p.attackTarget.alive) {
               p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false;
-              if (G.extraStrike) { G.extraStrike = false; p.atkT = 0; }   // 追猎: 立刻再出手
+              /* v2.5 基础攻速: 秒杀中断也吃满攻击间隔 —— 否则高攻秒怪时只剩 ~0.5s/杀的连环速攻 */
+              p.atkT = Math.max(p.atkT, 1 / p.aspd);
+              if (G.extraStrike) { G.extraStrike = false; p.atkT = 0; }   // 追猎: 立刻再出手(技能特性保留)
             }
           }
         }
