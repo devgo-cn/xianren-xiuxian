@@ -2,9 +2,9 @@
   "files": {
     "assets/cultivator_body.webp": "a72d9d498231d77e7f8d131152f06059ddca1091e83889c38c3224ae26927b94",
     "assets/cultivator_hair.webp": "4e83df9dfe253be84dbbfb0a183b283ef75c9c362c522d24b012e3c2070c639d",
-    "assets/cultivator_meta.json": "6e4877f2ba35816da6016ea06e88afd4b72d56435b39a8dbd2b048b6295f4667",
+    "assets/cultivator_meta.json": "5ea21a40843b6fa40d875d8f10bc86b5bc9f1172e15f41690fc1bd92b77c1670",
     "assets/cultivator_robe.webp": "30b6bdf27221803a1a91d901e9c691b884c70287002bb0b5688d9684e34faf59",
-    "assets/cultivator_sheet.png": "f09e38551377422a7fbf804993b9babc444698f477748b636a039de88845c695",
+    "assets/cultivator_sheet.png": "d059a1e6b782e3888260f5c5a7543ea773dd0c7837e2272c79b14fd7a95b48bc",
     "assets/hpbar-ink-bg.png": "9c4d59566fea202e116fe53702df50b7ce9257891a9bb55b1b6f3a58e754faed",
     "assets/hpbar-ink-mask.png": "f7b2802c5d93ab447300c15d5ccaf035cd9c37eef292ec83910b0aef3394c8e2",
     "assets/main-bg.jpg": "30bda2c355760f1364da3a11f01f31cd7928babeb565ed064d0c41f66b8fb0d8",
@@ -128,8 +128,8 @@
     "dt-theme.css": "036a3ebb6cff5f075c3ab8ea3666b7f99e0f843b39d6f2b05e0b54fad8e569ae",
     "fx2d.js": "a2a094eda63597f16245e2f2d421fcc05c0955b4239650e62c63887bc352a9ea",
     "game.js": "c29f23d10a4a1bd121200c279a7490924e615c3312feed566e8822eb766a075c",
-    "index.html": "5b61c68cb065f1aa3e37063749c22a02c545a3132f808a26800f82513effe42d"
+    "index.html": "33ea7327b8b9ff11e43e000ebcefa80d9d042efde6ff31dd3b6616458a0cb42c"
   },
-  "rev": "aa3aef43b0e914aa",
+  "rev": "1ccd9caa1ef33493",
   "version": "2.4"
 }
