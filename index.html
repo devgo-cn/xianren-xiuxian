@@ -1444,7 +1444,7 @@
     G.dmg = G.dmg.filter(d => d.t < 0.9);
   }
   function updateCamera(dt) {
-    const targetCam = G.player.x - stageW()*0.28;
+    const targetCam = G.player.x - stageW()*0.42;   // 玩家锁屏中间偏左: 右侧留出更多来怪空间, 推进感更强
     G.camX += (targetCam-G.camX)*Math.min(1, dt*6);
   }
   let _pushT = 0;
@@ -1490,38 +1490,70 @@
   }
   function worldToScreen(wx) { return wx - G.camX; }
 
+  function hash01(n) { return ((Math.imul(n | 0, 1103515245) + 12345) >>> 8) % 1000 / 1000; }
+  function drawCloudShape(x, y, s, alpha) {
+    /* 一朵云 = 4 个椭圆拼的云团(同一路径一次填充, 重叠处不会加深) */
+    ctx.save(); ctx.globalAlpha = alpha; ctx.fillStyle = '#d8e4f0';
+    ctx.beginPath();
+    ctx.ellipse(x, y, 70 * s, 13 * s, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - 40 * s, y + 4 * s, 32 * s, 8 * s, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + 42 * s, y + 5 * s, 28 * s, 7 * s, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + 8 * s, y - 9 * s, 34 * s, 9 * s, 0, 0, Math.PI * 2);
+    ctx.fill(); ctx.restore();
+  }
+  function drawClouds() {
+    /* 三层视差云: 远层慢而淡、近层快而实; 随摄像机视差滚动 + 自身缓慢漂移 + 上下浮动 */
+    const t = G.t;
+    const layers = [
+      { par: 0.12, n: 5, gap: 540, alpha: 0.045, sc: 0.72, yBase: 0.10, spd: 3 },
+      { par: 0.28, n: 4, gap: 660, alpha: 0.062, sc: 1.0,  yBase: 0.21, spd: 6 },
+      { par: 0.52, n: 3, gap: 840, alpha: 0.08,  sc: 1.38, yBase: 0.34, spd: 10 },
+    ];
+    for (const L of layers) {
+      const total = L.n * L.gap;
+      for (let i = 0; i < L.n; i++) {
+        const wx = i * L.gap + hash01(i * 31 + L.n * 7) * 260;
+        let sx = (((wx - G.camX * L.par - t * L.spd) % total) + total) % total - 320;
+        if (sx > CW + 320) continue;
+        const r = hash01(i * 57 + L.n * 13);
+        const cy = CH * (L.yBase + r * 0.09) + Math.sin(t * 0.5 + i * 1.7) * 4;
+        drawCloudShape(sx, cy, L.sc * (0.8 + r * 0.45), L.alpha);
+      }
+    }
+  }
+  function drawGround() {
+    /* 地面带 + 1:1 滚动刻度/碎石 —— 推进感的主要参照物 */
+    const fy = floorY();
+    const g = ctx.createLinearGradient(0, fy, 0, fy + 16);
+    g.addColorStop(0, 'rgba(180,170,140,0.10)');
+    g.addColorStop(1, 'rgba(180,170,140,0.02)');
+    ctx.fillStyle = g; ctx.fillRect(0, fy, CW, 16);
+    /* 刻度斜线: 世界坐标每 56px 一条, 随 camX 滚动 */
+    const gap = 56, off = ((G.camX % gap) + gap) % gap;
+    ctx.strokeStyle = 'rgba(180,170,140,0.16)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = gap - off; x < CW + gap; x += gap) { ctx.moveTo(x, fy + 3); ctx.lineTo(x - 6, fy + 11); }
+    ctx.stroke();
+    /* 碎石点: 按世界格索引取确定性伪随机, 高低错落 */
+    const gap2 = 23, start = Math.floor(G.camX / gap2) - 1, end = start + Math.ceil(CW / gap2) + 3;
+    ctx.fillStyle = 'rgba(200,190,160,0.13)';
+    for (let i = start; i < end; i++) {
+      const r = hash01(i * 2654435761);
+      ctx.fillRect(i * gap2 - G.camX, fy + 4 + r * 9, 2, 1.5);
+    }
+  }
   function drawBg() {
     /* 战斗区背景完全透明，直接叠加在原游戏墨夜星空(canvas#bg)上 */
     const fy = floorY();
-    /* 静态云层特效（不随摄像机移动，作为角色向前推进的视觉参考） */
-    ctx.save();
-    ctx.globalAlpha = 0.07;
-    ctx.fillStyle = '#d8e4f0';
-    /* 高层云 */
-    ctx.beginPath();
-    ctx.ellipse(CW*0.18, CH*0.14, CW*0.17, CH*0.038, 0, 0, Math.PI*2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(CW*0.72, CH*0.09, CW*0.14, CH*0.032, 0, 0, Math.PI*2);
-    ctx.fill();
-    /* 中层云 */
-    ctx.globalAlpha = 0.05;
-    ctx.beginPath();
-    ctx.ellipse(CW*0.48, CH*0.27, CW*0.20, CH*0.045, 0, 0, Math.PI*2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(CW*0.88, CH*0.21, CW*0.11, CH*0.028, 0, 0, Math.PI*2);
-    ctx.fill();
-    /* 低层薄雾 */
-    ctx.globalAlpha = 0.03;
-    ctx.beginPath();
-    ctx.ellipse(CW*0.3, CH*0.42, CW*0.25, CH*0.04, 0, 0, Math.PI*2);
-    ctx.fill();
-    ctx.restore();
-    /* 地板线：2px 旧金色细线 */
-    ctx.strokeStyle = 'rgba(180,170,140,0.25)';
+    drawClouds();
+    /* 地板线：2px 旧金色细线 + 上缘高光 */
+    ctx.strokeStyle = 'rgba(180,170,140,0.28)';
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(0, fy); ctx.lineTo(CW, fy); ctx.stroke();
+    ctx.strokeStyle = 'rgba(240,230,200,0.10)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, fy - 1.5); ctx.lineTo(CW, fy - 1.5); ctx.stroke();
+    drawGround();
   }
 
   function drawEliteRing(x, y, r) {          // 精英怪: 脚下金色法环
