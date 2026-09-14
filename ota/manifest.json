@@ -114,6 +114,8 @@
     "assets/monster_001_green_slime_meta.json": "33a719f4ae861c8c07513e035ab678c9a662e30592daea9dacfbd828221d3712",
     "assets/monster_002_water_sprite.webp": "a19104128518abf8a910f14632302240b36496ffd4e756b11278275dab00f0b1",
     "assets/monster_002_water_sprite_meta.json": "32160b5628c45ac577a5ac1d6ed69637629c602dbc3b5c882120cf00bea751c7",
+    "assets/monster_003_slime_king.webp": "665c23ae8e6b63f0aa842c60bb0650492701863f6de63efb1c596e754cb75ad3",
+    "assets/monster_003_slime_king_idle.webp": "f4eb08a3015b82645859b2e71333225e22f56ac61b0e019d400ac3d7b73835f0",
     "assets/monster_idle_icons/cultivator_idle.png": "47936dcdbd7f9824c7576d5cce701d898fdfb7687e9273668625486eda2e15d0",
     "assets/monster_idle_icons/monster_001_green_slime_idle.png": "19d6ec30f475a34d83d508a198f3f246550269f6152b38e1c091a6435554df0a",
     "assets/monster_idle_icons/monster_002_water_sprite_idle.png": "088a57b32c8c4b67c197c68cda0a31dd166dfa3a8a3506acb9f0ea7dc3d02b16",
@@ -128,6 +130,7 @@
     "assets/pet_fox_sheet.webp": "1f5b7279fb682b63b362f7c73c4fc41e12434f517ef337fbf30f8dbf95e18956",
     "assets/sfx/attack1.ogg": "bb1e63052519c6c8a0e6e86f684035ad209f247c63b3317b48be8abf454f4b96",
     "assets/sfx/attack2.ogg": "89ee51ee4cac1e101107e68610c1b815a303bd9009d36747bb6d80f57aa71e2f",
+    "assets/sfx/boss_attack.ogg": "115ae50fddb3bb168a18eff55dafa76f272c45b421d96d847aa3697b60c706d5",
     "assets/sfx/footstep.ogg": "609f738673b63dda5b904d27e9ee9296910b547b348a627f60250a0a35d97e43",
     "assets/sfx/skill_attack.ogg": "bd5377598a07113ccf4efa6be7f7668901cfe5a367e59c7802d05667feb573fc",
     "assets/sfx/slime_attack.ogg": "1825b4ec66f26049dba4d7111533cfc5c6bd1686c46e5b6a63e0d32e30e9d6d5",
@@ -158,8 +161,8 @@
     "dt-theme.css": "6a17d65775d8c19500601b2b309e5682b6f9768bb0fb537d61b98c8538aa1a66",
     "fx2d.js": "a2a094eda63597f16245e2f2d421fcc05c0955b4239650e62c63887bc352a9ea",
     "game.js": "644547399a27149ff1f33a5afe8a4a2bcd41cb3756eb0eaf266795dc6bae8fd6",
-    "index.html": "437707fa9a8245fa59ba06874914d3e9f029ec87ed0f72a14b13c2b36da9e1db"
+    "index.html": "f2607a11f5fed990c00a6f0e9ab6e49c1c0a1ef9063e6db3ae16e5b32a87efb2"
   },
-  "rev": "6fa8709d0be207ff",
+  "rev": "626f9e2a6d11b980",
   "version": "2.4"
 }
