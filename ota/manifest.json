@@ -144,7 +144,10 @@
     "dt-theme.css": "6a17d65775d8c19500601b2b309e5682b6f9768bb0fb537d61b98c8538aa1a66",
     "fx2d.js": "a2a094eda63597f16245e2f2d421fcc05c0955b4239650e62c63887bc352a9ea",
     "game.js": "6be3618bf2fbc0e478b8cbad068d1146994a04c2e99f7d43a7b55ec3e2f873de",
-    "index.html": "d04cf7ee15de6bfe81fa1a3dc0cafe00a23e56fc4b2d6097e2b5508e4054ab8b"
+    "index.html": "d04cf7ee15de6bfe81fa1a3dc0cafe00a23e56fc4b2d6097e2b5508e4054ab8b",
+    "assets/pet_fox_sheet.webp": "30ea8420e23203417b9fff9d835080337e61887f882061dd068129f489e00589",
+    "assets/pet_fox_meta.json": "9c1b5e821cfbdc1355bb53b7c2530a2ace20234b5ef985dfed950cb18fe62a1b",
+    "assets/cultivator_skill_sheet.webp": "6c3c98fb343e0a7689162c2337d93953124d3c91db123dc689aa930c2033d31a"
   },
   "rev": "e90673193f7d22aa",
   "version": "2.4"
