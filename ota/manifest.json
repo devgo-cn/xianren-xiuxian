@@ -109,7 +109,7 @@
     "assets/modals/ico/zhuji.webp": "58402ece9363e8e6bb6e53cda8ac42b14fef0656ee763978c09b5c060afce2bc",
     "assets/modals/ico/zihou.webp": "5dc6a78f3c18c93582216276cef61de91038a294c00baab89c370656ce3f8a59",
     "assets/modals/ico/zilei.webp": "6a8fd580f989d58366165d14bd6e1d4d61ceb85baa7958bdd16217c74f5a51c8",
-    "assets/monster_001_green_slime.png": "c2a6aa6f5a2b455d98dcef51f3ad0bce49038f4079699dc2ee92e58beb1e4d97",
+    "assets/monster_001_green_slime.png": "9902dc678c51700e5c9fdcf218360b6b17ab7567faf335b7f55c05fb3c80cf4f",
     "assets/monster_001_green_slime_meta.json": "854ad8da7520f456d310a16bc1b849ae06dd1be88df9485e71803cf983a715ae",
     "assets/monsters/m0_wolf.png": "6789c303957e665440519b98aa680a7f9308f960dcd5bca0576a3552e8bafbe8",
     "assets/monsters/m1_shanyao.png": "0d7c9b8b9b2517d6755c94d0ca9a79d151ade5d7ab9bcc82bb8fbc5169ca4e06",
@@ -130,8 +130,8 @@
     "dt-theme.css": "036a3ebb6cff5f075c3ab8ea3666b7f99e0f843b39d6f2b05e0b54fad8e569ae",
     "fx2d.js": "a2a094eda63597f16245e2f2d421fcc05c0955b4239650e62c63887bc352a9ea",
     "game.js": "c29f23d10a4a1bd121200c279a7490924e615c3312feed566e8822eb766a075c",
-    "index.html": "d9c0f55c3c3d1c5da8027abe77ca576acba760d1d14dd89ab473eff65bfb79e3"
+    "index.html": "529eb1b3c3f187932b0ab004fc8abebad1f0666c1fa81fc36d7fed3318d27929"
   },
-  "rev": "634cd0e7a607bdf6",
+  "rev": "10a6fd9376beda37",
   "version": "2.4"
 }
