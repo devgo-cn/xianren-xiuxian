@@ -5,6 +5,7 @@
     "assets/cultivator_meta.json": "5ea21a40843b6fa40d875d8f10bc86b5bc9f1172e15f41690fc1bd92b77c1670",
     "assets/cultivator_robe.webp": "30b6bdf27221803a1a91d901e9c691b884c70287002bb0b5688d9684e34faf59",
     "assets/cultivator_sheet.webp": "ed72ed2f3440483c79b6626a588452a0455d29a71147102f0a3baa92f83fecbb",
+    "assets/cultivator_skill_sheet.webp": "6c3c98fb343e0a7689162c2337d93953124d3c91db123dc689aa930c2033d31a",
     "assets/hpbar-ink-bg.png": "9c4d59566fea202e116fe53702df50b7ce9257891a9bb55b1b6f3a58e754faed",
     "assets/hpbar-ink-mask.png": "f7b2802c5d93ab447300c15d5ccaf035cd9c37eef292ec83910b0aef3394c8e2",
     "assets/main-bg.jpg": "30bda2c355760f1364da3a11f01f31cd7928babeb565ed064d0c41f66b8fb0d8",
@@ -123,6 +124,8 @@
     "assets/monsters/m4_jiaoyao.png": "23c21be19f7cf63d4924d3d87b472e9a12af32e768a93012d191fea1bebafc54",
     "assets/monsters/m5_tianmo.png": "4b4893a5bd5265150b3aa1be6caaf75c9f0bb546e9afc57e0309c081097a37a4",
     "assets/music/bgm.mp3": "3139ad8a89de8d7284c4b0c00b9d94164d1f231e8b3a6b0a2923d78206c5befe",
+    "assets/pet_fox_meta.json": "9c1b5e821cfbdc1355bb53b7c2530a2ace20234b5ef985dfed950cb18fe62a1b",
+    "assets/pet_fox_sheet.webp": "30ea8420e23203417b9fff9d835080337e61887f882061dd068129f489e00589",
     "assets/sfx/attack1.ogg": "bb1e63052519c6c8a0e6e86f684035ad209f247c63b3317b48be8abf454f4b96",
     "assets/sfx/attack2.ogg": "89ee51ee4cac1e101107e68610c1b815a303bd9009d36747bb6d80f57aa71e2f",
     "assets/sfx/footstep.ogg": "609f738673b63dda5b904d27e9ee9296910b547b348a627f60250a0a35d97e43",
@@ -144,11 +147,8 @@
     "dt-theme.css": "6a17d65775d8c19500601b2b309e5682b6f9768bb0fb537d61b98c8538aa1a66",
     "fx2d.js": "a2a094eda63597f16245e2f2d421fcc05c0955b4239650e62c63887bc352a9ea",
     "game.js": "6be3618bf2fbc0e478b8cbad068d1146994a04c2e99f7d43a7b55ec3e2f873de",
-    "index.html": "d04cf7ee15de6bfe81fa1a3dc0cafe00a23e56fc4b2d6097e2b5508e4054ab8b",
-    "assets/pet_fox_sheet.webp": "30ea8420e23203417b9fff9d835080337e61887f882061dd068129f489e00589",
-    "assets/pet_fox_meta.json": "9c1b5e821cfbdc1355bb53b7c2530a2ace20234b5ef985dfed950cb18fe62a1b",
-    "assets/cultivator_skill_sheet.webp": "6c3c98fb343e0a7689162c2337d93953124d3c91db123dc689aa930c2033d31a"
+    "index.html": "8c8ff5898a6a99637eb9be3b83c30d246c75f287494e3a9fff3cb6e3d6530d12"
   },
-  "rev": "e90673193f7d22aa",
+  "rev": "90785636747e3e80",
   "version": "2.4"
 }
