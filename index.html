@@ -1852,13 +1852,13 @@
           off.width = drawW; off.height = drawH;
           const octx = off.getContext('2d');
           octx.drawImage(G.bossSprite, srcX, srcY, BOSS_SPRITE.fw, BOSS_SPRITE.fh, 0, 0, drawW, drawH);
-          /* 左侧40%区域渐隐: 从左边缘完全透明到40%位置完全不透明 */
+          /* 左侧40%区域渐隐: 从左边缘完全透明到40%位置完全不透明, 右侧保持不透明 */
           octx.globalCompositeOperation = 'destination-in';
           const grad = octx.createLinearGradient(0, 0, drawW * 0.4, 0);
           grad.addColorStop(0, 'rgba(0,0,0,0)');
           grad.addColorStop(1, 'rgba(0,0,0,1)');
           octx.fillStyle = grad;
-          octx.fillRect(0, 0, drawW * 0.4, drawH);
+          octx.fillRect(0, 0, drawW, drawH);  /* 必须填充整个画布, 否则右侧变透明 */
           ctx.drawImage(off, -drawW*0.5, -drawH);
         } else {
           /* 漂浮帧直接绘制 */
