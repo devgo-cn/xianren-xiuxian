@@ -358,10 +358,12 @@
   #cloudChip{display:flex;align-items:center;gap:5px;max-width:168px;white-space:nowrap;overflow:hidden;
     background:rgba(10,14,18,.72);border:1px solid rgba(140,180,255,.25);border-radius:999px;
     padding:3px 9px;font-size:11px;color:#9fc2e8;cursor:pointer;user-select:none;line-height:1.2}
-  #cloudChip .dot{width:7px;height:7px;border-radius:50%;background:#7a8694;flex:none}
-  #cloudChip.on .dot{background:#3ddc84;box-shadow:0 0 6px #3ddc84}
+  #cloudChip .dot{width:8px;height:8px;border-radius:50%;background:#7a8694;flex:none;transition:background .2s}
+  /* 联通状态点: 已连通=绿色脉冲闪烁; 同步中=黄色闪烁; 断开=红色常亮 */
+  #cloudChip.on .dot{background:#3ddc84;animation:cpon 1.4s ease-in-out infinite}
   #cloudChip.off .dot{background:#ff6b6b}
   #cloudChip.sync .dot{background:#ffd166;animation:cp 1s infinite}
+  @keyframes cpon{0%,100%{box-shadow:0 0 8px #3ddc84;opacity:1}50%{box-shadow:0 0 2px rgba(61,220,132,.35);opacity:.4}}
   @keyframes cp{50%{opacity:.3}}
   #cloudPanel{position:fixed;right:12px;top:118px;z-index:61;width:min(264px,86vw);
     background:rgba(12,16,22,.94);border:1px solid rgba(140,180,255,.3);border-radius:12px;
@@ -527,7 +529,7 @@
 <!-- 右上角小图标(独立层级, 不受battle-ui pointer-events影响) -->
 <div class="small-icons" id="smallIcons">
   <button class="icon-btn small" id="btnSet" onclick="openSettings()" title="设置" aria-label="设置"><img src="assets/ui_icons/icon_settings.webp" alt="设置"></button>
-  <div class="icon-btn small" id="cloudChip" onclick="cloudTogglePanel(event)" title="云存档"><img src="assets/ui_icons/icon_cloud.webp" alt="云存档"><span class="dot" style="display:none"></span><span id="cloudTxt" style="display:none">云存</span></div>
+  <div class="icon-btn small" id="cloudChip" onclick="cloudTogglePanel(event)" title="云存档"><img src="assets/ui_icons/icon_cloud.webp" alt="云存档"><span class="dot"></span><span id="cloudTxt" style="display:none">云存</span></div>
   <div class="icon-btn small" id="mailChip" onclick="openMail()" title="鸿雁信匣"><img src="assets/ui_icons/icon_mail.webp" alt="邮件"><span class="mail-dot" id="mailDot"></span></div>
   <button class="icon-btn small" id="storyBtn" onclick="openStory()" title="剧情纲目"><img src="assets/ui_icons/icon_story.webp" alt="剧情"></button>
 </div>

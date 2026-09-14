@@ -1678,7 +1678,7 @@ function cloudPushNow() {
   if (!window.fetch) return;
   if (!cld.ready) { cld.dirty = true; return; }   // 尚未完成首次同步, 先标记等 pull 后再传
   cldUI("sync");
-  cldPush().then(ok => { if (ok) cldUI("on"); });
+  cldPush().then(ok => { if (ok) { cld.dirty = false; cldUI("on"); } });   // v2.5: 上传成功清脏, 避免周期兜底反复空传
 }
 function cloudPullNow() { cldPull(); }
 const CLOUD_PUSH_MIN = 300000;   // v1.5.1: 静默兜底窗口 5 分钟(窗口内所有高频进度合并为 1 次 PUT)
@@ -3805,6 +3805,13 @@ function startGame() {
     }
   }
   setInterval(save, 30000);   // v2.3 PERF: 自动存档 8s→30s(pagehide/visibilitychange 已保证退出即存, 挂机期 30s 足够防崩溃丢档)
+  /* v2.5: 关页/切后台的 cloudFlush 走异步 fetch, App 被杀瞬间请求常被掐断 → 进度白丢。
+   * 改为会话内周期性兜底: 有脏数据且页面可见时每 20s 上云一次, 关闭时最多只差 20s,
+   * 不再"白玩几分钟"。localStorage 同步写照旧保底(进程崩也不丢)。 */
+  setInterval(() => {
+    if (document.hidden || !cld.ready || !cld.dirty) return;
+    cloudPushNow();
+  }, 20000);
   /* v1.9.9d 法宝图标空闲预热解码(4 部位×6 品质 24 张 webp):
      安卓 WebView 首开法宝窗才现解码 4 张图, 与弹窗全卡首光栅化同帧挤爆 → 开窗卡死/掉帧闪屏;
      启动低谷期逐张 decode() 预热, 开窗只剩合成 */
@@ -5492,7 +5499,11 @@ const SKILL_DEFS = [
     from: { chance: 5, crit: 20 },         to: { chance: 30, crit: 100 },
     fmt: v => `${v.chance.toFixed(0)}% 触发 · 击杀后连击 · 该击 <b>暴击 +${v.crit.toFixed(0)}%</b>` },
 ];
-function skillExpNeed(lv) { return Math.round(30 * Math.pow(Math.max(1, lv), 1.35)); }
+/* v2.5: 经验曲线大幅变陡(原 30·lv^1.35 → 120·lv^1.9)。
+ * 原曲线单技能满 20 级仅需约 40 分钟连续战斗, 几天就全满, 与"几十天"的长周期严重脱节;
+ * 新曲线约慢 20 倍, 单技能满级约需 10~15 小时有效战斗(全技能同步成长), 贴合长线节奏。
+ * 想再调快慢只改这一行的系数/指数即可。 */
+function skillExpNeed(lv) { return Math.round(120 * Math.pow(Math.max(1, lv), 1.9)); }
 function skillDef(id) { for (const d of SKILL_DEFS) if (d.id === id) return d; return null; }
 function skillGet(id) {                       // 惰性初始化: 老档没有 skills 字段也照常跑
   if (!state.skills || typeof state.skills !== "object") state.skills = {};
