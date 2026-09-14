@@ -5572,26 +5572,43 @@ window.applyDropRates = applyDropRates;
 let _dropSaveT = 0;
 function onBattleDrop(info) {
   if (!state || !info) return;
-  if (info.spirit > 0) state.spirit += info.spirit;
-  let touched = false;
-  if (Math.random() < DROP_CFG.equipChance * (info.elite ? DROP_CFG.eliteEquipMul : 1)) {
-    const a = makeArt();
-    const kept = keepArtQuiet(a);              // 静默择优: 能顶替就换上, 不入眼当场熔作灵石
-    if (kept && a.q > (state.bestArtQ || -1)) state.bestArtQ = a.q;
-    touched = true;
-    if (info.elite || a.q >= 3) {
-      pushMsg("avatar", `${info.elite ? "斩一精英" : "斩妖"}得宝 <b style="color:#f0c98a">${a.name}</b>`
-        + (kept ? "（已入囊）" : "（不入眼，熔作灵石）"));
-    }
+  /* v2.5 掉落分阶段: 此处只管灵石入账(飞行到顶部统计区时由战斗侧回调);
+     装备掉落改由 requestEquipDrop/applyEquipDrop 驱动——宠物拾起时才入包/熔炼 */
+  if (info.spirit > 0) { state.spirit += info.spirit; updateHUD(); }
+}
+/* 装备掉落队列: 击杀时 roll 出具体部件(图标/品质), 宠物飞去拾起后回调 applyEquipDrop 才真正入包 */
+const _equipQueue = [];
+let _equipId = 0;
+function requestEquipDrop(info) {
+  if (!state || !info) return null;
+  if (Math.random() >= DROP_CFG.equipChance * (info.elite ? DROP_CFG.eliteEquipMul : 1)) return null;
+  const a = makeArt();
+  const id = ++_equipId;
+  _equipQueue.push({ id, a, elite: !!info.elite });
+  const tp = SLOT_TYPES[a.slot];
+  return { id, slot: a.slot, q: a.q, name: a.name, icon: 'assets/modals/art-ico/' + tp.k + a.q + '.webp' };
+}
+function applyEquipDrop(id) {
+  if (!state) return;
+  const i = _equipQueue.findIndex(e => e.id === id);
+  if (i < 0) return;                            // 已被拾取/超时处理过 → 幂等, 不重复入包
+  const { a, elite } = _equipQueue.splice(i, 1)[0];
+  const kept = keepArtQuiet(a);                 // 静默择优: 能顶替就换上, 不入眼当场熔作灵石
+  if (kept && a.q > (state.bestArtQ || -1)) state.bestArtQ = a.q;
+  if (elite || a.q >= 3) {
+    pushMsg("avatar", `${elite ? "斩一精英" : "斩妖"}得宝 <b style="color:#f0c98a">${a.name}</b>`
+      + (kept ? "（已入囊）" : "（不入眼，熔作灵石）"));
   }
   updateHUD();
-  if (touched) updateArts();
+  if (kept) updateArts();
   if (Date.now() - _dropSaveT > 15000) { _dropSaveT = Date.now(); save(); cloudSoon(); }
 }
 function bindBattleHooks() {                    // 战斗 IIFE 是内联脚本, 载入序不定 → 轮询挂接
   const api = window.BattleAPI;
   if (!api) { setTimeout(bindBattleHooks, 300); return; }
   api.onDrop = onBattleDrop;
+  api.requestEquipDrop = requestEquipDrop;
+  api.applyEquipDrop = applyEquipDrop;
   pushBattleStats();
 }
 
