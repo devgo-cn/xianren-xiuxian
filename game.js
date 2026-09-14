@@ -725,7 +725,7 @@ const MAIN_STORY = [
 /* ============ 存档 ============ */
 let state = { ver: 1, realmIdx: 0, exp: 0, spirit: 0, arrayLv: 1, arts: [], journal: [],
   milestones: {}, peakSpirit: 0, bestArtQ: -1, lastTs: Date.now(),
-  mats: {}, pills: {}, buffs: [], travel: null, mails: [], offlineBoostUntil: 0 };
+  mats: {}, pills: {}, buffs: [], travel: null, mails: [], offlineBoostUntil: 0, skills: {} };
 let breaking = false;
 let lastReadyHint = false;
 const SAVE_KEY = "dongtian_save_v1";   // v1.10.0: 本地档明文 JSON(键名跟随 schema 大版本)
@@ -1387,7 +1387,7 @@ async function loadRank(force) {
  * 服务器同样只认 g1(zlib 解压自带 CRC 完整性校验)。 */
 const G1_TPL = { realmIdx: 0, exp: 0, spirit: 0, arrayLv: 1, arts: [], journal: [], milestones: {},
   peakSpirit: 0, bestArtQ: -1, lastTs: 0, mats: {}, pills: {}, buffs: [], travel: null, mails: [],
-  offlineBoostUntil: 0, pages: {}, name: "", _pn: "", _named: 0, _settledAt: 0, ver: 1 };
+  offlineBoostUntil: 0, pages: {}, name: "", _pn: "", _named: 0, _settledAt: 0, ver: 1, skills: {} };
 function g1prune(v, tpl) {
   if (v === null || typeof v !== "object" || tpl === null || typeof tpl !== "object" || Array.isArray(tpl)) {
     return JSON.stringify(v) === JSON.stringify(tpl) ? undefined : v;   // 数组整体比; 误判不同=多存, 安全方向
@@ -1618,6 +1618,7 @@ function cldAdoptCloud(s) {
   renderAutoHunt(); travelBtnLbl(); traceRefresh();
   renderPillHints();            // v1.9.8c.2: 采纳云端档后药力行(丹力正盛/洗髓)要跟着重绘, 否则重开不显示
   renderPName();                // v1.7.26: 云端档自带道号 → 界面同步
+  pushBattleStats();            // 换档 → 战斗三围/技能等级随之更新
   return true;
 }
 async function cldPush() {
@@ -1951,7 +1952,7 @@ function doBreak() {
     state.realmIdx++;
     state.exp = isBigBreak ? 0 : Math.max(0, state.exp - r.need);  // 大境清零, 小境扣需
     breaking = false;
-    updateRealmUI(); updateHUD(); save();
+    updateRealmUI(); updateHUD(); save(); pushBattleStats();   // 境界变了 → 战斗三围与怪物成长线重算
     cloudFlush();
     const nr = realm();
     if (isBigBreak) {
@@ -3556,6 +3557,7 @@ function updateArts(highlight) {
     const old = state.arts.shift();
     state.spirit += Math.round(60 * Math.pow(1.6, old.q));
   }
+  pushBattleStats();        // 装备变动 → 战斗里的攻防血立刻跟上
 }
 
 /* ============ 突破粒子 ============ */
@@ -3603,25 +3605,29 @@ function keepArtQuiet(a) {          // 静默版 smartEquip: 批量结算不发�
   state.spirit += Math.round(40 * Math.pow(1.5, a.q));      // 新件不入眼, 当场熔作灵石
   return false;
 }
-/* 离线巡猎胜负判定: 与在线 fireFight 同式的随机单场战(新数值), 后端 game-core 同此,
- * 让离线胜率 ≈ 在线每境稳态 80~95% 而非旧"中值怪+固定4%翻车" */
+/* ---------------------------------------------------------------------------
+ * 【已停用 · 文字巡猎】下面整段是"文字巡猎(遭遇/秘境)"时代的遗留:
+ *   offlineFightWin 调 tryStrike, 而 tryStrike 早已是空 stub → 一旦调用必抛 TypeError。
+ *   该玩法已由"动画战斗区"取代, 战斗产出改为灵石 + 法宝(见 onBattleDrop), 不再产修为。
+ *   按策划要求不删除(留档备查), 整段注释。
+ * ---------------------------------------------------------------------------
 function offlineFightWin(big) {
   const lv = (state.realmIdx || 0) + 1, eb = equipBonus();
   const hs = finalStats({ hp: 100 + 330 * lv, atk: 10 + 46 * lv, def: 5 + 26 * lv },
     { hp: eb.hp || 0, atk: eb.atk || 0, def: eb.def || 0 }, eb.agg);
-  const mon = genMonster(big, lv);                        // 同在线同式(含词缀妖兽)
+  const mon = genMonster(big, lv);
   const ms = finalStats({ hp: mon.hp, atk: mon.atk, def: mon.def }, {}, fxAgg(mon.fx ? [mon] : []));
   let mhp = ms.hp, hphp = hs.hp, round = 0;
   while (true) {
     round++;
-    const sh = tryStrike(hs.atk, hs, ms.def, ms.dodge);   // 玩家出手(会心/暴击/破甲同在线)
+    const sh = tryStrike(hs.atk, hs, ms.def, ms.dodge);
     if (!sh.miss) { mhp -= sh.dmg; if (mhp <= 0) return true; }
-    const sf = tryStrike(ms.atk, ms, hs.def, hs.dodge);   // 妖兽还手
+    const sf = tryStrike(ms.atk, ms, hs.def, hs.dodge);
     if (!sf.miss) { hphp -= sf.dmg; if (hphp <= 0) return false; }
     if (round > 300) return hphp > mhp;
   }
 }
-function huntTxtOf(H) {                 // 离线巡猎纪要(云端 gains.hunt / 本地兜底 共用)
+function huntTxtOf(H) {
   if (!H || !H.waves) return "";
   const kN = H.keptCount != null ? H.keptCount : (Array.isArray(H.kept) ? H.kept.length : (H.kept || 0));
   const kName = H.keptName || (Array.isArray(H.kept) && H.kept.length ? H.kept[0].name : "");
@@ -3630,6 +3636,7 @@ function huntTxtOf(H) {                 // 离线巡猎纪要(云端 gains.hunt 
     (kN ? `<br>阿青收下 <b>${kN}</b> 件新宝${kName ? `（${kName} 等）` : ""}，藏宝阁在架 ${H.equipped || kN} 件` : "") +
     (H.melted ? `；余下 <b>${H.melted}</b> 件不入眼，尽数投炉熔作灵石 +<span class="num"> ${fmt(H.meltSp || 0)}</span>` : "");
 }
+--------------------------------------------------------------------------- */
 
 function closeOffline() { $("offlineModal").classList.remove("show"); }
 
@@ -3789,6 +3796,7 @@ function startGame() {
   _floatPrev.spirit = state.spirit; _floatPrev.exp = state.exp;
   updateHUD();
   updateArts();
+  bindBattleHooks();        // 战斗系统: 挂上掉落回流 + 首次注入玩家三围
   realmPlot(); // 按当前境界推进已及剧情
   {
     const o0 = PLOT[0] && PLOT[0][0];
@@ -4427,6 +4435,8 @@ async function cloudSettle() {
          之后 srvNow() 就是可信的服务端时间, 所有时间显示/判断都用它, 不再用 Date.now()。 */
       if (typeof j.serverTime === "number") _srvOffset = j.serverTime - (t0 + (t1 - t0) / 2);
       if (j.rate) _rate = { exp: +j.rate.exp || 0, spirit: +j.rate.spirit || 0 };
+      /* 战斗掉落系数由服务端下发(每击杀产出); 没下发就用内置默认, 断网照常可玩 */
+      if (j.dropRates) applyDropRates(j.dropRates);
       /* v1.8.1: 先判定本轮是否「真归来」, 再 adopt —— adoptKeep 据此决定是否保留本地 travel */
       _travelReturned = !!(j.gains && j.gains.travel);
       const j0 = await g1Unpack(j.data);
@@ -4822,9 +4832,11 @@ const slp = ms => new Promise(r => setTimeout(r, ms));
  *   （旧式 lv×120 为线性，挂机却是 (大境+1)^2.05 阶梯 —— 占比从 5.6% 一路掉到化神 3.8%）
  * v1.4.0 用户反馈「升级还是慢」→ 周期 180s 收紧到 90s（一天 960 波 / 768 场，原 480/384），
  *   W 不动 → 战斗占修为总产出由 40% 抬到 57%，整体修为产出 +42%。 */
-const ENC_PERIOD = 90;         // 波次周期(秒) —— v1.4.0: 180 → 90
-const FIGHT_EXP_W = 155;       // 每战修为 = rateNow × 此秒数(x = W/P×0.8×胜率 ≈ 1.32 → 占 57%)
-const FIGHT_SP_W = 90;         // 每战灵石 = spiritRate × 此秒数(x ≈ 0.77 → 挂机灵石约占四成三)
+/* 【已停用 · 文字巡猎】战斗不再产修为, 修为全部走聚灵阵 rateNow();
+   战斗产出改为灵石 + 法宝, 系数见 DROP_CFG / BattleAPI.setDropRates。留档备查:
+   const ENC_PERIOD = 90;      // 波次周期(秒)
+   const FIGHT_EXP_W = 155;    // 每战修为 = rateNow × 此秒数
+   const FIGHT_SP_W = 90;      // 每战灵石 = spiritRate × 此秒数 */
 const MYST_W = 45;             // 秘境机缘等效秒数
 const HUNT_FIGHT_RATE = 0.8;   // 波次中斗法占比(余下为秘境)
 
@@ -5064,7 +5076,7 @@ async function mystRun() {
   }
   if (!MYST) return;
   // 洞中也可能撞妖(30%): 顺接成一场主身斗法
-  if (Math.random() < 0.3) { MYST = null; fireFight(); if (BTL) warAppend("话音未落，洞中妖气骤起 —— "); }
+  // if (Math.random() < 0.3) { MYST = null; fireFight(); if (BTL) warAppend("话音未落，洞中妖气骤起 —— "); }  // 文字斗法已废(空 stub), 注释留档
   else {
     const kind = Math.random();
     let txt;
@@ -5117,7 +5129,8 @@ renderAutoHunt();                  // v1.4.0: 自动斗法按钮初态(跟存档
 function debugEncounter() {
   if (BTL || MYST) { pushMsg("main", "正在斗法/探秘中，且待收场。"); return; }
   closeTravel();
-  fireEvent();                              // 立即遇事(妖兽伏击/秘境)
+  // fireEvent();                           // 文字巡猎已废(空 stub), 注释留档 —— 战斗已迁至动画战斗区
+  pushMsg("main", "文字斗法已撤，妖物都在下方战斗区里 —— 看着打便是。");
 }
 window.debugEncounter = debugEncounter;     // 仅控制台可用, 界面不再摆按钮
 
@@ -5443,6 +5456,164 @@ function genMonster(big, lv) {                   // 妖兽: 基础线性 + 词�
   return m;
 }
 function hashRand(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; }
+
+/* ==================== 神通技能系统(8 个 · 纯战斗行为) ====================
+ * 定调(已与策划确认):
+ *   · 技能**不做属性光环** —— 不加攻/不加血/不加暴击/不减伤, 只改变"出手方式与战斗节奏";
+ *     属性成长一律来自境界三围 + 装备, 两者互不污染。
+ *   · 网游标配形态: 概率触发的招式, 触发/生效即涨经验, 达标自动升级, 20 级封顶。
+ *   · 初始都很低(疾风步 Lv1 仅 5%), 随战斗慢慢长上去; 满级后 2 倍速几近全程。
+ *   · 宠物系统接口预留(BattleAPI.addPet/removePet/getPets), 本次不实现实体。
+ * 数值: from(Lv1) → to(Lv20) 线性插值 —— 调参只改这两组数。 */
+const SKILL_MAX = 20;
+const SKILL_DEFS = [
+  { id: "jianqi",  name: "剑气斩", ico: "✦", tip: "普攻命中时概率斩出一道剑气 —— 这一击自带攻击力加成",
+    from: { chance: 5, dmg: 60 },          to: { chance: 30, dmg: 160 },
+    fmt: v => `${v.chance.toFixed(0)}% 触发 · 这一击 <b>×${v.dmg.toFixed(0)}% 攻击</b>` },
+  { id: "sanlian", name: "三连斩", ico: "❊", tip: "第二段落剑后概率再补一刀 —— 补刀必会心",
+    from: { chance: 4, dmg: 50 },          to: { chance: 25, dmg: 130 },
+    fmt: v => `${v.chance.toFixed(0)}% 触发 · 补刀 <b>×${v.dmg.toFixed(0)}% 攻击</b> 且必会心` },
+  { id: "hengsao", name: "横扫千军", ico: "◠", tip: "普攻命中时概率波及身周数名妖物",
+    from: { chance: 3, n: 2, dmg: 40 },    to: { chance: 20, n: 5, dmg: 80 },
+    fmt: v => `${v.chance.toFixed(0)}% 触发 · 波及 ${v.n.toFixed(0)} 个 · <b>×${v.dmg.toFixed(0)}% 攻击</b>` },
+  { id: "zhansha", name: "斩杀", ico: "✖", tip: "目标残血时这一击伤害翻倍，残血线随等级抬高",
+    from: { threshold: 5 },                to: { threshold: 25 },
+    fmt: v => `残血 ${v.threshold.toFixed(0)}% 以下 · 这一击 <b>伤害翻倍</b>` },
+  { id: "jifeng",  name: "疾风步", ico: "≫", tip: "身法 —— 击杀后概率踏入二倍速，期间身形飘忽加闪避",
+    from: { chance: 5, dur: 4, mult: 2, dodge: 4 },   to: { chance: 65, dur: 8, mult: 2, dodge: 25 },
+    fmt: v => `${v.chance.toFixed(0)}% 触发 · ${v.mult} 倍速 ${v.dur.toFixed(0)} 秒 · 期间 <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
+  { id: "suodi",   name: "缩地成寸", ico: "⋙", tip: "身法 —— 击杀后小概率踏入三倍速，缩地无形更易闪身",
+    from: { chance: 0.5, dur: 2, mult: 3, dodge: 8 }, to: { chance: 12, dur: 4, mult: 3, dodge: 40 },
+    fmt: v => `${v.chance.toFixed(1)}% 触发 · ${v.mult} 倍速 ${v.dur.toFixed(0)} 秒 · 期间 <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
+  { id: "pojia",   name: "破甲击", ico: "◆", tip: "普攻命中时概率无视目标部分防御",
+    from: { chance: 5, pen: 30 },          to: { chance: 25, pen: 70 },
+    fmt: v => `${v.chance.toFixed(0)}% 触发 · 无视 <b>${v.pen.toFixed(0)}% 防御</b>` },
+  { id: "zhuilie", name: "追猎", ico: "➤", tip: "击杀后概率立刻向下一目标再出手一次，衔尾一击更易暴击",
+    from: { chance: 5, crit: 20 },         to: { chance: 30, crit: 100 },
+    fmt: v => `${v.chance.toFixed(0)}% 触发 · 击杀后连击 · 该击 <b>暴击 +${v.crit.toFixed(0)}%</b>` },
+];
+function skillExpNeed(lv) { return Math.round(30 * Math.pow(Math.max(1, lv), 1.35)); }
+function skillDef(id) { for (const d of SKILL_DEFS) if (d.id === id) return d; return null; }
+function skillGet(id) {                       // 惰性初始化: 老档没有 skills 字段也照常跑
+  if (!state.skills || typeof state.skills !== "object") state.skills = {};
+  const s = state.skills[id];
+  if (!s || typeof s !== "object") { state.skills[id] = { lv: 1, exp: 0 }; return state.skills[id]; }
+  if (!(s.lv >= 1)) s.lv = 1;
+  if (!(s.exp >= 0)) s.exp = 0;
+  return s;
+}
+function skillLv(id) { return Math.min(SKILL_MAX, Math.max(1, skillGet(id).lv | 0)); }
+function skillVal(id) {
+  const d = skillDef(id); if (!d) return null;
+  const t = (skillLv(id) - 1) / (SKILL_MAX - 1), o = {};
+  for (const k in d.from) o[k] = d.from[k] + (d.to[k] - d.from[k]) * t;
+  return o;
+}
+let _skillSaveT = 0;
+function skillAddExp(id, n) {
+  if (!(n > 0)) return;
+  const s = skillGet(id);
+  if (s.lv >= SKILL_MAX) { s.exp = 0; return; }
+  s.exp += n;
+  let up = 0;
+  while (s.lv < SKILL_MAX && s.exp >= skillExpNeed(s.lv)) { s.exp -= skillExpNeed(s.lv); s.lv++; up++; }
+  if (up) {
+    const d = skillDef(id);
+    pushMsg("main", `<b style="color:#f0c98a">${d ? d.name : id}</b> 精进至 <b>Lv.${s.lv}</b>`);
+    _skillSaveT = 0;                                   // 升级立刻落档, 不节流
+  }
+  if (Date.now() - _skillSaveT > 15000) { _skillSaveT = Date.now(); save(); cloudSoon(); }
+}
+function skillAddExpAll(n) { for (const d of SKILL_DEFS) skillAddExp(d.id, n); }
+function skillTotalLv() { let t = 0; for (const d of SKILL_DEFS) t += skillLv(d.id); return t; }
+window.SkillAPI = {
+  defs: SKILL_DEFS, max: SKILL_MAX, need: skillExpNeed,
+  lv: skillLv, val: skillVal, exp: id => skillGet(id).exp,
+  addExp: skillAddExp, addExpAll: skillAddExpAll, total: skillTotalLv,
+};
+
+/* ==================== 战斗对接: 属性注入 / 掉落回流 / 服务端系数 ====================
+ * 战斗 IIFE 不读 window.state(保持解耦), 只通过 BattleAPI 双向通信:
+ *   下行: setStats(玩家三围) / setDropRates(掉落系数)
+ *   上行: onDrop({spirit, elite, enemy}) —— 灵石入账 + 装备掉落在主游戏侧生成 */
+const DROP_CFG = {
+  equipChance: 0.035,      // 每杀掉法宝概率
+  eliteEquipMul: 4,        // 精英怪掉宝倍率
+};
+function pushBattleStats() {
+  const api = window.BattleAPI;
+  if (!api || !api.setStats) return;
+  const lv = (state.realmIdx || 0) + 1, eb = equipBonus();
+  const s = finalStats({ hp: 100 + 330 * lv, atk: 10 + 46 * lv, def: 5 + 26 * lv },
+    { hp: eb.hp || 0, atk: eb.atk || 0, def: eb.def || 0 }, eb.agg);
+  s.lv = lv;                                  // 怪物成长按境界缩放
+  api.setStats(s);
+}
+window.pushBattleStats = pushBattleStats;
+function applyDropRates(r) {                  // 服务端下发"每击杀产出"系数(拿不到就用内置默认)
+  if (!r || typeof r !== "object") return;
+  if (r.equipChance != null) DROP_CFG.equipChance = +r.equipChance;
+  if (r.eliteEquipMul != null) DROP_CFG.eliteEquipMul = +r.eliteEquipMul;
+  if (window.BattleAPI && window.BattleAPI.setDropRates) window.BattleAPI.setDropRates(r);
+  pushBattleStats();
+}
+window.applyDropRates = applyDropRates;
+let _dropSaveT = 0;
+function onBattleDrop(info) {
+  if (!state || !info) return;
+  if (info.spirit > 0) state.spirit += info.spirit;
+  let touched = false;
+  if (Math.random() < DROP_CFG.equipChance * (info.elite ? DROP_CFG.eliteEquipMul : 1)) {
+    const a = makeArt();
+    const kept = keepArtQuiet(a);              // 静默择优: 能顶替就换上, 不入眼当场熔作灵石
+    if (kept && a.q > (state.bestArtQ || -1)) state.bestArtQ = a.q;
+    touched = true;
+    if (info.elite || a.q >= 3) {
+      pushMsg("avatar", `${info.elite ? "斩一精英" : "斩妖"}得宝 <b style="color:#f0c98a">${a.name}</b>`
+        + (kept ? "（已入囊）" : "（不入眼，熔作灵石）"));
+    }
+  }
+  updateHUD();
+  if (touched) updateArts();
+  if (Date.now() - _dropSaveT > 15000) { _dropSaveT = Date.now(); save(); cloudSoon(); }
+}
+function bindBattleHooks() {                    // 战斗 IIFE 是内联脚本, 载入序不定 → 轮询挂接
+  const api = window.BattleAPI;
+  if (!api) { setTimeout(bindBattleHooks, 300); return; }
+  api.onDrop = onBattleDrop;
+  pushBattleStats();
+}
+
+/* ==================== 神通面板 ==================== */
+function openSkills() {
+  renderSkills();
+  const m = $("skillModal"); if (m) m.classList.add("show");
+}
+function closeSkills() { const m = $("skillModal"); if (m) m.classList.remove("show"); }
+window.openSkills = openSkills; window.closeSkills = closeSkills;
+function renderSkills() {
+  const box = $("skillBody"); if (!box) return;
+  const rows = SKILL_DEFS.map(d => {
+    const s = skillGet(d.id), lv = skillLv(d.id), maxed = lv >= SKILL_MAX;
+    const need = skillExpNeed(lv), pct = maxed ? 100 : Math.min(100, (s.exp / need) * 100);
+    const v = skillVal(d.id);
+    return `<div class="sk-row${maxed ? " maxed" : ""}">
+      <div class="sk-ic">${d.ico}</div>
+      <div class="sk-main">
+        <div class="sk-top"><b>${d.name}</b><span class="sk-lv">Lv.${lv}<i>/${SKILL_MAX}</i></span></div>
+        <div class="sk-eff">${d.fmt(v)}</div>
+        <div class="sk-tip">${d.tip}</div>
+        <div class="sk-bar"><i style="width:${pct.toFixed(1)}%"></i></div>
+        <div class="sk-exp">${maxed ? "已臻化境" : `经验 ${Math.floor(s.exp)} / ${need}`}</div>
+      </div>
+    </div>`;
+  }).join("");
+  const total = skillTotalLv();
+  box.innerHTML = `<p class="story-tip" style="color:#8b94a8">神通只在战斗中自行触发，触发与生效即涨经验，日久自精。
+    共习 <b style="color:#a98a5a">${SKILL_DEFS.length}</b> 门，累计 <b style="color:#a98a5a">${total}</b> / ${SKILL_MAX * SKILL_DEFS.length} 阶。
+    神通只改出手与节奏，不增益属性 —— 攻防血仍由境界与法宝定夺。</p>`
+    + `<div class="sk-list">${rows}</div>`;
+}
 
 /* ==================== v1.8.0 开屏 = 启动门禁 UI ====================
  * 开屏页不再"资源加载完就淡出", 而是等门禁通过才淡出 —— 这样连不通服务器时

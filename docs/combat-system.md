@@ -68,10 +68,10 @@ G.camX += (targetCam - G.camX) * Math.min(1, dt*6); // 阻尼跟随，不硬切
 |---|---|---|
 | 玩家 | `75` | 剑锋可及的左右各 75 世界单位 |
 | 妖卒 slime（近战） | `30` | 贴身才打得到 |
-| 水灵 water（近战） | `35` | 略长，血厚（hp 2） |
-| 妖将 demon（近战） | `35` | 略长 |
-| 妖弓 raptor（远程） | `110` | 远程压制 |
+| 水灵 water（近战） | `35` | 略长，血更厚 |
 | 宠物（默认） | `50` | `addPet` 可覆盖 |
+
+> 占位怪妖将 / 妖弓已移除（无素材，只画椭圆）。
 
 **判定公式**：
 
@@ -119,14 +119,19 @@ const sdt = dt * G.speedMult;        // 逻辑用 sdt；动画/特效用 dt
 
 > **逻辑用 `sdt`，表现用 `dt`**：倍速只加快战斗节奏，不把动画也快进成鬼畜。
 
-### 3.2 倍速
+### 3.2 倍速（由身法技能驱动）
 
-| 技能 | 倍率 | 时长 | 触发概率 |
+原来的固定 `double/triple` 概率表**已废弃**，改为两个身法技能在**击杀时独立 roll**（见 §4.5）：
+
+| 技能 | 倍率 | Lv1（概率/时长/闪避） | Lv20（概率/时长/闪避） |
 |---|---|---|---|
-| `double` | 2x | 5s | 8% |
-| `triple` | 3x | 3s | 3% |
+| 疾风步 `jifeng` | 2x | 5% / 4s / +4% | 65% / 8s / +25% |
+| 缩地成寸 `suodi` | 3x | 0.5% / 2s / +8% | 12% / 4s / +40% |
 
-接口已备（`trySpeedSkill` / `triggerSpeedSkill`），**由玩法层调用**，战斗层不自行 roll。
+- 两者**独立 roll，取高者**；已在加速中再触发则**刷新时长**
+- 满级疾风步 65% × 8s，配合高频击杀 → **二倍速几近全程**；三倍速作为稀有惊喜
+- 身法**不是属性光环**：只在生效那几秒加闪避，时效一到 `G.speedDodge` 归零，不写回面板
+- `trySpeedSkill()` / `triggerSpeedSkill()` 保留作外部触发口
 
 ### 3.3 动画帧推进
 
@@ -137,8 +142,12 @@ const sdt = dt * G.speedMult;        // 逻辑用 sdt；动画/特效用 dt
 ### 3.4 生成节拍
 
 ```js
-G.spawnT -= sdt; if (G.spawnT <= 0) { spawnWave(); G.spawnT = BC.spawnInterval; }  // 1.4s
+G.spawnT -= sdt; if (G.spawnT <= 0) { spawnWave(); G.spawnT = BC.spawnInterval; }  // 1.0s
 ```
+
+- 场上存活 **上限 14**（`BC.maxAlive`），满了就跳过本次生成 —— 防止无限堆积
+- **排队机制**：每帧按 x 排序，靠前的先站位 `p.x + e.atkRange`，后面的依次后挪
+  `BC.queueGap = 34`px。否则所有怪都会挤在同一点**完全重叠**
 
 ---
 
@@ -148,17 +157,58 @@ G.spawnT -= sdt; if (G.spawnT <= 0) { spawnWave(); G.spawnT = BC.spawnInterval; 
 
 一次挥剑动画（40 帧）触发**两次**独立判定：
 
-| 段 | 触发帧 | 攻击系数 | 暴击率 | 暴击倍率 | 伤害色 |
-|---|---|---|---|---|---|
-| 第一段（主刺） | `10` | `0.9~1.1` | `8%` | `1.8x` | `#7fe0ff` |
-| 第二段（补刺） | `26` | `0.95~1.2` | `10%` | `2.0x` | `#a0e8ff` |
-
-```js
-dmg = p.atk * (base + random()*var) * (crit ? critMult : 1)
-```
+| 段 | 触发帧 | 攻击系数 |
+|---|---|---|
+| 第一段（主刺） | `10` | `0.9~1.1` |
+| 第二段（补刺） | `26` | `0.95~1.2` |
 
 **死亡中断**：第一段把目标打死了 → 立即中断，不刺第二下（网游判定，目标已死不补刀）。
 攻击动画播放期间**不可被新目标打断**。
+
+### 4.1.1 数值伤害公式（2026-09-15 重建）
+
+玩家的 `atk` **不再硬编码**，由主游戏 `pushBattleStats()` 注入最终面板值（`BattleAPI.setStats`）：
+
+```js
+// 主游戏: (裸身 + 装备) × (1 + 词条%)
+const s = finalStats({ hp:100+330*lv, atk:10+46*lv, def:5+26*lv }, 装备数值, 装备词条);
+BattleAPI.setStats({ ...s, lv });
+// 战斗内: 减伤系数 K=100, 破甲按百分比削防御
+function calcDmg(atk, mult, def, pen) {
+  const eff = Math.max(0, def * (1 - Math.min(90, pen)/100));
+  return Math.max(1, Math.round(atk * mult * (100/(100+eff))));
+}
+```
+
+一次命中的倍率 `mult` 由下列因素**连乘**得到（顺序固定）：
+
+```
+基础段系数 → 斩杀(残血 ×2) → 会心/暴击 → 爆伤增幅
+   会心 ×1.5（critB%）／暴击 ×2.0（crit%）／爆伤 ×(1 + critD%)
+```
+
+> 攻防血**只来自境界与装备**；技能的加成只作用于"打出去的那一下"，不回写面板。
+
+### 4.1.2 怪物成长系统
+
+两种怪的三围随**玩家境界 `lv`** 线性成长（怪只吃境界，**不吃装备** → 换装即提速）：
+
+```js
+e.maxHp = Math.round((60 + 26*lv) * def.hpK);
+e.atk   = Math.round((8  + 5*lv)  * def.atkK);
+e.def   = Math.round((2  + 2*lv)  * def.defK);
+```
+
+| 类型 | 名称 | 权重 | `hpK` | `atkK` | `defK` | 速度 | 定位 |
+|---|---|---|---|---|---|---|---|
+| `slime` | 妖卒 | 60 | 1.0 | 0.55 | 0.35 | 120 | 脆、快，**约一轮两剑收掉** |
+| `water` | 水灵 | 40 | 1.6 | 0.75 | 0.60 | 80 | 略厚、慢 |
+
+**精英怪**（`eliteChance 6%`）：体型 ×1.28、血量 ×3、攻击 ×1.2、移速 ×0.85、
+产出 ×4，脚下画金色法环。
+
+> 占位怪 `demon`(妖将) / `raptor`(妖弓) 已于本次移除 —— 它们没有真实素材，只画椭圆。
+> 当前只有两种有素材的怪。
 
 ### 4.2 攻击间隔
 
@@ -179,9 +229,10 @@ p.atkT = 1 / p.aspd;   // 冷却 = 1/攻速
 ```js
 if (Math.abs(e.x - p.x) <= e.atkRange + 5 && e.atkT <= 0) {
   e.anim = 1; e.atkT = 1/(0.8 + Math.random()*0.5);
-  p.hp -= e.atk * (0.85 + Math.random()*0.3);   // 敌人伤害 ±15% 浮动
-  p.hurtT = 0.25; p.stun = 0.5;
-  if (p.hp <= 0) p.hp = p.maxHp;                 // 玩家不死
+  // 先判闪避(装备词条 + 身法时效加成), 再走同一套减伤公式
+  if (Math.random()*100 < PST.dodge + G.speedDodge) { /* 落空, 飘一个「闪」 */ }
+  else { p.hp -= calcDmg(e.atk, 0.85 + Math.random()*0.3, PST.def, 0); p.hurtT = 0.25; p.stun = 0.5; }
+  if (p.hp <= 0) p.hp = p.maxHp;                 // 收草节奏: 玩家不死
 }
 ```
 
@@ -202,6 +253,53 @@ function findNearestEnemy(fromX, maxDist) { /* 跳过死亡/正在死亡的敌�
 - `dying` = 已 `alive=false` 但仍在场上播消散（0.4s 淡出），此间不可被选中
 - 索敌半径 `atkRange + 200`——**视野 > 攻击范围**，够不着时先走过去
 
+### 4.5 神通技能系统（8 个 · 纯战斗行为）
+
+**定调**：技能**不做常驻属性光环**（不永久加攻/加血/加暴击/减伤），
+但**打出去的那一下**完全可以有攻击倍率、会心、暴击、破甲；**身法类在生效期间加闪避**。
+属性成长一律来自境界三围 + 装备，两者互不污染。
+
+| # | 技能 | 时机 | 效果 | Lv1 → Lv20 |
+|---|---|---|---|---|
+| 1 | 剑气斩 `jianqi` | 普攻命中 | 追加一段剑气 | 5% / ×60% → 30% / ×160% |
+| 2 | 三连斩 `sanlian` | 第二段后 | 补一刀，**必会心** | 4% / ×50% → 25% / ×130% |
+| 3 | 横扫千军 `hengsao` | 普攻命中 | 波及 N 个 | 3% / 2 个 / ×40% → 20% / 5 个 / ×80% |
+| 4 | 斩杀 `zhansha` | 命中残血 | 这一击伤害翻倍 | 残血 5% → 25% |
+| 5 | 疾风步 `jifeng` | 击杀后 | 2 倍速 + 闪避 | 5%/4s/+4% → 65%/8s/+25% |
+| 6 | 缩地成寸 `suodi` | 击杀后 | 3 倍速 + 闪避 | 0.5%/2s/+8% → 12%/4s/+40% |
+| 7 | 破甲击 `pojia` | 普攻命中 | 无视目标防御 | 5% / 30% → 25% / 70% |
+| 8 | 追猎 `zhuilie` | 击杀后 | 立刻再出手，暴击加成 | 5% / +20% → 30% / +100% |
+
+- **数值**：`from(Lv1) → to(Lv20)` 线性插值，调参只改这两组数（`game.js` 的 `SKILL_DEFS`）
+- **成长**：`expNeed(lv) = round(30 * lv^1.35)`，20 级封顶；
+  触发/生效 +2~3 exp，每次击杀**全部技能 +2**（不触发也在慢慢长）
+- **存档**：`state.skills = { id: {lv, exp} }`，已进 `G1_TPL`，老档惰性初始化
+- **面板**：入口是 HUD 的「技」chip → `#skillModal`
+
+### 4.6 战斗产出（只掉灵石 + 法宝）
+
+战斗**不再产修为** —— 修为全部走聚灵阵 `rateNow()`。击杀产出：
+
+```js
+// 战斗内(灵石): 服务端系数 × 随机浮动 × 精英倍率
+sp = round((DROP.spiritBase + DROP.spiritPerLv*lv) * (0.6~1.4) * (elite ? 4 : 1));
+BattleAPI.onDrop({ spirit: sp, elite, enemy });   // 回调主游戏
+// 主游戏侧: 灵石入账 + 按 DROP_CFG.equipChance 掷点 → makeArt() → keepArtQuiet() 静默择优
+```
+
+| 系数 | 默认 | 说明 |
+|---|---|---|
+| `spiritBase` / `spiritPerLv` | 6 / 1.2 | 每杀灵石 = 基数 + 每级加成 |
+| `spiritRand` | 0.4 | ±40% 浮动 |
+| `equipChance` | 3.5% | 掉法宝概率（精英 ×4） |
+| `eliteChance` / `eliteMul` / `eliteHp` | 6% / 4 / 3 | 精英怪三件套 |
+
+**结算权威**：服务端下发「每击杀产出」系数 → `applyDropRates(j.dropRates)` →
+本地按击杀实时结算；拿不到就用内置默认值，**断网照常可玩**。
+
+> 文字巡猎（`fireFight`/`fireEvent`/`tryStrike`）已整段注释留档，
+> `offlineFightWin` 调空 stub 的 TypeError 隐患一并消除。
+
 ---
 
 ## 五、对外接口 `window.BattleAPI`（唯一耦合点）
@@ -211,12 +309,22 @@ function findNearestEnemy(fromX, maxDist) { /* 跳过死亡/正在死亡的敌�
 | `getKills()` | `→ number` | 当前击杀数 |
 | `resetKills()` | `→ void` | 清零（换境界/重置时调用） |
 | `triggerSpeedSkill(mult, dur)` | `→ bool` | 直接触发倍速（`mult<=1` 返回 false） |
-| `trySpeedSkill()` | `→ {name,mult,duration}\|null` | 按概率随机触发 |
+| `trySpeedSkill()` | `→ {name,mult,duration}\|null` | 按身法技能概率随机触发 |
 | `getSpeedMult()` | `→ number` | 当前倍速 |
-| `addPet(def)` / `removePet(id)` / `getPets()` | — | 宠物挂载/卸载/查询 |
-| `spawnWave()` | `→ void` | 立即刷一波 |
+| **`setStats(s)`** | `← {lv,atk,hp,def,crit,critB,critD,pen,dodge}` | **主游戏注入面板三围**（装备/境界变化时调用） |
+| `getStats()` | `→ object` | 当前注入值快照 |
+| **`setDropRates(r)`** | `← object` | **服务端下发掉落系数** |
+| `getDropRates()` | `→ object` | 当前掉落系数 |
+| **`onDrop`** | `← ({spirit, elite, enemy}) => void` | **击杀回流回调**，由主游戏赋值 |
+| `getSpirit()` | `→ number` | 战斗累计产出灵石 |
+| `debug()` | `→ {enemies[], playerX, dodge, nextCrit}` | 调参用只读快照 |
+| `addPet(def)` / `removePet(id)` / `getPets()` | — | 宠物挂载/卸载/查询（**预留，未实现实体**） |
+| `spawnWave()` | `→ void` | 立即刷一波（受 `maxAlive` 限制） |
 | `pause()` / `resume()` | `→ void` | 暂停/恢复（**主游戏弹窗时必须 pause**，见 §7.2） |
-| `getState()` | `→ {kills,speedMult,state,playerHp,pets,enemies}` | 状态快照 |
+| `getState()` | `→ {kills,spirit,speedMult,state,playerHp,pets,enemies}` | 状态快照 |
+
+> 战斗 IIFE **不读 `window.state`**，只通过 `BattleAPI` 双向通信；
+> 主游戏侧对应 `pushBattleStats()` / `onBattleDrop()` / `bindBattleHooks()` / `window.SkillAPI`。
 
 ### 5.1 宠物定义 schema
 
@@ -350,6 +458,13 @@ BattleAPI.addPet({
 | 6 | 怪物形态**没有拉伸/抖动** | **肉眼看**——这条自动化测不出来，别省 |
 | 7 | 弹窗打开后仍能点击 | 开任意弹窗 |
 | 8 | 切后台再回来不瞬移 | 切走 10s 再回来 |
+| 9 | 三围注入正确 | `BattleAPI.getStats()` 与主游戏面板一致 |
+| 10 | 换高属性装备后打得更快 | 换装前后各测 20s 击杀数（实测 16 → 31） |
+| 11 | 场上怪 ≤ 14 且不重叠 | `BattleAPI.debug()` 看 x 间距 ≥ 30 |
+| 12 | 只有 slime/water 两种怪 | `debug().enemies` 的 `t` 去重 |
+| 13 | 技能经验会涨、会升级 | 跑 25s 看 `SkillAPI.lv/exp` |
+| 14 | 身法加速 + 闪避生效 | 拉满技能后 `getState().speedMult > 1`、`debug().dodge > 0` |
+| 15 | 击杀有产出 | `getState().spirit` 增长、法宝偶尔入账 |
 
 ---
 
@@ -358,10 +473,11 @@ BattleAPI.addPet({
 | # | 事项 | 优先级 |
 |---|---|---|
 | 1 | 重新生成两张怪物素材（当前形态不准，依赖 scaleY/skew 校正掩盖） | **高** |
-| 2 | 多怪物类型 sprite：`slime`/`demon`/`raptor` 目前共用 `monster_001` | 中 |
-| 3 | `speedSkill` 自动触发接线（接口已备，需玩法层调用） | 低 |
-| 4 | 宠物实体 sprite（当前画圆形） | 低 |
-| 5 | 敌人是否改成分帧出手（当前起手即结算，无"抬手中被打断"的表现） | 低 |
+| 2 | **扩容怪物种类**：当前只有 `slime`/`water` 两种（占位怪已删），出新素材即可按 `hpK/atkK/defK` 接入 | 中 |
+| 3 | **宠物系统**：`addPet/removePet/getPets` 接口已预留，缺实体 sprite 与属性来源 | 中 |
+| 4 | 服务端 `/api` 真正下发 `dropRates`（当前走内置默认值，接口与本地降级已就绪） | 中 |
+| 5 | 战斗产出与服务端对账（现在只做"本地实时结算"，尚未周期对账） | 低 |
+| 6 | 敌人是否改成分帧出手（当前起手即结算，无"抬手中被打断"的表现） | 低 |
 
 ---
 
@@ -403,23 +519,26 @@ git push
 
 ```js
 // —— 平衡（BC）——
-playerAtk: 2          playerHp: 200
 playerAtkRange: 75    playerAspd: 1.1      playerSpeed: 28
-spawnInterval: 1.4    enemySpawnOffset: 40
+spawnInterval: 1.0    enemySpawnOffset: 40    maxAlive: 14    queueGap: 34
+（playerAtk/playerHp 已废 —— 三围由主游戏 setStats 注入）
 
 // —— 判定容差（现状为裸数字）——
 起手 +5    命中 +15    索敌 +200（宠物 +100）    停步 +2
 受击白闪 0.25s    死亡消散 0.4s    玩家僵直 0.5s
 
-// —— 敌人 ——
-slime:  atkRange 30   speed 120   hp 1   atk 3   (近战)
-water:  atkRange 35   speed 80    hp 2   atk 4   (近战)
-demon:  atkRange 35   speed 95    hp 1   atk 5   (近战)
-raptor: atkRange 110  speed 70    hp 1   atk 4   (远程)
+// —— 敌人(三围 = 系数 × 玩家境界, 见 §4.1.2) ——
+slime:  atkRange 30  speed 120  w 60  hpK 1.0  atkK 0.55  defK 0.35
+water:  atkRange 35  speed  80  w 40  hpK 1.6  atkK 0.75  defK 0.60
+精英:   6% 出现   体型 ×1.28   血 ×3   攻 ×1.2   产出 ×4
 
 // —— 玩家攻击帧 ——
-第一段: frame 10  系数 0.9~1.1   暴击 8%   ×1.8   #7fe0ff
-第二段: frame 26  系数 0.95~1.2  暴击 10%  ×2.0   #a0e8ff
+第一段: frame 10  系数 0.9~1.1
+第二段: frame 26  系数 0.95~1.2
+（暴击/会心/爆伤一律读 PST.crit / critB / critD）
+
+// —— 伤害公式 ——
+dmg = atk × mult × 100/(100 + def×(1-pen%)),  最低 1
 
 // —— 摄像机 ——
 主角锚点 28%   阻尼 dt*6
@@ -427,8 +546,13 @@ raptor: atkRange 110  speed 70    hp 1   atk 4   (远程)
 // —— 时间 ——
 dt 上限 0.05s   动画 fps 24   逻辑用 sdt / 动画用 dt
 
-// —— 倍速 ——
-double 2x/5s/8%   triple 3x/3s/3%
+// —— 倍速(身法技能, 见 §4.5) ——
+疾风步  2x：Lv1 5%/4s/+4%闪避   → Lv20 65%/8s/+25%
+缩地成寸 3x：Lv1 0.5%/2s/+8%闪避 → Lv20 12%/4s/+40%
+
+// —— 掉落(见 §4.6) ——
+spiritBase 6   spiritPerLv 1.2   spiritRand ±40%
+equipChance 3.5%   精英 ×4
 
 // —— z-index ——
 battle-stage: 1（必须低于 UI 最低层 5）

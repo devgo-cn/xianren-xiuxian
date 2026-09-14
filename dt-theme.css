@@ -719,6 +719,25 @@
   .eq-empty{text-align:center;color:#8b94a8;font-size:12.5px;padding:24px 8px;line-height:2.1}
   .eq-rec{font-size:10px;color:#5f6980;text-align:center;margin-top:10px;line-height:1.7}
 
+/* ============ 神通面板(技能) ============ */
+  .sk-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .sk-row{display:flex;gap:10px;align-items:stretch;padding:9px 10px;
+    background:rgba(18,24,40,.55);border:1px solid rgba(201,168,106,.14)}
+  .sk-row.maxed{border-color:rgba(240,201,138,.42)}
+  .sk-ic{flex:none;width:32px;display:flex;align-items:center;justify-content:center;
+    font-size:18px;color:#f0c98a;text-shadow:0 0 10px rgba(240,200,140,.45)}
+  .sk-main{flex:1;min-width:0}
+  .sk-top{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:#e6ecf5}
+  .sk-lv{font-size:11px;color:#f0c98a;font-weight:600}
+  .sk-lv i{font-style:normal;color:#7f92ad;font-size:10px;font-weight:400}
+  .sk-eff{font-size:11px;color:#9fd8ff;margin-top:2px;line-height:1.55}
+  .sk-eff b{color:#dff0ff;font-weight:600}
+  .sk-tip{font-size:10.5px;color:#6f7a90;margin-top:2px;line-height:1.5}
+  .sk-bar{height:3px;margin-top:5px;background:rgba(255,255,255,.08);overflow:hidden}
+  .sk-bar i{display:block;height:100%;background:linear-gradient(90deg,#6fe0a8,#3ab878);transition:width .3s ease}
+  .sk-row.maxed .sk-bar i{background:linear-gradient(90deg,#f0c98a,#d8a838)}
+  .sk-exp{font-size:10px;color:#7f92ad;margin-top:3px}
+
 
 /* ============ v0.9.5 法宝大钮 + 六格面板 ============ */
   .equip-chip{position:relative;width:40px;height:40px;flex:none;cursor:pointer;z-index:9;

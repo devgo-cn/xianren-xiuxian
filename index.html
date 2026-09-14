@@ -476,6 +476,7 @@
       <div class="hud-icons">
         <div class="equip-chip" id="equipChip" onclick="openEquip()" title="法宝·装备"><span class="lg">宝</span></div>
         <div class="equip-chip" id="alchemyChip" onclick="openAlchemy()" title="丹房 · 炼丹"><span class="lg" style="font-size:17px">丹</span></div>
+        <div class="equip-chip" id="skillChip" onclick="openSkills()" title="神通 · 技能"><span class="lg" style="font-size:17px">技</span></div>
         <div class="mail-chip" id="mailChip" onclick="openMail()" title="鸿雁信匣">
           <svg class="m-bg" viewBox="0 0 200 200" preserveAspectRatio="none" aria-hidden="true"><path class="ink" d="M100 8 C146 2 190 32 195 80 C200 130 172 188 126 195 C78 203 18 178 9 124 C1 74 28 16 78 8 C85 7 93 8 100 8 Z"/></svg>
           <svg class="m-ico" viewBox="0 0 24 24" aria-hidden="true">
@@ -502,6 +503,7 @@
   <canvas id="battleCanvas"></canvas>
   <div class="battle-hud">
     <span class="kills">击杀 <b id="battleKills">0</b></span>
+    <span class="kills">灵石 <b id="battleSpirit">0</b></span>
     <span class="speed" id="battleSpeed" style="display:none">×2 倍速</span>
     <span id="battleState">推进中</span>
   </div>
@@ -666,6 +668,14 @@
   </div>
 </div>
 
+<div class="modal" id="skillModal">
+  <div class="card story-card">
+    <div class="mhead"><h3>神 通<i>SKILLS</i></h3><button class="xbtn" onclick="closeSkills()">✕</button></div>
+    <div id="skillBody"></div>
+    <button class="btn primary story-close" onclick="closeSkills()">合 上</button>
+  </div>
+</div>
+
 <div class="modal" id="setModal">
   <div class="card story-card">
     <h3>设 置</h3>
@@ -719,21 +729,35 @@
  * ============================================================ */
 (function(){
   const BC = {
-    playerAtk: 2, playerHp: 200, playerAtkRange: 75, playerAspd: 1.1, playerSpeed: 28,
-    spawnInterval: 1.4, enemySpawnOffset: 40,
+    /* 占位怪 demon(妖将)/raptor(妖弓) 已移除 —— 只保留两种有真实素材的怪 */
+    playerAtkRange: 75, playerAspd: 1.1, playerSpeed: 28,
+    spawnInterval: 1.0, enemySpawnOffset: 40, maxAlive: 14, queueGap: 34,
     enemies: {
-      slime:  { name:'妖卒', role:'melee', atkRange:30,  speed:120, hp:1, atk:3,  color:'#6fe0a8' },
-      water:  { name:'水灵', role:'melee', atkRange:35,  speed:80,  hp:2, atk:4,  color:'#6fd0e8' },
-      demon:  { name:'妖将', role:'melee', atkRange:35,  speed:95,  hp:1, atk:5,  color:'#e87060' },
-      raptor: { name:'妖弓', role:'range', atkRange:110, speed:70,  hp:1, atk:4,  color:'#c59bff' },
+      /* hpK/atkK/defK: 按玩家境界(lv)线性成长 —— 怪只随境界长, 玩家随境界+装备长, 换装即提速。
+       * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。 */
+      slime: { name:'妖卒', role:'melee', w:60, atkRange:30, speed:120, hpK:1.0, atkK:0.55, defK:0.35, color:'#6fe0a8' },
+      water: { name:'水灵', role:'melee', w:40, atkRange:35, speed:80,  hpK:1.6, atkK:0.75, defK:0.60, color:'#6fd0e8' },
     },
-    speedSkills: { double:{mult:2,duration:5,chance:0.08}, triple:{mult:3,duration:3,chance:0.03} },
+  };
+
+  /* 玩家属性(主游戏 pushBattleStats 注入) —— 战斗内一切数值伤害以此为准 */
+  let PST = { lv:1, atk:56, hp:430, def:31, crit:0, critB:0, critD:0, pen:0, dodge:0 };
+  /* 掉落系数(服务端可下发覆盖; 断网/离线用内置默认值, 保证照常可玩) */
+  const DROP = {
+    spiritBase: 6,        // 每杀灵石基数
+    spiritPerLv: 1.2,     // 每杀灵石 · 每境界级加成
+    spiritRand: 0.4,      // 灵石浮动 ±40%
+    equipChance: 0.035,   // 掉法宝概率(装备实际生成在主游戏 makeArt)
+    eliteChance: 0.06,    // 精英怪出现率
+    eliteMul: 4,          // 精英产出倍率
+    eliteHp: 3,           // 精英血量倍率
   };
 
   const G = {
-    t:0, kills:0, speedMult:1, speedMultTimer:0, state:'walk', camX:0, paused:false,
+    t:0, kills:0, spirit:0, speedMult:1, speedMultTimer:0, state:'walk', camX:0, paused:false,
     player:null, pets:[], enemies:[], fx:[], dmg:[], spawnT:BC.spawnInterval,
-    sprite:null, bgImg:null, spriteReady:false, bgReady:false,
+    sprite:null, bgImg:null, spriteReady:false, bgReady:false, extraStrike:false,
+    speedDodge:0, nextStrikeCrit:0,     // 身法期间的闪避加成 / 追猎连击的暴击加成
   };
 
   /* 加载素材 */
@@ -788,17 +812,47 @@
   /* 水精灵帧配置: 10列8行, walk32+attack33+hurt13 */
   const WATER_SPRITE = { cols:10, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:33, hurtStart:65, hurtCount:13, fps:24 };
 
+  function fmtNum(n) {
+    n = Math.round(n || 0);
+    if (n >= 100000000) return (n/100000000).toFixed(2) + '亿';
+    if (n >= 10000) return (n/10000).toFixed(n >= 1000000 ? 0 : 1) + '万';
+    return String(n);
+  }
+  /* ---------- 技能读取: 等级与数值的唯一来源是主游戏 SkillAPI ---------- */
+  function skVal(id)  { const api = window.SkillAPI; return api ? api.val(id) : null; }   // {chance, dmg, ...} 已按等级插值
+  function skLv(id)   { const api = window.SkillAPI; return api ? api.lv(id) : 1; }
+  function skExp(id,n){ const api = window.SkillAPI; if (api) api.addExp(id, n); }
+  function skExpAll(n){ const api = window.SkillAPI; if (api) api.addExpAll(n); }
+
   window.BattleAPI = {
     getKills: () => G.kills,
     resetKills: () => { G.kills = 0; },
     triggerSpeedSkill: (mult, duration) => { if (mult<=1) return false; G.speedMult=mult; G.speedMultTimer=duration||5; return true; },
+    /* 兼容旧接口: 加速现在由「疾风步/缩地成寸」两个技能驱动 */
     trySpeedSkill: () => {
-      for (const [name, sk] of Object.entries(BC.speedSkills)) {
-        if (Math.random() < sk.chance) { window.BattleAPI.triggerSpeedSkill(sk.mult, sk.duration); return {name, mult:sk.mult, duration:sk.duration}; }
-      }
-      return null;
+      const a = rollSpeedSkill('jifeng'), b = rollSpeedSkill('suodi');
+      const hit = a || b;
+      return hit ? { name: hit, mult: G.speedMult, duration: G.speedMultTimer } : null;
     },
     getSpeedMult: () => G.speedMult,
+    /* 主游戏注入玩家三围(境界+装备汇总后的面板值) */
+    setStats: (s) => {
+      if (!s) return;
+      PST = Object.assign(PST, s);
+      if (G.player) { G.player.maxHp = PST.hp; if (G.player.hp > PST.hp) G.player.hp = PST.hp; }
+    },
+    getStats: () => Object.assign({}, PST),
+    /* 服务端下发掉落系数(每击杀产出) */
+    setDropRates: (r) => { if (r) Object.assign(DROP, r); },
+    getDropRates: () => Object.assign({}, DROP),
+    onDrop: null,      // 主游戏赋值: ({spirit, elite, enemy}) => void
+    getSpirit: () => G.spirit,
+    /* 调参用调试口(只读快照) */
+    debug: () => ({
+      enemies: G.enemies.filter(e => e.alive && e.dying <= 0)
+        .sort((a, b) => a.x - b.x).map(e => ({ t: e.type, x: Math.round(e.x), hp: Math.round(e.hp), maxHp: e.maxHp, elite: !!e.elite })),
+      playerX: G.player ? Math.round(G.player.x) : 0, dodge: G.speedDodge, nextCrit: G.nextStrikeCrit,
+    }),
     addPet: (petDef) => {
       const pet = { id:petDef.id||'pet_'+Date.now(), name:petDef.name||'宠物', atk:petDef.atk||5, aspd:petDef.aspd||1.0, atkRange:petDef.atkRange||50, hp:petDef.hp||80, maxHp:petDef.hp||80, color:petDef.color||'#ffd76b', offsetX:petDef.offsetX||-30, offsetY:petDef.offsetY||0, x:0,y:0, atkT:Math.random()*0.5, anim:0, hurtT:0, alive:true };
       G.pets.push(pet); return pet;
@@ -808,22 +862,128 @@
     spawnWave: () => spawnWave(),
     pause: () => { G.paused = true; },
     resume: () => { G.paused = false; lastT = performance.now(); },
-    getState: () => ({ kills:G.kills, speedMult:G.speedMult, state:G.state, playerHp:G.player?G.player.hp:0, pets:G.pets.length, enemies:G.enemies.filter(e=>e.alive).length }),
+    getState: () => ({ kills:G.kills, spirit:G.spirit, speedMult:G.speedMult, state:G.state, playerHp:G.player?G.player.hp:0, pets:G.pets.length, enemies:G.enemies.filter(e=>e.alive).length }),
   };
 
   function makePlayer() {
-    return { x:0,y:0, hp:BC.playerHp,maxHp:BC.playerHp, atk:BC.playerAtk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0,stun:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false, attackTarget:null, hit1:false, hit2:false };
+    return { x:0,y:0, hp:PST.hp,maxHp:PST.hp, atk:PST.atk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0,stun:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false, attackTarget:null, hit1:false, hit2:false };
   }
+  /* 怪物成长系统: 三围随玩家境界 lv 线性成长(怪只吃境界, 不吃装备 → 换装备=变快) */
   function makeEnemy(type) {
     const def = BC.enemies[type] || BC.enemies.slime;
-    return { type,name:def.name,role:def.role, x:0,y:0, hp:def.hp,maxHp:def.hp, atk:def.atk,atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2), color:def.color, atkT:Math.random()*0.6, anim:0,hurtT:0,stun:0, alive:true,dying:0,reach:1, animFrame:0, animTimer:0, moving:false };
+    const lv = Math.max(1, PST.lv || 1);
+    const elite = Math.random() < DROP.eliteChance;
+    let hp  = Math.round((60 + 26*lv) * def.hpK);
+    let atk = Math.round((8 + 5*lv)   * def.atkK);
+    const dfn = Math.round((2 + 2*lv)   * def.defK);
+    if (elite) { hp = Math.round(hp*DROP.eliteHp); atk = Math.round(atk*1.2); }
+    return { type,name:def.name,role:def.role, elite, x:0,y:0, hp,maxHp:hp, atk, def:dfn,
+      atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2)*(elite?0.85:1), color:def.color,
+      atkT:Math.random()*0.6, anim:0,hurtT:0,stun:0, alive:true,dying:0,reach:1, animFrame:0, animTimer:0, moving:false };
   }
   function spawnWave() {
     const types = Object.keys(BC.enemies);
-    const type = types[(Math.random()*types.length)|0];
+    const tw = types.reduce((s,t) => s + (BC.enemies[t].w || 1), 0);
+    let r = Math.random()*tw, type = types[0];
+    for (const t of types) { r -= (BC.enemies[t].w || 1); if (r <= 0) { type = t; break; } }
+    if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= BC.maxAlive) return null;
     const e = makeEnemy(type);
     e.x = G.camX + stageW() + BC.enemySpawnOffset;
     G.enemies.push(e);
+    return e;
+  }
+  /* ---------- 数值伤害: 减伤系数 100/(100+有效防御), 破甲按百分比削减防御 ---------- */
+  function calcDmg(atk, mult, def, pen) {
+    const eff = Math.max(0, (def||0) * (1 - Math.min(90, pen||0)/100));
+    return Math.max(1, Math.round(atk * mult * (100/(100+eff))));
+  }
+  /* ---------- 身法技能(疾风步 2x / 缩地成寸 3x): 独立 roll, 取高者, 时长可刷新 ----------
+   * 身法不是光环: 只在生效的那几秒里加闪避(身形飘忽), 时效一到即散, 不进面板属性 */
+  function rollSpeedSkill(id) {
+    const s = skVal(id);
+    if (!s || Math.random()*100 >= s.chance) return null;
+    skExp(id, 3);
+    if (s.mult >= G.speedMult || G.speedMultTimer <= 0) { G.speedMult = s.mult; G.speedDodge = s.dodge || 0; }
+    else if ((s.dodge || 0) > G.speedDodge) G.speedDodge = s.dodge || 0;
+    G.speedMultTimer = Math.max(G.speedMultTimer, s.dur);
+    updateHUD();
+    return id;
+  }
+  /* ---------- 击杀结算: 灵石 + (装备由主游戏 roll) + 技能经验 + 追猎/加速 ---------- */
+  function onKill(e) {
+    const mul = e.elite ? DROP.eliteMul : 1;
+    const jitter = 1 - DROP.spiritRand + Math.random()*DROP.spiritRand*2;
+    const sp = Math.max(1, Math.round((DROP.spiritBase + DROP.spiritPerLv*(PST.lv||1)) * jitter * mul));
+    G.spirit += sp;
+    if (typeof window.BattleAPI.onDrop === 'function') {
+      try { window.BattleAPI.onDrop({ spirit: sp, elite: !!e.elite, enemy: e.name }); } catch (err) {}
+    }
+    skExpAll(2);                       // 每杀全体技能 +2: 不触发也在慢慢长
+    rollSpeedSkill('jifeng');
+    rollSpeedSkill('suodi');
+    const zl = skVal('zhuilie');       // 追猎: 击杀后立刻再出手一次, 衔尾一击暴击率大增
+    if (zl && Math.random()*100 < zl.chance) {
+      skExp('zhuilie', 3); G.extraStrike = true; G.nextStrikeCrit = zl.crit || 0;
+    }
+  }
+  /* ---------- 玩家一次命中(段1/段2)的全部技能判定 ----------
+   * 技能的加成只作用于"打出去的那一下": 攻击倍率 / 会心 / 暴击 / 破甲 ——
+   * 一律不写回面板属性(不做常驻光环), 攻防血仍只由境界与装备决定。 */
+  function playerStrike(p, target, seg) {
+    if (!target || !target.alive) return;
+    let base = seg === 1 ? (0.9 + Math.random()*0.2) : (0.95 + Math.random()*0.25);
+    let pen = PST.pen || 0;
+    /* 破甲击: 这一击无视目标 Y% 防御 */
+    const pj = skVal('pojia');
+    if (pj && Math.random()*100 < pj.chance) {
+      pen = Math.min(90, pen + pj.pen); skExp('pojia', 2);
+      G.fx.push({ kind:'hitSpark', x:target.x, y:target.y-20, color:'#ffd76b', t:0, dur:0.3 });
+    }
+    /* 斩杀: 目标残血(低于 X%)时, 这一击伤害翻倍 */
+    const zs = skVal('zhansha');
+    if (zs && target.hp / target.maxHp * 100 < zs.threshold) { base *= 2; skExp('zhansha', 2); }
+    /* 会心(×1.5) / 暴击(×2.0) / 爆伤增幅(critD%); 追猎的衔尾一击额外加暴击率 */
+    const critBonus = G.nextStrikeCrit; G.nextStrikeCrit = 0;
+    let kind = 0;
+    if (Math.random()*100 < (PST.crit || 0) + critBonus) kind = 2;
+    else if (Math.random()*100 < (PST.critB || 0)) kind = 1;
+    const cmul = kind === 2 ? 2 : kind === 1 ? 1.5 : 1;
+    const mult = base * (kind ? cmul * (1 + (PST.critD || 0)/100) : 1);
+    const big = kind === 2;
+    dealDamage(target, calcDmg(PST.atk, mult, target.def, pen), kind ? '#ffd76b' : '#7fe0ff', big);
+    if (!target.alive) return;
+    /* 剑气斩: 追加一段自带攻击力加成的剑气 */
+    const jq = skVal('jianqi');
+    if (jq && Math.random()*100 < jq.chance) {
+      skExp('jianqi', 2);
+      G.fx.push({ kind:'slash', x:target.x, y:target.y-24, color:'#bfe8ff', t:0, dur:0.28 });
+      dealDamage(target, calcDmg(PST.atk, mult*(jq.dmg||0)/100, target.def, pen), '#bfe8ff', big);
+      if (!target.alive) return;
+    }
+    /* 横扫千军: 波及周围 N 个 */
+    const hs = skVal('hengsao');
+    if (hs && Math.random()*100 < hs.chance) {
+      skExp('hengsao', 2);
+      const n = Math.max(1, Math.round(hs.n || 1));
+      let hit = 0;
+      for (const o of G.enemies) {
+        if (hit >= n) break;
+        if (o === target || !o.alive || o.dying > 0) continue;
+        if (Math.abs(o.x - p.x) > p.atkRange + 60) continue;
+        dealDamage(o, calcDmg(PST.atk, mult*(hs.dmg||0)/100, o.def, pen), '#ffc98a', big);
+        hit++;
+      }
+      if (hit) G.fx.push({ kind:'sweep', x:p.x, y:floorY()-30, color:'#ffc98a', t:0, dur:0.3 });
+    }
+    /* 三连斩: 第二段之后补一刀, 补刀必会心(至少 ×1.5) */
+    if (seg === 2) {
+      const sl = skVal('sanlian');
+      if (sl && Math.random()*100 < sl.chance) {
+        skExp('sanlian', 2);
+        const m2 = (sl.dmg||0)/100 * Math.max(cmul, 1.5) * (1 + (PST.critD || 0)/100);
+        dealDamage(target, calcDmg(PST.atk, m2, target.def, pen), '#ffe7a8', big);
+      }
+    }
   }
   function findNearestEnemy(fromX, maxDist) {
     let best=null, bestD=maxDist||Infinity;
@@ -838,6 +998,7 @@
       target.hp=0; target.alive=false; target.dying=0.4;
       G.kills++;
       G.fx.push({ kind:'death', x:target.x,y:target.y-15, color:target.color, t:0,dur:0.4 });
+      onKill(target);
       updateHUD();
     }
   }
@@ -859,22 +1020,22 @@
         if (p.animFrame === 10 && !p.hit1 && p.attackTarget && p.attackTarget.alive) {
           p.hit1 = true;
           if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
-            const crit = Math.random()<0.08;
-            const dmg = p.atk*(0.9+Math.random()*0.2)*(crit?1.8:1);
-            dealDamage(p.attackTarget, dmg, '#7fe0ff', crit);
+            playerStrike(p, p.attackTarget, 1);
             /* 正儿八经的网游死亡判定: 第一段刺死就中断, 不刺第二下 */
-            if (!p.attackTarget.alive) { p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false; }
+            if (!p.attackTarget.alive) {
+              p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false;
+              if (G.extraStrike) { G.extraStrike = false; p.atkT = 0; }   // 追猎: 立刻再出手
+            }
           }
         }
         if (p.animFrame === 26 && !p.hit2 && p.attackTarget && p.attackTarget.alive) {
           p.hit2 = true;
-          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
-            const crit = Math.random()<0.1;
-            const dmg = p.atk*(0.95+Math.random()*0.25)*(crit?2.0:1);
-            dealDamage(p.attackTarget, dmg, '#a0e8ff', crit);
-          }
+          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) playerStrike(p, p.attackTarget, 2);
         }
-        if (p.animFrame >= SPRITE.attackCount) { p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false; }
+        if (p.animFrame >= SPRITE.attackCount) {
+          p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false;
+          if (G.extraStrike) { G.extraStrike = false; p.atkT = 0; }        // 追猎: 立刻再出手
+        }
       } else {
         p.animFrame = (p.animFrame + 1) % SPRITE.walkCount;
         /* 脚步声同步: walk第18帧(源帧22) */
@@ -919,6 +1080,14 @@
   }
   function updateEnemies(dt) {
     const p = G.player;
+    /* 排队: 近的先站位, 后面的依次后挪一个身位 —— 否则所有怪挤在同一点完全重叠 */
+    const queue = G.enemies.filter(e => e.alive && e.dying <= 0).sort((a, b) => a.x - b.x);
+    let prevX = -1e9;
+    for (const e of queue) {
+      const stopX = Math.max(p.x + e.atkRange, prevX + BC.queueGap);
+      e.stopX = stopX;
+      prevX = Math.max(e.x, stopX);
+    }
     for (const e of G.enemies) {
       if (e.dying>0) { e.dying-=dt; continue; }
       if (!e.alive) continue;
@@ -946,7 +1115,7 @@
           }
         }
       }
-      const stopX = p.x + e.atkRange;
+      const stopX = e.stopX != null ? e.stopX : p.x + e.atkRange;
       e.moving = e.x > stopX+2;
       if (e.x > stopX+2) e.x = Math.max(stopX, e.x-e.speed*dt);
       const wasAttacking = e.anim > 0;
@@ -957,10 +1126,16 @@
           if (e.type === 'slime') playSfx('slime_attack', 0.5);
           else if (e.type === 'water') playSfx('water_attack', 0.5);
         }
-        p.hp -= e.atk*(0.85+Math.random()*0.3); p.hurtT = 0.25; p.stun = 0.5;
-        G.dmg.push({ x:p.x,y:p.y-40, val:Math.round(e.atk), crit:false, color:'#ff8a7a', t:0 });
-        G.fx.push({ kind:'hitSpark', x:p.x,y:p.y-20, color:'#ff8a7a', t:0,dur:0.3 });
-        if (p.hp <= 0) p.hp = p.maxHp;
+        /* 闪避判定(装备词条 + 身法技能时效加成) —— 落空则不进伤害 */
+        if (Math.random()*100 < ((PST.dodge || 0) + G.speedDodge)) {
+          G.dmg.push({ x:p.x,y:p.y-40, val:'闪', crit:false, color:'#9fd8ff', t:0 });
+        } else {
+          const dmg = calcDmg(e.atk, 0.85+Math.random()*0.3, PST.def, 0);
+          p.hp -= dmg; p.hurtT = 0.25; p.stun = 0.5;
+          G.dmg.push({ x:p.x,y:p.y-40, val:dmg, crit:false, color:'#ff8a7a', t:0 });
+          G.fx.push({ kind:'hitSpark', x:p.x,y:p.y-20, color:'#ff8a7a', t:0,dur:0.3 });
+          if (p.hp <= 0) p.hp = p.maxHp;              // 收草节奏: 主角不死, 倒下即刻重整旗鼓
+        }
       }
     }
     G.enemies = G.enemies.filter(e => e.alive || e.dying>0);
@@ -975,8 +1150,13 @@
     const targetCam = G.player.x - stageW()*0.28;
     G.camX += (targetCam-G.camX)*Math.min(1, dt*6);
   }
+  let _pushT = 0;
   function update(dt) {
-    if (G.speedMultTimer > 0) { G.speedMultTimer -= dt; if (G.speedMultTimer <= 0) { G.speedMult=1; G.speedMultTimer=0; } updateHUD(); }
+    if (G.speedMultTimer > 0) {
+      G.speedMultTimer -= dt;
+      if (G.speedMultTimer <= 0) { G.speedMult = 1; G.speedMultTimer = 0; G.speedDodge = 0; }   // 身法时效到点, 闪避加成一并散去
+      updateHUD();
+    }
     const sdt = dt * G.speedMult;
     G.t += sdt;
     const aliveEnemies = G.enemies.filter(e => e.alive && e.dying<=0);
@@ -984,6 +1164,9 @@
     if (newState !== G.state) { G.state = newState; updateHUD(); }
     G.spawnT -= sdt;
     if (G.spawnT <= 0) { spawnWave(); G.spawnT = BC.spawnInterval; }
+    /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
+    _pushT -= dt;
+    if (_pushT <= 0) { _pushT = 5; if (typeof window.pushBattleStats === 'function') window.pushBattleStats(); }
     updatePlayer(sdt); updatePets(sdt); updateEnemies(sdt); updateFx(sdt); updateCamera(sdt);
   }
 
@@ -1044,6 +1227,12 @@
     ctx.beginPath(); ctx.moveTo(0, fy); ctx.lineTo(CW, fy); ctx.stroke();
   }
 
+  function drawEliteRing(x, y, r) {          // 精英怪: 脚下金色法环
+    ctx.save(); ctx.translate(x, y); ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = '#e8c46b'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(0, 0, r, r*0.3, 0, 0, Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
   function drawHpBar(x, y, w, hp, maxHp) {
     const p = Math.max(0, hp/maxHp); const h = 3;
     ctx.fillStyle = 'rgba(8,12,20,0.6)';
@@ -1136,8 +1325,8 @@
         const row = Math.floor(frameIdx / SLIME_SPRITE.cols);
         const srcX = col * SLIME_SPRITE.fw;
         const srcY = row * SLIME_SPRITE.fh;
-        /* 渲染尺寸: 到玩家肩膀高度 */
-        const drawH = Math.min(CH * 0.5, 72);
+        /* 渲染尺寸: 到玩家肩膀高度(精英怪体型 ×1.28) */
+        const drawH = Math.min(CH * 0.5, 72) * (e.elite ? 1.28 : 1);
         const drawW = drawH * (SLIME_SPRITE.fw / SLIME_SPRITE.fh);
         /* 脚底在帧中的y=120(距底部8px), 用这个偏移让脚底踩在地板上 */
         const footOffset = 120 * (drawH / SLIME_SPRITE.fh);
@@ -1153,6 +1342,7 @@
         /* 史莱姆面朝左, 素材本身就是面朝左, 不需要翻转 */
         ctx.drawImage(G.slimeSprite, srcX, srcY, SLIME_SPRITE.fw, SLIME_SPRITE.fh, -drawW*0.5, -footOffset, drawW, compensatedH);
         ctx.restore();
+        if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
         if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp);
       } else if (G.waterReady && G.waterSprite && e.type === 'water') {
         /* 水精灵真实 sprite 渲染 */
@@ -1170,7 +1360,7 @@
         const row = Math.floor(frameIdx / WATER_SPRITE.cols);
         const srcX = col * WATER_SPRITE.fw;
         const srcY = row * WATER_SPRITE.fh;
-        const drawH = Math.min(CH * 0.5, 70);
+        const drawH = Math.min(CH * 0.5, 70) * (e.elite ? 1.28 : 1);
         const drawW = drawH * (WATER_SPRITE.fw / WATER_SPRITE.fh);
         /* 脚底在帧中的y=118(距底部10px) */
         const footOffset = 118 * (drawH / WATER_SPRITE.fh);
@@ -1188,9 +1378,10 @@
         /* 水精灵面朝左, 素材本身就是面朝左, 不需要翻转 */
         ctx.drawImage(G.waterSprite, srcX, srcY, WATER_SPRITE.fw, WATER_SPRITE.fh, -drawW*0.5, -footOffset, drawW, compensatedH);
         ctx.restore();
+        if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
         if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp);
       } else {
-        /* 其他怪物类型暂用占位 */
+        /* 素材未就绪时的兜底占位(正常不会走到这里) */
         ctx.save(); ctx.translate(sx, sy);
         if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
         if (e.hurtT > 0) { ctx.globalAlpha *= 0.6; ctx.filter = 'brightness(2)'; }
@@ -1209,6 +1400,17 @@
         ctx.save(); ctx.translate(sx, f.y); ctx.rotate(f.t*3);
         ctx.strokeStyle = f.color; ctx.globalAlpha = 1-k; ctx.lineWidth = 1.2;
         for (let i=0; i<4; i++) { ctx.rotate(Math.PI/4); ctx.beginPath(); ctx.moveTo(0,2); ctx.lineTo(0,6); ctx.stroke(); }
+        ctx.restore();
+      } else if (f.kind === 'slash') {                    // 剑气斩: 一道横掠的剑气
+        ctx.save(); ctx.translate(sx, f.y); ctx.globalAlpha = 1-k;
+        ctx.strokeStyle = f.color; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        const w = 26 + k*34;
+        ctx.beginPath(); ctx.moveTo(-w*0.5, 6+k*4); ctx.lineTo(w*0.5, -2-k*6); ctx.stroke();
+        ctx.restore();
+      } else if (f.kind === 'sweep') {                    // 横扫千军: 一道贴地弧光
+        ctx.save(); ctx.translate(sx, f.y); ctx.globalAlpha = (1-k)*0.9;
+        ctx.strokeStyle = f.color; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.arc(0, 0, 18 + k*46, -Math.PI*0.15, Math.PI*0.42); ctx.stroke();
         ctx.restore();
       } else if (f.kind === 'death') {
         ctx.save(); ctx.translate(sx, f.y);
@@ -1244,7 +1446,9 @@
     const killsEl = document.getElementById('battleKills');
     const speedEl = document.getElementById('battleSpeed');
     const stateEl = document.getElementById('battleState');
+    const spEl = document.getElementById('battleSpirit');
     if (killsEl) killsEl.textContent = G.kills;
+    if (spEl) spEl.textContent = fmtNum(G.spirit);
     if (speedEl) {
       if (G.speedMult > 1) { speedEl.style.display = ''; speedEl.textContent = '×'+G.speedMult+' 倍速 ('+G.speedMultTimer.toFixed(1)+'s)'; }
       else speedEl.style.display = 'none';
@@ -1264,6 +1468,7 @@
     if (!initCanvas()) { setTimeout(init, 200); return; }
     G.player = makePlayer(); G.player.x = 100;
     updateHUD();
+    if (typeof window.pushBattleStats === 'function') window.pushBattleStats();
     requestAnimationFrame(loop);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
