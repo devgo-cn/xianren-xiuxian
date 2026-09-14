@@ -123,6 +123,15 @@
     "assets/monsters/m4_jiaoyao.png": "23c21be19f7cf63d4924d3d87b472e9a12af32e768a93012d191fea1bebafc54",
     "assets/monsters/m5_tianmo.png": "4b4893a5bd5265150b3aa1be6caaf75c9f0bb546e9afc57e0309c081097a37a4",
     "assets/music/bgm.mp3": "3139ad8a89de8d7284c4b0c00b9d94164d1f231e8b3a6b0a2923d78206c5befe",
+    "assets/sfx/attack1.ogg": "bb1e63052519c6c8a0e6e86f684035ad209f247c63b3317b48be8abf454f4b96",
+    "assets/sfx/attack2.ogg": "89ee51ee4cac1e101107e68610c1b815a303bd9009d36747bb6d80f57aa71e2f",
+    "assets/sfx/footstep.ogg": "609f738673b63dda5b904d27e9ee9296910b547b348a627f60250a0a35d97e43",
+    "assets/sfx/slime_attack.ogg": "1825b4ec66f26049dba4d7111533cfc5c6bd1686c46e5b6a63e0d32e30e9d6d5",
+    "assets/sfx/slime_footstep.ogg": "66ca6ff89b88ff82ec95f9745ec7a53683f9b338a324d9a1ede7de49889a42d8",
+    "assets/sfx/slime_hurt.ogg": "287b18f2fbcac4247d40989aebe2a75e54b120f921a73e0dc46b20e23b412c3a",
+    "assets/sfx/water_attack.ogg": "2255df80b2be0678e063bf713ce97c78705e1510851b8ac67fa7d944536b0b81",
+    "assets/sfx/water_footstep.ogg": "6cf4533faeae71ea5ecc6000583feb272de717d165785deff9e5edd995540ab2",
+    "assets/sfx/water_hurt.ogg": "e73056e800bd4b8dfbfd21e62d292910844c9094dcab471e7d326440f28d46c3",
     "assets/sound/alert.mp3": "3cf7c6a93f00f79fd2136b08bf6dd78f2e4d8eed1f62a734d4d92906e89904e8",
     "assets/sound/crit.mp3": "2874a4165eb320d01d910cbefec1fee765e8b76b8b7b07ab5a54fcac19e05f58",
     "assets/sound/hit.mp3": "ba9d45eac4154f526e170216023ef43bf949d7e34d14dd4bb03bdec7cbb7f636",
@@ -135,8 +144,8 @@
     "dt-theme.css": "036a3ebb6cff5f075c3ab8ea3666b7f99e0f843b39d6f2b05e0b54fad8e569ae",
     "fx2d.js": "a2a094eda63597f16245e2f2d421fcc05c0955b4239650e62c63887bc352a9ea",
     "game.js": "c29f23d10a4a1bd121200c279a7490924e615c3312feed566e8822eb766a075c",
-    "index.html": "5817544ca7f6acc91d4034c8387e22d1f8c62d64f782a7a61d69fb1e64f49083"
+    "index.html": "fd18e7a6bfe293a96825c880d0de4e8a885355c70fda8c6a237458e59f1591a4"
   },
-  "rev": "2239da241253452e",
+  "rev": "8cbeaebfc53d58ff",
   "version": "2.4"
 }
