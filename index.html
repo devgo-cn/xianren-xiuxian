@@ -122,6 +122,27 @@
   .battle-hud .kills{color:#e8c56b;font-weight:700}
   .battle-hud .speed{color:#ff8a4a;font-weight:700}
 
+  /* 战斗区UI图标层：大图标(地板右下) + 小图标(右上角) */
+  .battle-ui{position:fixed;left:0;right:0;top:92px;bottom:calc(44vh + 84px);z-index:4;pointer-events:none}
+  .battle-ui .big-icons{position:absolute;bottom:6px;right:10px;display:flex;gap:7px;pointer-events:auto}
+  .battle-ui .small-icons{position:absolute;top:5px;right:8px;display:flex;gap:5px;pointer-events:auto;align-items:center}
+  .battle-ui .icon-btn{position:relative;width:42px;height:42px;border-radius:5px;overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .3s;border:1px solid rgba(232,197,107,.25);background:#000;flex:none}
+  .battle-ui .icon-btn img{width:100%;height:100%;display:block;pointer-events:none}
+  .battle-ui .icon-btn.small{width:28px;height:28px;border-radius:3px}
+  .battle-ui .icon-btn:active{transform:scale(.9)}
+  .battle-ui .icon-btn .lg{display:none}
+  /* 激活态：丹房可炼丹(橙光) */
+  .battle-ui .icon-btn.glow-ember{box-shadow:0 0 10px rgba(255,138,74,.9),0 0 20px rgba(255,138,74,.5);border-color:#ff8a4a;animation:iconPulseEmber 1.8s ease-in-out infinite}
+  @keyframes iconPulseEmber{0%,100%{box-shadow:0 0 6px rgba(255,138,74,.6)}50%{box-shadow:0 0 14px rgba(255,138,74,1),0 0 28px rgba(255,138,74,.5)}}
+  /* 激活态：有邮件(红点+金光) */
+  .battle-ui .icon-btn.has-mail{box-shadow:0 0 8px rgba(232,197,107,.8);border-color:#e8c56b}
+  .battle-ui .icon-btn .mail-dot{position:absolute;top:-1px;right:-1px;width:7px;height:7px;background:#ff4a4a;border-radius:50%;border:1px solid #fff;display:none;z-index:2}
+  .battle-ui .icon-btn.has-mail .mail-dot{display:block;animation:dotBlink 1.2s ease-in-out infinite}
+  @keyframes dotBlink{0%,100%{opacity:1}50%{opacity:.4}}
+  /* 激活态：金光(通用) */
+  .battle-ui .icon-btn.glow-gold{box-shadow:0 0 10px rgba(232,197,107,.9),0 0 20px rgba(232,197,107,.4);border-color:#e8c56b;animation:iconPulseGold 1.8s ease-in-out infinite}
+  @keyframes iconPulseGold{0%,100%{box-shadow:0 0 6px rgba(232,197,107,.6)}50%{box-shadow:0 0 14px rgba(232,197,107,1),0 0 28px rgba(232,197,107,.5)}}
+
   /* 主角（略微缩小以腾出战斗区空间） */
   .stage{position:fixed;inset:0;z-index:5;display:flex;align-items:flex-end;justify-content:center;pointer-events:none}
   .cult{position:relative;height:min(44vh,350px);aspect-ratio:825/835}
@@ -142,6 +163,8 @@
   /* 中央按钮 */
   .actions{position:fixed;left:0;right:0;bottom:24px;z-index:10;display:flex;justify-content:center;gap:10px;padding:0 14px}  /* v1.7.52: 上移 6px 给按钮下方数字进度留位 */
   /* v1.7.46 按钮内进度: SVG clipPath 复用墨形, 填充宽度即进度(聚灵阵=灵石/升级价, 突破=修为/所需) */
+  .btn .skin{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none;z-index:0}
+  .btn .label{position:relative;z-index:2}
   .btn .prog{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;
     mix-blend-mode:multiply;isolation:isolate}   /* v1.7.49: 与按钮底色相乘 → 恒为"本色加深", 任何状态(金/红/禁用灰调)都不割裂 */
   /* v1.10.2: 右移躲屏幕圆角(原来 right:9px 的尾字被圆角吃掉), 并叠一层 safe-area 兜底 */
@@ -460,32 +483,16 @@
   <div class="res-bar">
     <div class="spirit res-chip"><svg class="sico" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5 L18.5 10 L10 18.5 L1.5 10 Z" fill="#67c9ab"/><path d="M10 1.5 L10 18.5 L18.5 10 Z" fill="#b7ecda"/><path d="M10 1.5 L1.5 10 L10 10 Z" fill="#9de0c9"/></svg><span id="spirit">0</span></div>
     <div class="rate res-chip">修为 <b id="rateText">0</b>/秒</div>
-    <div id="cloudChip" class="cloud-mini res-chip" onclick="cloudTogglePanel(event)" title="云存档"><span class="dot"></span><span id="cloudTxt">云存</span></div>
-    <button class="snd-btn" id="btnSet" onclick="openSettings()" title="设置" aria-label="设置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94a7.07 7.07 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.75 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.12.22.38.3.6.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.04.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.22.08.48 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/></svg></button>
   </div>
   <div class="hud-row">
     <div class="realm-left">
       <!-- v1.8.0: 榜单入口从资源栏移进境界牌 —— 资源栏不再被挤到第二行, 点整块境界牌即看榜 -->
       <div class="realm-badge" id="realmBadge" onclick="openRank()" title="洞天风云榜 · 前十"><span class="big" id="realmName">凡人</span><span class="sub-a" id="realmSubA"></span><span class="sub-b" id="realmSubB"></span><span class="rb-rank">榜</span></div>
       <div class="rl-btns">
-        <button class="story-btn" onclick="openStory()"><svg viewBox="0 0 20 20" style="width:12px;height:12px;vertical-align:-2px;margin-right:4px" aria-hidden="true"><path d="M5.4 3 C9 2.2 12.6 2.4 15.8 3.4 C16.6 3.8 16.8 4.6 16.6 5.4 L16.2 15.4 C16.2 16.2 15.6 16.8 14.8 16.8 C11.4 17.4 8 17.2 5 16.4 C4.4 16 4.2 15.4 4.4 14.8 L5 4.4 C5.1 3.8 5.2 3.3 5.4 3 Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7.4 7 C10 6.4 12.4 6.4 14.4 6.8 M7.2 10 C9.6 9.5 11.8 9.5 14 9.9 M7.2 13 C9 12.7 10.8 12.7 12.6 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".7"/></svg>剧情纲目</button>
         <button class="pname-btn" id="pName" onclick="openRename()" title="点此定道号"></button>
       </div>
     </div>
     <div class="hud-right">
-      <div class="hud-icons">
-        <div class="equip-chip" id="equipChip" onclick="openEquip()" title="法宝·装备"><span class="lg">宝</span></div>
-        <div class="equip-chip" id="alchemyChip" onclick="openAlchemy()" title="丹房 · 炼丹"><span class="lg" style="font-size:17px">丹</span></div>
-        <div class="equip-chip" id="skillChip" onclick="openSkills()" title="神通 · 技能"><span class="lg" style="font-size:17px">技</span></div>
-        <div class="mail-chip" id="mailChip" onclick="openMail()" title="鸿雁信匣">
-          <svg class="m-bg" viewBox="0 0 200 200" preserveAspectRatio="none" aria-hidden="true"><path class="ink" d="M100 8 C146 2 190 32 195 80 C200 130 172 188 126 195 C78 203 18 178 9 124 C1 74 28 16 78 8 C85 7 93 8 100 8 Z"/></svg>
-          <svg class="m-ico" viewBox="0 0 24 24" aria-hidden="true">
-            <path class="env" d="M4.6 7.8 C9 5.4 15 5.4 19.4 7.8 L19.4 16.2 C19.4 17.9 18 19 16.2 19 L7.8 19 C6 19 4.6 17.9 4.6 16.2 Z"/>
-            <path class="fold" d="M5.8 8.4 L12 13.6 L18.2 8.4"/>
-          </svg>
-          <span class="mail-dot" id="mailDot"></span>
-        </div>
-      </div>
       <div id="pillHints"></div>
     </div>
   </div>
@@ -509,6 +516,21 @@
   </div>
 </div>
 
+<!-- 战斗区UI图标层：大图标(地板右下) + 小图标(右上角) -->
+<div class="battle-ui" id="battleUI">
+  <div class="small-icons">
+    <button class="icon-btn small" id="btnSet" onclick="openSettings()" title="设置" aria-label="设置"><img src="assets/ui_icons/icon_settings.webp" alt="设置"></button>
+    <div class="icon-btn small" id="cloudChip" onclick="cloudTogglePanel(event)" title="云存档"><img src="assets/ui_icons/icon_cloud.webp" alt="云存档"><span class="dot" style="display:none"></span><span id="cloudTxt" style="display:none">云存</span></div>
+    <div class="icon-btn small" id="mailChip" onclick="openMail()" title="鸿雁信匣"><img src="assets/ui_icons/icon_mail.webp" alt="邮件"><span class="mail-dot" id="mailDot"></span></div>
+    <button class="icon-btn small" id="storyBtn" onclick="openStory()" title="剧情纲目"><img src="assets/ui_icons/icon_story.webp" alt="剧情"></button>
+  </div>
+  <div class="big-icons">
+    <div class="icon-btn" id="equipChip" onclick="openEquip()" title="法宝·装备"><img src="assets/ui_icons/icon_treasure.webp" alt="宝物"></div>
+    <div class="icon-btn" id="alchemyChip" onclick="openAlchemy()" title="丹房·炼丹"><img src="assets/ui_icons/icon_alchemy.webp" alt="丹房"><span class="lg"></span></div>
+    <div class="icon-btn" id="skillChip" onclick="openSkills()" title="神通·技能"><img src="assets/ui_icons/icon_skill.webp" alt="技能"></div>
+  </div>
+</div>
+
 <div class="stage">
   <div class="cult" id="cult">
     <img class="bodyL" src="assets/cultivator_body.webp" alt="">
@@ -522,9 +544,9 @@
 <div class="feed feed-avatar" id="avatarFeed"></div>
 <div class="feed feed-main" id="mainFeed"></div>
 <div class="actions">
-  <button class="btn" id="btnArray" onclick="tapArray()"><svg class="skin" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true"><path class="ink" d="M12 9 C28 3 44 10 60 6 C76 2 92 8 108 6 C124 4 140 8 158 6 C174 4 192 8 197 16 C199 26 198 34 195 41 C193 46 196 52 182 53 C168 55 154 50 140 53 C124 56 110 50 96 53 C82 56 68 51 56 53 C42 55 30 50 20 52 C8 54 2 46 3 38 C3 28 2 20 5 15 C7 12 9 10 12 9 Z"/></svg><svg class="prog" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true"><defs><clipPath id="arrFillClip"><path d="M12 9 C28 3 44 10 60 6 C76 2 92 8 108 6 C124 4 140 8 158 6 C174 4 192 8 197 16 C199 26 198 34 195 41 C193 46 196 52 182 53 C168 55 154 50 140 53 C124 56 110 50 96 53 C82 56 68 51 56 53 C42 55 30 50 20 52 C8 54 2 46 3 38 C3 28 2 20 5 15 C7 12 9 10 12 9 Z"/></clipPath></defs><rect id="arrFill" x="0" y="0" width="0" height="60" fill="url(#progGreen)" clip-path="url(#arrFillClip)"/></svg><span class="label">聚灵阵 Lv.<span id="arrayLv">1</span></span><i class="pnum" id="arrNum"></i></button>
-  <button class="btn primary" id="btnBreak" onclick="manualBreak()"><svg class="skin" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true"><path class="ink" d="M14 7 C30 2 40 12 56 6 C72 1 84 9 100 6 C118 3 132 8 150 5 C166 3 184 6 194 12 C199 20 196 28 197 36 C198 44 194 50 180 52 C166 54 150 49 136 53 C120 57 104 50 90 54 C76 58 62 52 48 55 C34 57 20 52 10 53 C2 52 3 44 4 36 C5 27 3 19 6 14 C7 11 10 9 14 7 Z"/></svg><svg class="prog" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true"><defs><clipPath id="brkFillClip"><path d="M14 7 C30 2 40 12 56 6 C72 1 84 9 100 6 C118 3 132 8 150 5 C166 3 184 6 194 12 C199 20 196 28 197 36 C198 44 194 50 180 52 C166 54 150 49 136 53 C120 57 104 50 90 54 C76 58 62 52 48 55 C34 57 20 52 10 53 C2 52 3 44 4 36 C5 27 3 19 6 14 C7 11 10 9 14 7 Z"/></clipPath></defs><rect id="brkFill" x="0" y="0" width="0" height="60" fill="url(#progJade)" clip-path="url(#brkFillClip)"/></svg><span class="label">☯ 立即突破</span><i class="pnum" id="brkNum"></i></button>
-  <button class="btn" id="btnTravel" onclick="openTravel()"><svg class="skin" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true"><path class="ink" d="M12 9 C28 3 44 10 60 6 C76 2 92 8 108 6 C124 4 140 8 158 6 C174 4 192 8 197 16 C199 26 198 34 195 41 C193 46 196 52 182 53 C168 55 154 50 140 53 C124 56 110 50 96 53 C82 56 68 51 56 53 C42 55 30 50 20 52 C8 54 2 46 3 38 C3 28 2 20 5 15 C7 12 9 10 12 9 Z"/></svg><span class="label">云游</span></button>
+  <button class="btn" id="btnArray" onclick="tapArray()"><img class="skin" src="assets/ui_icons/btn_array.webp" alt=""><svg class="prog" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true"><defs><clipPath id="arrFillClip"><path d="M12 9 C28 3 44 10 60 6 C76 2 92 8 108 6 C124 4 140 8 158 6 C174 4 192 8 197 16 C199 26 198 34 195 41 C193 46 196 52 182 53 C168 55 154 50 140 53 C124 56 110 50 96 53 C82 56 68 51 56 53 C42 55 30 50 20 52 C8 54 2 46 3 38 C3 28 2 20 5 15 C7 12 9 10 12 9 Z"/></clipPath></defs><rect id="arrFill" x="0" y="0" width="0" height="60" fill="url(#progGreen)" clip-path="url(#arrFillClip)"/></svg><span class="label">聚灵阵 Lv.<span id="arrayLv">1</span></span><i class="pnum" id="arrNum"></i></button>
+  <button class="btn primary" id="btnBreak" onclick="manualBreak()"><img class="skin" src="assets/ui_icons/btn_break.webp" alt=""><svg class="prog" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true"><defs><clipPath id="brkFillClip"><path d="M14 7 C30 2 40 12 56 6 C72 1 84 9 100 6 C118 3 132 8 150 5 C166 3 184 6 194 12 C199 20 196 28 197 36 C198 44 194 50 180 52 C166 54 150 49 136 53 C120 57 104 50 90 54 C76 58 62 52 48 55 C34 57 20 52 10 53 C2 52 3 44 4 36 C5 27 3 19 6 14 C7 11 10 9 14 7 Z"/></clipPath></defs><rect id="brkFill" x="0" y="0" width="0" height="60" fill="url(#progJade)" clip-path="url(#brkFillClip)"/></svg><span class="label">☯ 立即突破</span><i class="pnum" id="brkNum"></i></button>
+  <button class="btn" id="btnTravel" onclick="openTravel()"><img class="skin" src="assets/ui_icons/btn_travel.webp" alt=""><span class="label">云游</span></button>
 </div>
 
 <div class="ver-float"><span class="ver-tag" id="verTag"></span></div>
@@ -1135,9 +1157,9 @@
       }
       /* 上下浮动 */
       pet.bobT += dt * 2.5;
-      /* 跟随玩家: 左上方, 平滑跟随 */
+      /* 跟随玩家: 左上方, 平滑跟随 (基于地板位置, 不是p.y=0) */
       const targetX = p.x + pet.offsetX;
-      const targetY = p.y + pet.offsetY + Math.sin(pet.bobT) * 3;
+      const targetY = floorY() + pet.offsetY + Math.sin(pet.bobT) * 3;
       pet.x += (targetX - pet.x) * Math.min(1, dt * 6);
       pet.y += (targetY - pet.y) * Math.min(1, dt * 6);
 
@@ -1385,8 +1407,8 @@
       const row = Math.floor(frameIdx / SKILL.cols);
       const srcX = col * SKILL.fw;
       const srcY = row * SKILL.fh;
-      /* 技能帧较大(480x256), 按角色高度缩放, 与普通攻击角色大小一致 */
-      const drawH = Math.min(CH * 0.55, 80) * (SKILL.fh / SPRITE.fh);  /* 按比例放大 */
+      /* 技能帧较大(480x256), 但角色应与普通攻击一样大, 不按帧高比例放大 */
+      const drawH = Math.min(CH * 0.55, 80);
       const drawW = drawH * (SKILL.fw / SKILL.fh);
       ctx.save();
       ctx.translate(sx, sy);
@@ -1394,8 +1416,9 @@
       /* 技能发光效果 */
       ctx.shadowColor = 'rgba(150,220,255,0.6)';
       ctx.shadowBlur = 12;
-      /* 技能帧中角色脚底在 y=250, 需要偏移对齐 */
+      /* 技能帧中角色脚底在 y=250(帧高256), 偏移对齐地板 */
       const footOffset = (SKILL.fh - 250) / SKILL.fh * drawH;
+      /* 角色中心在帧中 x≈200/480≈0.42, 水平对齐 */
       ctx.drawImage(G.skillSprite, srcX, srcY, SKILL.fw, SKILL.fh, -drawW*0.42, -drawH + footOffset, drawW, drawH);
       ctx.restore();
       drawHpBar(sx, sy-drawH*0.7-10, 36, p.hp, p.maxHp);
