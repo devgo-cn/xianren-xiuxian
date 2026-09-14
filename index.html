@@ -1066,17 +1066,19 @@
         const row = Math.floor(frameIdx / SLIME_SPRITE.cols);
         const srcX = col * SLIME_SPRITE.fw;
         const srcY = row * SLIME_SPRITE.fh;
-        /* 渲染尺寸: 比玩家小一点 */
-        const drawH = Math.min(CH * 0.4, 60);
+        /* 渲染尺寸: 到玩家肩膀高度 */
+        const drawH = Math.min(CH * 0.5, 72);
         const drawW = drawH * (SLIME_SPRITE.fw / SLIME_SPRITE.fh);
+        /* 脚底在帧中的y=120(距底部8px), 用这个偏移让脚底踩在地板上 */
+        const footOffset = 120 * (drawH / SLIME_SPRITE.fh);
         ctx.save();
         ctx.translate(sx, sy);
         if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
         if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
         /* 史莱姆面朝左, 素材本身就是面朝左, 不需要翻转 */
-        ctx.drawImage(G.slimeSprite, srcX, srcY, SLIME_SPRITE.fw, SLIME_SPRITE.fh, -drawW*0.5, -drawH, drawW, drawH);
+        ctx.drawImage(G.slimeSprite, srcX, srcY, SLIME_SPRITE.fw, SLIME_SPRITE.fh, -drawW*0.5, -footOffset, drawW, drawH);
         ctx.restore();
-        if (e.alive) drawHpBar(sx, sy - drawH - 6, 28, e.hp, e.maxHp);
+        if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp);
       } else {
         /* 其他怪物类型暂用占位 */
         ctx.save(); ctx.translate(sx, sy);
