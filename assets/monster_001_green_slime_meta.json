@@ -7,7 +7,7 @@
   "role": "melee",
   "facing": "left",
   "tier": 1,
-  "description": "最弱的怪物，凝胶状生物，行动缓慢，受击时蜷缩",
+  "description": "最弱的怪物，凝胶状生物，行动缓慢，攻击时先蜷缩蓄力再伸出手，受击时蜷缩",
   "sprite": "assets/monster_001_green_slime.png",
   "walk": {
     "start": 0,
@@ -18,22 +18,23 @@
   },
   "attack": {
     "start": 32,
-    "count": 40,
+    "count": 51,
     "fps": 24,
     "loop": false,
-    "src_frames": [55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94]
+    "phases": ["蜷缩蓄力", "恢复", "伸出手攻击"],
+    "src_frames": [55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105]
   },
   "hurt": {
-    "start": 72,
+    "start": 83,
     "count": 11,
     "fps": 24,
     "loop": false,
-    "src_frames": [122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132]
+    "src_frames": [118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128]
   },
   "frame_size": [240, 128],
   "cols": 12,
-  "rows": 7,
-  "total_frames": 83,
+  "rows": 8,
+  "total_frames": 94,
   "base_stats": {
     "hp": 1,
     "atk": 2,
@@ -41,6 +42,6 @@
     "atkRange": 25,
     "aspd": 0.8
   },
-  "pipeline": "24fps + fixed crop window + top 25% head detection + median filter + integer pixel alignment + target_height=85",
+  "pipeline": "24fps + flood fill去背景(保护眼睛) + fixed crop window + top 25% head detection + median filter + integer pixel alignment + target_height=85",
   "created_at": "2026-09-14"
 }
