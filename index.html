@@ -125,7 +125,7 @@
   /* 战斗区UI图标层：大图标(地板右下) + 小图标(右上角) */
   .battle-ui{position:fixed;left:0;right:0;top:92px;bottom:calc(44vh + 84px);z-index:4;pointer-events:none}
   .battle-ui .big-icons{position:absolute;bottom:6px;right:10px;display:flex;gap:7px;pointer-events:auto}
-  .battle-ui .small-icons{position:absolute;top:8px;right:10px;display:grid;grid-template-columns:repeat(2,1fr);gap:4px;pointer-events:auto}
+  .battle-ui .small-icons{position:fixed;top:6px;right:8px;display:grid;grid-template-columns:repeat(2,1fr);gap:4px;pointer-events:auto;z-index:50}
   .battle-ui .icon-btn{position:relative;width:42px;height:42px;border-radius:5px;overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .3s;border:1px solid rgba(232,197,107,.25);background:#000;flex:none}
   .battle-ui .icon-btn img{width:100%;height:100%;display:block;pointer-events:none}
   .battle-ui .icon-btn.small{width:28px;height:28px;border-radius:3px}
@@ -1483,28 +1483,23 @@
         const drawW = drawH * (PET_SPRITE.fw / PET_SPRITE.fh);
         ctx.save();
         ctx.translate(sx, sy);
-        /* 施法光环特效 */
+        /* 施法特效: 柔和光晕扩散, 无明显线圈 */
         if (pet.casting) {
           const castColor = pet.castType === 'heal' ? '120,255,170' : '255,170,85';
           const pulse = 0.5 + 0.5 * Math.sin(pet.castAnim * Math.PI * 4);
-          const ringR = drawH * (0.8 + pulse * 0.3);
-          /* 外圈光环 */
-          ctx.beginPath();
-          ctx.arc(0, -drawH*0.5, ringR, 0, Math.PI*2);
-          ctx.strokeStyle = `rgba(${castColor},${0.4 + pulse*0.3})`;
-          ctx.lineWidth = 2 + pulse*2;
-          ctx.stroke();
-          /* 内圈光晕 */
-          const grad = ctx.createRadialGradient(0, -drawH*0.5, 0, 0, -drawH*0.5, ringR*0.8);
-          grad.addColorStop(0, `rgba(${castColor},${0.15 + pulse*0.1})`);
+          /* 柔和光晕扩散(无描边线圈) */
+          const glowR = drawH * (1.0 + pulse * 0.4);
+          const grad = ctx.createRadialGradient(0, -drawH*0.5, 0, 0, -drawH*0.5, glowR);
+          grad.addColorStop(0, `rgba(${castColor},${0.25 + pulse*0.15})`);
+          grad.addColorStop(0.5, `rgba(${castColor},${0.1 + pulse*0.08})`);
           grad.addColorStop(1, `rgba(${castColor},0)`);
           ctx.fillStyle = grad;
           ctx.beginPath();
-          ctx.arc(0, -drawH*0.5, ringR*0.8, 0, Math.PI*2);
+          ctx.arc(0, -drawH*0.5, glowR, 0, Math.PI*2);
           ctx.fill();
           /* 施法时宠物更亮 */
-          ctx.shadowColor = `rgba(${castColor},0.8)`;
-          ctx.shadowBlur = 12 + pulse*8;
+          ctx.shadowColor = `rgba(${castColor},0.9)`;
+          ctx.shadowBlur = 14 + pulse*10;
         } else {
           /* 轻微发光效果 */
           ctx.shadowColor = 'rgba(150,255,200,0.4)';
