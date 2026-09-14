@@ -779,7 +779,7 @@
        * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。 */
       slime: { name:'妖卒', role:'melee', w:60, atkRange:30, speed:120, hpK:1.0, atkK:0.55, defK:0.35, color:'#6fe0a8' },
       water: { name:'水灵', role:'melee', w:40, atkRange:35, speed:80,  hpK:1.6, atkK:0.75, defK:0.60, color:'#6fd0e8' },
-      boss:  { name:'史莱姆王', role:'ranged', w:5,  atkRange:100, speed:40, hpK:25.0, atkK:2.5, defK:2.0, color:'#a0ff80', isBoss:true, floatHeight:35, sizeMult:2.0 },
+      boss:  { name:'史莱姆王', role:'ranged', w:5,  atkRange:80, speed:40, hpK:80.0, atkK:3.0, defK:3.0, color:'#a0ff80', isBoss:true, floatHeight:20, sizeMult:2.0 },
     },
   };
 
@@ -874,7 +874,7 @@
   /* 水精灵帧配置: 10列8行, walk32+attack33+hurt13 */
   const WATER_SPRITE = { cols:10, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:33, hurtStart:65, hurtCount:13, fps:24 };
   /* BOSS史莱姆王: 飘着的, 2倍大, 帧0-17漂浮, 帧18-39攻击, 帧40-47恢复 */
-  const BOSS_SPRITE = { cols:8, fw:240, fh:200, walkStart:0, walkCount:18, attackStart:18, attackCount:22, hurtStart:0, hurtCount:0, fps:8, isBoss:true, floatHeight:35, sizeMult:2.0 };
+  const BOSS_SPRITE = { cols:8, fw:240, fh:200, walkStart:0, walkCount:18, attackStart:18, attackCount:22, hurtStart:0, hurtCount:0, fps:8, isBoss:true, floatHeight:20, sizeMult:2.0 };
 
   function fmtNum(n) {
     n = Math.round(n || 0);
@@ -1605,12 +1605,15 @@
     ctx.beginPath(); ctx.ellipse(0, 0, r, r*0.3, 0, 0, Math.PI*2); ctx.stroke();
     ctx.restore();
   }
-  function drawHpBar(x, y, w, hp, maxHp) {
+  function drawHpBar(x, y, w, hp, maxHp, isEnemy) {
     const p = Math.max(0, hp/maxHp); const h = 3;
     ctx.fillStyle = 'rgba(8,12,20,0.6)';
     roundRect(x-w/2, y, w, h, 1.5); ctx.fill();
     const grad = ctx.createLinearGradient(x-w/2, y, x+w/2, y);
-    if (p>0.5) { grad.addColorStop(0,'#6fe0a8'); grad.addColorStop(1,'#3ab878'); }
+    if (isEnemy) {
+      /* 怪物血条: 红色 */
+      grad.addColorStop(0,'#ff6050'); grad.addColorStop(1,'#d82020');
+    } else if (p>0.5) { grad.addColorStop(0,'#6fe0a8'); grad.addColorStop(1,'#3ab878'); }
     else if (p>0.25) { grad.addColorStop(0,'#f0d070'); grad.addColorStop(1,'#d8a838'); }
     else { grad.addColorStop(0,'#ff8070'); grad.addColorStop(1,'#e84030'); }
     ctx.fillStyle = grad; roundRect(x-w/2, y, w*p, h, 1.5); ctx.fill();
@@ -1788,7 +1791,7 @@
         ctx.drawImage(G.slimeSprite, srcX, srcY, SLIME_SPRITE.fw, SLIME_SPRITE.fh, -drawW*0.5, -footOffset, drawW, compensatedH);
         ctx.restore();
         if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
-        if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp);
+        if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp, true);
       } else if (G.waterReady && G.waterSprite && e.type === 'water') {
         /* 水精灵真实 sprite 渲染 */
         let frameIdx;
@@ -1824,7 +1827,7 @@
         ctx.drawImage(G.waterSprite, srcX, srcY, WATER_SPRITE.fw, WATER_SPRITE.fh, -drawW*0.5, -footOffset, drawW, compensatedH);
         ctx.restore();
         if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
-        if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp);
+        if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp, true);
       } else if (G.bossReady && G.bossSprite && e.type === 'boss') {
         /* BOSS史莱姆王: 飘着的, 2倍大, 攻击/漂浮分帧 */
         let frameIdx;
@@ -1865,8 +1868,8 @@
           ctx.drawImage(G.bossSprite, srcX, srcY, BOSS_SPRITE.fw, BOSS_SPRITE.fh, -drawW*0.5, -drawH, drawW, drawH);
         }
         ctx.restore();
-        /* BOSS血条在头顶 */
-        if (e.alive) drawHpBar(sx, sy - floatY - drawH - 8, 50, e.hp, e.maxHp);
+        /* BOSS血条在头顶, 右移对齐头部 */
+        if (e.alive) drawHpBar(sx + drawW*0.2, sy - floatY - drawH - 8, 50, e.hp, e.maxHp, true);
       } else {
         /* 素材未就绪时的兜底占位(正常不会走到这里) */
         ctx.save(); ctx.translate(sx, sy);
@@ -1875,7 +1878,7 @@
         const bodyH = Math.min(25, CH*0.2);
         ctx.fillStyle = e.color; ctx.beginPath(); ctx.ellipse(0,-bodyH/2,10,bodyH/2,0,0,Math.PI*2); ctx.fill();
         ctx.restore();
-        if (e.alive) drawHpBar(sx, sy-35, 24, e.hp, e.maxHp);
+        if (e.alive) drawHpBar(sx, sy-35, 24, e.hp, e.maxHp, true);
       }
     }
   }
