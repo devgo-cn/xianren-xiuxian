@@ -879,11 +879,17 @@
       return hit ? { name: hit, mult: G.speedMult, duration: G.speedMultTimer } : null;
     },
     getSpeedMult: () => G.speedMult,
-    /* 主游戏注入玩家三围(境界+装备汇总后的面板值) */
+    /* 主游戏注入玩家三围(境界+装备汇总后的面板值)
+     * 注意: 必须同步进 p.atk / p.maxHp —— 战斗逻辑读的是 player 身上的字段,
+     * 只更新 PST 会导致"面板数字涨了、打出去还是建号那把剑"(v2.5 回归修复)。 */
     setStats: (s) => {
       if (!s) return;
       PST = Object.assign(PST, s);
-      if (G.player) { G.player.maxHp = PST.hp; if (G.player.hp > PST.hp) G.player.hp = PST.hp; }
+      if (G.player) {
+        G.player.atk = PST.atk;
+        G.player.maxHp = PST.hp;
+        if (G.player.hp > PST.hp) G.player.hp = PST.hp;
+      }
     },
     getStats: () => Object.assign({}, PST),
     /* 服务端下发掉落系数(每击杀产出) */
@@ -896,6 +902,7 @@
       enemies: G.enemies.filter(e => e.alive && e.dying <= 0)
         .sort((a, b) => a.x - b.x).map(e => ({ t: e.type, x: Math.round(e.x), hp: Math.round(e.hp), maxHp: e.maxHp, elite: !!e.elite })),
       playerX: G.player ? Math.round(G.player.x) : 0, dodge: G.speedDodge, nextCrit: G.nextStrikeCrit,
+      pAtk: G.player ? Math.round(G.player.atk) : 0, pMaxHp: G.player ? G.player.maxHp : 0,
     }),
     addPet: (petDef) => {
       const pet = { id:petDef.id||'pet_'+Date.now(), name:petDef.name||'宠物', atk:petDef.atk||5, aspd:petDef.aspd||1.0, atkRange:petDef.atkRange||50, hp:petDef.hp||80, maxHp:petDef.hp||80, color:petDef.color||'#ffd76b', offsetX:petDef.offsetX||-30, offsetY:petDef.offsetY||0, x:0,y:0, atkT:Math.random()*0.5, anim:0, hurtT:0, alive:true };
