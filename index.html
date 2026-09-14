@@ -823,6 +823,7 @@
     footstep: new Audio('assets/sfx/footstep.ogg'),
     attack1: new Audio('assets/sfx/attack1.ogg'),
     attack2: new Audio('assets/sfx/attack2.ogg'),
+    skill_attack: new Audio('assets/sfx/skill_attack.ogg'),
     slime_footstep: new Audio('assets/sfx/slime_footstep.ogg'),
     slime_attack: new Audio('assets/sfx/slime_attack.ogg'),
     slime_hurt: new Audio('assets/sfx/slime_hurt.ogg'),
@@ -832,8 +833,8 @@
     ready: false
   };
   let sfxLoaded = 0;
-  const sfxTotal = 9;
-  for (const key of ['footstep', 'attack1', 'attack2', 'slime_footstep', 'slime_attack', 'slime_hurt', 'water_footstep', 'water_attack', 'water_hurt']) {
+  const sfxTotal = 10;
+  for (const key of ['footstep', 'attack1', 'attack2', 'skill_attack', 'slime_footstep', 'slime_attack', 'slime_hurt', 'water_footstep', 'water_attack', 'water_hurt']) {
     sfx[key].addEventListener('canplaythrough', () => {
       sfxLoaded++;
       if (sfxLoaded >= sfxTotal) sfx.ready = true;
@@ -1070,7 +1071,7 @@
       /* 技能伤害判定: 第12帧 (剑气月牙出现时) */
       if (p.skillFrame >= SKILL.hitFrame && !p.skillHit && p.skillTarget && p.skillTarget.alive) {
         p.skillHit = true;
-        playSfx('attack2', 0.9);  /* 剑气斩攻击音效 */
+        playSfx('skill_attack', 0.9);  /* 剑气斩专属攻击音效 */
         const crit = Math.random() < 0.15;
         const atkMult = 1 + (p.atkBuff || 0);
         const dmg = p.atk * atkMult * SKILL.damageMult * (0.9 + Math.random()*0.2) * (crit ? 2.0 : 1);
