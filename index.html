@@ -753,6 +753,35 @@
   waterSpriteImg.onload = function() { G.waterSprite = waterSpriteImg; G.waterReady = true; };
   waterSpriteImg.src = 'assets/monster_002_water_sprite.webp';
 
+  /* 音效加载 */
+  const sfx = {
+    footstep: new Audio('assets/sfx/footstep.ogg'),
+    attack1: new Audio('assets/sfx/attack1.ogg'),
+    attack2: new Audio('assets/sfx/attack2.ogg'),
+    slime_footstep: new Audio('assets/sfx/slime_footstep.ogg'),
+    slime_attack: new Audio('assets/sfx/slime_attack.ogg'),
+    slime_hurt: new Audio('assets/sfx/slime_hurt.ogg'),
+    water_footstep: new Audio('assets/sfx/water_footstep.ogg'),
+    water_attack: new Audio('assets/sfx/water_attack.ogg'),
+    water_hurt: new Audio('assets/sfx/water_hurt.ogg'),
+    ready: false
+  };
+  let sfxLoaded = 0;
+  const sfxTotal = 9;
+  for (const key of ['footstep', 'attack1', 'attack2', 'slime_footstep', 'slime_attack', 'slime_hurt', 'water_footstep', 'water_attack', 'water_hurt']) {
+    sfx[key].addEventListener('canplaythrough', () => {
+      sfxLoaded++;
+      if (sfxLoaded >= sfxTotal) sfx.ready = true;
+    });
+    sfx[key].load();
+  }
+  function playSfx(name, vol) {
+    if (!sfx.ready || !sfx[name]) return;
+    const a = sfx[name].cloneNode();
+    a.volume = vol || 0.6;
+    a.play().catch(() => {});
+  }
+
   /* Sprite 帧配置: 玩家 */
   const SPRITE = { cols:9, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:40, fps:24 };
   /* 史莱姆帧配置: 12列8行, walk32+attack51+hurt11 */
@@ -788,7 +817,7 @@
   }
   function makeEnemy(type) {
     const def = BC.enemies[type] || BC.enemies.slime;
-    return { type,name:def.name,role:def.role, x:0,y:0, hp:def.hp,maxHp:def.hp, atk:def.atk,atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2), color:def.color, atkT:Math.random()*0.6, anim:0,hurtT:0,stun:0, alive:true,dying:0,reach:1 };
+    return { type,name:def.name,role:def.role, x:0,y:0, hp:def.hp,maxHp:def.hp, atk:def.atk,atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2), color:def.color, atkT:Math.random()*0.6, anim:0,hurtT:0,stun:0, alive:true,dying:0,reach:1, animFrame:0, animTimer:0, moving:false };
   }
   function spawnWave() {
     const types = Object.keys(BC.enemies);
@@ -824,6 +853,9 @@
       p.animTimer -= frameDur;
       if (p.attackAnim) {
         p.animFrame++;
+        /* 攻击音效同步: 第一段在帧8(挥剑前), 第二段在帧24(第二段刺剑前) */
+        if (p.animFrame === 8) playSfx('attack1', 0.7);
+        if (p.animFrame === 24) playSfx('attack2', 0.8);
         /* 双段攻击: 第一段刺剑在帧10, 第二段刺剑在帧26 */
         if (p.animFrame === 10 && !p.hit1 && p.attackTarget && p.attackTarget.alive) {
           p.hit1 = true;
@@ -846,6 +878,8 @@
         if (p.animFrame >= SPRITE.attackCount) { p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false; }
       } else {
         p.animFrame = (p.animFrame + 1) % SPRITE.walkCount;
+        /* 脚步声同步: walk第18帧(源帧22) */
+        if (p.animFrame === 18 && p.moving) playSfx('footstep', 0.5);
       }
     }
     const near = findNearestEnemy(p.x, p.atkRange+200);
@@ -889,11 +923,41 @@
     for (const e of G.enemies) {
       if (e.dying>0) { e.dying-=dt; continue; }
       if (!e.alive) continue;
-      e.atkT -= dt; e.anim = Math.max(0, e.anim-dt*1.5); e.hurtT = Math.max(0, e.hurtT-dt);
+      e.atkT -= dt; e.anim = Math.max(0, e.anim-dt*1.5);
+      const wasHurt = e.hurtT > 0;
+      e.hurtT = Math.max(0, e.hurtT-dt);
+      /* 受击音效: 受击开始时 */
+      if (!wasHurt && e.hurtT > 0) {
+        if (e.type === 'slime') playSfx('slime_hurt', 0.5);
+        else if (e.type === 'water') playSfx('water_hurt', 0.5);
+      }
+      /* 动画帧跟踪 */
+      e.animTimer += dt;
+      const frameDur = 1 / 24;
+      if (e.animTimer >= frameDur) {
+        e.animTimer -= frameDur;
+        if (e.anim > 0) {
+          e.animFrame++;
+        } else {
+          e.animFrame = (e.animFrame + 1) % 32;
+          /* 脚步声: walk特定帧, 仅在移动时 */
+          if (e.moving) {
+            if (e.type === 'slime' && (e.animFrame === 4 || e.animFrame === 20)) playSfx('slime_footstep', 0.4);
+            else if (e.type === 'water' && (e.animFrame === 8 || e.animFrame === 24)) playSfx('water_footstep', 0.4);
+          }
+        }
+      }
       const stopX = p.x + e.atkRange;
+      e.moving = e.x > stopX+2;
       if (e.x > stopX+2) e.x = Math.max(stopX, e.x-e.speed*dt);
+      const wasAttacking = e.anim > 0;
       if (Math.abs(e.x-p.x) <= e.atkRange+5 && e.atkT <= 0) {
-        e.anim = 1; e.atkT = 1/(0.8+Math.random()*0.5);
+        e.anim = 1; e.atkT = 1/(0.8+Math.random()*0.5); e.animFrame = 0;
+        /* 攻击音效: 攻击开始时 */
+        if (!wasAttacking) {
+          if (e.type === 'slime') playSfx('slime_attack', 0.5);
+          else if (e.type === 'water') playSfx('water_attack', 0.5);
+        }
         p.hp -= e.atk*(0.85+Math.random()*0.3); p.hurtT = 0.25; p.stun = 0.5;
         G.dmg.push({ x:p.x,y:p.y-40, val:Math.round(e.atk), crit:false, color:'#ff8a7a', t:0 });
         G.fx.push({ kind:'hitSpark', x:p.x,y:p.y-20, color:'#ff8a7a', t:0,dur:0.3 });
