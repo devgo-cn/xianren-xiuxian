@@ -4601,6 +4601,7 @@ function enterDim() {
   dimRender();
   SND.mute(true);                                  // 音乐 + 音效 全关(硬静音, 音效不会自己跳出来)
   try { if (window.__bgCtrl && window.__bgCtrl.pause) window.__bgCtrl.pause(); } catch (e) {}
+  try { if (window.BattleAPI && window.BattleAPI.pause) window.BattleAPI.pause(); } catch (e) {}
   resetDimKnob();
 }
 
@@ -4611,6 +4612,7 @@ function exitDim() {
   DIMSTAT.on = false;
   SND.mute(false);                                 // 按玩家原有开关恢复
   try { if (window.__bgCtrl && window.__bgCtrl.resume) window.__bgCtrl.resume(); } catch (e) {}
+  try { if (window.BattleAPI && window.BattleAPI.resume) window.BattleAPI.resume(); } catch (e) {}
 }
 
 /* 滑动解锁: 拖到 88% 处松手才进游戏 */

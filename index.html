@@ -730,7 +730,7 @@
   };
 
   const G = {
-    t:0, kills:0, speedMult:1, speedMultTimer:0, state:'walk', camX:0,
+    t:0, kills:0, speedMult:1, speedMultTimer:0, state:'walk', camX:0, paused:false,
     player:null, pets:[], enemies:[], fx:[], dmg:[], spawnT:BC.spawnInterval,
     sprite:null, bgImg:null, spriteReady:false, bgReady:false,
   };
@@ -764,6 +764,8 @@
     removePet: (petId) => { G.pets = G.pets.filter(p => p.id !== petId); },
     getPets: () => G.pets,
     spawnWave: () => spawnWave(),
+    pause: () => { G.paused = true; },
+    resume: () => { G.paused = false; lastT = performance.now(); },
     getState: () => ({ kills:G.kills, speedMult:G.speedMult, state:G.state, playerHp:G.player?G.player.hp:0, pets:G.pets.length, enemies:G.enemies.filter(e=>e.alive).length }),
   };
 
@@ -1116,6 +1118,7 @@
 
   let lastT = 0;
   function loop(t) {
+    if (G.paused) { lastT = t; requestAnimationFrame(loop); return; }
     const dt = Math.min(0.05, (t-lastT)/1000); lastT = t;
     update(dt); render();
     requestAnimationFrame(loop);
