@@ -18,7 +18,7 @@
     user-select:none;-webkit-user-select:none;
   }
   #bg{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
-  .bg-img{position:fixed;inset:0;background:center/cover no-repeat url(assets/main-bg.jpg);opacity:.14;z-index:1;filter:saturate(1.1)}
+  .bg-img{position:fixed;inset:0;background:center/cover no-repeat url(assets/main-bg.jpg);opacity:.14;z-index:1;filter:saturate(1.1);pointer-events:none}
   .vignette{position:fixed;inset:0;z-index:2;pointer-events:none;
     background:
       radial-gradient(120% 90% at 50% 8%, transparent 40%, rgba(4,8,18,.55) 100%),
@@ -493,8 +493,7 @@
 <!-- v1.5.0 顶部纵向流: 行迹 → 搜寻妖踪提示 → 战斗横幅, 依次排布不挤压(自动战斗开关已上移资源栏) -->
 <div class="top-stack" id="topStack">
 <div class="trace" id="traceArea" onclick="traceTap()"></div>
-
-
+</div>
 
 <div class="artifacts" style="display:none"><div class="art-row" id="artRow"></div></div>
 
