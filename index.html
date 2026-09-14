@@ -779,7 +779,7 @@
        * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。 */
       slime: { name:'妖卒', role:'melee', w:60, atkRange:30, speed:120, hpK:1.0, atkK:0.55, defK:0.35, color:'#6fe0a8' },
       water: { name:'水灵', role:'melee', w:40, atkRange:35, speed:80,  hpK:1.6, atkK:0.75, defK:0.60, color:'#6fd0e8' },
-      boss:  { name:'史莱姆王', role:'ranged', w:5,  atkRange:160, speed:40, hpK:8.0, atkK:1.5, defK:1.2, color:'#a0ff80', isBoss:true, floatHeight:60, sizeMult:2.0 },
+      boss:  { name:'史莱姆王', role:'ranged', w:5,  atkRange:100, speed:40, hpK:25.0, atkK:2.5, defK:2.0, color:'#a0ff80', isBoss:true, floatHeight:35, sizeMult:2.0 },
     },
   };
 
@@ -874,7 +874,7 @@
   /* 水精灵帧配置: 10列8行, walk32+attack33+hurt13 */
   const WATER_SPRITE = { cols:10, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:33, hurtStart:65, hurtCount:13, fps:24 };
   /* BOSS史莱姆王: 飘着的, 2倍大, 帧0-17漂浮, 帧18-39攻击, 帧40-47恢复 */
-  const BOSS_SPRITE = { cols:8, fw:240, fh:200, walkStart:0, walkCount:18, attackStart:18, attackCount:22, hurtStart:0, hurtCount:0, fps:8, isBoss:true, floatHeight:60, sizeMult:2.0 };
+  const BOSS_SPRITE = { cols:8, fw:240, fh:200, walkStart:0, walkCount:18, attackStart:18, attackCount:22, hurtStart:0, hurtCount:0, fps:8, isBoss:true, floatHeight:35, sizeMult:2.0 };
 
   function fmtNum(n) {
     n = Math.round(n || 0);
@@ -1846,8 +1846,24 @@
         ctx.translate(sx, sy - floatY);  /* 漂浮在地板上方 */
         if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
         if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
-        /* BOSS面朝左, 素材本身就是面朝左 */
-        ctx.drawImage(G.bossSprite, srcX, srcY, BOSS_SPRITE.fw, BOSS_SPRITE.fh, -drawW*0.5, -drawH, drawW, drawH);
+        /* 攻击帧左侧特效渐隐: 用离屏canvas + destination-in做alpha渐变, 消除割裂感 */
+        if (e.anim > 0) {
+          const off = document.createElement('canvas');
+          off.width = drawW; off.height = drawH;
+          const octx = off.getContext('2d');
+          octx.drawImage(G.bossSprite, srcX, srcY, BOSS_SPRITE.fw, BOSS_SPRITE.fh, 0, 0, drawW, drawH);
+          /* 左侧40%区域渐隐: 从左边缘完全透明到40%位置完全不透明 */
+          octx.globalCompositeOperation = 'destination-in';
+          const grad = octx.createLinearGradient(0, 0, drawW * 0.4, 0);
+          grad.addColorStop(0, 'rgba(0,0,0,0)');
+          grad.addColorStop(1, 'rgba(0,0,0,1)');
+          octx.fillStyle = grad;
+          octx.fillRect(0, 0, drawW * 0.4, drawH);
+          ctx.drawImage(off, -drawW*0.5, -drawH);
+        } else {
+          /* 漂浮帧直接绘制 */
+          ctx.drawImage(G.bossSprite, srcX, srcY, BOSS_SPRITE.fw, BOSS_SPRITE.fh, -drawW*0.5, -drawH, drawW, drawH);
+        }
         ctx.restore();
         /* BOSS血条在头顶 */
         if (e.alive) drawHpBar(sx, sy - floatY - drawH - 8, 50, e.hp, e.maxHp);
