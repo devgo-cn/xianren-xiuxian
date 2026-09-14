@@ -722,268 +722,43 @@
   const BC = {
     playerAtk: 2, playerHp: 200, playerAtkRange: 75, playerAspd: 1.1, playerSpeed: 28,
     spawnInterval: 1.4, enemySpawnOffset: 40,
-    /* ---- 判定边距（规范 §4）：全部是“为了让手感不穿帮而额外放宽”的容差 ---- */
-    vision: 200,        // 索敌视野外扩：视野内即使够不着也朝目标移动
-    attackEnter: 5,     // 攻击进入阈值：距离 ≤ atkRange+5 才起手
-    hitMargin: 15,      // 伤害判定阈：起手后目标最多再走远 15px 仍算命中
-    stopMargin: 2,      // 停步死区：防止怪物在停步线上抖动
-    enemyHitRatio: 0.55,// 怪物攻击动画的出手进度（0.55 = 抬起手时判定，不是收招时）
     enemies: {
-      slime:  { name:'妖卒', role:'melee', atkRange:30,  speed:120, hp:1, atk:3,  color:'#6fe0a8', sprite:'monster_001' },
-      water:  { name:'水灵', role:'melee', atkRange:35,  speed:80,  hp:2, atk:4,  color:'#6fd0e8', sprite:'monster_002' },
-      demon:  { name:'妖将', role:'melee', atkRange:35,  speed:95,  hp:1, atk:5,  color:'#e87060', sprite:'monster_001' },
-      raptor: { name:'妖弓', role:'range', atkRange:110, speed:70,  hp:1, atk:4,  color:'#c59bff', sprite:'monster_001' },
+      slime:  { name:'妖卒', role:'melee', atkRange:30,  speed:120, hp:1, atk:3,  color:'#6fe0a8' },
+      water:  { name:'水灵', role:'melee', atkRange:35,  speed:80,  hp:2, atk:4,  color:'#6fd0e8' },
+      demon:  { name:'妖将', role:'melee', atkRange:35,  speed:95,  hp:1, atk:5,  color:'#e87060' },
+      raptor: { name:'妖弓', role:'range', atkRange:110, speed:70,  hp:1, atk:4,  color:'#c59bff' },
     },
-    /* 素材缺位时的兜底映射：同类角色共用一个 sprite，等第二批素材到位再换 */
-    defaultSpriteByRole: { melee:'monster_001', range:'monster_001' },
-    /* ---- 表现层时长（规范 §5）---- */
-    hurtFlash: 0.25,    // 受击白闪时长(s)；hurt 动画短于它时以它为下限，保证反馈看得见
-    deathFade: 0.4,     // 死亡消散时长(s)
-    /* 速度类技能：由外部玩法系统触发（BattleAPI.triggerSpeedSkill），战斗层不自行 roll */
     speedSkills: { double:{mult:2,duration:5,chance:0.08}, triple:{mult:3,duration:3,chance:0.03} },
   };
-  /* 表现层时长写死在 BC 里会互相打架，统一从 BC 读、给默认值兜底 */
-  const HURT_FLASH = BC.hurtFlash, DEATH_FADE = BC.deathFade;
 
   const G = {
     t:0, kills:0, speedMult:1, speedMultTimer:0, state:'walk', camX:0, paused:false,
     player:null, pets:[], enemies:[], fx:[], dmg:[], spawnT:BC.spawnInterval,
-    sprite:null, bgImg:null, spriteReady:false, bgReady:false, assetsReady:false,
+    sprite:null, bgImg:null, spriteReady:false, bgReady:false,
   };
 
-  /* ============================================================
-   *  帧寻址规范（见 docs/combat-system.md §6）
-   *  meta 的 start/count = 贴图内的绝对帧号，直接用：
-   *    absFrame = start + i ；col = absFrame % cols, row = ⌊absFrame / cols⌋
-   *  meta 的 src_frames = 源视频帧号，仅供溯源，与贴图无关 —— 别拿它算帧。
-   *
-   *  ⚠️ 这里曾经有个 +4 的 SHEET_SHIFT，是误判（源帧号 4 恰好也是有效帧的巧合）。
-   *  后果：hurt 段被算到贴图外，受击动画永远不播。别再引入任何偏移。
-   * ============================================================ */
-
-  /* 判定/显示用常量（可被 BC 覆盖，BC 定义在下面，用 ?? 兜底） */
-
-  /* ============================================================
-   *  角色贴图注册表（数据驱动）
-   *  —— 规范条款：帧数/列数/帧宽高只从 meta 读，禁止在绘制代码里写死。
-   *  落地方式：manifest（assets/sprite-manifest.json，随 OTA 资源清单发布）
-   *  先注册；未就绪时用内置 EMBEDDED_META 兜底，保证战斗画面永远能画出来。
-   * ============================================================ */
-  /* 兜底表：manifest 拉取失败时用。数值必须与 meta/manifest 一致，
-   * 否则会出现"兜底和实测画得不一样"的诡异差异。改素材时两处都要改。 */
-  const EMBEDDED_META = {
-    characters: {
-      cultivator: {
-        sprite: 'assets/cultivator_sheet.webp', cols: 9, frame_size: [240,128], fps: 24, facing: 'right',
-        content_h: 107, target_ratio: 0.62, max_px: 110,
-        clips: { walk:{index:0,count:32,loop:true}, attack:{index:32,count:40,loop:false} },
-      },
-      monster_001: {
-        sprite: 'assets/monster_001_green_slime.webp', cols: 12, frame_size: [240,128], fps: 24, facing: 'left',
-        content_h: 98, target_ratio: 0.34, max_px: 60,
-        correct: { scaleY: 0.92 },                 // 底部压平贴合地板，总高由 drawFrame 补偿
-        clips: {
-          walk:  {index:0,  count:32, loop:true},
-          attack:{index:32, count:51, loop:false},
-          hurt:  {index:83, count:11, loop:false},
-        },
-      },
-      monster_002: {
-        sprite: 'assets/monster_002_water_sprite.webp', cols: 10, frame_size: [240,128], fps: 24, facing: 'left',
-        content_h: 67, target_ratio: 0.34, max_px: 60,
-        correct: { scaleY: 0.92, skewX: -0.03 },   // 同上 + 身体微右倾的斜切校正(约 -1.7°)
-        clips: {
-          walk:  {index:0,  count:32, loop:true},
-          attack:{index:32, count:33, loop:false},
-          hurt:  {index:65, count:13, loop:false},
-        },
-      },
-    },
-  };
-
-  /* id -> {img, ready, meta, cols, fw, fh, walkStart/Count, attackStart/Count,
-   *        hurtStart/Count, clipFrames, frameBoxes} */
-  const CHARS = Object.create(null);
-  const CHAR_IDS = Object.keys(EMBEDDED_META.characters);
-
-  function registerCharacter(id, meta, img) {
-    const clips = meta.clips || {};
-    const pick = (k) => clips[k] || null;
-    const c = {
-      id, img, meta, ready: !!img, failed: false,
-      cols: meta.cols, fw: meta.frame_size[0], fh: meta.frame_size[1],
-      fps: meta.fps || 24,
-      walkStart:   pick('walk')   ? pick('walk').index   : 0,
-      walkCount:   pick('walk')   ? pick('walk').count   : 1,
-      attackStart: pick('attack') ? pick('attack').index : 0,
-      attackCount: pick('attack') ? pick('attack').count : 1,
-      hurtStart:   pick('hurt')   ? pick('hurt').index   : 0,
-      hurtCount:   pick('hurt')   ? pick('hurt').count   : 0,
-      hasHurt:     !!pick('hurt'),
-      facing: meta.facing || 'left',
-      /* 表现尺寸：以内容真实高度为基准等比缩放，避免矮胖角色被拉高 */
-      contentH: meta.content_h || meta.frame_size[1],
-      targetRatio: meta.target_ratio || 0.34,
-      maxPx: meta.max_px || 76,
-      /* 以下三项是“实测数据”，优先级高于上面的门面值 */
-      clipFrames: {},     // 每帧的合集绝对帧号（解决片段跨行时的矩形寻址失效）
-      frameBoxes: null,   // 每帧的内容框 {x,y,w,h}，用于像素级对齐
-      /* 形态校正（素材合同字段 correct）：素材本身画歪/画扁时在这里纠正，
-       * 禁止在绘制分支里为某一种怪写死 —— 见 docs/combat-system.md §6.6
-       *   scaleY <1 纵向压扁（底部变平贴合地板），高度由 drawFrame 自动补偿保持总高
-       *   skewX    横向斜切，修正身体倾斜（负值=向左倾） */
-      correct: Object.assign({ scaleY: 1, skewX: 0 }, meta.correct || {}),
-    };
-    for (const key of ['walk','attack','hurt']) {
-      const src = pick(key);
-      if (!src) continue;
-      if (Array.isArray(src.frames) && src.frames.length) {
-        c.clipFrames[key] = src.frames.slice();          // 实测绝对帧号，直接可用
-        c[key + 'Count'] = src.frames.length;
-      }
-      if (Array.isArray(src.boxes) && src.boxes.length) {
-        c.frameBoxes = c.frameBoxes || {};
-        src.frames.forEach((abs, i) => { if (src.boxes[i]) c.frameBoxes[abs] = src.boxes[i]; });
-      }
-    }
-    if (!c.clipFrames.attack) delete c.clipFrames.attack;
-    /* 只有实测数据能证明某帧是空的；没有实测数据时一律按“有内容”处理 */
-    c.emptyTail = c.emptyTail || 0;
-    CHARS[id] = c;
-    return c;
-  }
-
-  function absFrameOf(c, clip, i) {
-    /* 防御：NaN/Infinity 一旦流进来，% 和数组下标都会把帧号污染成 NaN，
-     * 表现就是“随机几帧不画”。这里统一兜成 0，宁可回到首帧也不要空帧。 */
-    if (!Number.isFinite(i)) i = 0;
-    const list = c.clipFrames && c.clipFrames[clip];
-    if (list && list.length) return list[Math.min(Math.max(i, 0), list.length - 1)];
-    const start = clip === 'attack' ? c.attackStart : (clip === 'hurt' ? c.hurtStart : c.walkStart);
-    return start + i;                                // 兜底：meta.start 即贴图绝对帧号，无偏移
-  }
-
-  /* 朝向镜像：素材本身朝哪边由 meta.facing 声明，站位在对手哪边由 want 决定。
-   * 两者一致就不翻转（省一次 transform），不一致就水平镜像。见 docs/combat-system.md §6。 */
-  function applyFacing(sx, sy, sheetFacing, want) {
-    ctx.translate(sx, sy);
-    if ((sheetFacing || 'right') !== want) ctx.scale(-1, 1);
-  }
-
-  /* 渲染实测：绘制用了哪张图、哪一帧、落在屏幕哪块区域。
-   * 规范要求“素材是否真的换上了”必须能自证，不靠肉眼看截图猜。
-   * 记录是全覆盖的（每次绘制都记最后一帧），限流只作用于 console 打印。 */
-  const RENDER_LOG = { frames:{}, boxes:{}, counts:{}, byClip:{}, lastLog:0 };
-  /* 按“角色 + 片段”分别记最近一帧。
-   * 只按角色 id 记是不够的：场上十几只怪共用同一个 id，
-   * 最后一只（多半在走路）会覆盖掉前面正在挥击的那只，
-   * 表现就是 attackAnim 明明为 true，诊断却永远看不到 attack 帧。 */
-  function logRender(c, absFrame, clip, box) {
-    RENDER_LOG.frames[c.id] = absFrame;
-    RENDER_LOG.boxes[c.id] = box || null;
-    RENDER_LOG.counts[c.id] = (RENDER_LOG.counts[c.id] || 0) + 1;
-    const per = RENDER_LOG.byClip[c.id] || (RENDER_LOG.byClip[c.id] = {});
-    if (clip) per[clip] = absFrame;
-    const now = performance.now();
-    if (now - RENDER_LOG.lastLog > 1000) RENDER_LOG.lastLog = now;   // 留个时间戳给诊断用
-  }
-
-  /* 帧带：诊断用，记录最近每角色各 240 次渲染用到的帧号，外部据此判断
-   * “walk/attack/hurt 是否都被播到过”。上限固定长度，不会无界增长。 */
-  const FRAME_TAPE = {};
-  function tape(id, absFrame) {
-    const t = FRAME_TAPE[id] || (FRAME_TAPE[id] = []);
-    t.push(absFrame);
-    if (t.length > 600) t.shift();      // 600 帧 ≈ 10s @60fps，够覆盖一整轮攻击循环
-  }
-
-  /* 逐帧绘制：有实测内容框就按“脚底对齐 + 内容高度缩放”落位，
-   * 没有就退回“整窗居中 + 脚底对齐”。像素级对齐见 docs/combat-system.md §6。 */
-  function drawFrame(c, absFrame, sx, sy, hitH, clip) {
-    if (!Number.isFinite(absFrame)) absFrame = 0;     // 双保险：绝不把 NaN 交给 % 运算
-    const col = absFrame % c.cols, row = (absFrame / c.cols) | 0;
-    const srcX = col * c.fw, srcY = row * c.fh;
-    let dw, dh, dx, dy;
-    const box = c.frameBoxes ? c.frameBoxes[absFrame] : null;
-    if (box && box.w > 8 && box.h > 8) {
-      const k = hitH / box.h;                         // 让内容高度等于 hitH，形态不失真
-      dw = box.w * k; dh = box.h * k;
-      dx = -dw * 0.5; dy = -dh;                       // 水平居中、脚底对齐地面
-    } else {
-      dh = hitH; dw = dh * (c.fw / c.fh);
-      dx = -dw * 0.5; dy = -dh;
-    }
-    /* 形态校正：变换基准点就是脚底（0,0），所以只要把高度和 y 预先除以 scaleY，
-     * 缩放后总高仍然等于 dh、脚底仍然贴在 y=0 —— 不会“压扁即变矮”。
-     * skew 不改变高度，跟着一起叠即可。数值来自素材合同 correct，不在这里写死。 */
-    const corr = c.correct || { scaleY:1, skewX:0 };
-    const csy = Number.isFinite(corr.scaleY) && corr.scaleY > 0 ? corr.scaleY : 1;
-    const csk = Number.isFinite(corr.skewX) ? corr.skewX : 0;
-    if (csk) ctx.transform(1, 0, csk, 1, 0, 0);
-    if (csy !== 1) { ctx.scale(1, csy); dh /= csy; dy /= csy; }
-    ctx.drawImage(c.img, srcX, srcY, c.fw, c.fh, dx, dy, dw, dh);
-    tape(c.id, absFrame);
-    logRender(c, absFrame, clip, box);
-  }
-
-  /* 素材加载：优先读 manifest 注册表（含实测帧号与内容框），失败退回 EMBEDDED_META。
-   * manifest 由 tools/gen_sprite_manifest.py 生成，随 OTA 资源清单发布。 */
-  let manifestPromise = null;
-  function loadManifest() {
-    if (manifestPromise) return manifestPromise;
-    manifestPromise = fetch('assets/sprite-manifest.json', { cache:'no-cache' })
-      .then(r => (r.ok ? r.json() : null))
-      .then(j => {
-        if (!(j && j.characters && Object.keys(j.characters).length)) return EMBEDDED_META.characters;
-        /* 整条覆盖会丢掉 manifest 里没写的字段（比如形态校正 correct），
-         * correct 必须深合并：它是“素材画歪了”的修正，不属于生成器产出的实测数据，
-         * 一旦被覆盖掉，怪物会立刻退回未校正的歪斜形态。 */
-        const out = Object.assign({}, EMBEDDED_META.characters);
-        for (const id of Object.keys(j.characters)) {
-          const base = out[id] || {};
-          out[id] = Object.assign({}, base, j.characters[id], {
-            correct: Object.assign({}, base.correct || {}, (j.characters[id].correct) || {}),
-          });
-        }
-        return out;
-      })
-      .catch(() => EMBEDDED_META.characters);
-    return manifestPromise;
-  }
-
-  const loadImg = (src) => new Promise((resolve) => {
-    const im = new Image();
-    im.onload = () => resolve(im);
-    im.onerror = () => resolve(null);
-    im.src = src;
-  });
-
+  /* 加载素材 */
+  const spriteImg = new Image();
+  spriteImg.onload = function() { G.sprite = spriteImg; G.spriteReady = true; };
+  spriteImg.src = 'assets/cultivator_sheet.webp';
   const bgImg = new Image();
   bgImg.onload = function() { G.bgImg = bgImg; G.bgReady = true; };
   bgImg.src = 'assets/main-bg.jpg';
-  /* 怪物/玩家素材统一由 CHARS 注册表加载（见下方 loadManifest），
-   * 不再为每种怪物单独 new Image()——加一种怪只需 manifest 里多一条。 */
+  /* 怪物素材: 绿色史莱姆 */
+  const slimeImg = new Image();
+  slimeImg.onload = function() { G.slimeSprite = slimeImg; G.slimeReady = true; };
+  slimeImg.src = 'assets/monster_001_green_slime.webp';
+  /* 怪物素材: 水精灵 */
+  const waterSpriteImg = new Image();
+  waterSpriteImg.onload = function() { G.waterSprite = waterSpriteImg; G.waterReady = true; };
+  waterSpriteImg.src = 'assets/monster_002_water_sprite.webp';
 
-  let assetsReady = false;
-  const assetsPromise = loadManifest().then(async (chars) => {
-    for (const id of Object.keys(chars)) {
-      const meta = chars[id];
-      const im = await loadImg(meta.sprite);
-      registerCharacter(id, meta, im);
-    }
-    syncSPRITE();
-    assetsReady = true;
-    G.assetsReady = true;
-  });
-
-  /* 兼容旧代码引用的 SPRITE（玩家剪辑表），数值全部来自注册表 */
+  /* Sprite 帧配置: 玩家 */
   const SPRITE = { cols:9, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:40, fps:24 };
-  function syncSPRITE() {
-    const c = CHARS.cultivator; if (!c) return;
-    SPRITE.cols = c.cols; SPRITE.fw = c.fw; SPRITE.fh = c.fh; SPRITE.fps = c.fps;
-    SPRITE.walkStart = c.walkStart; SPRITE.walkCount = c.walkCount;
-    SPRITE.attackStart = c.attackStart; SPRITE.attackCount = c.attackCount;
-  }
+  /* 史莱姆帧配置: 12列8行, walk32+attack51+hurt11 */
+  const SLIME_SPRITE = { cols:12, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:51, hurtStart:83, hurtCount:11, fps:24 };
+  /* 水精灵帧配置: 10列8行, walk32+attack33+hurt13 */
+  const WATER_SPRITE = { cols:10, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:33, hurtStart:65, hurtCount:13, fps:24 };
 
   window.BattleAPI = {
     getKills: () => G.kills,
@@ -1006,30 +781,6 @@
     pause: () => { G.paused = true; },
     resume: () => { G.paused = false; lastT = performance.now(); },
     getState: () => ({ kills:G.kills, speedMult:G.speedMult, state:G.state, playerHp:G.player?G.player.hp:0, pets:G.pets.length, enemies:G.enemies.filter(e=>e.alive).length }),
-    /* 素材合同只读接口：给美术/CI 校验用，避免外部脚本去猜内部变量 */
-    getAssetContract: () => Object.fromEntries(Object.entries(CHARS).map(([id,c]) => [id, {
-      ready:c.ready, sheet:c.meta.sprite, cols:c.cols, frame:c.fw+'x'+c.fh, fps:c.fps, facing:c.facing,
-      measured: !!c.frameBoxes, correct: c.correct,
-      clips: Object.fromEntries(['walk','attack','hurt'].filter(k => c[k+'Count'] > 0).map(k => [k, {count:c[k+'Count'], first:absFrameOf(c,k,0)}])),
-    }])),
-    /* 诊断：给像素级校验脚本用，能拿到帧号、内容框与画布尺寸 */
-    debugClips: () => ({
-      stage: { w: CW, h: CH, floorY: floorY() },
-      drawH: { player: playerDrawH(), enemy: enemyDrawH({ sprite:'monster_001' }) },
-      rendered: JSON.parse(JSON.stringify(RENDER_LOG)),
-      history: JSON.parse(JSON.stringify(FRAME_TAPE)),
-      enemies: G.enemies.map(e => ({
-        type:e.type, sprite:e.sprite, alive:e.alive, x:Math.round(e.x), hp:e.hp,
-        atkRange:e.atkRange, atkT:+e.atkT.toFixed(2), attackAnim:e.attackAnim,
-        animFrame:Math.round(e.animFrame), hurtT:+e.hurtT.toFixed(2), hitFired:e.hitFired,
-      })),
-      chars: Object.fromEntries(Object.entries(CHARS).map(([id,c]) => [id, {
-        cols:c.cols, fw:c.fw, fh:c.fh, fps:c.fps, ready:c.ready,
-        count: { walk:c.walkCount, attack:c.attackCount, hurt:c.hurtCount },
-        first: { walk:absFrameOf(c,'walk',0), attack:absFrameOf(c,'attack',0), hurt:c.hasHurt?absFrameOf(c,'hurt',0):null },
-        last: { walk:absFrameOf(c,'walk',c.walkCount-1), attack:absFrameOf(c,'attack',c.attackCount-1) },
-      }])),
-    }),
   };
 
   function makePlayer() {
@@ -1037,14 +788,7 @@
   }
   function makeEnemy(type) {
     const def = BC.enemies[type] || BC.enemies.slime;
-    const spriteId = def.sprite || (BC.defaultSpriteByRole[def.role] || 'monster_001');
-    const c = CHARS[spriteId];
-    const cdef = c ? c.meta : null;
-    return { type,sprite:spriteId,name:def.name,role:def.role, x:0,y:0, hp:def.hp,maxHp:def.hp,
-      atk:def.atk,atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2), color:def.color,
-      atkT:Math.random()*0.6, anim:0,hurtT:0,stun:0, alive:true,dying:0,reach:1,
-      walkT:Math.random()*6.28, attackAnim:false, animFrame:0, hitFired:false,
-      facing: (cdef && cdef.facing) || 'left' };
+    return { type,name:def.name,role:def.role, x:0,y:0, hp:def.hp,maxHp:def.hp, atk:def.atk,atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2), color:def.color, atkT:Math.random()*0.6, anim:0,hurtT:0,stun:0, alive:true,dying:0,reach:1 };
   }
   function spawnWave() {
     const types = Object.keys(BC.enemies);
@@ -1059,11 +803,11 @@
     return best;
   }
   function dealDamage(target, amount, color, crit) {
-    target.hp -= amount; target.hurtT = HURT_FLASH;
+    target.hp -= amount; target.hurtT = 0.25;
     G.dmg.push({ x:target.x,y:target.y-40, val:Math.round(amount), crit:crit||false, color:color||'#e8f2fa', t:0 });
     G.fx.push({ kind:'hitSpark', x:target.x,y:target.y-20, color:color||'#fff', t:0,dur:0.3 });
     if (target.hp <= 0) {
-      target.hp=0; target.alive=false; target.dying=DEATH_FADE;
+      target.hp=0; target.alive=false; target.dying=0.4;
       G.kills++;
       G.fx.push({ kind:'death', x:target.x,y:target.y-15, color:target.color, t:0,dur:0.4 });
       updateHUD();
@@ -1083,7 +827,7 @@
         /* 双段攻击: 第一段刺剑在帧10, 第二段刺剑在帧26 */
         if (p.animFrame === 10 && !p.hit1 && p.attackTarget && p.attackTarget.alive) {
           p.hit1 = true;
-          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + BC.hitMargin) {
+          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
             const crit = Math.random()<0.08;
             const dmg = p.atk*(0.9+Math.random()*0.2)*(crit?1.8:1);
             dealDamage(p.attackTarget, dmg, '#7fe0ff', crit);
@@ -1093,7 +837,7 @@
         }
         if (p.animFrame === 26 && !p.hit2 && p.attackTarget && p.attackTarget.alive) {
           p.hit2 = true;
-          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + BC.hitMargin) {
+          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
             const crit = Math.random()<0.1;
             const dmg = p.atk*(0.95+Math.random()*0.25)*(crit?2.0:1);
             dealDamage(p.attackTarget, dmg, '#a0e8ff', crit);
@@ -1104,11 +848,11 @@
         p.animFrame = (p.animFrame + 1) % SPRITE.walkCount;
       }
     }
-    const near = findNearestEnemy(p.x, p.atkRange+BC.vision);
+    const near = findNearestEnemy(p.x, p.atkRange+200);
     /* 攻击动画播放期间不中断，保持攻击状态 */
     if (p.attackAnim) {
       p.moving = 0;
-    } else if (near && Math.abs(near.x-p.x) <= p.atkRange+BC.attackEnter) {
+    } else if (near && Math.abs(near.x-p.x) <= p.atkRange+5) {
       /* 进入攻击范围，开始攻击（触发时不立即造成伤害，伤害在动画帧中触发） */
       p.moving = 0;
       if (p.atkT <= 0) {
@@ -1131,8 +875,8 @@
       pet.atkT -= dt; pet.anim = Math.max(0, pet.anim-dt*1.5); pet.hurtT = Math.max(0, pet.hurtT-dt);
       const targetX = p.x + pet.offsetX;
       pet.x += (targetX-pet.x)*Math.min(1, dt*8); pet.y = p.y + pet.offsetY;
-      const near = findNearestEnemy(pet.x, pet.atkRange+BC.vision);
-      if (near && Math.abs(near.x-pet.x) <= pet.atkRange+BC.attackEnter && pet.atkT <= 0) {
+      const near = findNearestEnemy(pet.x, pet.atkRange+100);
+      if (near && Math.abs(near.x-pet.x) <= pet.atkRange+5 && pet.atkT <= 0) {
         pet.anim = 1; pet.atkT = 1/pet.aspd;
         const crit = Math.random()<0.05;
         const dmg = pet.atk*(0.9+Math.random()*0.2)*(crit?1.6:1);
@@ -1145,35 +889,15 @@
     for (const e of G.enemies) {
       if (e.dying>0) { e.dying-=dt; continue; }
       if (!e.alive) continue;
-      e.atkT -= dt; e.anim = Math.max(0, e.anim-dt*1.5); e.hurtT = Math.max(0, e.hurtT-dt); e.walkT += dt;
-      /* 攻击动画按帧推进，帧率取角色注册表（禁止写死 fps） */
-      const ec = CHARS[e.sprite];
-      if (e.attackAnim && ec) {
-        e.animFrame += dt * (ec.fps || 24);
-        /* 怪物攻击帧在动画 55% 处出手（见 docs/combat-system.md §5 出手机制） */
-        const hitAt = Math.round(ec.attackCount * BC.enemyHitRatio);
-        if (!e.hitFired && e.animFrame >= hitAt) {
-          e.hitFired = true;
-          if (Math.abs(e.x-p.x) <= e.atkRange + BC.hitMargin) {
-            p.hp -= e.atk*(0.85+Math.random()*0.3); p.hurtT = HURT_FLASH; p.stun = 0.5;
-            G.dmg.push({ x:p.x,y:p.y-40, val:Math.round(e.atk), crit:false, color:'#ff8a7a', t:0 });
-            G.fx.push({ kind:'hitSpark', x:p.x,y:p.y-20, color:'#ff8a7a', t:0,dur:0.3 });
-            if (p.hp <= 0) p.hp = p.maxHp;
-          }
-        }
-        if (e.animFrame >= ec.attackCount) { e.attackAnim = false; e.animFrame = 0; e.hitFired = false; }
-      } else if (e.attackAnim) {
-        e.animFrame += dt * 24;
-        if (e.animFrame >= 24) { e.attackAnim = false; e.animFrame = 0; e.hitFired = false; }
-      }
+      e.atkT -= dt; e.anim = Math.max(0, e.anim-dt*1.5); e.hurtT = Math.max(0, e.hurtT-dt);
       const stopX = p.x + e.atkRange;
-      if (e.x > stopX+BC.stopMargin) e.x = Math.max(stopX, e.x-e.speed*dt);
-      /* 出手门槛 = 攻击范围 + 起手容差。注意这里不带 !e.attackAnim：
-       * 怪一旦走进来就必须持续挥击，否则动画播完到冷却结束之间会有空窗，
-       * 表现成“怪站着不动也不打人”。 */
-      if (Math.abs(e.x-p.x) <= e.atkRange+BC.attackEnter && e.atkT <= 0) {
-        e.atkT = 1/(e.aspd || (0.8+Math.random()*0.5));
-        e.attackAnim = true; e.animFrame = 0; e.hitFired = false;
+      if (e.x > stopX+2) e.x = Math.max(stopX, e.x-e.speed*dt);
+      if (Math.abs(e.x-p.x) <= e.atkRange+5 && e.atkT <= 0) {
+        e.anim = 1; e.atkT = 1/(0.8+Math.random()*0.5);
+        p.hp -= e.atk*(0.85+Math.random()*0.3); p.hurtT = 0.25; p.stun = 0.5;
+        G.dmg.push({ x:p.x,y:p.y-40, val:Math.round(e.atk), crit:false, color:'#ff8a7a', t:0 });
+        G.fx.push({ kind:'hitSpark', x:p.x,y:p.y-20, color:'#ff8a7a', t:0,dur:0.3 });
+        if (p.hp <= 0) p.hp = p.maxHp;
       }
     }
     G.enemies = G.enemies.filter(e => e.alive || e.dying>0);
@@ -1276,39 +1000,40 @@
 
   function drawPlayerSprite() {
     const p = G.player;
-    const c = CHARS.cultivator;
-    if (!c || !c.ready) {
+    if (!G.spriteReady || !G.sprite) {
       /* 素材未加载时用占位图形 */
-      const sx0 = worldToScreen(p.x); const sy0 = floorY();
-      ctx.save(); ctx.translate(sx0, sy0);
+      const sx = worldToScreen(p.x); const sy = floorY();
+      ctx.save(); ctx.translate(sx, sy);
       if (p.hurtT > 0) { ctx.globalAlpha = 0.5+0.5*Math.sin(p.hurtT*40); ctx.filter = 'brightness(2.2) saturate(0.3)'; }
       const bodyH = Math.min(40, CH*0.3);
       ctx.fillStyle = '#e8eef5';
       ctx.beginPath(); ctx.moveTo(-10,-bodyH); ctx.lineTo(10,-bodyH); ctx.lineTo(13,-4); ctx.lineTo(-13,-4); ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#f0d8c0'; ctx.beginPath(); ctx.arc(0,-bodyH-6,7,0,Math.PI*2); ctx.fill();
       ctx.restore();
-      drawHpBar(sx0, sy0-bodyH-20, 32, p.hp, p.maxHp);
+      drawHpBar(sx, sy-bodyH-20, 32, p.hp, p.maxHp);
       return;
     }
     /* 真实 sprite 渲染 */
     const sx = worldToScreen(p.x);
     const sy = floorY();
-    const frameIdx = p.attackAnim
-      ? absFrameOf(c, 'attack', Math.min(p.animFrame, c.attackCount-1))
-      : absFrameOf(c, 'walk', p.animFrame % c.walkCount);
-    /* 绘制尺寸 = 角色真实身高（以美术交付时的像素高度为准）等比缩放到战斗区高度。
-     * 不用“内容高度”直接当命中高度，否则矮胖的史莱姆会被拉成和人物一样高。 */
-    /* 绘制高度 = 角色真实身高按 targetRatio 缩放；命中高度用实测内容高度 */
-    const boxH = (c.frameBoxes && c.frameBoxes[frameIdx] && c.frameBoxes[frameIdx].h) || c.contentH;
-    const drawH = boxH * charScale(c);
+    /* 计算帧索引和位置 */
+    let frameIdx;
+    if (p.attackAnim) frameIdx = SPRITE.attackStart + Math.min(p.animFrame, SPRITE.attackCount-1);
+    else frameIdx = SPRITE.walkStart + (p.animFrame % SPRITE.walkCount);
+    const col = frameIdx % SPRITE.cols;
+    const row = Math.floor(frameIdx / SPRITE.cols);
+    const srcX = col * SPRITE.fw;
+    const srcY = row * SPRITE.fh;
+    /* 渲染尺寸: 适配战斗区高度 */
+    const drawH = Math.min(CH * 0.55, 80);
+    const drawW = drawH * (SPRITE.fw / SPRITE.fh);
     ctx.save();
-    /* 玩家永远在追右边的怪：素材本身朝右，朝向无需翻转；c.facing 仅作合同声明 */
-    applyFacing(sx, sy, c.facing, 'right');
+    ctx.translate(sx, sy);
     if (p.hurtT > 0) { ctx.globalAlpha = 0.5+0.5*Math.sin(p.hurtT*40); ctx.filter = 'brightness(2.2) saturate(0.3)'; }
-    drawFrame(c, frameIdx, sx, sy, drawH, p.attackAnim ? 'attack' : 'walk');
+    ctx.drawImage(G.sprite, srcX, srcY, SPRITE.fw, SPRITE.fh, -drawW*0.35, -drawH, drawW, drawH);
     ctx.restore();
-    /* 血条：跟着当前帧的实际高度走，挥剑抬手时不会被剑尖顶穿 */
-    drawHpBar(sx, sy - Math.max(drawH, playerTopH(c)) - 8, 36, p.hp, p.maxHp);
+    /* 血条 */
+    drawHpBar(sx, sy - drawH - 8, 36, p.hp, p.maxHp);
   }
 
   function drawPets() {
@@ -1324,71 +1049,93 @@
     }
   }
 
-  /* 绘制尺寸 = 角色真实身高（以美术交付时的像素高度为准）等比缩放到战斗区高度。
-   * 不用“内容高度”直接当绘制高度，否则矮胖的史莱姆会被拉成和人物一样高。 */
-  function charContentH(c) {
-    return (c && c.contentH) || c.fh;                 // 缺实测高度时退回整窗高度
-  }
-  function charScale(c) {
-    const targetH = Math.min(CH * c.targetRatio, c.maxPx);
-    return targetH / charContentH(c);
-  }
-  /* 血条飘在角色头顶：用同一套缩放算出来的绘制高度，别写死 */
-  function playerDrawH() { return charContentH(CHARS.cultivator) * charScale(CHARS.cultivator); }
-  /* 当前这一帧的绘制高度（帧与帧姿态不同，血条要跟着动，不能站桩） */
-  function playerTopH(c) {
-    if (!c || !c.ready) return playerDrawH();
-    let h = 0;
-    const box = c.frameBoxes && c.frameBoxes[G.player.animFrame];
-    if (box) h = box.h;
-    return (h || c.contentH) * charScale(c);
-  }
-  function enemyTopH(e) {
-    const c = e && CHARS[e.sprite];
-    if (!c || !c.ready) return enemyDrawH(e);
-    let h = 0;
-    if (e.attackAnim || (e.hurtT > 0 && c.hasHurt)) {
-      const clip = (e.hurtT > 0 && c.hasHurt) ? 'hurt' : 'attack';
-      const abs = absFrameOf(c, clip, Math.max(0, Math.min(e.animFrame, (clip === 'hurt' ? c.hurtCount : c.attackCount) - 1)));
-      const box = c.frameBoxes && c.frameBoxes[abs];
-      if (box) h = box.h;
-    }
-    return (h || c.contentH) * charScale(c);
-  }
-  function enemyDrawH(which) {
-    const c = CHARS[(which && which.sprite) || 'monster_001'];
-    if (!c || !c.ready) return Math.min(CH * 0.22, 36);
-    return charContentH(c) * charScale(c);
-  }
-
   function drawEnemies() {
     for (const e of G.enemies) {
       if (!e.alive && e.dying <= 0) continue;
       const sx = worldToScreen(e.x); const sy = floorY();
-      const c = CHARS[e.sprite];
-      ctx.save();
-      if (e.dying > 0) ctx.globalAlpha = e.dying/DEATH_FADE;
-      if (e.hurtT > 0) { ctx.globalAlpha *= 0.6; ctx.filter = 'brightness(2)'; }
-      if (c && c.ready) {
-        /* 怪物站在玩家左边，必须面向右（素材朝左 → 镜像） */
-        applyFacing(sx, sy, c.facing, 'right');
-        /* 真实 sprite：hurt 优先于 attack 优先于 walk（受击反馈最短最急，优先显示） */
-        const clip = (e.hurtT > 0 && c.hasHurt) ? 'hurt'
-                   : (e.attackAnim ? 'attack' : 'walk');
-        const frames = clip === 'hurt' ? c.hurtCount : (clip === 'attack' ? c.attackCount : c.walkCount);
-        const idx = clip === 'walk'
-          ? (Math.floor((e.walkT || 0) * c.fps) % c.walkCount)
-          : Math.max(0, Math.min(e.animFrame || 0, frames - 1));
-        const abs = absFrameOf(c, clip, Math.max(0, idx));
-        drawFrame(c, abs, sx, sy, enemyDrawH(e), clip);
-      } else {
-        /* 素材未就绪时的降级：统一占位椭圆，保证战斗画面永远能画出来 */
+      /* 史莱姆真实 sprite 渲染 */
+      if (G.slimeReady && G.slimeSprite && e.type === 'slime') {
+        /* 根据状态选择帧 */
+        let frameIdx;
+        if (e.hurtT > 0) {
+          /* 受击动画: hurtT从0.25递减到0, 映射到hurt帧范围 */
+          const hurtProgress = 1 - (e.hurtT / 0.25);
+          frameIdx = SLIME_SPRITE.hurtStart + Math.min(Math.floor(hurtProgress * SLIME_SPRITE.hurtCount), SLIME_SPRITE.hurtCount-1);
+        } else if (e.anim > 0) {
+          /* 攻击动画: anim从1递减到0, 映射到attack帧范围 */
+          const atkProgress = 1 - e.anim;
+          frameIdx = SLIME_SPRITE.attackStart + Math.min(Math.floor(atkProgress * SLIME_SPRITE.attackCount), SLIME_SPRITE.attackCount-1);
+        } else {
+          /* 走路/待机循环: 用时间驱动 */
+          frameIdx = SLIME_SPRITE.walkStart + (Math.floor(G.t * SLIME_SPRITE.fps) % SLIME_SPRITE.walkCount);
+        }
+        const col = frameIdx % SLIME_SPRITE.cols;
+        const row = Math.floor(frameIdx / SLIME_SPRITE.cols);
+        const srcX = col * SLIME_SPRITE.fw;
+        const srcY = row * SLIME_SPRITE.fh;
+        /* 渲染尺寸: 到玩家肩膀高度 */
+        const drawH = Math.min(CH * 0.5, 72);
+        const drawW = drawH * (SLIME_SPRITE.fw / SLIME_SPRITE.fh);
+        /* 脚底在帧中的y=120(距底部8px), 用这个偏移让脚底踩在地板上 */
+        const footOffset = 120 * (drawH / SLIME_SPRITE.fh);
+        ctx.save();
         ctx.translate(sx, sy);
+        /* 变形纠正: 轻微垂直压缩(scaleY=0.92)让底部变平贴合地板, 同时补偿高度 */
+        const scaleY = 0.92;
+        const compensatedH = drawH / scaleY;
+        ctx.translate(0, -footOffset * (1 - scaleY));
+        ctx.scale(1, scaleY);
+        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
+        if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
+        /* 史莱姆面朝左, 素材本身就是面朝左, 不需要翻转 */
+        ctx.drawImage(G.slimeSprite, srcX, srcY, SLIME_SPRITE.fw, SLIME_SPRITE.fh, -drawW*0.5, -footOffset, drawW, compensatedH);
+        ctx.restore();
+        if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp);
+      } else if (G.waterReady && G.waterSprite && e.type === 'water') {
+        /* 水精灵真实 sprite 渲染 */
+        let frameIdx;
+        if (e.hurtT > 0) {
+          const hurtProgress = 1 - (e.hurtT / 0.25);
+          frameIdx = WATER_SPRITE.hurtStart + Math.min(Math.floor(hurtProgress * WATER_SPRITE.hurtCount), WATER_SPRITE.hurtCount-1);
+        } else if (e.anim > 0) {
+          const atkProgress = 1 - e.anim;
+          frameIdx = WATER_SPRITE.attackStart + Math.min(Math.floor(atkProgress * WATER_SPRITE.attackCount), WATER_SPRITE.attackCount-1);
+        } else {
+          frameIdx = WATER_SPRITE.walkStart + (Math.floor(G.t * WATER_SPRITE.fps) % WATER_SPRITE.walkCount);
+        }
+        const col = frameIdx % WATER_SPRITE.cols;
+        const row = Math.floor(frameIdx / WATER_SPRITE.cols);
+        const srcX = col * WATER_SPRITE.fw;
+        const srcY = row * WATER_SPRITE.fh;
+        const drawH = Math.min(CH * 0.5, 70);
+        const drawW = drawH * (WATER_SPRITE.fw / WATER_SPRITE.fh);
+        /* 脚底在帧中的y=118(距底部10px) */
+        const footOffset = 118 * (drawH / WATER_SPRITE.fh);
+        ctx.save();
+        ctx.translate(sx, sy);
+        /* 变形纠正: 轻微垂直压缩(scaleY=0.92)让底部变平贴合地板 + 轻微倾斜校正 */
+        const scaleY = 0.92;
+        const compensatedH = drawH / scaleY;
+        ctx.translate(0, -footOffset * (1 - scaleY));
+        /* 水精灵身体微微向右倾斜, 用skew校正(-0.03弧度约-1.7度) */
+        ctx.transform(1, 0, -0.03, 1, 0, 0);
+        ctx.scale(1, scaleY);
+        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
+        if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
+        /* 水精灵面朝左, 素材本身就是面朝左, 不需要翻转 */
+        ctx.drawImage(G.waterSprite, srcX, srcY, WATER_SPRITE.fw, WATER_SPRITE.fh, -drawW*0.5, -footOffset, drawW, compensatedH);
+        ctx.restore();
+        if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp);
+      } else {
+        /* 其他怪物类型暂用占位 */
+        ctx.save(); ctx.translate(sx, sy);
+        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
+        if (e.hurtT > 0) { ctx.globalAlpha *= 0.6; ctx.filter = 'brightness(2)'; }
         const bodyH = Math.min(25, CH*0.2);
         ctx.fillStyle = e.color; ctx.beginPath(); ctx.ellipse(0,-bodyH/2,10,bodyH/2,0,0,Math.PI*2); ctx.fill();
+        ctx.restore();
+        if (e.alive) drawHpBar(sx, sy-35, 24, e.hp, e.maxHp);
       }
-      ctx.restore();
-      if (e.alive) drawHpBar(sx, sy - enemyTopH(e) - 6, 24, e.hp, e.maxHp);
     }
   }
 
@@ -1452,7 +1199,6 @@
 
   function init() {
     if (!initCanvas()) { setTimeout(init, 200); return; }
-    syncSPRITE();
     G.player = makePlayer(); G.player.x = 100;
     updateHUD();
     requestAnimationFrame(loop);

@@ -1,9 +1,4 @@
 {
-  "id": "cultivator",
-  "name": "修仙者",
-  "type": "player",
-  "facing": "right",
-  "sprite": "assets/cultivator_sheet.webp",
   "walk": {
     "start": 0,
     "count": 32,

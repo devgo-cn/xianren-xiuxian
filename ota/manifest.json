@@ -2,7 +2,7 @@
   "files": {
     "assets/cultivator_body.webp": "a72d9d498231d77e7f8d131152f06059ddca1091e83889c38c3224ae26927b94",
     "assets/cultivator_hair.webp": "4e83df9dfe253be84dbbfb0a183b283ef75c9c362c522d24b012e3c2070c639d",
-    "assets/cultivator_meta.json": "118b2c81d7c3eaab3027caf8b18ba2f3d92cdb70f0795cd2d912690567995786",
+    "assets/cultivator_meta.json": "5ea21a40843b6fa40d875d8f10bc86b5bc9f1172e15f41690fc1bd92b77c1670",
     "assets/cultivator_robe.webp": "30b6bdf27221803a1a91d901e9c691b884c70287002bb0b5688d9684e34faf59",
     "assets/cultivator_sheet.webp": "ed72ed2f3440483c79b6626a588452a0455d29a71147102f0a3baa92f83fecbb",
     "assets/hpbar-ink-bg.png": "9c4d59566fea202e116fe53702df50b7ce9257891a9bb55b1b6f3a58e754faed",
@@ -131,13 +131,12 @@
     "assets/sound/myst.mp3": "f9ad8bc90064e3873756900265d4a36f48014214bd0a1a6c4e61317a6eb7473e",
     "assets/sound/swing.mp3": "90d43e97f4c03c4578368fe927152d0dd587fbe7cd4d54963320c54d68609066",
     "assets/sound/win.mp3": "ffdf24c675745017a997f0d65686feb5eef373b42a44aab8747e3b7c79f1b0bc",
-    "assets/sprite-manifest.json": "37c0ceb29a8b824e582a0fc7ae256f62085f6133e19142fd51d50397130b3555",
     "bg.js": "d61cf11f268274f8bcdbea5aac1da08eb3f58b59e82b650b0d1f178803343954",
     "dt-theme.css": "036a3ebb6cff5f075c3ab8ea3666b7f99e0f843b39d6f2b05e0b54fad8e569ae",
     "fx2d.js": "a2a094eda63597f16245e2f2d421fcc05c0955b4239650e62c63887bc352a9ea",
     "game.js": "c29f23d10a4a1bd121200c279a7490924e615c3312feed566e8822eb766a075c",
-    "index.html": "a09c18a51d35a613d6ae2545b13d6aaedec8ea2a68e94f73a08e9e0d405940a8"
+    "index.html": "5817544ca7f6acc91d4034c8387e22d1f8c62d64f782a7a61d69fb1e64f49083"
   },
-  "rev": "f57d7a97fa0e1b4f",
+  "rev": "2239da241253452e",
   "version": "2.4"
 }
