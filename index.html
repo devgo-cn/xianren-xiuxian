@@ -1070,6 +1070,7 @@
       /* 技能伤害判定: 第12帧 (剑气月牙出现时) */
       if (p.skillFrame >= SKILL.hitFrame && !p.skillHit && p.skillTarget && p.skillTarget.alive) {
         p.skillHit = true;
+        playSfx('attack2', 0.9);  /* 剑气斩攻击音效 */
         const crit = Math.random() < 0.15;
         const atkMult = 1 + (p.atkBuff || 0);
         const dmg = p.atk * atkMult * SKILL.damageMult * (0.9 + Math.random()*0.2) * (crit ? 2.0 : 1);
