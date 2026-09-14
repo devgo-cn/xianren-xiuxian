@@ -814,7 +814,17 @@
       }
     }
     const near = findNearestEnemy(p.x, p.atkRange+200);
-    if (near && Math.abs(near.x-p.x) <= p.atkRange+5) {
+    /* 攻击动画播放期间不中断，保持攻击状态（修复抽搐） */
+    if (p.attackAnim) {
+      p.moving = 0;
+      if (p.atkT <= 0 && near && Math.abs(near.x-p.x) <= p.atkRange+25) {
+        p.anim = 1; p.atkT = 1/p.aspd; p.attackAnim = true; p.animFrame = 0; p.animTimer = 0;
+        const crit = Math.random()<0.08;
+        const dmg = p.atk*(0.9+Math.random()*0.2)*(crit?1.8:1);
+        dealDamage(near, dmg, '#7fe0ff', crit);
+      }
+    } else if (near && Math.abs(near.x-p.x) <= p.atkRange+5) {
+      /* 进入攻击范围，开始攻击 */
       p.moving = 0;
       if (p.atkT <= 0) {
         p.anim = 1; p.atkT = 1/p.aspd; p.attackAnim = true; p.animFrame = 0; p.animTimer = 0;
@@ -823,11 +833,13 @@
         dealDamage(near, dmg, '#7fe0ff', crit);
       }
     } else if (near) {
-      p.moving = 1; p.walkT += dt*8; p.attackAnim = false;
+      /* 有怪但不在攻击范围，向怪移动 */
+      p.moving = 1; p.walkT += dt*8;
       const targetX = near.x - p.atkRange*0.85;
       p.x += Math.sign(targetX-p.x)*Math.min(Math.abs(targetX-p.x), BC.playerSpeed*1.5*dt);
     } else {
-      p.moving = 1; p.walkT += dt*8; p.attackAnim = false; p.x += BC.playerSpeed*dt;
+      /* 无怪，向前推进 */
+      p.moving = 1; p.walkT += dt*8; p.x += BC.playerSpeed*dt;
     }
   }
   function updatePets(dt) {
@@ -910,9 +922,34 @@
   function worldToScreen(wx) { return wx - G.camX; }
 
   function drawBg() {
-    /* 战斗区背景完全透明，直接叠加在原游戏墨夜星空(canvas#bg)上
-       只画一条 2px 地板线作为行走基准 */
+    /* 战斗区背景完全透明，直接叠加在原游戏墨夜星空(canvas#bg)上 */
     const fy = floorY();
+    /* 静态云层特效（不随摄像机移动，作为角色向前推进的视觉参考） */
+    ctx.save();
+    ctx.globalAlpha = 0.07;
+    ctx.fillStyle = '#d8e4f0';
+    /* 高层云 */
+    ctx.beginPath();
+    ctx.ellipse(CW*0.18, CH*0.14, CW*0.17, CH*0.038, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(CW*0.72, CH*0.09, CW*0.14, CH*0.032, 0, 0, Math.PI*2);
+    ctx.fill();
+    /* 中层云 */
+    ctx.globalAlpha = 0.05;
+    ctx.beginPath();
+    ctx.ellipse(CW*0.48, CH*0.27, CW*0.20, CH*0.045, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(CW*0.88, CH*0.21, CW*0.11, CH*0.028, 0, 0, Math.PI*2);
+    ctx.fill();
+    /* 低层薄雾 */
+    ctx.globalAlpha = 0.03;
+    ctx.beginPath();
+    ctx.ellipse(CW*0.3, CH*0.42, CW*0.25, CH*0.04, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+    /* 地板线：2px 旧金色细线 */
     ctx.strokeStyle = 'rgba(180,170,140,0.25)';
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(0, fy); ctx.lineTo(CW, fy); ctx.stroke();
