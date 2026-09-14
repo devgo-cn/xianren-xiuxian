@@ -143,9 +143,9 @@
     "assets/sound/myst.mp3": "f9ad8bc90064e3873756900265d4a36f48014214bd0a1a6c4e61317a6eb7473e",
     "assets/sound/swing.mp3": "90d43e97f4c03c4578368fe927152d0dd587fbe7cd4d54963320c54d68609066",
     "assets/sound/win.mp3": "ffdf24c675745017a997f0d65686feb5eef373b42a44aab8747e3b7c79f1b0bc",
-    "assets/ui_icons/btn_array.webp": "5b12a958e5ed41465f9a86e2b58fdeb76ef159f79458d6be7d496412cd4ff751",
-    "assets/ui_icons/btn_break.webp": "a403da7c06137916b018db20d68bdb6f2bea89db3485cc9faf12b2ef67f7acfd",
-    "assets/ui_icons/btn_travel.webp": "a2a9f6c11936732a3efd6111aac692917414d9759dc34783486ce099aa678fdb",
+    "assets/ui_icons/btn_array.webp": "199fbd47579d867ac48c627d72d4669274f3229c0aff7a93e110c8ceb49326f9",
+    "assets/ui_icons/btn_break.webp": "1bed02beda69c818c8ccb185654b597bb6921ceba89f6edb7cfe5061a118126f",
+    "assets/ui_icons/btn_travel.webp": "fed0c8c1c8c79feab92856904e7d9b28d7fa7e795f76cca53e387d0d47f19faa",
     "assets/ui_icons/icon_alchemy.webp": "24e8062db6e001280f2db447b626cc1cf6f2d1738961e2e8d07064f29e86c571",
     "assets/ui_icons/icon_cloud.webp": "85656e0a817c5ec268cf3bd50600b68b0e6c64508baaa3eefadfa8143f100a27",
     "assets/ui_icons/icon_mail.webp": "462f73d86a92beb666b7aa99f87439b5234241ebb23582764215517c1ad0b6a5",
@@ -159,6 +159,6 @@
     "game.js": "6be3618bf2fbc0e478b8cbad068d1146994a04c2e99f7d43a7b55ec3e2f873de",
     "index.html": "b3ad64dd2c08b8aff793ce74f013094a332b9b2f9631aef7da46e529fd2eeef7"
   },
-  "rev": "ae6f31566b0ad009",
+  "rev": "dae07696e7905e7d",
   "version": "2.4"
 }
