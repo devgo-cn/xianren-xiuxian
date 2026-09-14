@@ -109,6 +109,8 @@
     "assets/modals/ico/zhuji.webp": "58402ece9363e8e6bb6e53cda8ac42b14fef0656ee763978c09b5c060afce2bc",
     "assets/modals/ico/zihou.webp": "5dc6a78f3c18c93582216276cef61de91038a294c00baab89c370656ce3f8a59",
     "assets/modals/ico/zilei.webp": "6a8fd580f989d58366165d14bd6e1d4d61ceb85baa7958bdd16217c74f5a51c8",
+    "assets/monster_001_green_slime.png": "d1df9fed074032db0279cb4ad48fb08ac095ff15719904b9d9046165bac5c2bb",
+    "assets/monster_001_green_slime_meta.json": "1f83e5c344389987459a5fd649f50f5fc30464c39eb2ba8b59ad2a712ad03af4",
     "assets/monsters/m0_wolf.png": "6789c303957e665440519b98aa680a7f9308f960dcd5bca0576a3552e8bafbe8",
     "assets/monsters/m1_shanyao.png": "0d7c9b8b9b2517d6755c94d0ca9a79d151ade5d7ab9bcc82bb8fbc5169ca4e06",
     "assets/monsters/m2_xiongpi.png": "86f588d45ece7630b92f029163ac68e23180821d145879389eca08245b3ab510",
@@ -130,6 +132,6 @@
     "game.js": "c29f23d10a4a1bd121200c279a7490924e615c3312feed566e8822eb766a075c",
     "index.html": "dc9bd11313baf96bcb2824a45846254de09c30feae8b18b19df54784d141c235"
   },
-  "rev": "a016f8518d9523f1",
+  "rev": "88a265200a11a943",
   "version": "2.4"
 }
