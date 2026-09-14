@@ -125,10 +125,11 @@
   /* 战斗区UI图标层：大图标(地板右下) + 小图标(右上角) */
   .battle-ui{position:fixed;left:0;right:0;top:92px;bottom:calc(44vh + 84px);z-index:4;pointer-events:none}
   .battle-ui .big-icons{position:absolute;bottom:6px;right:10px;display:flex;gap:7px;pointer-events:auto}
-  .battle-ui .small-icons{position:absolute;top:5px;right:8px;display:flex;gap:5px;pointer-events:auto;align-items:center}
+  .battle-ui .small-icons{position:absolute;top:8px;right:10px;display:grid;grid-template-columns:repeat(2,1fr);gap:4px;pointer-events:auto}
   .battle-ui .icon-btn{position:relative;width:42px;height:42px;border-radius:5px;overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .3s;border:1px solid rgba(232,197,107,.25);background:#000;flex:none}
   .battle-ui .icon-btn img{width:100%;height:100%;display:block;pointer-events:none}
   .battle-ui .icon-btn.small{width:28px;height:28px;border-radius:3px}
+  .battle-ui #cloudChip{display:block;width:28px;height:28px;max-width:none;padding:0;overflow:hidden}
   .battle-ui .icon-btn:active{transform:scale(.9)}
   .battle-ui .icon-btn .lg{display:none}
   /* 激活态：丹房可炼丹(橙光) */
