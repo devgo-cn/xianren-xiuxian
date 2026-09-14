@@ -740,18 +740,18 @@
   /* 加载素材 */
   const spriteImg = new Image();
   spriteImg.onload = function() { G.sprite = spriteImg; G.spriteReady = true; };
-  spriteImg.src = 'assets/cultivator_sheet.png';
+  spriteImg.src = 'assets/cultivator_sheet.webp';
   const bgImg = new Image();
   bgImg.onload = function() { G.bgImg = bgImg; G.bgReady = true; };
   bgImg.src = 'assets/main-bg.jpg';
   /* 怪物素材: 绿色史莱姆 */
   const slimeImg = new Image();
   slimeImg.onload = function() { G.slimeSprite = slimeImg; G.slimeReady = true; };
-  slimeImg.src = 'assets/monster_001_green_slime.png';
+  slimeImg.src = 'assets/monster_001_green_slime.webp';
   /* 怪物素材: 水精灵 */
   const waterSpriteImg = new Image();
   waterSpriteImg.onload = function() { G.waterSprite = waterSpriteImg; G.waterReady = true; };
-  waterSpriteImg.src = 'assets/monster_002_water_sprite.png';
+  waterSpriteImg.src = 'assets/monster_002_water_sprite.webp';
 
   /* Sprite 帧配置: 玩家 */
   const SPRITE = { cols:9, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:40, fps:24 };

@@ -8,7 +8,7 @@
   "facing": "left",
   "tier": 2,
   "description": "蓝色凝胶状水精灵，有小尾巴，通过下盘皮筋往前拉伸弹跳移动，原地不动",
-  "sprite": "assets/monster_002_water_sprite.png",
+  "sprite": "assets/monster_002_water_sprite.webp",
   "walk": {
     "start": 0,
     "count": 32,

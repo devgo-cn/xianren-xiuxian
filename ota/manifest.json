@@ -4,7 +4,6 @@
     "assets/cultivator_hair.webp": "4e83df9dfe253be84dbbfb0a183b283ef75c9c362c522d24b012e3c2070c639d",
     "assets/cultivator_meta.json": "5ea21a40843b6fa40d875d8f10bc86b5bc9f1172e15f41690fc1bd92b77c1670",
     "assets/cultivator_robe.webp": "30b6bdf27221803a1a91d901e9c691b884c70287002bb0b5688d9684e34faf59",
-    "assets/cultivator_sheet.png": "569b8c452e690674ed2f8b17f0faa7e5d23ef5b4883f8b7818693ca117e068b0",
     "assets/hpbar-ink-bg.png": "9c4d59566fea202e116fe53702df50b7ce9257891a9bb55b1b6f3a58e754faed",
     "assets/hpbar-ink-mask.png": "f7b2802c5d93ab447300c15d5ccaf035cd9c37eef292ec83910b0aef3394c8e2",
     "assets/main-bg.jpg": "30bda2c355760f1364da3a11f01f31cd7928babeb565ed064d0c41f66b8fb0d8",
@@ -109,10 +108,7 @@
     "assets/modals/ico/zhuji.webp": "58402ece9363e8e6bb6e53cda8ac42b14fef0656ee763978c09b5c060afce2bc",
     "assets/modals/ico/zihou.webp": "5dc6a78f3c18c93582216276cef61de91038a294c00baab89c370656ce3f8a59",
     "assets/modals/ico/zilei.webp": "6a8fd580f989d58366165d14bd6e1d4d61ceb85baa7958bdd16217c74f5a51c8",
-    "assets/monster_001_green_slime.png": "9902dc678c51700e5c9fdcf218360b6b17ab7567faf335b7f55c05fb3c80cf4f",
     "assets/monster_001_green_slime_meta.json": "854ad8da7520f456d310a16bc1b849ae06dd1be88df9485e71803cf983a715ae",
-    "assets/monster_002_water_sprite.png": "28b4d77db19ca6a49ddb59fb8bbd8e643b2b3d58d8979ebf007d32ee746527df",
-    "assets/monster_002_water_sprite_meta.json": "afcf9d5988f2d51853f2c58a5e0cbc384671d3d429cbf4fe34c80c3fcb469acf",
     "assets/monsters/m0_wolf.png": "6789c303957e665440519b98aa680a7f9308f960dcd5bca0576a3552e8bafbe8",
     "assets/monsters/m1_shanyao.png": "0d7c9b8b9b2517d6755c94d0ca9a79d151ade5d7ab9bcc82bb8fbc5169ca4e06",
     "assets/monsters/m2_xiongpi.png": "86f588d45ece7630b92f029163ac68e23180821d145879389eca08245b3ab510",
@@ -132,8 +128,11 @@
     "dt-theme.css": "036a3ebb6cff5f075c3ab8ea3666b7f99e0f843b39d6f2b05e0b54fad8e569ae",
     "fx2d.js": "a2a094eda63597f16245e2f2d421fcc05c0955b4239650e62c63887bc352a9ea",
     "game.js": "c29f23d10a4a1bd121200c279a7490924e615c3312feed566e8822eb766a075c",
-    "index.html": "d91a85abc6f356bfc70977a216336ffdd746f02fa83c93ec15e4d0f4b3e7f4d3"
+    "index.html": "529eb1b3c3f187932b0ab004fc8abebad1f0666c1fa81fc36d7fed3318d27929",
+    "assets/cultivator_sheet.webp": "ed72ed2f3440483c79b6626a588452a0455d29a71147102f0a3baa92f83fecbb",
+    "assets/monster_001_green_slime.webp": "bc53348de1e63d8a720d599f535ffd10c01b2fecaa5aa56cbcda0ee259de615e",
+    "assets/monster_002_water_sprite.webp": "a19104128518abf8a910f14632302240b36496ffd4e756b11278275dab00f0b1"
   },
-  "rev": "99a598001ba37ab7",
+  "rev": "10a6fd9376beda37",
   "version": "2.4"
 }

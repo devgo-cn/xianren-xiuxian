@@ -8,7 +8,7 @@
   "facing": "left",
   "tier": 1,
   "description": "最弱的怪物，凝胶状生物，行动缓慢，攻击时先蜷缩蓄力再伸出手，受击时蜷缩",
-  "sprite": "assets/monster_001_green_slime.png",
+  "sprite": "assets/monster_001_green_slime.webp",
   "walk": {
     "start": 0,
     "count": 32,
