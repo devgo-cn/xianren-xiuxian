@@ -365,6 +365,14 @@
   #cloudChip.sync .dot{background:#ffd166;animation:cp 1s infinite}
   @keyframes cpon{0%,100%{box-shadow:0 0 8px #3ddc84;opacity:1}50%{box-shadow:0 0 2px rgba(61,220,132,.35);opacity:.4}}
   @keyframes cp{50%{opacity:.3}}
+  /* v2.5 修复: 小图标模式(28px 方块, overflow:hidden)下 .dot 被裁掉 → 状态机全程不可见。
+     改为右下角角标(同 .mail-dot 做法), 按钮本体再加状态光晕, 绿=已同步/黄=同步中/红=断开 */
+  .small-icons #cloudChip .dot, .battle-ui #cloudChip .dot{
+    position:absolute;right:0;bottom:0;width:9px;height:9px;border-radius:50%;
+    border:1px solid rgba(6,10,14,.7);z-index:3}
+  .small-icons #cloudChip.on, .battle-ui #cloudChip.on{border-color:rgba(61,220,132,.8);box-shadow:0 0 8px rgba(61,220,132,.55)}
+  .small-icons #cloudChip.sync, .battle-ui #cloudChip.sync{border-color:rgba(255,209,102,.8);box-shadow:0 0 8px rgba(255,209,102,.5)}
+  .small-icons #cloudChip.off, .battle-ui #cloudChip.off{border-color:rgba(255,107,107,.8);box-shadow:0 0 8px rgba(255,107,107,.45)}
   #cloudPanel{position:fixed;right:12px;top:118px;z-index:61;width:min(264px,86vw);
     background:rgba(12,16,22,.94);border:1px solid rgba(140,180,255,.3);border-radius:12px;
     padding:10px 12px;font-size:12px;color:#cfe3fb;display:none;backdrop-filter:blur(6px);
