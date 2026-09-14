@@ -1609,6 +1609,8 @@ function cldFlash(txt) {
   setTimeout(() => { el.textContent = old; }, 1600);
 }
 function cldAdoptCloud(s) {
+  /* v2.5 技能存档保护: 云端旧档(神通系统上线前)不带 skills → 不让旧档回滚本地技能等级 */
+  if (s && !s.skills && state && state.skills && Object.keys(state.skills).length) s.skills = state.skills;
   const c = adopt(s);
   if (!c) return false;
   state = c;
@@ -4349,8 +4351,11 @@ let _travelReturned = false;
 function adoptKeep(st) {          // 采用结算后的存档, 但本地叙事(非云端净化)不回退
   const keep = (state.journal || []).slice();
   const hadTravel = state.travel;          // 采纳前的本地云游状态
+  /* v2.5 技能存档保护: 服务端旧档(神通系统上线前入库)不带 skills —— 不得用它回滚本地技能等级 */
+  const keepSkills = (state.skills && Object.keys(state.skills).length) ? state.skills : null;
   const c = adopt(st);
   if (!c) return false;
+  if (!c.skills && keepSkills) c.skills = keepSkills;
   c.journal = keep.length >= (c.journal || []).length ? keep : c.journal;
   /* v1.8.1 派发竞态保护(沿用): 心跳的普通 settle 不该把刚派发的云游抹掉。
    * 只有当服务端明确给出「化身归来」事件(gains.travel)时才认可清空。
