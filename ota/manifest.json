@@ -146,19 +146,19 @@
     "assets/ui_icons/btn_array.webp": "ca434c9518f3d12b269a9e9617cb987911ef708557d57001b4bd31397a4d1a87",
     "assets/ui_icons/btn_break.webp": "b7afa86e2f0e06ce27412a3f4cc4cb5595bd471a9bee70982d2a40a7f959a239",
     "assets/ui_icons/btn_travel.webp": "376778f32ea668daa85333f674a2c30f6a19e1d6ee166e2f8908bdb2d2301772",
-    "assets/ui_icons/icon_alchemy.webp": "24e8062db6e001280f2db447b626cc1cf6f2d1738961e2e8d07064f29e86c571",
+    "assets/ui_icons/icon_alchemy.webp": "22543af274a5109269184854dab445e0cc6b6374b91cdc96aea331528adc699b",
     "assets/ui_icons/icon_cloud.webp": "85656e0a817c5ec268cf3bd50600b68b0e6c64508baaa3eefadfa8143f100a27",
     "assets/ui_icons/icon_mail.webp": "462f73d86a92beb666b7aa99f87439b5234241ebb23582764215517c1ad0b6a5",
     "assets/ui_icons/icon_settings.webp": "c5792265643acb035d7a11ed99ff3deb13fcada2f24bbad6c3e2ccff91db16d7",
-    "assets/ui_icons/icon_skill.webp": "0084d7e3eeea50549af653db4f6e984fab9685e598732e1fcc2503755ff88f43",
+    "assets/ui_icons/icon_skill.webp": "9f4120ba7855ce3ed6012766534ff8f068521508f4814b763463337447d9ccd6",
     "assets/ui_icons/icon_story.webp": "9974a3fdbcf748410ad89380b9bd36dd8ca891656a6d695609b43c5f917794ac",
-    "assets/ui_icons/icon_treasure.webp": "415e5ad97613d8da39e361b9272263c322056dd551c4a141dd1ec1413b7e5e50",
+    "assets/ui_icons/icon_treasure.webp": "d3b60ce82bbc842e8e41b153e569a8203160843952e9e5e80b8592e4c613c31e",
     "bg.js": "d61cf11f268274f8bcdbea5aac1da08eb3f58b59e82b650b0d1f178803343954",
     "dt-theme.css": "6a17d65775d8c19500601b2b309e5682b6f9768bb0fb537d61b98c8538aa1a66",
     "fx2d.js": "a2a094eda63597f16245e2f2d421fcc05c0955b4239650e62c63887bc352a9ea",
     "game.js": "6be3618bf2fbc0e478b8cbad068d1146994a04c2e99f7d43a7b55ec3e2f873de",
     "index.html": "b3ad64dd2c08b8aff793ce74f013094a332b9b2f9631aef7da46e529fd2eeef7"
   },
-  "rev": "78753fd7c48683ec",
+  "rev": "00f30f2f711187ce",
   "version": "2.4"
 }
