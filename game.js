@@ -4838,18 +4838,10 @@ const SEEK_TALE = [
   "剑意微鸣，前方有物", "踏破山脊，搜寻妖踪", "拾级而上，草木皆兵",
   "风里有腥气，循迹而去", "拨草寻径，屏息前行",
 ];
-function autoHuntOn() { return !state || state.autoHunt !== false; }     // 默认开(懒人)
+function autoHuntOn() { return false; /* 原战斗系统已移除 */ }     // 默认开(懒人)
 function searchMs() { return (SEARCH_MIN + Math.random() * (SEARCH_MAX - SEARCH_MIN)) * 1000; }
 function toggleAutoHunt() {
-  if (!state) return;
-  state.autoHunt = !autoHuntOn();
-  if (state.autoHunt) { _encNext = Date.now() + searchMs(); seekPick(); }
-  else { _encNext = 0; seekHide(); }
-  renderAutoHunt();
-  pushMsg("main", state.autoHunt
-    ? `<span class="b">自动战斗</span>已开 —— 你佩剑出府，主身自此巡山不止，遇妖即斩。`
-    : `<span class="b">自动战斗</span>已收 —— 你回洞天只打坐吐纳，妖兽暂不来扰。`);
-  save(); cloudSoon();
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
 function renderAutoHunt() {
   /* v1.5.0: 小开关 —— 文案恒为「⚔ 自动」, 开/关只切 .on 激活态(朱砂亮 / 熄墨灰) */
@@ -4859,28 +4851,21 @@ function renderAutoHunt() {
   b.title = on ? "自动战斗 · 开（点击关闭）" : "自动战斗 · 关（点击开启）";
   if (!on) seekHide();
 }
-function seekPick() { _seekLine = SEEK_TALE[Math.floor(Math.random() * SEEK_TALE.length)]; }
+function seekPick() {
+  /* 战斗系统已移除，新战斗动画后续接入 */
+}
 let _seekLine = SEEK_TALE[0];
 /* 只在换句时重绘: traceBeat 每 2.5s 调一次 seekShow, 整锅重设会把跳动/淡入动画掐断重放 */
 let _seekShown = "", _seekAt = 0;
 function seekShow() {
-  const el = $("huntSeek"); if (!el) return;
-  if (!autoHuntOn()) { el.style.display = "none"; _seekShown = ""; return; }
-  const now = Date.now();
-  if (!_seekShown || now - _seekAt > 9000) { seekPick(); _seekAt = now; _seekShown = _seekLine; }
-  if (el.dataset.line !== _seekShown) {
-    el.dataset.line = _seekShown;
-    el.innerHTML = `<span class="sk-txt">${_seekShown}</span><span class="sk-dots"><i></i><i></i><i></i></span>`;
-  }
-  el.style.display = "flex";
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
-function seekHide() { const el = $("huntSeek"); if (el) { el.style.display = "none"; _seekShown = ""; } }
+function seekHide() {
+  /* 战斗系统已移除，新战斗动画后续接入 */
+}
 function huntBarShow(v) { const bar = $("huntBar"); if (bar) bar.style.display = v ? "flex" : "none"; }
-function huntNext() {                  // 一波收场 → 重新起算搜寻时刻(自动斗法开时才生效)
-  _traceT = Date.now();
-  huntBarShow(true);                   // 收场 → 自动斗法条归位
-  if (autoHuntOn()) { _encNext = Date.now() + searchMs(); seekPick(); }
-  else { _encNext = 0; seekHide(); }
+function huntNext() {
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
 
 function warZone() {                   // 斗法地界 = 主身当前大境地界(与化身云游无关)
@@ -4889,160 +4874,31 @@ function warZone() {                   // 斗法地界 = 主身当前大境地�
 /* ---------- 节拍: 行迹句 2.5 分钟一换; 主身巡猎按固定波次周期(与离线同频) ---------- */
 function traceBeat() {
   if (!state) return;
-  if (document.hidden) return;    // v2.3 PERF: 后台不跑巡猎节拍(回前台会走离线结算/强制刷新, 不需要后台持续触发)
-  if (!BTL && !MYST) {
-    if (autoHuntOn()) {
-      if (!_encNext) { _encNext = Date.now() + searchMs(); seekPick(); }
-      if (Date.now() >= _encNext) {
-        try { fireEvent(); } catch (e) { _encNext = Date.now() + searchMs(); huntBarShow(true); console.warn("遭遇异常:", e); }
-      } else seekShow();
-    } else seekHide();
-  } else seekHide();
-  if (!BTL && !MYST && Date.now() - _traceT > 150000) { _traceT = Date.now(); traceRefresh(); }
+  if (document.hidden) return;
+  /* 原战斗系统已移除，新战斗动画后续接入资源结算 */
+  if (Date.now() - _traceT > 150000) { _traceT = Date.now(); traceRefresh(); }
 }
-function fireEvent() {                // 遇事分发: 八成妖兽伏击, 两成秘境机缘 —— 皆挂主身
-  if (BTL || MYST) return;
-  seekHide();                          // 妖已现踪 → 收起搜寻提示
-  _encNext = Date.now() + 3600 * 1000; // 占位保险: 真正的下一波时刻由收场时(搜寻)重设
-  if (Math.random() < HUNT_FIGHT_RATE) fireFight(); else fireMyst();
-}function fireFight() {                // 主身斗法: 不再借化身行迹, 出洞天巡猎遇妖
-  if (BTL) return;
-  const z = warZone();
-  const big = z.big;
-  const lv = (state.realmIdx || 0) + 1;              // 同尺: 怪=你的境界级
-  const mon = genMonster(big, lv);
-  const eb = equipBonus();
-  /* 主身三围(装备为属性主力): 裸身线性已收小, 装备数值+词条乘区为主要来源;
-     裸装能过凡人, 之后战力由掉落与词条驱动 */
-  const hs = finalStats({ hp: 100 + 330 * lv, atk: 10 + 46 * lv, def: 5 + 26 * lv },
-    { hp: eb.hp || 0, atk: eb.atk || 0, def: eb.def || 0 }, eb.agg);
-  const ms = finalStats({ hp: mon.hp, atk: mon.atk, def: mon.def }, {}, fxAgg(mon.fx ? [mon] : []));
-  BTL = { mon, ms, monNm: mon.n, big, lv, turn: 0, round: 0,
-    php: hs.hp, phpMax: hs.hp, patk: hs.atk, pdef: hs.def,
-    crit: hs.crit, critB: hs.critB, critD: hs.critD, pen: hs.pen, dodge: hs.dodge, life: hs.life,
-    mhp: ms.hp, mhpMax: ms.hp,
-    logs: [], ended: false, skip: false };
-  let mTag = "";
-  if (mon.fx && mon.fx.length) mTag = "（凶煞：" + mon.fx.map(fmtFxTag).join(" · ") + "）";
-  traceSay(`妖气扑面 —— 一头 <b>${mon.n}</b> 拦住去路，斗法已起!`);
-  warStart(`妖战`, `${mon.n} 拦住去路，龇牙低吼，妖风卷起一地枯叶。${mTag}`);
-  SND.alert();                          // v1.7.9 横幅已上台再击战鼓, 保证"有声必有画"
-  pushMsg("main", `妖气骤起!你行至<span class="r">${z.name}</span>一带巡山，撞见一头 ${mon.n}${mTag}，你来我往斗了起来。`);
-  const fl = $("flash"); if (fl) { fl.style.transition = "none"; fl.style.opacity = .38; void fl.offsetWidth; fl.style.transition = "opacity .6s ease"; fl.style.opacity = "0"; }
-  btlRun();
+function fireEvent() {
+  /* 战斗系统已移除，新战斗动画后续接入 */
+}function fireFight() {
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
 async function btlRun() {
-  while (BTL && !BTL.ended) {
-    // v1.7.2 播报节奏: 开场首合多留白读警示语, 每合出手/受击各自停顿, 玩家看得清来龙去脉; ⚡速战不受影响
-    await slp(BTL.skip ? 40 : (BTL.round === 0 ? 2500 : 1500));
-    if (!BTL || BTL.ended) break;
-    BTL.round++;
-    fieldLine();
-    await btlHeroAct();
-    if (!BTL || BTL.ended) break;
-    await slp(BTL.skip ? 40 : 1050);       // 怪物还手前略顿, 一来一回看得清
-    if (BTL && !BTL.ended) await btlFoeAct();
-  }
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
 /* 速战: 懒人按钮 —— 不再逐合播报, 直接同步结算到分出胜负 */
 function warSkip() {
-  if (!BTL || BTL.ended || BTL.skip) return;
-  BTL.skip = true;
-  const btn = $("warSkipBtn"); if (btn) btn.style.opacity = ".45";
-  for (let n = 0; n < 200000 && BTL && !BTL.ended; n++) {
-    const stH = tryStrike(BTL.patk, BTL, BTL.ms.def, BTL.ms.dodge);   // 玩家出手
-    if (!stH.miss) { BTL.mhp = Math.max(0, BTL.mhp - stH.dmg); if (BTL.mhp <= 0) { btlWin(); return; } }
-    const stF = tryStrike(BTL.ms.atk, BTL.ms, BTL.pdef, BTL.dodge);   // 妖兽还手
-    if (!stF.miss) { BTL.php = Math.max(0, BTL.php - stF.dmg); if (BTL.php <= 0) { btlLose(); return; } }
-  }
-  if (BTL && !BTL.ended) (BTL.mhp <= BTL.php ? btlWin() : btlLose());
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
 window.warSkip = warSkip;/* v1.7.13 通用判定: 命中(闪避→落空) → 破甲(无视目标防御%) → 会心(×1.5)/暴击(×2.0) → 爆伤增幅 */
 function tryStrike(atk, sAtk, tDef, tDodge) {
-  const dodgeCh = 0.04 + ((tDodge || 0)) / 100;           // 基础脱手4% + 目标闪避
-  if (Math.random() < dodgeCh) return { miss: true, dodge: (tDodge || 0) > 0 };
-  const pen = (sAtk.pen || 0) / 100;
-  const defEff = tDef * (1 - pen);
-  let dmg = Math.max(1, Math.round((atk - defEff) * (0.85 + Math.random() * 0.3)));
-  let kind = null;
-  const r = Math.random();
-  if ((sAtk.critB || 0) / 100 >= r) kind = "critB";
-  else if ((sAtk.crit || 0) / 100 >= Math.random()) kind = "crit";
-  const cd = 1 + (sAtk.critD || 0) / 100;
-  if (kind === "critB") dmg = Math.round(dmg * 2 * cd);
-  else if (kind === "crit") dmg = Math.round(dmg * 1.5 * cd);
-  return { miss: false, kind, dmg, pen: (sAtk.pen || 0) > 0 };
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
 async function btlHeroAct() {
-  if (!BTL || BTL.ended) return;
-  const si = (BTL.turn++ % 2), pool = SKILLS[BTL.big] || SKILLS[SKILLS.length - 1], name = pool[si];
-  const monNm = BTL.monNm;
-  /* ① 出招瞬现 + 呼啸即刻起(不等文字), ② 稍顿 ③ 命中判定与音效/受创文字 */
-  btlNow(`⚡ 你使出「${name}」`, "cast"); SND.swing(); castFlash();   // cast: 技能行专属色 + 顶部光束扫过
-  if (!BTL.skip) await slp(300);
-  const st = tryStrike(BTL.patk, BTL, BTL.ms.def, BTL.ms.dodge);
-  if (st.miss) {
-    spawnDmg("foe", 0, "dodge");
-    btlLog(st.dodge
-      ? `「<b class="dodge">闪避!</b>」${monNm} 身形一晃，你这一击落空。`
-      : `…… ${monNm} 侧身一闪，你落空了。`);
-  } else {
-    BTL.mhp = Math.max(0, BTL.mhp - st.dmg);
-    SND.crit();   // 命中统一"扎实"音(区分度已由画面/文案承担)
-    if (BTL.barFoe) BTL.barFoe.hit();
-    /* 演出: 伤害飘字 + 震屏 + 命中停顿(暴击才冻帧, 强化打击感) */
-    const dmgCls = st.kind === "critB" ? "critb" : st.kind === "crit" ? "crit" : "normal";
-    const shakeLv = st.kind === "critB" ? "heavy" : st.kind === "crit" ? "mid" : "light";
-    spawnDmg("foe", st.dmg, dmgCls);
-    shakeBanner(shakeLv);
-    if (!BTL.skip && st.kind === "critB") await slp(80);
-    else if (!BTL.skip && st.kind === "crit") await slp(50);
-    const lead = st.kind === "critB" ? `<b class="critb">暴击!</b>` : st.kind === "crit" ? `<b class="crit">会心!</b>` : st.pen ? `<b class="w">破甲</b>` : "";
-    let suck = "";
-    if (BTL.life > 0) {
-      const heal = Math.round(st.dmg * BTL.life / 100);
-      if (heal > 0) { BTL.php = Math.min(BTL.phpMax, BTL.php + heal); suck = ` <b class="suck">（吸血 +${heal}）</b>`; spawnDmg("hero", heal, "heal"); if (BTL.barHero) BTL.barHero.heal(); }
-    }
-    fieldLine();
-    /* v1.7.17 吸血并进伤害行括号, 不再独占一行 */
-    btlLog(`${lead ? lead + " " : ""}命中 <b class="r">${monNm}</b>，打出 <b class="r">${st.dmg}</b> 伤害${suck}。`);
-  }
-  fieldLine();
-  if (BTL.mhp <= 0) { btlWin(); }
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
 async function btlFoeAct() {
-  if (!BTL || BTL.ended) return;
-  const monNm = BTL.monNm;
-  const st = tryStrike(BTL.ms.atk, BTL.ms, BTL.pdef, BTL.dodge);
-  if (st.miss) {
-    spawnDmg("hero", 0, "dodge");
-    btlLog(st.dodge
-      ? `「<b class="dodge">闪避!</b>」你侧身一晃，${monNm} 扑了个空。`
-      : `${monNm} 猛地扑来，你侧身避开，溅起一地尘土。`);
-  } else {
-    btlNow(`${monNm} 反扑而至！`); SND.swing();               // 敌袭也先有声有影
-    if (!BTL.skip) await slp(240);
-    BTL.php = Math.max(0, BTL.php - st.dmg); SND.hurt();      // 受击反馈(瞬时)
-    if (BTL.barHero) BTL.barHero.hit();
-    /* 演出: 受击红闪 + 伤害飘字 + 震屏 + 命中停顿 */
-    hitFlash();
-    const dmgCls = st.kind === "critB" ? "critb" : st.kind === "crit" ? "crit" : "normal";
-    const shakeLv = st.kind === "critB" ? "heavy" : st.kind === "crit" ? "mid" : "light";
-    spawnDmg("hero", st.dmg, dmgCls);
-    shakeBanner(shakeLv);
-    if (!BTL.skip && st.kind === "critB") await slp(80);
-    else if (!BTL.skip && st.kind === "crit") await slp(50);
-    const lead = st.kind === "critB" ? `<b class="critb">暴击!</b>` : st.kind === "crit" ? `<b class="crit">会心!</b>` : st.pen ? `<b class="w">破甲</b>` : "";
-    let suck = "";
-    if (BTL.ms.life > 0) {                                   // 妖吸血词缀: 并进其伤害行
-      const heal = Math.round(st.dmg * BTL.ms.life / 100);
-      if (heal > 0) { BTL.mhp = Math.min(BTL.mhpMax, BTL.mhp + heal); suck = ` <b class="suck">（吸血 +${heal}）</b>`; spawnDmg("foe", heal, "heal"); if (BTL.barFoe) BTL.barFoe.heal(); }
-    }
-    fieldLine();
-    btlLog(`　${lead ? lead + " " : ""}打出 <b class="r">${st.dmg}</b> 伤害${suck}。`);
-  }
-  fieldLine();
-  if (BTL.php <= 0) { btlLose(); }
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
 /* v1.7.5 战场日志演出: 出招细节点即时整行, 描述句逐字滚动; 行上限 9, typing 串行不打架 */
 let _warQueue = [], _warTyping = false;
@@ -5066,8 +4922,12 @@ function warType(s, cls) {
   if (!_warTyping) _typeNext();
 }
 function warAppend(s, cls) { warType(s, cls); }
-function btlLog(s, cls) { if (!BTL) return; BTL.logs.push(s); warType(s, cls); }
-function btlNow(s, cls) { if (!BTL) return; BTL.logs.push(s); warNow(s, cls); }
+function btlLog(s, cls) {
+  /* 战斗系统已移除，新战斗动画后续接入 */
+}
+function btlNow(s, cls) {
+  /* 战斗系统已移除，新战斗动画后续接入 */
+}
 function _typeNext() {
   const el = $("warLog");
   if (!el || !_warQueue.length) { _warTyping = false; return; }
@@ -5103,12 +4963,7 @@ function _typeNext() {
 /* 实时血条: 妖(赤,左) / 主身(青碧,右), 数值叠条显示, 每合即时刷新
    残影条(.bar-ghost): 掉血时白色幽灵条停留 180ms 后缓缓追上, 直观展示"掉了多少" */
 function fieldLine() {
-  if (!BTL) return;
-  /* Canvas 血条: setHP 触发缓动填充 + 渐变变色 + 低血红光(组件内部处理) */
-  if (BTL.barFoe) BTL.barFoe.setHP(BTL.mhp, BTL.mhpMax);
-  if (BTL.barHero) BTL.barHero.setHP(BTL.php, BTL.phpMax);
-  const t = $("tfTurn"); if (t) t.textContent = BTL.round ? `${BTL.round}合` : "";
-  const row = $("warHpRow"); if (row) row.style.display = "flex";
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
 
 /* ============ 战斗演出函数 ============ */
@@ -5117,17 +4972,7 @@ function fieldLine() {
    kind: normal / crit / critb / dodge / heal
    飘字从血条下方弹出, 带物理上升+淡出, 暴击放大弹跳 */
 function spawnDmg(side, num, kind) {
-  const layer = $("dmgLayer"); if (!layer) return;
-  const el = document.createElement("div");
-  el.className = "dmg-num " + (kind || "normal");
-  el.textContent = (kind === "heal" ? "+" : (kind === "dodge" ? "闪避" : num));
-  /* 定位: foe 偏左 22%, hero 偏右 72%, 各加 ±6% 随机偏移避免重叠 */
-  const baseX = side === "foe" ? 22 : 72;
-  const jitter = (Math.random() - 0.5) * 12;
-  el.style.left = (baseX + jitter) + "%";
-  el.style.top = (2 + Math.random() * 6) + "px";
-  layer.appendChild(el);
-  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 1200);
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
 
 /* 血条震动: 只震 hprow(血条行), 不震文字日志 — 震整个横幅会导致阅读困难
@@ -5179,177 +5024,7 @@ let HP_BG_READY = false;
 HP_BG_IMG.onload = () => { HP_BG_READY = true; };
 
 class CanvasHpBar {
-  constructor(canvas, side) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext("2d");
-    this.side = side;            // "foe" | "hero"
-    this.cur = 100; this.max = 100;
-    this.targetPct = 1;          // 目标填充比
-    this.dispPct = 1;            // 动画填充比(缓动)
-    this.particles = [];
-    this.flash = 0;              // 受击白闪 0~1
-    this.lowGlow = 0;            // 低血红光 0~1
-    this.wave = 0;               // 波动相位
-    this.running = false;
-    this._lastW = 0; this._lastH = 0;
-  }
-  _fit() {
-    const rect = this.canvas.getBoundingClientRect();
-    const w = Math.max(2, rect.width), h = Math.max(2, rect.height);
-    if (w !== this._lastW || h !== this._lastH) {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      this.canvas.width = w * dpr; this.canvas.height = h * dpr;
-      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      this._lastW = w; this._lastH = h;
-    }
-    this.w = w; this.h = h;
-  }
-  setHP(cur, max) {
-    this.cur = cur; this.max = max || 1;
-    this.targetPct = Math.max(0, Math.min(1, cur / this.max));
-  }
-  hit() {
-    this.flash = 1;
-    const x = this.w * this.targetPct;
-    for (let i = 0; i < 10; i++) {
-      this.particles.push({
-        x: x + (Math.random() - 0.5) * 8,
-        y: this.h * (0.25 + Math.random() * 0.5),
-        vx: (Math.random() - 0.5) * 2.5,
-        vy: -Math.random() * 2 - 0.5,
-        life: 1, size: 1.5 + Math.random() * 2.5,
-        r: 180 + Math.random() * 60, g: 50 + Math.random() * 30, b: 30
-      });
-    }
-  }
-  heal() {
-    for (let i = 0; i < 8; i++) {
-      this.particles.push({
-        x: this.w * (0.25 + Math.random() * 0.5),
-        y: this.h * (0.3 + Math.random() * 0.4),
-        vx: (Math.random() - 0.5) * 1.2,
-        vy: -Math.random() * 1.2 - 0.3,
-        life: 1, size: 1 + Math.random() * 1.8,
-        r: 80, g: 200 + Math.random() * 40, b: 120
-      });
-    }
-  }
-  start() { if (!this.running) { this.running = true; this._loop(); } }
-  stop() { this.running = false; }
-  _loop() {
-    if (!this.running) return;
-    this._update(); this._draw();
-    requestAnimationFrame(() => this._loop());
-  }
-  _update() {
-    this.dispPct += (this.targetPct - this.dispPct) * 0.12;
-    this.wave += 0.05;
-    this.flash *= 0.85;
-    const isLow = this.targetPct > 0 && this.targetPct < 0.3;
-    this.lowGlow += ((isLow ? 1 : 0) - this.lowGlow) * 0.06;
-    for (let i = this.particles.length - 1; i >= 0; i--) {
-      const p = this.particles[i];
-      p.x += p.vx; p.y += p.vy; p.vy += 0.06; p.life -= 0.022;
-      if (p.life <= 0) this.particles.splice(i, 1);
-    }
-  }
-  _draw() {
-    this._fit();
-    const ctx = this.ctx, w = this.w, h = this.h;
-    ctx.clearRect(0, 0, w, h);
-    if (w < 4 || h < 4) return;
-
-    /* ---- 层1: 暗底 + 填充 + 高光 + 刻度 + 文字(全部先画, 最后用水墨遮罩裁剪) ---- */
-    // 暗底(宣纸纹理优先, 纯色兜底)
-    if (HP_BG_READY) { ctx.drawImage(HP_BG_IMG, 0, 0, w, h); }
-    else { ctx.fillStyle = "rgba(8,12,20,0.88)"; this._roundRect(ctx, 1, 1, w - 2, h - 2, h / 2 - 1); ctx.fill(); }
-
-    // 填充(液态波动)
-    const pct = this.dispPct;
-    if (pct > 0.005) {
-      const fillW = w * pct;
-      const grad = ctx.createLinearGradient(0, 0, fillW, 0);
-      if (this.side === "foe") {
-        if (pct < 0.3) { grad.addColorStop(0, "#a82820"); grad.addColorStop(1, "#ff5a42"); }
-        else { grad.addColorStop(0, "#7a2018"); grad.addColorStop(1, "#c44a3a"); }
-      } else {
-        if (pct > 0.6) { grad.addColorStop(0, "#1a5e3c"); grad.addColorStop(1, "#4ac48a"); }
-        else if (pct > 0.3) { grad.addColorStop(0, "#7a5e18"); grad.addColorStop(1, "#e0b84a"); }
-        else { grad.addColorStop(0, "#7a1812"); grad.addColorStop(1, "#ff5a42"); }
-      }
-      const amp = h * 0.07, len = w * 0.12;
-      ctx.beginPath();
-      ctx.moveTo(0, h); ctx.lineTo(0, h * 0.25);
-      for (let x = 0; x <= fillW; x += 2) {
-        ctx.lineTo(x, h * 0.25 + Math.sin(x / len + this.wave) * amp);
-      }
-      ctx.lineTo(fillW, h); ctx.closePath();
-      ctx.fillStyle = grad; ctx.fill();
-      // 顶部高光
-      ctx.beginPath();
-      ctx.moveTo(0, h * 0.25);
-      for (let x = 0; x <= fillW; x += 2) {
-        ctx.lineTo(x, h * 0.25 + Math.sin(x / len + this.wave) * amp);
-      }
-      ctx.strokeStyle = "rgba(255,255,255,0.28)"; ctx.lineWidth = 1; ctx.stroke();
-    }
-
-    // 受击白闪(在遮罩内)
-    if (this.flash > 0.02) {
-      ctx.fillStyle = "rgba(255,255,255," + (0.35 * this.flash) + ")";
-      this._roundRect(ctx, 1, 1, w - 2, h - 2, h / 2 - 1); ctx.fill();
-    }
-
-    // 分段刻度
-    ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 1;
-    for (let i = 1; i < 4; i++) {
-      const x = w * i / 4;
-      ctx.beginPath(); ctx.moveTo(x, h * 0.2); ctx.lineTo(x, h * 0.8); ctx.stroke();
-    }
-
-    // 文字
-    ctx.font = "bold 9.5px ui-monospace,SFMono-Regular,monospace";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillStyle = "#fff"; ctx.strokeStyle = "rgba(0,0,0,0.85)"; ctx.lineWidth = 2.5;
-    const txt = (this.side === "foe" ? "妖 " : "主 ") + Math.round(this.cur) + "/" + Math.round(this.max);
-    ctx.strokeText(txt, w / 2, h / 2); ctx.fillText(txt, w / 2, h / 2);
-
-    /* ---- 层2: 水墨遮罩裁剪 ---- */
-    if (HP_MASK_READY) {
-      ctx.globalCompositeOperation = "destination-in";
-      ctx.drawImage(HP_MASK_IMG, 0, 0, w, h);
-      ctx.globalCompositeOperation = "source-over";
-    }
-
-    /* ---- 层3: 遮罩外效果(粒子/低血光, 可超出血条外形) ---- */
-    // 低血红光晕
-    if (this.lowGlow > 0.02) {
-      ctx.save();
-      ctx.shadowColor = "rgba(255,50,30," + (0.5 * this.lowGlow) + ")";
-      ctx.shadowBlur = 10 + Math.sin(this.wave * 2.5) * 5;
-      ctx.fillStyle = "rgba(255,50,30," + (0.12 * this.lowGlow) + ")";
-      this._roundRect(ctx, 0, 0, w, h, h / 2); ctx.fill();
-      ctx.restore();
-    }
-    // 粒子
-    for (const p of this.particles) {
-      ctx.save();
-      ctx.globalAlpha = p.life;
-      ctx.fillStyle = "rgb(" + p.r + "," + p.g + "," + p.b + ")";
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    }
-  }
-  _roundRect(ctx, x, y, w, h, r) {
-    r = Math.min(r, w / 2, h / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
-  }
+  /* 战斗血条已移除 */
 }
 
 function traceSay(txt) {
@@ -5359,118 +5034,20 @@ function traceSay(txt) {
   el.innerHTML = `<span class="t-row"><span class="t-ic">战</span><span class="t-txt">${txt}</span></span>`;
 }
 function warStart(title, lead) {
-  const el = $("warBanner"); if (!el) return;
-  huntBarShow(false);                    // v1.4.0: 开打/探秘时整条让位给横幅(二者同一行, 互斥)
-  el.style.display = "flex";
-  SND.setStage(true);                    // v1.7.9: 横幅上台 → 允许该场音效出声(有声必有画)
-  el.innerHTML = `<div class="war-hd"><span class="war-t">${title}</span><span class="war-turn" id="tfTurn"></span><button class="war-skip" id="warSkipBtn" onclick="warSkip()">⚡</button></div>` +
-    `<div class="hprow" id="warHpRow"><canvas class="hpbar-canvas" id="cvFoe"></canvas><canvas class="hpbar-canvas" id="cvHero"></canvas></div>` +
-    `<div class="war-bd" id="warBd"><div class="dmg-layer" id="dmgLayer"></div><div id="warLog"></div></div>`;
-  const hpRow = $("warHpRow");
-  if (hpRow) hpRow.style.display = (title === "秘境") ? "none" : "flex";   // 秘境无对战, 不摆血条
-  /* 创建 Canvas 血条实例 */
-  if (BTL) {
-    BTL.barFoe = new CanvasHpBar($("cvFoe"), "foe");
-    BTL.barHero = new CanvasHpBar($("cvHero"), "hero");
-    BTL.barFoe.start(); BTL.barHero.start();
-  }
-  fieldLine();
-  if (lead) warAppend(lead, "lead");
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
 function warEnd(finalTxt, cls, extra) {
-  if (finalTxt) warAppend(finalTxt, cls || "win");
-  if (extra) { const es = Array.isArray(extra) ? extra : [extra]; for (const e of es) { if (e) warAppend(e, "drop"); } }
-  const wb = $("warBanner");
-  /* v1.7.7: 战斗结算驻留更久留复盘(8s), 秘境维持; 轻触战报任意处可提前关闭 */
-  const wait = (BTL && BTL.skip) ? 2100 : (MYST ? 2600 : 8000);
-  const close = () => { if (wb) { wb.style.display = "none"; wb.removeEventListener("click", close); } SND.setStage(false); if (BTL) { if (BTL.barFoe) BTL.barFoe.stop(); if (BTL.barHero) BTL.barHero.stop(); } };
-  if (wb) { wb.style.pointerEvents = "auto"; wb.addEventListener("click", close);
-    setTimeout(() => { wb.removeEventListener("click", close); if (wb) wb.style.display = "none"; SND.setStage(false); }, wait); }
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
 function btlWin() {
-  if (!BTL || BTL.ended) return; BTL.ended = true;
-  SND.victory();                      // v1.7.3 胜利号角
-  const m = BTL.mon;
-  /* 产出同尺(参考 exp = maxCultivation/100 = 2^境界, 即「指数曲线 + 每境百战」)：
-     折算成我们的挂机速率 —— 每战 ≈ 打坐 FIGHT_EXP_W 秒、≈ 聚灵 FIGHT_SP_W 秒。
-     修为/灵石随境界同步增长，战斗占修为总产出恒为 40%（见 ENC_PERIOD 注释） */
-  const g = Math.round(spiritRate() * FIGHT_SP_W);
-  const ge = Math.round(rateNow() * FIGHT_EXP_W);
-  state.spirit += g; state.exp += ge;
-  // 参考"每战必掉装备": 掉落一件同级法宝(品质概率), 走自动择优穿戴, 并在结算战报展示
-  let dropInfo = "", dropCard = "", dropQ = -1;
-  let drName = "", drQ = 0, drQn = "", drSlot = "";     // v1.7.61 黑屏挂机记账用
-  try {
-    const dr = makeArt();
-    const arts = state.arts || [];
-    const idx = (typeof dr.slot === "number" && dr.slot < 4) ? dr.slot : arts.length;
-    const before = arts[idx];
-    const preLen = arts.length;
-    smartEquip(dr);
-    const now = (state.arts || [])[idx];
-    const qn = (QUALITY[dr.q] || QUALITY[0]).name;
-    const slotN = SLOT_TYPES[idx] ? SLOT_TYPES[idx].n : "";
-    drName = dr.name; drQ = dr.q; drQn = qn; drSlot = slotN;
-    if (preLen < 4 && idx >= preLen || !before) dropInfo = `　拾获 <b class="r">「${dr.name}」</b>（${qn}·${slotN}）—— 阿青已替你收进藏宝阁。`;
-    else if (now === dr) dropInfo = `　拾获 <b class="r">「${dr.name}」</b>（${qn}·${slotN}）胜过旧佩，自动换上。`;
-    else dropInfo = `　拾获 <b class="r">「${dr.name}」</b>（${qn}·${slotN}）不及身上所佩，阿青熔作灵石。`;
-    /* v1.7.17 高品掉宝宝卡(古宝+/灵宝+/玄天+), 成就感强化 */
-    if (dr.q >= 3) {
-      dropQ = dr.q;
-      const chips = (dr.fx || []).map(f => `<span class="f k-${f.k}"><i class="dot"></i>${FX_TXT[f.k] || f.k}<b>+${f.v}%</b></span>`).join("");
-      const verdict = now === dr ? "胜过旧佩 · 已自动换上"
-        : (dropInfo.indexOf("熔") > -1 ? "不及所佩 · 阿青炼作灵石" : "阿青已替你收进藏宝阁");
-      dropCard = `<div class="drop-in qc${dr.q}">
-        <div class="dh"><span class="q">${qn} · ${slotN}</span><span class="n">「${dr.name}」</span></div>
-        <div class="ds">攻 <b>${dr.a || 0}</b> · 防 <b>${dr.d || 0}</b> · 血 <b>${dr.h || 0}</b></div>
-        ${chips ? `<div class="df">${chips}</div>` : ""}
-        <div class="dt">${verdict}</div></div>`;
-    }
-  } catch (e) {}
-  /* v1.7.61 黑屏挂机记账: 场次 / 灵石 / 修为 / 掉落 */
-  dimNoteWin(g, ge, drName ? { n: drName, q: drQ, qn: drQn, slot: drSlot } : null);
-  pushMsg("main", `你击退 <span class="r">${m.n}</span>，<span class="g">+${fmt(g)} 灵石</span>、修为+<span class="g">${fmt(ge)}</span>。`);
-  /* v1.9.3: 普通斗法不再入修行录 —— 巡猎每两三秒一场, 实测存档 86% 字节是这类战斗流水;
-   * 演出留在消息栏/巡猎记录/黑屏挂机账里, 修行录只记剧情、里程碑与游历。 */
-  warEnd(`妖雾散尽 · 斗法得胜! 灵石 <b>+${fmt(g)}</b>，修为 +<b>${fmt(ge)}</b>`, "win", dropInfo);
-  if (dropCard) {                                            // 高品宝卡 + 品光一闪
-    const wl = $("warLog"); if (wl) { const d = document.createElement("div"); d.innerHTML = dropCard; wl.appendChild(d); }
-    const fl = $("flash");
-    if (fl && !BTL.skip) {
-      fl.style.transition = "none";
-      fl.style.opacity = dropQ >= 5 ? .55 : .32;
-      void fl.offsetWidth;
-      fl.style.transition = "opacity .9s ease";
-      fl.style.opacity = "0";
-    }
-  }
-  traceSay(`你击退 ${m.n}，<b>+${fmt(g)} 灵石</b>`);
-  const wait = (BTL && BTL.skip) ? 2400 : 3800;
-  setTimeout(() => { if (BTL) { BTL = null; huntNext(); traceRefresh(); save(); cloudSoon(); } }, wait);
-  return;
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
 function btlLose() {
-  if (!BTL || BTL.ended) return; BTL.ended = true;
-  SND.fail();                        // v1.7.3 落败低音
-  const m = BTL.mon;
-  dimNoteLose();                     // v1.7.61 黑屏挂机: 败仗也计一场
-  warEnd(`你力竭不支，被 ${m.n} 击倒在地 …… 败退 · 回洞天休养`, "lose");
-  pushMsg("main", `<span class="r">你不敌 ${m.n}</span>，狼狈遁回洞天。阿青在旁呜咽，叼来药囊替你敷上。`);
-  /* v1.9.3: 败仗同样不入修行录(理由同上) */
-  traceSay(`你不敌 ${m.n}，负伤归府休养`);
-  const wait = (BTL && BTL.skip) ? 2400 : 3800;
-  setTimeout(() => { if (BTL) { BTL = null; huntNext(); traceRefresh(); save(); cloudSoon(); } }, wait);
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
 /* ---------- 秘境机缘: 文字探索(主身奇遇) ---------- */
 function fireMyst() {
-  if (MYST) return;
-  const z = warZone();
-  MYST = { i: 0, logs: [] };
-  traceSay(`灵光隐现 —— 你在<b>${z.name}</b>发现一处<b>秘境入口</b>，踏入其中。`);
-  warStart(`秘境`, `你循着灵光拨开藤蔓，露出一道幽深的石阶入口。`);
-  SND.chime();                         // v1.7.9 横幅上台后再起风铃(有声必有画)
-  pushMsg("main", `<span class="b">秘境!</span> 你在${z.name}一带发现一处隐秘入口，进去一探。`);
-  mystRun();
+  /* 战斗系统已移除，新战斗动画后续接入 */
 }
 async function mystRun() {
   const lines = [
