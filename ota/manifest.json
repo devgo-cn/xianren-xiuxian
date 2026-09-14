@@ -129,6 +129,7 @@
     "assets/sfx/attack1.ogg": "bb1e63052519c6c8a0e6e86f684035ad209f247c63b3317b48be8abf454f4b96",
     "assets/sfx/attack2.ogg": "89ee51ee4cac1e101107e68610c1b815a303bd9009d36747bb6d80f57aa71e2f",
     "assets/sfx/footstep.ogg": "609f738673b63dda5b904d27e9ee9296910b547b348a627f60250a0a35d97e43",
+    "assets/sfx/skill_attack.ogg": "bd5377598a07113ccf4efa6be7f7668901cfe5a367e59c7802d05667feb573fc",
     "assets/sfx/slime_attack.ogg": "1825b4ec66f26049dba4d7111533cfc5c6bd1686c46e5b6a63e0d32e30e9d6d5",
     "assets/sfx/slime_footstep.ogg": "66ca6ff89b88ff82ec95f9745ec7a53683f9b338a324d9a1ede7de49889a42d8",
     "assets/sfx/slime_hurt.ogg": "287b18f2fbcac4247d40989aebe2a75e54b120f921a73e0dc46b20e23b412c3a",
@@ -157,8 +158,8 @@
     "dt-theme.css": "6a17d65775d8c19500601b2b309e5682b6f9768bb0fb537d61b98c8538aa1a66",
     "fx2d.js": "a2a094eda63597f16245e2f2d421fcc05c0955b4239650e62c63887bc352a9ea",
     "game.js": "6be3618bf2fbc0e478b8cbad068d1146994a04c2e99f7d43a7b55ec3e2f873de",
-    "index.html": "461d5c693e6b4c9a09631aa17ff4eccbb281e89d589e7e204b46362bbead7d9a"
+    "index.html": "1dfa13769e7563f1c46258d22bfc00a5713155db6c8afe6151e27d10fc38980f"
   },
-  "rev": "0fde763f64cfd273",
+  "rev": "e702793ed524c7df",
   "version": "2.4"
 }
