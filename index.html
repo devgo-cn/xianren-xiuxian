@@ -949,6 +949,15 @@
     const eff = Math.max(0, (def||0) * (1 - Math.min(90, pen||0)/100));
     return Math.max(1, Math.round(atk * mult * (100/(100+eff))));
   }
+  /* 玩家暴击/会心判定: 读装备词条(PST.crit 暴击率 / PST.critB 会心率 / PST.critD 爆伤);
+   * kind=2 暴击(×2)、kind=1 会心(×1.5)、mult 含爆伤增幅; bonus 为技能临时加的暴击率 */
+  function playerCritRoll(bonus) {
+    let kind = 0;
+    if (Math.random()*100 < (PST.crit || 0) + (bonus || 0)) kind = 2;
+    else if (Math.random()*100 < (PST.critB || 0)) kind = 1;
+    const cmul = kind === 2 ? 2 : kind === 1 ? 1.5 : 1;
+    return { kind, cmul, crit: kind > 0, mult: kind ? cmul * (1 + (PST.critD || 0)/100) : 1 };
+  }
   /* ---------- 身法技能(疾风步 2x / 缩地成寸 3x): 独立 roll, 取高者, 时长可刷新 ----------
    * 身法不是光环: 只在生效的那几秒里加闪避(身形飘忽), 时效一到即散, 不进面板属性 */
   function rollSpeedSkill(id) {
@@ -1044,7 +1053,7 @@
   }
   function dealDamage(target, amount, color, crit) {
     target.hp -= amount; target.hurtT = 0.25;
-    G.dmg.push({ x:target.x,y:target.y-40, val:Math.round(amount), crit:crit||false, color:color||'#e8f2fa', t:0 });
+    G.dmg.push({ x:target.x,y:target.y-40, val:Math.round(amount), crit:crit||false, color:color||'#e8f2fa', t:0, vx:(Math.random()-0.5)*18 });
     G.fx.push({ kind:'hitSpark', x:target.x,y:target.y-20, color:color||'#fff', t:0,dur:0.3 });
     if (target.hp <= 0) {
       target.hp=0; target.alive=false; target.dying=0.4;
@@ -1072,15 +1081,15 @@
       if (p.skillFrame >= SKILL.hitFrame && !p.skillHit && p.skillTarget && p.skillTarget.alive) {
         p.skillHit = true;
         playSfx('skill_attack', 0.9);  /* 剑气斩专属攻击音效 */
-        const crit = Math.random() < 0.15;
-        const atkMult = 1 + (p.atkBuff || 0);
-        const dmg = p.atk * atkMult * SKILL.damageMult * (0.9 + Math.random()*0.2) * (crit ? 2.0 : 1);
-        dealDamage(p.skillTarget, dmg, '#bfe8ff', crit);
+        const r = playerCritRoll(0);                       // 读装备暴击/会心/爆伤
+        const atkMult = (1 + (p.atkBuff || 0)) * SKILL.damageMult;
+        const dmg = calcDmg(p.atk, atkMult * (0.9 + Math.random()*0.2) * r.mult, p.skillTarget.def, PST.pen || 0);
+        dealDamage(p.skillTarget, dmg, '#bfe8ff', r.crit);
         /* 剑气斩范围伤害: 波及周围敌人 */
         for (const o of G.enemies) {
           if (o === p.skillTarget || !o.alive || o.dying > 0) continue;
           if (Math.abs(o.x - p.x) <= p.atkRange + 80) {
-            const dmg2 = p.atk * atkMult * SKILL.damageMult * 0.5 * (0.9 + Math.random()*0.2);
+            const dmg2 = calcDmg(p.atk, atkMult * 0.5 * (0.9 + Math.random()*0.2), o.def, PST.pen || 0);
             dealDamage(o, dmg2, '#bfe8ff', false);
           }
         }
@@ -1103,15 +1112,12 @@
         /* 攻击音效同步: 第一段在帧8(挥剑前), 第二段在帧24(第二段刺剑前) */
         if (p.animFrame === 8) playSfx('attack1', 0.7);
         if (p.animFrame === 24) playSfx('attack2', 0.8);
-        /* 双段攻击: 第一段刺剑在帧10, 第二段刺剑在帧26 */
+        /* 双段攻击: 第一段刺剑在帧10, 第二段刺剑在帧26 —— 统一走 playerStrike(读装备暴击/破甲/减伤) */
         if (p.animFrame === 10 && !p.hit1 && p.attackTarget && p.attackTarget.alive) {
           p.hit1 = true;
           if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
-            const crit = Math.random()<0.08;
-            const atkMult = 1 + (p.atkBuff || 0);
-            const dmg = p.atk*atkMult*(0.9+Math.random()*0.2)*(crit?1.8:1);
-            dealDamage(p.attackTarget, dmg, '#7fe0ff', crit);
-            /* 正儿八经的网游死亡判定: 第一段刺死就中断, 不刺第二下 */
+            playerStrike(p, p.attackTarget, 1);
+            /* 一段刺死就中断, 不刺第二下 */
             if (!p.attackTarget.alive) {
               p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false;
               if (G.extraStrike) { G.extraStrike = false; p.atkT = 0; }   // 追猎: 立刻再出手
@@ -1120,12 +1126,7 @@
         }
         if (p.animFrame === 26 && !p.hit2 && p.attackTarget && p.attackTarget.alive) {
           p.hit2 = true;
-          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
-            const crit = Math.random()<0.1;
-            const atkMult = 1 + (p.atkBuff || 0);
-            const dmg = p.atk*atkMult*(0.95+Math.random()*0.25)*(crit?2.0:1);
-            dealDamage(p.attackTarget, dmg, '#a0e8ff', crit);
-          }
+          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) playerStrike(p, p.attackTarget, 2);
         }
         if (p.animFrame >= SPRITE.attackCount) {
           p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false;
@@ -1704,15 +1705,26 @@
     }
   }
 
+  /* 现代游戏伤害飘字: 暴击放大+金光描边, 快速浮现→上浮→渐隐, 横向随机漂移避免堆叠 */
   function drawDmg() {
     for (const d of G.dmg) {
-      const a = 1-d.t/0.9; const sx = worldToScreen(d.x); const sy = d.y-d.t*20;
-      ctx.save(); ctx.globalAlpha = a;
-      ctx.font = (d.crit ? 'bold 13px ' : 'bold 10px ') + 'ui-monospace, monospace';
-      ctx.textAlign = 'center'; ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(8,12,18,0.9)';
-      const scale = d.crit ? 1+Math.min(0.25, d.t*2) : 1;
-      ctx.translate(sx, sy); ctx.scale(scale, scale);
-      ctx.strokeText(d.val, 0, 0); ctx.fillStyle = d.color; ctx.fillText(d.val, 0, 0);
+      const k = Math.min(1, d.t / 0.95);
+      const a = k < 0.12 ? k/0.12 : 1 - (k-0.12)/0.88;     // 起手快现, 之后渐隐
+      const sx = worldToScreen(d.x) + (d.vx || 0) * k;
+      const sy = d.y - 40 * k;                                // 上浮
+      const pop = d.crit ? 1 + 0.6*Math.max(0, 1-k*2.2) : 1 + 0.35*Math.max(0, 1-k*3);
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, a));
+      ctx.translate(sx, sy); ctx.scale(pop, pop);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineJoin = 'round';
+      ctx.font = `bold ${d.crit ? 19 : 12}px ui-monospace, "SF Mono", Menlo, monospace`;
+      ctx.lineWidth = d.crit ? 4 : 3;
+      ctx.strokeStyle = 'rgba(6,10,18,0.95)';
+      ctx.strokeText(d.val, 0, 0);
+      if (d.crit) { ctx.shadowColor = 'rgba(255,196,80,0.9)'; ctx.shadowBlur = 10; }
+      ctx.fillStyle = d.color || '#eaf2fb';
+      ctx.fillText(d.val, 0, 0);
       ctx.restore();
     }
   }
