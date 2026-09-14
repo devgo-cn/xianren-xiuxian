@@ -115,9 +115,10 @@
   /* 修为进度 */
 
   /* 战斗区（无尽边界式横向推进战斗） */
-  .battle-stage{position:fixed;left:0;right:0;top:92px;bottom:calc(44vh + 84px);z-index:6;pointer-events:none;overflow:hidden}
-  .battle-stage canvas{display:block;width:100%;height:100%;pointer-events:none}
-  .battle-hud{position:absolute;left:0;right:0;top:0;z-index:7;display:flex;justify-content:space-between;align-items:center;padding:3px 10px;font-size:10px;color:#c8d4e8;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+  .battle-stage{position:fixed;left:0;right:0;top:92px;bottom:calc(44vh + 84px);z-index:1;pointer-events:none !important;overflow:hidden}
+  .battle-stage *{pointer-events:none !important}
+  .battle-stage canvas{display:block;width:100%;height:100%;pointer-events:none !important}
+  .battle-hud{position:absolute;left:0;right:0;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:3px 10px;font-size:10px;color:#c8d4e8;pointer-events:none !important;text-shadow:0 1px 3px rgba(0,0,0,.8)}
   .battle-hud .kills{color:#e8c56b;font-weight:700}
   .battle-hud .speed{color:#ff8a4a;font-weight:700}
 
