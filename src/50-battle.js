@@ -57,7 +57,7 @@ import { SND } from './10-base.js';
 
   /* 加载素材 */
   const spriteImg = new Image();
-  spriteImg.onload = function() { G.sprite = spriteImg; G.spriteReady = true; };
+  spriteImg.onload = function() { G.sprite = solidify(spriteImg); G.spriteReady = true; };
   spriteImg.src = 'assets/cultivator_sheet.webp';
   /* 怪物素材: 幽夜森林(像素风, v3.7 换新背景) */
   const bgImg = new Image();
@@ -65,19 +65,19 @@ import { SND } from './10-base.js';
   bgImg.src = 'assets/battle-forest-bg.webp';
   /* 怪物素材: 绿色史莱姆 */
   const slimeImg = new Image();
-  slimeImg.onload = function() { G.slimeSprite = slimeImg; G.slimeReady = true; };
+  slimeImg.onload = function() { G.slimeSprite = solidify(slimeImg); G.slimeReady = true; };
   slimeImg.src = 'assets/monster_001_green_slime.webp';
   /* 怪物素材: 水精灵 */
   const waterSpriteImg = new Image();
-  waterSpriteImg.onload = function() { G.waterSprite = waterSpriteImg; G.waterReady = true; };
+  waterSpriteImg.onload = function() { G.waterSprite = solidify(waterSpriteImg); G.waterReady = true; };
   waterSpriteImg.src = 'assets/monster_002_water_sprite.webp';
   /* BOSS素材: 史莱姆王(飘着, 2倍大) */
   const bossSpriteImg = new Image();
-  bossSpriteImg.onload = function() { G.bossSprite = bossSpriteImg; G.bossReady = true; };
+  bossSpriteImg.onload = function() { G.bossSprite = solidify(bossSpriteImg); G.bossReady = true; };
   bossSpriteImg.src = 'assets/monster_003_slime_king.webp';
   /* 宠物素材: 灵狐 */
   const petFoxImg = new Image();
-  petFoxImg.onload = function() { G.petFoxSprite = petFoxImg; G.petFoxReady = true; };
+  petFoxImg.onload = function() { G.petFoxSprite = solidify(petFoxImg); G.petFoxReady = true; };
   petFoxImg.src = 'assets/pet_fox_sheet.webp';
   /* 技能素材: 剑气月牙 */
   const skillImg = new Image();
@@ -984,15 +984,38 @@ import { SND } from './10-base.js';
   let cv, ctx, CW, CH;
   function stageW() { return CW; }
   function stageH() { return CH; }
-  function floorY() { return CH * 0.82; }
-  /* v3.7 三车道: lane 0 最近(地板基线), 1 居中, 2 最远(靠上), 纵向错开 26px 制造纵深。
+  function floorY() { return CH * 0.92; }
+  /* v3.7 三车道: lane 0 最近, 1 居中, 2 最远(靠上)。v3.7.1 对齐新背景的石板路:
+   * 石板路可站区间约 0.72~0.94 倍横带高(上方是花草丛, 下方是前景草), 三道按
+   * 0.74/0.83/0.92 铺进去 —— 间隔用 CH 比例而非固定像素, 任何横带高度都不越界。
    * 实体的 y 字段 = 车道偏移(负值) —— 特效/伤害数字/宠物/掉落全部从实体 y 推导,
    * 因此只要实体带 y, 整条表现链自动跟道, 无需逐处改坐标。 */
   const LANES = 3;
-  const LANE_GAP = 26;
-  function laneOff(lane) { return -(LANES - 1 - lane) * LANE_GAP; }
+  function laneGap() { return CH * 0.09; }
+  function laneOff(lane) { return -(LANES - 1 - lane) * laneGap(); }
   /* 纵深缩放: 越远的道越小一档(0.88/0.94/1.0), 强化三车道空间感 */
   function laneScale(lane) { return 1 - (LANES - 1 - lane) * 0.06; }
+  /* v3.7.1 素材实化: 部分序列帧素材的像素 alpha 不满(实测玩家表均值仅 ~219),
+   * 黑底时代看不出来, 换亮背景后角色透出背景纹理。加载时一次性处理:
+   * alpha≥200 拉满 255, 30~200 线性拉伸保留软边防锯齿, <30 不动(淡出边缘)。
+   * 返回离屏 canvas —— drawImage 兼容, 运行时零额外成本。 */
+  function solidify(img) {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth || img.width; c.height = img.naturalHeight || img.height;
+    const g = c.getContext('2d');
+    g.drawImage(img, 0, 0);
+    try {
+      const id = g.getImageData(0, 0, c.width, c.height), d = id.data;
+      const softT = 30, hardT = 200, range = hardT - softT;
+      for (let i = 3; i < d.length; i += 4) {
+        const a = d[i];
+        if (a >= hardT) d[i] = 255;
+        else if (a > softT) d[i] = (a - softT) * 255 / range | 0;
+      }
+      g.putImageData(id, 0, 0);
+    } catch (e) { return img; }   /* getImageData 被跨域污染时退回原图 */
+    return c;
+  }
   function initCanvas() {
     cv = document.getElementById('battleCanvas');
     if (!cv) return false;
