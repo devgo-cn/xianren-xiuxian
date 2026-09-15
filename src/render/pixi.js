@@ -29,6 +29,9 @@ let PIXI = null;
 export function createPixiBackend() {
   let app = null;
   let root = null;
+  let overlay = null;          // 叠加层（光环 / 血条），永远在精灵之上
+  let ringG = null;            // 精英光环：一个 Graphics 画全部，一次 draw call
+  let hpG = null;              // 血条：同上
   let ready = false;
   let _initPromise = null;
   let lastError = '';          // 初始化失败原因，供角标显示
@@ -59,8 +62,18 @@ export function createPixiBackend() {
         resolution: 1,
         preference: 'webgl',
       });
+      /* 两层容器：精灵在下，叠加物（精英光环 / 血条）在上。
+       * 这样不管精灵池怎么扩，叠加物永远压在精灵之上 —— 与原 Canvas2D
+       * 的绘制顺序（精灵 → 光环 → 血条）一致。 */
       root = new Container();
+      overlay = new Container();
+      const { Graphics } = PIXI;
+      ringG = new Graphics();
+      hpG = new Graphics();
+      overlay.addChild(ringG);
+      overlay.addChild(hpG);
       app.stage.addChild(root);
+      app.stage.addChild(overlay);
       ready = true;
       return true;
     } catch (e) {
@@ -106,6 +119,56 @@ export function createPixiBackend() {
     return s;
   }
 
+  /* ── BOSS 攻击帧的左侧渐隐特效 ──────────────────────────────────────
+   * 原为 50-battle.js 里的 Canvas2D 离屏烘焙（BOSS_MASK）。现在怪物的一切
+   * 都由本渲染器负责，烘焙也搬到这儿 —— 只在尺寸变化时重烤一次，
+   * 烤出来的 canvas 转成 Pixi 纹理缓存，之后每帧只是换 texture。 */
+  let _maskBake = { w: 0, h: 0, tex: [] };
+
+  function bakedMasks(drawW, drawH) {
+    const B = getMonster('boss');
+    if (!B || !B.sprite.ready) return null;
+    if (_maskBake.tex.length && _maskBake.w === drawW && _maskBake.h === drawH) return _maskBake;
+    const { Texture } = PIXI;
+    const BS = B.frames;
+    const cw = Math.max(1, Math.ceil(drawW)), chh = Math.max(1, Math.ceil(drawH));
+    const tex = [];
+    for (let i = 0; i < BS.attack.count; i++) {
+      const src = BS.attack.start + i;
+      const off = document.createElement('canvas');
+      off.width = cw; off.height = chh;
+      const octx = off.getContext('2d');
+      octx.drawImage(B.sprite.img, (src % BS.cols) * BS.fw,
+        Math.floor(src / BS.cols) * BS.fh, BS.fw, BS.fh, 0, 0, cw, chh);
+      octx.globalCompositeOperation = 'destination-in';
+      const grad = octx.createLinearGradient(0, 0, cw * 0.4, 0);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, 'rgba(0,0,0,1)');
+      octx.fillStyle = grad;
+      octx.fillRect(0, 0, cw, chh);          /* 必须填满，否则右侧变透明 */
+      tex.push(Texture.from(off));
+    }
+    _maskBake = { w: drawW, h: drawH, tex };
+    return _maskBake;
+  }
+
+  /* 血条配色桶：与原 Canvas2D 渐变的两端色一致，这里用左右两段实色近似渐变。
+   * 怪物血条恒为 'e'（敌方红）；玩家/宠物的血条仍由 Canvas2D 画。 */
+  const HP_COLORS = { e: [0xff6050, 0xd82020] };
+
+  function drawHpBar(g, x, y, w, hp, maxHp) {
+    const p = Math.max(0, hp / maxHp);
+    const h = 3;
+    g.roundRect(x - w / 2, y, w, h, 1.5).fill({ color: 0x080c14, alpha: 0.6 });
+    if (p <= 0) return;
+    const [c0, c1] = HP_COLORS.e;
+    const half = w * p * 0.5;
+    if (half <= 0) return;
+    /* 左半段用渐变起点色，右半段用终点色 —— 两段拼出横向渐变观感 */
+    g.roundRect(x - w / 2, y, Math.max(1, half), h, 1.5).fill({ color: c0 });
+    g.roundRect(x - w / 2 + half, y, Math.max(1, w * p - half), h, 1.5).fill({ color: c1 });
+  }
+
   let _cw = 0, _ch = 0;
 
   return {
@@ -144,6 +207,9 @@ export function createPixiBackend() {
         catch (e) { return null; }
       }
       _used = 0;
+      /* 叠加层每帧重画：一个 Graphics 装下全部光环/血条，draw call 恒为 2 */
+      ringG.clear();
+      hpG.clear();
 
       for (const e of enemies) {
         if (!e.alive && e.dying <= 0) continue;
@@ -156,12 +222,22 @@ export function createPixiBackend() {
         const sx = e.x - camX;
         const sy = floorY - m.floatY;
 
-        /* 与 Canvas2D 路径一致的几何：踩地板的用 footOffset 对齐脚底，
+        /* 与改造前 Canvas2D 完全一致的几何：踩地板的用 footOffset 对齐脚底，
          * 漂浮的（boss）用 drawH 顶对齐 */
         const dy = M.visual.footBase != null ? -m.footOffset : -m.drawH;
         const dh = M.visual.footBase != null ? m.compensatedH : m.drawH;
 
-        const tex = getFrame(M.spritePath, M.sprite.img, fr.srcX, fr.srcY, fr.fw, fr.fh);
+        /* BOSS 攻击帧：换成预烘焙的左侧渐隐帧，其余帧照常 */
+        let tex = getFrame(M.spritePath, M.sprite.img, fr.srcX, fr.srcY, fr.fw, fr.fh);
+        if (M.visual.maskedAttack && e.anim > 0) {
+          const bake = bakedMasks(m.drawW, m.drawH);
+          if (bake) {
+            const fi = Math.min(fr.frameIdx - M.frames.attack.start, M.frames.attack.count - 1);
+            const mt = bake.tex[Math.max(0, fi)];
+            if (mt) tex = mt;
+          }
+        }
+
         const s = obtain();
         s.texture = tex;
         s.visible = true;
@@ -177,6 +253,19 @@ export function createPixiBackend() {
         if (e.hurtT > 0) a *= 0.7;
         s.alpha = Math.max(0, Math.min(1, a));
         s.tint = (e.hurtT > 0) ? 0xffe9c8 : 0xffffff;   /* brightness 近似 */
+
+        if (!e.alive) continue;                          /* 尸体不画光环/血条 */
+
+        /* 精英光环：脚下金色椭圆，alpha 0.5 */
+        if (e.elite) {
+          ringG.ellipse(sx, floorY, 16, 16 * 0.3).stroke({
+            color: 0xe8c46b, width: 1.5, alpha: 0.5,
+          });
+        }
+        /* 血条位置与改造前一致：踩地板的贴脚底上方 4px（宽 28），
+         * BOSS 在头顶右移对齐头部（宽 50） */
+        if (M.visual.footBase != null) drawHpBar(hpG, sx, floorY - m.footOffset - 4, 28, e.hp, e.maxHp);
+        else drawHpBar(hpG, sx + m.drawW * 0.2, sy - m.drawH - 8, 50, e.hp, e.maxHp);
       }
 
       /* 复用池：本帧没用到的精灵隐藏 */

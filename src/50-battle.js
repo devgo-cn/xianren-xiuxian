@@ -1060,51 +1060,10 @@ import {
     ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath();
   }
 
-  /* v2.6 PERF: BOSS 攻击帧"左侧渐隐"掩码按帧预渲染 —— 原实现攻击期间每帧新建
-   * 离屏 canvas + 渐变(60fps 下每秒 60 次分配), 现在只在尺寸变化时重建 22 张 */
-  const BOSS_MASK = { w: 0, h: 0, frames: null };
-  /* v2.9 PERF: 横扫千军帧级离屏缓存(左右渐隐贴图), 尺寸固定 280×drawH 故只需按帧号缓存 */
+  /* BOSS 攻击帧的"左侧渐隐"掩码已迁入怪物渲染器（src/render/pixi.js 的
+   * bakedMasks）—— 它是怪物的一部分，跟着怪物走，不在这里留第二份。
+   * 横扫千军是【玩家技能】特效，不是怪物，仍留在本文件。 */
   const HENGSAO_MASK = { frames: null };
-  function bossMaskedFrame(fi, drawW, drawH) {
-    if (!BOSS_MASK.frames || BOSS_MASK.w !== drawW || BOSS_MASK.h !== drawH) {
-      BOSS_MASK.w = drawW; BOSS_MASK.h = drawH;
-      const cw = Math.max(1, Math.ceil(drawW)), chh = Math.max(1, Math.ceil(drawH));
-      BOSS_MASK.frames = [];
-      const BS = getMonster('boss').frames;
-      for (let i = 0; i < BS.attack.count; i++) {
-        const src = BS.attack.start + i;
-        const off = document.createElement('canvas');
-        off.width = cw; off.height = chh;
-        const octx = off.getContext('2d');
-        octx.drawImage(G.bossSprite, (src % BS.cols) * BS.fw,
-          Math.floor(src / BS.cols) * BS.fh, BS.fw, BS.fh, 0, 0, cw, chh);
-        octx.globalCompositeOperation = 'destination-in';
-        const grad = octx.createLinearGradient(0, 0, cw * 0.4, 0);
-        grad.addColorStop(0, 'rgba(0,0,0,0)');
-        grad.addColorStop(1, 'rgba(0,0,0,1)');
-        octx.fillStyle = grad;
-        octx.fillRect(0, 0, cw, chh);  /* 必须填充整个画布, 否则右侧变透明 */
-        BOSS_MASK.frames.push(off);
-      }
-    }
-    return BOSS_MASK.frames[fi] || null;
-  }
-
-  /* BOSS 攻击帧的左侧渐隐特效。两条渲染路径（Canvas2D / pixi）共用同一实现，
-   * 避免"pixi 只画精灵、忘补特效"的偏移。函数自带 translate/restore。 */
-  function drawMaskedAttack(e, M, geo, sx, sy) {
-    const fr = pickFrame(M, e, G.t);
-    const { drawW, drawH, floatY, scaleY, footOffset } = geo;
-    const fi = Math.min(fr.frameIdx - M.frames.attack.start, M.frames.attack.count - 1);
-    const off = bossMaskedFrame(fi, drawW, drawH);
-    ctx.save();
-    ctx.translate(sx, sy - floatY);
-    if (scaleY !== 1) { ctx.translate(0, -footOffset * (1 - scaleY)); ctx.scale(1, scaleY); }
-    if (off) ctx.drawImage(off, -drawW * 0.5, -drawH, drawW, drawH);
-    else ctx.drawImage(M.sprite.img, fr.srcX, fr.srcY, fr.fw, fr.fh,
-                       -drawW * 0.5, -drawH, drawW, drawH);
-    ctx.restore();
-  }
 
   function drawPlayerSprite() {
     const p = G.player;
@@ -1258,24 +1217,6 @@ import {
     });
     if (!cv) { reportRenderer(false, '本帧渲染失败'); return; }
     ctx.drawImage(cv, 0, 0);
-
-    /* 伴生元素（血条 / 精英光环 / BOSS 攻击掩码特效）仍用 Canvas2D 叠加在
-     * 精灵之上。它们【只有这一份实现】，不是第二套画怪物的路子 ——
-     * 几何量与精灵同源（都来自 measure()），位置天然对齐。 */
-    for (const e of G.enemies) {
-      if (!e.alive && e.dying <= 0) continue;
-      const sx = worldToScreen(e.x); const sy = floorY();
-      const M = getMonster(e.type);
-      if (!M || !M.sprite.ready) continue;
-      const geo = measure(M, CH, e.elite, G.t);
-      const { drawW, drawH, footOffset, floatY } = geo;
-      if (M.visual.maskedAttack && e.anim > 0) drawMaskedAttack(e, M, geo, sx, sy);
-      if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
-      if (e.alive) {
-        if (M.visual.footBase != null) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp, true);
-        else drawHpBar(sx + drawW*0.2, sy - floatY - drawH - 8, 50, e.hp, e.maxHp, true);
-      }
-    }
   }
 
   /* v2.6.2 柔光贴图: 预渲染 radial-gradient 中心亮→边缘透, 供加法混合(lighter)绘制 ——
