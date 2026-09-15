@@ -310,8 +310,9 @@
   #btnTravel.traveling{color:#dce7f8}
   #btnTravel .ink{fill:rgba(86,148,128,.5);stroke:rgba(150,230,205,.75)}
   #btnTravel{color:#cdeeda}
-  /* v1.5.0: 空态不再占位(min-height 15→0), 有丹力/洗髓 buff 时才撑开一行 */
-  #pillHints{min-height:0;font-size:10px;color:#9aa5ba;text-align:right;line-height:1.4}
+  /* v2.6.1: 丹力提示改独立定层 —— 固定在右上角小图标(两行, 底≈66px)正下方, 不再压图标 */
+  #pillHints{position:fixed;top:72px;right:10px;z-index:99;min-height:0;font-size:10px;color:#9aa5ba;
+    text-align:right;line-height:1.5;pointer-events:none;max-width:72vw;text-shadow:0 1px 3px rgba(0,0,0,.7)}
   #travelModal .story-body{padding:4px 4px 8px}
   /* v1.7.18 装备面板: 4 件竖排卡 + 词条药丸 + 熔炼近记, 高度比剧情长, 单独放开 */
   #equipModal .story-body{max-height:min(78vh,720px);padding:2px 6px 8px}
@@ -719,24 +720,27 @@
   .eq-empty{text-align:center;color:#8b94a8;font-size:12.5px;padding:24px 8px;line-height:2.1}
   .eq-rec{font-size:10px;color:#5f6980;text-align:center;margin-top:10px;line-height:1.7}
 
-/* ============ 神通面板(技能) ============ */
-  .sk-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
-  .sk-row{display:flex;gap:10px;align-items:stretch;padding:9px 10px;
+/* ============ 神通面板(技能) —— v2.6.1 紧凑重排: 8 门一屏放下 ============ */
+  .sk-sum{font-size:10.5px;color:#8b94a8;letter-spacing:.04em;line-height:1.7;margin:0 0 2px}
+  .sk-sum b{color:#a98a5a}
+  .sk-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+  .sk-row{display:flex;gap:9px;align-items:center;padding:6px 10px;
     background:rgba(18,24,40,.55);border:1px solid rgba(201,168,106,.14)}
   .sk-row.maxed{border-color:rgba(240,201,138,.42)}
-  .sk-ic{flex:none;width:32px;display:flex;align-items:center;justify-content:center;
-    font-size:18px;color:#f0c98a;text-shadow:0 0 10px rgba(240,200,140,.45)}
+  .sk-ic{flex:none;width:26px;display:flex;align-items:center;justify-content:center;
+    font-size:17px;color:#f0c98a;text-shadow:0 0 10px rgba(240,200,140,.45)}
   .sk-main{flex:1;min-width:0}
   .sk-top{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:#e6ecf5}
-  .sk-lv{font-size:11px;color:#f0c98a;font-weight:600}
-  .sk-lv i{font-style:normal;color:#7f92ad;font-size:10px;font-weight:400}
-  .sk-eff{font-size:11px;color:#9fd8ff;margin-top:2px;line-height:1.55}
+  .sk-lv{font-size:10.5px;color:#f0c98a;font-weight:600}
+  .sk-lv i{font-style:normal;color:#7f92ad;font-size:9.5px;font-weight:400}
+  .sk-eff{font-size:10.5px;color:#9fd8ff;margin-top:1px;line-height:1.5;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .sk-eff b{color:#dff0ff;font-weight:600}
-  .sk-tip{font-size:10.5px;color:#6f7a90;margin-top:2px;line-height:1.5}
-  .sk-bar{height:3px;margin-top:5px;background:rgba(255,255,255,.08);overflow:hidden}
+  .sk-meta{display:flex;align-items:center;gap:8px;margin-top:4px}
+  .sk-bar{flex:1;height:3px;background:rgba(255,255,255,.08);overflow:hidden}
   .sk-bar i{display:block;height:100%;background:linear-gradient(90deg,#6fe0a8,#3ab878);transition:width .3s ease}
   .sk-row.maxed .sk-bar i{background:linear-gradient(90deg,#f0c98a,#d8a838)}
-  .sk-exp{font-size:10px;color:#7f92ad;margin-top:3px}
+  .sk-exp{flex:none;font-size:9.5px;color:#7f92ad;font-family:ui-monospace,SFMono-Regular,monospace}
 
 
 /* ============ v0.9.5 法宝大钮 + 六格面板 ============ */

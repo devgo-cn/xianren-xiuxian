@@ -5214,30 +5214,30 @@ function hashRand(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { 
  * 数值: from(Lv1) → to(Lv20) 线性插值 —— 调参只改这两组数。 */
 const SKILL_MAX = 20;
 const SKILL_DEFS = [
-  { id: "jianqi",  name: "剑气斩", ico: "✦", tip: "普攻命中时概率斩出一道剑气 —— 这一击自带攻击力加成",
+  { id: "jianqi",  name: "剑气斩", ico: "✦",
     from: { chance: 5, dmg: 60 },          to: { chance: 30, dmg: 160 },
-    fmt: v => `${v.chance.toFixed(0)}% 触发 · 这一击 <b>×${v.dmg.toFixed(0)}% 攻击</b>` },
-  { id: "sanlian", name: "三连斩", ico: "❊", tip: "第二段落剑后概率再补一刀 —— 补刀必会心",
+    fmt: v => `命中 ${v.chance.toFixed(0)}% 斩出剑气 · 该击 <b>×${v.dmg.toFixed(0)}% 攻</b>` },
+  { id: "sanlian", name: "三连斩", ico: "❊",
     from: { chance: 4, dmg: 50 },          to: { chance: 25, dmg: 130 },
-    fmt: v => `${v.chance.toFixed(0)}% 触发 · 补刀 <b>×${v.dmg.toFixed(0)}% 攻击</b> 且必会心` },
-  { id: "hengsao", name: "横扫千军", ico: "◠", tip: "普攻命中时概率波及身周数名妖物",
+    fmt: v => `二段后 ${v.chance.toFixed(0)}% 补刀 · <b>×${v.dmg.toFixed(0)}% 攻</b> 必会心` },
+  { id: "hengsao", name: "横扫千军", ico: "◠",
     from: { chance: 3, n: 2, dmg: 40 },    to: { chance: 20, n: 5, dmg: 80 },
-    fmt: v => `${v.chance.toFixed(0)}% 触发 · 波及 ${v.n.toFixed(0)} 个 · <b>×${v.dmg.toFixed(0)}% 攻击</b>` },
-  { id: "zhansha", name: "斩杀", ico: "✖", tip: "目标残血时这一击伤害翻倍，残血线随等级抬高",
+    fmt: v => `命中 ${v.chance.toFixed(0)}% 波及身周 ${v.n.toFixed(0)} 个 · <b>×${v.dmg.toFixed(0)}% 攻</b>` },
+  { id: "zhansha", name: "斩杀", ico: "✖",
     from: { threshold: 5 },                to: { threshold: 25 },
-    fmt: v => `残血 ${v.threshold.toFixed(0)}% 以下 · 这一击 <b>伤害翻倍</b>` },
-  { id: "jifeng",  name: "疾风步", ico: "≫", tip: "身法 —— 击杀后概率踏入二倍速，期间身形飘忽加闪避",
+    fmt: v => `目标残血 <b>${v.threshold.toFixed(0)}%</b> 以下 · 该击伤害翻倍` },
+  { id: "jifeng",  name: "疾风步", ico: "≫",
     from: { chance: 5, dur: 4, mult: 2, dodge: 4 },   to: { chance: 65, dur: 8, mult: 2, dodge: 25 },
-    fmt: v => `${v.chance.toFixed(0)}% 触发 · ${v.mult} 倍速 ${v.dur.toFixed(0)} 秒 · 期间 <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
-  { id: "suodi",   name: "缩地成寸", ico: "⋙", tip: "身法 —— 击杀后小概率踏入三倍速，缩地无形更易闪身",
+    fmt: v => `击杀 ${v.chance.toFixed(0)}% 入 ${v.mult} 倍速 ${v.dur.toFixed(0)} 秒 · <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
+  { id: "suodi",   name: "缩地成寸", ico: "⋙",
     from: { chance: 0.5, dur: 2, mult: 3, dodge: 8 }, to: { chance: 12, dur: 4, mult: 3, dodge: 40 },
-    fmt: v => `${v.chance.toFixed(1)}% 触发 · ${v.mult} 倍速 ${v.dur.toFixed(0)} 秒 · 期间 <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
-  { id: "pojia",   name: "破甲击", ico: "◆", tip: "普攻命中时概率无视目标部分防御",
+    fmt: v => `击杀 ${v.chance.toFixed(1)}% 入 ${v.mult} 倍速 ${v.dur.toFixed(0)} 秒 · <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
+  { id: "pojia",   name: "破甲击", ico: "◆",
     from: { chance: 5, pen: 30 },          to: { chance: 25, pen: 70 },
-    fmt: v => `${v.chance.toFixed(0)}% 触发 · 无视 <b>${v.pen.toFixed(0)}% 防御</b>` },
-  { id: "zhuilie", name: "追猎", ico: "➤", tip: "击杀后概率立刻向下一目标再出手一次，衔尾一击更易暴击",
+    fmt: v => `命中 ${v.chance.toFixed(0)}% 无视目标 <b>${v.pen.toFixed(0)}% 防御</b>` },
+  { id: "zhuilie", name: "追猎", ico: "➤",
     from: { chance: 5, crit: 20 },         to: { chance: 30, crit: 100 },
-    fmt: v => `${v.chance.toFixed(0)}% 触发 · 击杀后连击 · 该击 <b>暴击 +${v.crit.toFixed(0)}%</b>` },
+    fmt: v => `击杀 ${v.chance.toFixed(0)}% 衔尾再击一次 · 该击 <b>暴击 +${v.crit.toFixed(0)}%</b>` },
 ];
 /* v2.5: 经验曲线大幅变陡(原 30·lv^1.35 → 120·lv^1.9)。
  * 原曲线单技能满 20 级仅需约 40 分钟连续战斗, 几天就全满, 与"几十天"的长周期严重脱节;
@@ -5367,21 +5367,18 @@ function renderSkills() {
     const s = skillGet(d.id), lv = skillLv(d.id), maxed = lv >= SKILL_MAX;
     const need = skillExpNeed(lv), pct = maxed ? 100 : Math.min(100, (s.exp / need) * 100);
     const v = skillVal(d.id);
+    /* v2.6.1: 单行紧凑卡 —— 触发时机并入 fmt, 砍说明行, 经验并入进度条同行 → 8 门一屏放下 */
     return `<div class="sk-row${maxed ? " maxed" : ""}">
       <div class="sk-ic">${d.ico}</div>
       <div class="sk-main">
         <div class="sk-top"><b>${d.name}</b><span class="sk-lv">Lv.${lv}<i>/${SKILL_MAX}</i></span></div>
         <div class="sk-eff">${d.fmt(v)}</div>
-        <div class="sk-tip">${d.tip}</div>
-        <div class="sk-bar"><i style="width:${pct.toFixed(1)}%"></i></div>
-        <div class="sk-exp">${maxed ? "已臻化境" : `经验 ${Math.floor(s.exp)} / ${need}`}</div>
+        <div class="sk-meta"><div class="sk-bar"><i style="width:${pct.toFixed(1)}%"></i></div><span class="sk-exp">${maxed ? "已臻化境" : `${Math.floor(s.exp)} / ${need}`}</span></div>
       </div>
     </div>`;
   }).join("");
   const total = skillTotalLv();
-  box.innerHTML = `<p class="story-tip" style="color:#8b94a8">神通只在战斗中自行触发，触发与生效即涨经验，日久自精。
-    共习 <b style="color:#a98a5a">${SKILL_DEFS.length}</b> 门，累计 <b style="color:#a98a5a">${total}</b> / ${SKILL_MAX * SKILL_DEFS.length} 阶。
-    神通只改出手与节奏，不增益属性 —— 攻防血仍由境界与法宝定夺。</p>`
+  box.innerHTML = `<p class="sk-sum">神通战斗中自行触发精进，不增益攻防血<br>共习 <b>${SKILL_DEFS.length}</b> 门 · 累计 <b>${total}</b> / ${SKILL_MAX * SKILL_DEFS.length} 阶</p>`
     + `<div class="sk-list">${rows}</div>`;
 }
 
