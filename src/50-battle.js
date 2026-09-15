@@ -16,7 +16,7 @@
  */
 
 import { SND } from './10-base.js';
-import { resolveBackend, reportBackend, BACKENDS } from './render/index.js';
+import { reportRenderer } from './render/status.js';
 import {
   initRegistry, getMonster, allMonsters, statsTable, pickFrame, measure,
 } from './monsters/registry.js';
@@ -68,30 +68,27 @@ import {
   const bgImg = new Image();
   bgImg.onload = function() { G.bgImg = bgImg; G.bgReady = true; };
   bgImg.src = 'assets/main-bg.jpg';
-  /* ── 渲染后端（可插拔）────────────────────────────────────────────
-   * 默认 canvas2d：与改造前完全一致，零风险，且【不会加载 801KB 的 PixiJS】。
-   * 选 pixi 时才动态 import src/render/pixi.js（两级懒加载）。
-   * 后端只负责"怎么画怪物"，不参与任何时间推进 —— 倍速乘法始终在 update() 首行。
+  /* ── 怪物渲染器：唯一实现 = PixiJS ────────────────────────────────
+   * 没有第二条路。原先"Canvas2D 画怪 / PixiJS 画怪"两套并存已废弃 ——
+   * 两套口径意味着加素材时不知道往哪加，也意味着屏幕上跑的是哪套无从判断。
    *
-   * ★ 不静默兜底：pixi 起不来就是起不来，怪物不画 + 角标红字写明原因，
-   *   绝不偷偷改用 Canvas2D（否则看着正常，实际跑哪套技术栈无从判断）。 */
-  let _pixiBackend = null;
-  const _wantPixi = resolveBackend() === BACKENDS.PIXI;
-  if (!_wantPixi) reportBackend(BACKENDS.CANVAS2D, true, '');
-  (function initBackend() {
-    if (!_wantPixi) return;                      // 默认路径：到此为止
+   * 动态 import 只为不阻塞首屏，不是"可选后端"：它必定会加载。
+   * 渲染器不参与任何时间推进 —— 倍速乘法始终在 update() 首行。
+   *
+   * ★ 不静默兜底：起不来就是起不来，怪物不画 + 角标红字写明原因。 */
+  let _monsterRenderer = null;
+  (function initRenderer() {
     import('./render/pixi.js').then(async mod => {
-      _pixiBackend = mod.createPixiBackend();
+      _monsterRenderer = mod.createPixiBackend();
       /* 尺寸沿用舞台横带；battleLayer 每帧会按需调用 resize */
-      const ok = _pixiBackend.ensureInit
-        ? await _pixiBackend.ensureInit(CW || 300, CH || 150)
+      const ok = _monsterRenderer.ensureInit
+        ? await _monsterRenderer.ensureInit(CW || 300, CH || 150)
         : true;
-      reportBackend(BACKENDS.PIXI, !!ok && _pixiBackend.available,
-        ok ? '' : (_pixiBackend.lastError || 'WebGL 初始化失败'));
+      reportRenderer(!!ok && _monsterRenderer.available,
+        ok ? '' : (_monsterRenderer.lastError || 'WebGL 初始化失败'));
     }).catch(err => {
-      _pixiBackend = null;                       /* 不置 Canvas2D —— 保持"未生效"状态 */
-      reportBackend(BACKENDS.PIXI, false,
-        '模块加载失败: ' + (err && err.message ? err.message : err));
+      _monsterRenderer = null;
+      reportRenderer(false, '模块加载失败: ' + (err && err.message ? err.message : err));
     });
   })();
 
@@ -1248,95 +1245,35 @@ import {
 
   function drawEnemies() {
     /* ── 渲染后端分流 ──────────────────────────────────────────────
-     * pixi 后端把怪物画到离屏画布，再在【本函数原本的位置】blit 回 #stage，
-     * 因此 bg → 怪物 → drops → player → ... 的层序与 Canvas2D 路径完全一致。
-     * 后端不可用时（WebGL 缺失/加载失败）自动回退 Canvas2D，观感不变。 */
-    /* pixiDrew = 本帧确实由 PixiJS 画出了怪物。
-     * 指定 pixi 但没画成（未就绪 / 初始化失败 / 本帧抛错）时保持 false，
-     * 并且【不回退到 Canvas2D】—— 怪物整帧不绘制，角标红字说明原因。 */
-    let pixiDrew = false;
-    if (_wantPixi) {
-      if (!_pixiBackend || !_pixiBackend.available) return;   /* ★ 不兜底 */
-      const cv = _pixiBackend.drawEnemies(G.enemies, {
-        W: CW, H: CH, floorY: floorY(), camX: G.camX, now: G.t,
-      });
-      if (!cv) {                                              /* ★ 不兜底 */
-        reportBackend(BACKENDS.PIXI, false, '本帧渲染失败');
-        return;
-      }
-      ctx.drawImage(cv, 0, 0);
-      pixiDrew = true;
-    }
+     * 怪物精灵【只由 PixiJS 画】（src/render/pixi.js）。它画到离屏画布，
+     * 再在【本函数原本的位置】blit 回 #stage，因此
+     * bg → 怪物 → drops → player → ... 的层序与改造前完全一致。
+     *
+     * ★ 不静默兜底：渲染器未就绪 / 本帧渲染失败 → 怪物整帧不绘制，
+     *   角标转红字写明原因。绝不偷偷换一套画法 —— 那会让屏幕上跑的是
+     *   哪套技术栈变得无从判断。 */
+    if (!_monsterRenderer || !_monsterRenderer.available) return;
+    const cv = _monsterRenderer.drawEnemies(G.enemies, {
+      W: CW, H: CH, floorY: floorY(), camX: G.camX, now: G.t,
+    });
+    if (!cv) { reportRenderer(false, '本帧渲染失败'); return; }
+    ctx.drawImage(cv, 0, 0);
+
+    /* 伴生元素（血条 / 精英光环 / BOSS 攻击掩码特效）仍用 Canvas2D 叠加在
+     * 精灵之上。它们【只有这一份实现】，不是第二套画怪物的路子 ——
+     * 几何量与精灵同源（都来自 measure()），位置天然对齐。 */
     for (const e of G.enemies) {
       if (!e.alive && e.dying <= 0) continue;
       const sx = worldToScreen(e.x); const sy = floorY();
       const M = getMonster(e.type);
-
-      /* pixi 已画过精灵，这里只补它以 Canvas2D 画的伴生元素：
-       * 精英光环 / 血条 / 掩码特效。与 Canvas2D 路径共用同一套几何计算。 */
-      if (pixiDrew) {
-        if (!M || !M.sprite.ready) continue;
-        const geo = measure(M, CH, e.elite, G.t);
-        const { drawW, drawH, footOffset, floatY } = geo;
-        if (M.visual.maskedAttack && e.anim > 0) drawMaskedAttack(e, M, geo, sx, sy);
-        if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
-        if (e.alive) {
-          if (M.visual.footBase != null) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp, true);
-          else drawHpBar(sx + drawW*0.2, sy - floatY - drawH - 8, 50, e.hp, e.maxHp, true);
-        }
-        continue;
-      }
-
-      /* 有注册表且有图集 → 统一绘制路径。
-       * 原先 slime / water / boss 三段几乎相同的代码已合并；差异全部由
-       * 注册表的 visual 字段描述（drawHMax / footBase / scaleY / skewX / float / maskedAttack）。 */
-      if (M && M.sprite.ready) {
-        const fr = pickFrame(M, e, G.t);
-        const geo = measure(M, CH, e.elite, G.t);
-        const { drawH, drawW, scaleY, footOffset, compensatedH, floatY, skewX } = geo;
-
-        ctx.save();
-        ctx.translate(sx, sy - floatY);
-        /* 变形纠正: 轻微垂直压缩让底部贴合地板（boss 的 scaleY=1 即不压缩） */
-        if (scaleY !== 1) {
-          ctx.translate(0, -footOffset * (1 - scaleY));
-          ctx.scale(1, scaleY);
-        }
-        /* 待机倾斜校正（水灵 -0.03 弧度 ≈ -1.7°） */
-        if (skewX) ctx.transform(1, 0, skewX, 1, 0, 0);
-        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
-        if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
-
-        /* boss 攻击帧有左侧特效渐隐（预渲染掩码帧，避免每帧离屏重建） */
-        if (M.visual.maskedAttack && e.anim > 0) {
-          drawMaskedAttack(e, M, geo, sx, sy);
-        } else {
-          /* 踩地板的怪用 footOffset 对齐脚底; 漂浮的怪(boss)用 drawH 顶对齐 */
-          const dy = M.visual.footBase != null ? -footOffset : -drawH;
-          const dh = M.visual.footBase != null ? compensatedH : drawH;
-          ctx.drawImage(M.sprite.img, fr.srcX, fr.srcY, fr.fw, fr.fh, -drawW*0.5, dy, drawW, dh);
-        }
-        ctx.restore();
-
-        if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
-        if (e.alive) {
-          if (M.visual.footBase != null) {
-            drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp, true);
-          } else {
-            /* BOSS 血条在头顶, 右移对齐头部 */
-            drawHpBar(sx + drawW*0.2, sy - floatY - drawH - 8, 50, e.hp, e.maxHp, true);
-          }
-        }
-      } else {
-        /* 素材未就绪 / 未注册类型 → 兜底占位（与原逻辑等价） */
-        ctx.save(); ctx.translate(sx, sy);
-        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
-        if (e.hurtT > 0) { ctx.globalAlpha *= 0.6; ctx.filter = 'brightness(2)'; }
-        const bodyH = Math.min(25, CH*0.2);
-        ctx.fillStyle = e.color || (M && M.stats.color) || '#8fa8c0';
-        ctx.beginPath(); ctx.ellipse(0,-bodyH/2,10,bodyH/2,0,0,Math.PI*2); ctx.fill();
-        ctx.restore();
-        if (e.alive) drawHpBar(sx, sy-35, 24, e.hp, e.maxHp, true);
+      if (!M || !M.sprite.ready) continue;
+      const geo = measure(M, CH, e.elite, G.t);
+      const { drawW, drawH, footOffset, floatY } = geo;
+      if (M.visual.maskedAttack && e.anim > 0) drawMaskedAttack(e, M, geo, sx, sy);
+      if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
+      if (e.alive) {
+        if (M.visual.footBase != null) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp, true);
+        else drawHpBar(sx + drawW*0.2, sy - floatY - drawH - 8, 50, e.hp, e.maxHp, true);
       }
     }
   }

@@ -1,20 +1,23 @@
 /**
- * PixiJS 战斗渲染后端
+ * 怪物渲染器（PixiJS）—— 怪物精灵的【唯一】绘制实现
  * ──────────────────────────────────────────────────────────────────────
- * 职责：只画【怪物】（enemies）。其余战斗元素（玩家/宠物/特效/伤害数字）
- * 仍走 Canvas2D —— 它们数量少且大量依赖 Canvas 特有绘制（渐变/文字/混合模式）。
+ * 职责：只画【怪物精灵】（enemies）。
  *
- * 为什么只画怪物：
- *   用户目标是"引进大量怪物内容"，怪物是唯一会规模增长的部分。
- *   怪物绘制又是纯图集 blit，正是 Pixi 批处理收益最大的场景。
+ * 加新怪物的素材往哪加？—— 唯一入口是 src/monsters/registry.js 的
+ * MONSTER_DEFS（图集路径 + meta.json + 帧范围 + visual 参数）。
+ * 本文件不含任何怪物硬编码，新增怪物不需要改这里。
  *
  * 顺序保证：
  *   产出一张画布，由调用方在原本 drawEnemies() 的位置 drawImage 回去，
  *   因此 bg → [怪物] → drops → player → ... 的层序完全不变。
+ *   血条 / 精英光环 / BOSS 掩码特效由调用方用 Canvas2D 叠加在精灵之上，
+ *   它们只有一份实现，几何量与本文件同源（都来自 measure()）。
  *
  * 铁律：
  *   - 不启用 Pixi 自带 ticker（autoStart:false），由 60-stage 单一 ticker 驱动
  *   - 不接收也不处理 dt；只按给定的帧号与坐标摆位置
+ *   - 失败就是失败：初始化/渲染出错如实上报（src/render/status.js），
+ *     不悄悄换第二种画法
  */
 
 import { getMonster, pickFrame, measure } from '../monsters/registry.js';
@@ -62,7 +65,7 @@ export function createPixiBackend() {
       return true;
     } catch (e) {
       /* 库加载失败 / WebGL 不可用：返回 false，并把原因交给角标显示。
-         注意【不回退 Canvas2D】—— 见 src/render/index.js 的"不静默兜底"铁律。 */
+         注意【不回退】—— 见 src/render/status.js 的"不静默兜底"铁律。 */
       app = null;
       _initPromise = null;
       lastError = (e && e.message ? e.message : String(e)) || '未知错误';
