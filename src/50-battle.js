@@ -1464,8 +1464,29 @@ import { SND } from './10-base.js';
     }
   }
 
-  function render() {
-    ctx.clearRect(0, 0, CW, CH);
+  /* 战斗层清屏 —— v3.2 关键修正
+   *
+   * 独立模式（自己就是 #battleCanvas 的主人）：必须 clearRect，直接透出底下的 #bg。
+   *
+   * 舞台模式（本层被 60-stage 驱动，ctx 指向【共享舞台画布】）：
+   *   ⚠️ 绝不能 clearRect —— 60-stage.tick() 每帧已经 clearRect 整屏一次，而这里
+   *      CW/CH 是「横带自身的宽高」，直接擦就是擦共享画布上 (0,0,CW,CH) 那一块，
+   *      会顺手把【横带下方/上方其它层已画好的东西】一起擦掉（实测每天擦掉 y<306
+   *      以内的一切，月亮被擦成黑洞就是这么来的）。
+   *   改成在【横带自己的坐标系里】铺一层不透明底色：视觉上与"擦出一个干净条带"
+   *   完全等价（横带内所有像素回到夜空底色），但裁剪区域外的像素一个都不动。
+   *   save/restore 保证底色只作用于横带内部，也不会污染 worldToScreen 平移。 */
+  function render(clear) {
+    if (clear) {
+      ctx.clearRect(0, 0, CW, CH);
+    } else {
+      const g = ctx.createLinearGradient(0, 0, 0, CH);
+      g.addColorStop(0, '#070b16');
+      g.addColorStop(0.72, '#060912');
+      g.addColorStop(1, '#050810');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, CW, CH);
+    }
     drawBg(); drawEnemies(); drawDrops(); drawPlayerSprite(); drawPets(); drawFx(); drawDmg(); drawSkillCall();
   }
 
@@ -1549,7 +1570,7 @@ import { SND } from './10-base.js';
     requestAnimationFrame(loop);
     _lastPaint = t;
     const dt = Math.min(0.05, (t-lastT)/1000); lastT = t;
-    update(dt); render();
+    update(dt); render(true);   /* 独立模式：自己就是画布主人，清屏透出底下 #bg */
   }
 
   /* v3.2: 交给 60-stage 的层对象，绘制顺序排在 bg 之后、aura 之前 */
@@ -1574,7 +1595,7 @@ import { SND } from './10-base.js';
         targetCtx.rect(0, band.top, W, band.height);
         targetCtx.clip();
         targetCtx.translate(0, band.top);
-        render();
+        render(false);   /* 舞台模式：只铺自己那条横带，绝不清共享画布 */
         targetCtx.restore();
         ctx = savedCtx; CW = savedCW; CH = savedCH;
       },

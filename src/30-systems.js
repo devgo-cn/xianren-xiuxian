@@ -234,23 +234,30 @@ function tickAura(dt, target) {
   } else {
     tctx.clearRect(0, 0, W, H);
   }
-  /* 合并后统一用 globalCompositeOperation 加法混合（原先靠 CSS mix-blend-mode:screen，
-   * 那是"画布级"合成，会迫使本层走独立合成通道 —— 正是要消掉的开销）。 */
-  tctx.globalCompositeOperation = "lighter";
+  /* 【合并后最关键的一处】原先本层靠 CSS mix-blend-mode:screen 与下层做「滤色」，
+   * 那是画布级合成 —— 效果是 `1-(1-a)(1-b)`，永远比原色【更亮】、不会变浓。
+   *
+   * 合并成一张画布后，混合必须在绘制期完成。这里必须用 'screen' 而不是 'lighter'：
+   *   lighter (加法)  a+b      —— 叠得越多越"曝"，大面积会糊成一片
+   *   screen  (滤色)  1-(1-a)(1-b) —— 与 CSS 的 screen 语义一致，柔和不糊
+   *
+   * ⚠️ v3.2 首版这里用了 'lighter' 并配了 1.75× 的 alpha 补偿，是错的：
+   *    绿色（凡人境灵气色 103,201,171）在加法混合下会盖住背景与纸月，
+   *    表现为"几处大区域不停闪烁的绿光"。改回 screen 后不再需要任何补偿。 */
+  tctx.globalCompositeOperation = "screen";
   const blobs = [[.25,.3,.5],[.7,.25,.42],[.5,.7,.55],[.82,.72,.4]];
-  const aScale = target ? 1.75 : 1;   // 舞台模式下背景已复合，原 alpha 偏淡 → 补偿
   for (let i = 0; i < blobs.length; i++) {
     const [bx,by,bz] = blobs[i];
     const cx = (bx + Math.sin(_auraT*0.06 + i)*0.05)*W, cy = (by + Math.cos(_auraT*0.05 + i*1.3)*0.05)*H, rad = bz*Math.min(W,H)*0.6;
     const grd = tctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
-    grd.addColorStop(0, `rgba(${r},${g},${b},${.07*aScale})`); grd.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    grd.addColorStop(0, `rgba(${r},${g},${b},.07)`); grd.addColorStop(1, `rgba(${r},${g},${b},0)`);
     tctx.fillStyle = grd; tctx.beginPath(); tctx.arc(cx, cy, rad, 0, 7); tctx.fill();
   }
   for (const p of _auraP) {
     p.y -= p.s*realDt; p.x += Math.sin(_auraT*0.6 + p.ph)*6*realDt;
     if (p.y < -10) { p.y = H + 10; p.x = Math.random()*W; }
     const a = p.a * (0.5 + 0.5*Math.sin(_auraT*1.2 + p.ph));
-    tctx.fillStyle = `rgba(${r},${g},${b},${a*0.5*aScale})`;
+    tctx.fillStyle = `rgba(${r},${g},${b},${a*0.5})`;
     tctx.beginPath(); tctx.arc(p.x, p.y, p.r, 0, 7); tctx.fill();
   }
   tctx.globalCompositeOperation = "source-over";

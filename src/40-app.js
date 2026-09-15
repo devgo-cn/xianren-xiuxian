@@ -6,7 +6,7 @@
  * 重建: node tools/split2.js <repo> <out>
  */
 import { $, ARRAY_MAX_LV, BIGS, CACHE_VER, CLD_KEY, DIMSTAT, DROP_CFG, EVENTS, MAIL_CAP, MAIN_STORY, MATS, PET_BONUS, PET_COIN, PET_FORGE, PET_STILL, PLOT, QUALITY, RECIPES, SAVE_KEY, SLOT_TYPES, __set_breaking, __set_cauldron, __set_dropSaveT, __set_encNext, __set_equipId, __set_hiddenAt, __set_hudAcc, __set_selRecipe, __set_state, __set_stayLast, _dropSaveT, _dsp, _equipId, _equipQueue, _floatPrev, _hiddenAt, _hudAcc, _pred, _rate, _settling, _srvOffset, _stayLast, _syncAt, autoHuntOn, breaking, cld, cnNum, fmt, hbOk, initFxDiag, selRecipe, state } from './00-pure.js';
-import { CLD_API, TOTAL_SEGS, adopt, arrayCostNow, buffAtCap, buffHintOf, burstBoom, cldApi, cldFlash, cldId, cldUI, closeTravel, cloudSnap, cloudSoon, ensureScrollFx, fitsRecipe, g1Pack, g1Unpack, hbFail, hiddenUnlocked, initAura, initBg, initFxLayer, journalHasKey, locById, mailDot, pickNoRepeat, pushBattleStats, pushBuff, pushMsg, renderAutoHunt, renderPName, renderPillHints, searchMs, seg, settleBlocked, spiritRate, srvNow, tickBurst, tickDsp, traceRefresh, travelBtnLbl, zoneOfLoc } from './10-base.js';
+import { CLD_API, TOTAL_SEGS, adopt, arrayCostNow, buffAtCap, buffHintOf, burstBoom, cldApi, cldFlash, cldId, cldUI, closeTravel, cloudSnap, cloudSoon, createFxLayer, ensureScrollFx, fitsRecipe, g1Pack, g1Unpack, hbFail, hiddenUnlocked, initAura, initBg, initFxLayer, journalHasKey, locById, mailDot, pickNoRepeat, pushBattleStats, pushBuff, pushMsg, renderAutoHunt, renderPName, renderPillHints, searchMs, seg, settleBlocked, spiritRate, srvNow, tickBurst, tickDsp, traceRefresh, travelBtnLbl, zoneOfLoc } from './10-base.js';
 import { addJournal, adoptKeep, bigIdx, cldFail, keepArtQuiet, load, realm, renderMailBox, save, showTravelMail, smartEquip, updateArts, updateRealmUI } from './20-core.js';
 import { checkMilestones, cldPush, cloudPushNow, cloudSettle, mainMoment, makeArt, openAlchemy, openStory, openTravel, pickLoc, rateNow, tickAura, updateHUD } from './30-systems.js';
 
@@ -669,12 +669,17 @@ function bindBattleHooks() {                    // 战斗 IIFE 是内联脚本, 
  * 合成 1 张 #stage + 1 个 ticker。
  *
  * 层的加入顺序 = 绘制顺序（后者盖前者）：
- *     bg  →  battle  →  aura  →  burst
- * 与原 z-index（0 / 1 / 3 / 30）一致。
+ *     bg  →  battle  →  aura  →  dantian  →  burst
+ *
+ * ⚠️ dantian 必须排在 aura【之后】。
+ *    灵气层（aura）是四团大半径柔光，铺满大半个屏幕；丹田只有几十像素，
+ *    若排在 aura 之前会被灵气直接盖掉（实测：dantian 画完 (3,3,3)，
+ *    aura 一过就变 (255,255,255)）。丹田是"界面上最亮的那个点"，
+ *    必须压在灵气之上；burst 是爆发特效，最顶层不变。
  *
  * 战斗层是动态 import 的（见 main.js 尾部说明），所以轮询等它就绪后再插入。
  */
-const _stageLayers = { bg: null, battle: null };
+const _stageLayers = { bg: null, battle: null, dantian: null };
 function mountStage() {
   if (window.__stage) return;                       // 幂等
   const canvas = document.getElementById("stage");
@@ -693,6 +698,22 @@ function mountStage() {
     name: "burst",
     draw(c, W, H, dt) { if (!DIMSTAT.on) tickBurst(dt, { ctx: c, W, H }); },
   };
+  /* v3.3 丹田层壳子：fx2d.js 是动态 import（模块可能还没就绪），
+   * 先用空壳占住位置，等模块到了再把真身回填进去 —— 这样层顺序不依赖加载时序。
+   *
+   * ⚠️ 这一层最终【不会画在 #stage 上】。
+   *   #stage 是 z-index:0，而角色本体（.stage/#cult）是 z-index:5 ——
+   *   画在 #stage 上的丹田会被角色贴图整个盖住（实测中心只有 (94,109,126)，
+   *   那是袍子本身的颜色，不是丹田的光）。
+   *   丹田必须"长在人物身上"，所以它得在角色之上。做法见 dantianOverlay()：
+   *   给角色容器加一张同尺寸的 overlay canvas，z-index 高于贴图。
+   *   这里仍保留一个层对象，用于【非 overlay 场景】的兜底与几何兜底。 */
+  const dantianLayer = {
+    name: "dantian",
+    _real: null,
+    resize(W, H) { if (this._real) this._real.resize(W, H); },
+    draw(c, W, H, dt) { if (!DIMSTAT.on && this._real) this._real.draw(c, W, H, dt); },
+  };
 
   /* 先建 stage（bg 层要拿到它给的真实尺寸），再按顺序挂层。 */
   import("./60-stage.js").then(mod => {
@@ -707,15 +728,91 @@ function mountStage() {
     import('../bg.js?v=' + CACHE_VER).then(bgMod => {
       try {
         const bgLayer = bgMod.initDeepSpace(canvas, { managed: true });
-        /* bg 必须在最底层：插到 aura 之前（此时 layer 顺序是 [aura, burst]） */
+        /* bg 必须在最底层：插到 aura 之前（此时顺序是 [aura, burst]） */
         stage.insertLayerBefore("aura", bgLayer);
       } catch (e) { console.error("[stage] bg 层初始化失败:", e); }
       pollBattleLayer(stage);
     }).catch(e => { console.error("[stage] bg 层加载失败:", e); pollBattleLayer(stage); });
+    /* 丹田：动态 import fx2d，回来后挂到角色之上的 overlay */
+    import('../fx2d.js?v=' + CACHE_VER).then(m => {
+      const real = m.createFxLayer();
+      if (!real) return;
+      try { m.setOverlayMode(true); } catch (e) {}
+      dantianLayer._real = real;
+      mountDantianOverlay(stage, real);
+    }).catch(e => console.error("[stage] dantian 加载失败:", e));
   }).catch(e => console.error("[stage] 加载失败:", e));
 }
 
-/* 战斗层就绪后插到 bg 与 aura 之间（绘制顺序：bg → battle → aura → burst） */
+/* 丹田 overlay —— 在角色容器里插一张贴身的 canvas，z-index 压在贴图之上。
+ *
+ * 为什么不能画在 #stage 上：#stage z-index:0、角色 .stage z-index:5，
+ * 画上去会被人物贴图整个盖住。丹田是"人物身上发光的一点"，
+ * 必须跟着人物一起在最上层。
+ *
+ * 做法：overlay 的尺寸/位置每帧对齐 #cult（或 .bodyL，取到哪个算哪个），
+ *   用 getBoundingClientRect() 反推 left/top/width/height，
+ *   backing store 按 DPR 放大、再 setTransform 归一到逻辑像素 ——
+ *   和 fx2d 的坐标系完全一致，所以 fx2d 的绘制代码一行都不用改。
+ *
+ * 生命周期：由舞台 ticker 驱动（不自持 rAF），黑屏挂机时随舞台一起暂停。
+ *   挂到 window.__dantian 便于验收脚本取证。 */
+function mountDantianOverlay(stage, realLayer) {
+  const cult = document.getElementById("cult");
+  if (!cult) return;
+  if (document.getElementById("cultDantian")) return;    // 幂等
+
+  const cv = document.createElement("canvas");
+  cv.id = "cultDantian";
+  cv.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;"
+    + "pointer-events:none;z-index:3";   /* 高于 4 张贴图，低于 UI */
+  cult.appendChild(cv);
+  const octx = cv.getContext("2d", { alpha: true });
+
+  let lastW = 0, lastH = 0, lastDpr = 0;
+  function sync() {
+    /* 对齐【#cult 自己】而不是它的父容器。
+     * #cult 有 aspect-ratio，父容器 .stage 是 inset:0 的整屏 flex 盒 ——
+     * 量父容器会拿到 420x860（整屏），overlay 就铺满屏幕了。
+     * 量 #cult 才是 346x350 的角色框。 */
+    const r = cult.getBoundingClientRect();
+    const w = Math.max(1, Math.round(r.width));
+    const h = Math.max(1, Math.round(r.height));
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    if (w !== lastW || h !== lastH || dpr !== lastDpr) {
+      lastW = w; lastH = h; lastDpr = dpr;
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(h * dpr);
+      cv.style.width = w + "px";
+      cv.style.height = h + "px";
+      octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    /* 每帧清一次自己的 overlay（它是独立画布，不共享，clear 是安全的）。
+     * clearRect 的作用域也是 [0,0,w,h]，与绘制范围完全吻合。 */
+    octx.clearRect(0, 0, lastW, lastH);
+  }
+
+  const layer = {
+    name: "dantian",
+    draw(c, W, H, dt) {
+      sync();
+      /* 把 overlay 自己的坐标系交给 fx2d：
+       * overlay 左上角 = cult 左上角，所以 fx2d 里以 overlay 为坐标原点的
+       * "角色框中心点" 就等于 (W/2, H*0.40) —— 用 overlay 尺寸算即可。 */
+      realLayer.draw(octx, lastW, lastH, dt);
+    },
+  };
+  /* 关键：不要交给 stage.addLayer —— 那会画到共享 #stage 上。
+   * 这里包一层，借用舞台的 ticker 调度，但把目标 ctx 换成 overlay。 */
+  stage.addLayer(layer);
+  window.__dantian = layer;
+
+  /* 把 fx2d 的锚点解析钉死在 overlay 自身上（不再去 querySelector 找 bodyL，
+   * 因为 overlay 的 rect 已经是角色框，FX 内部按 40% 高定位即可）。 */
+  realLayer.resize(lastW || 1, lastH || 1);
+}
+
+/* 战斗层就绪后插到 bg 与 aura 之间（绘制顺序：bg → battle → aura → dantian → burst） */
 let _battlePoll = 0;
 function pollBattleLayer(stage) {
   const api = window.BattleAPI;

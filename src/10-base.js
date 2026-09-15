@@ -506,7 +506,8 @@ function initFxLayer() {
   return null;
 }
 
-/* 旋臂星点带（原 #cultFx 上的第三张全屏画布）。舞台模式下作为层交给 60-stage。 */
+/* v3.3 丹田光华（原「旋臂星点带」，旋臂已删，只留中心那点金光）。
+ * 舞台模式下作为层交给 60-stage；standalone 版 initFxLayer 供单独调试页用。 */
 function createFxLayer() {
   return import('../fx2d.js?v=' + CACHE_VER)
     .then(m => { try { return m.createFxLayer(); } catch (e) { console.error("[fx2d] layer:", e); return null; } })

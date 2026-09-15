@@ -1,67 +1,61 @@
 /* ============================================================
- * fx2d.js —— 旋臂星点带 (Canvas 2D)
+ * fx2d.js —— 丹田光华 (Canvas 2D)
  *
- * OpenAI Astra 风格旋臂, 渲染 = 预渲染柔光贴图(无白膜/无拖尾):
- *   · 56% 柔光星点 + 34% 白热十字星芒 + 10% 大发光粒子
- *   · 3 条弧形旋臂, 8 车道宽(化神), 臂间细星尘填充
- *   · 粒子沿臂从外端向丹田缓流被吸收; 臂本体极慢公转
+ * v3.3：旋臂星点带整条移除。
+ *   用户实测反馈：「漩涡🌀现在看不到效果了，但我发现没有它更好看一点……
+ *   保留它的中心点，有一个发光的中心点，就是他的丹田，那个可以调出来。」
+ *
+ *   于是本层只保留【丹田金丹】这一件事：
+ *     · 外圈大柔和光晕（按境界换色，slow breathe）
+ *     · 内圈轮缘（凝实感，微微加速呼吸，与外壳相位错开）
+ *     · 最中心一点白热
+ *   旋臂粒子（buildParticles / starBurst / softDot 星点 / dust 星尘）全部删除，
+ *   REALM_VIS 的 n / spin / size / rw / pal 也不再需要 —— 只留每个境界的
+ *   【丹田颜色】，颜色取自原先 pal 的第一顺位亮色，保证换境界时观感连续。
  * ============================================================ */
 
 export const BIG_NAMES = ["凡人", "炼气", "筑基", "结丹", "元婴", "化神", "炼虚", "合体", "大乘", "渡劫", "真仙", "天仙"];
 
+/* 每个境界的丹田色： [外晕RGB, 内轮RGB]
+ * 取色沿用 v3.2 旋臂调的 pal[0]（亮色）与 pal[1]（本命色），只把 gamma 提到主色位。
+ * 这样从凡人到天仙，丹田会依次是：暖白 → 冰蓝 → 青碧 → 金 → 紫 → 天青 →
+ * 紫罗兰 → 品红 → 橙金 → 亮蓝 → 翠绿 → 金白，一条看得出来的成长线。 */
 export const REALM_VIS = {
-  "凡人": { n: 100, spin: .55, glow: 4,   size: 1.6, rw: .36,
-    pal: [[255,250,242,.5],[205,182,130,.34],[255,175,90,.16]] },
-  "炼气": { n: 190, spin: .75, glow: 7,   size: 1.9, rw: .44,
-    pal: [[255,250,242,.44],[132,214,244,.38],[48,92,170,.18]] },
-  "筑基": { n: 250, spin: .85, glow: 8,   size: 2.0, rw: .48,
-    pal: [[255,250,242,.42],[104,203,192,.38],[62,136,158,.20]] },
-  "结丹": { n: 320, spin: .95, glow: 10,  size: 2.1, rw: .52,
-    pal: [[255,250,242,.38],[232,197,107,.32],[255,170,80,.18],[255,242,214,.12]] },
-  "元婴": { n: 380, spin: 1.05, glow: 11, size: 2.2, rw: .56,
-    pal: [[255,250,242,.40],[203,163,250,.32],[122,80,205,.16],[255,175,90,.12]] },
-  "化神": { n: 480, spin: 1.15, glow: 12, size: 2.4, rw: .60,
-    pal: [[255,250,242,.38],[96,205,252,.28],[255,222,150,.16],[255,175,90,.10],[44,96,178,.08]] },
-  "炼虚": { n: 560, spin: 1.22, glow: 13, size: 2.5, rw: .63,
-    pal: [[255,250,242,.40],[196,160,255,.30],[140,105,235,.16],[120,190,255,.10]] },
-  "合体": { n: 650, spin: 1.29, glow: 14, size: 2.6, rw: .66,
-    pal: [[255,250,242,.40],[255,150,220,.28],[196,110,200,.16],[170,140,255,.10]] },
-  "大乘": { n: 740, spin: 1.36, glow: 15, size: 2.7, rw: .69,
-    pal: [[255,250,242,.40],[255,196,120,.30],[232,160,80,.18],[255,230,180,.12]] },
-  "渡劫": { n: 850, spin: 1.45, glow: 17, size: 2.9, rw: .71,
-    pal: [[255,255,255,.46],[150,185,255,.30],[80,120,235,.16],[220,235,255,.14]] },
-  "真仙": { n: 980, spin: 1.55, glow: 18, size: 3.1, rw: .73,
-    pal: [[255,255,255,.48],[150,240,205,.30],[90,190,150,.16],[230,255,244,.12]] },
-  "天仙": { n: 1120, spin: 1.68, glow: 21, size: 3.3, rw: .76,
-    pal: [[255,255,250,.52],[255,228,150,.30],[232,197,107,.18],[255,250,235,.16],[220,230,255,.10]] },
+  "凡人": { outer: [255, 236, 200], core: [255, 214, 150] },
+  "炼气": { outer: [180, 224, 250], core: [110, 190, 240] },
+  "筑基": { outer: [180, 240, 226], core: [ 96, 214, 190] },
+  "结丹": { outer: [255, 240, 190], core: [236, 199, 108] },
+  "元婴": { outer: [226, 208, 255], core: [186, 150, 248] },
+  "化神": { outer: [196, 234, 255], core: [ 96, 205, 252] },
+  "炼虚": { outer: [222, 206, 255], core: [176, 140, 250] },
+  "合体": { outer: [255, 208, 240], core: [248, 140, 214] },
+  "大乘": { outer: [255, 232, 196], core: [255, 178,  92] },
+  "渡劫": { outer: [222, 236, 255], core: [150, 185, 255] },
+  "真仙": { outer: [204, 255, 234], core: [146, 240, 200] },
+  "天仙": { outer: [255, 250, 216], core: [255, 224, 140] },
 };
 
-/* ---- 旋臂几何常数 ---- */
-const ARMS = 3;          // 旋臂条数
-const WIND = 3.4;        // 每臂总扭转 ~195°(弧形, 不风车)
-const ROT_K = 0.08;      // 公转系数: 实际角速度 = cfg.spin*ROT_K, 极慢
-const V_IN = 0.075;      // 向心流速: 外圈到丹田约 17 秒
-const S_MIN = 0.02;
-const LANE_HALF = 0.88;  // 臂"半宽"(rad): 加宽一倍后 3 臂覆盖大半个盘面
-const GOLD = [255, 205, 120];   // 丹田金丹统一金色
+/* 丹田几何：相对【角色框高度】的半径比。
+ * v3.3: 为什么用高度而不是宽度 —— 角色框宽高比 ≈ 825:835（近正方），
+ * 但真正决定"人物多大"的是高度（height:min(44vh,350px)，随视口变）。
+ * 以高为基准，丹田在任何屏幕上都稳定是人物高度的固定比例，不会忽大忽小。
+ *
+ * CORE_K = 0.030 → 350px 高的角色框上，丹体半径 ≈ 10.5px、直径 ≈ 21px。
+ *   这是"丹田"该有的存在感：一眼能看见，但不至于变成一颗大灯泡。
+ * HALO_K = 0.075 → 外晕半径 ≈ 26px。
+ *   ⚠️ 不要贪大：外晕是"托住丹体"的，半径一大、alpha 一高，
+ *   整块区域就被抬成一片平光，反而看不出中间有颗丹田（实测 alpha 0.26 时
+ *   剖面 -50..+50 全是 218~229，完全糊平）。
+ *   收窄到 0.075 且中心 alpha 压到 0.16，才能保住"中间亮、四周暗"的单峰。 */
+const CORE_K = 0.030;    // 丹体半径 / 角色框高
+const HALO_K = 0.075;    // 外晕半径 / 角色框高
 
-const TAU = Math.PI * 2;
-/* v1.7.20 PERF-2: 低端触屏设备 DPR 收敛到 1.5(帧缓冲像素约 -44%), 桌面/高性能保留 2 */
-function capFxDpr() {
-  let low = false;
-  try { low = matchMedia("(pointer: coarse)").matches; } catch (e) {}
-  try { if (navigator.deviceMemory && navigator.deviceMemory <= 4) low = true; } catch (e) {}
-  return Math.min(window.devicePixelRatio || 1, low ? 1.5 : 2);
-}
 let cv = null, ctx = null;
 let CW = 0, CH = 0, dpr = 1;
 let cfg = null, bigNow = null;
-let parts = [];
-let cx = 0, cy = 0, R = 0;
-let t = 0, eraT = 0, last = 0, raf = 0, resizeT = 0;   // eraT: 当前境界时长(金丹成长用)
-let fxRunning = false;                                 // 可见性守卫: 后台暂停绘制(省电)
-let sprites = {};
-/* v2.2 省电: 粒子旋臂为缓动动画, 30fps 观感无损 → GPU负载减半, 与 bg.js 背景层同帧率 */
+let cx = 0, cy = 0, R = 1;   // R = 角色框高度，由 resolveAnchor() 每帧刷新
+let t = 0, eraT = 0, last = 0, raf = 0, resizeT = 0;
+let fxRunning = false;
 let _lastPaint = 0;
 const FX_FRAME_MS = 33;   // ≈30fps
 
@@ -73,75 +67,52 @@ function curBig() {
   } catch (e) { return BIG_NAMES[0]; }
 }
 
-function pickColor() {
-  const pal = cfg.pal;
-  const tot = pal.reduce((s, p) => s + p[3], 0);
-  let v = Math.random() * tot;
-  for (let i = 0; i < pal.length; i++) { v -= pal[i][3]; if (v <= 0) return pal[i]; }
-  return pal[pal.length - 1];
-}
+/* ── 丹田锚点解析 ─────────────────────────────────────────────────
+ * 丹田必须长在角色身上，不能是固定屏幕比例。
+ *
+ * 两种驱动方式，锚点算法不同：
+ *   A. overlay 模式（主路径）：调用方给的就是一张【贴合角色框】的画布，
+ *      所以本层坐标系原点 = 角色框左上角。丹田位置直接取
+ *          (W/2, H*0.40)   —— 水平居中、垂直 40%（胸腔→下腹之间）
+ *      尺寸基准 R = H（角色框高）。完全不碰 DOM，零重排。
+ *   B. 独立模式（initFx）：画布是整屏的，此时才需要去 DOM 里量角色框。
+ * 用 _overlayMode 区分：overlay 模式由 fitManaged 之后置位。 */
+let _overlayMode = false;
 
-/* 柔光贴图: 中心白热(hot)或纯色 → 渐变到透明(无圈边/无白膜) */
-function softDot(col, hot) {
-  const key = col[0] + "," + col[1] + "," + col[2] + (hot ? "|hot" : "|soft");
-  if (sprites[key]) return sprites[key];
-  const S = 64, cv = document.createElement("canvas");
-  cv.width = cv.height = S;
-  const g = cv.getContext("2d");
-  const wb = hot ? 0.72 : 0;
-  const r0 = Math.round(col[0] + (255 - col[0]) * wb);
-  const g0 = Math.round(col[1] + (250 - col[1]) * wb);
-  const b0 = Math.round(col[2] + (242 - col[2]) * wb);
-  const grd = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
-  grd.addColorStop(0, "rgba(" + r0 + "," + g0 + "," + b0 + ",1)");
-  grd.addColorStop(0.4, "rgba(" + col[0] + "," + col[1] + "," + col[2] + ",0.45)");
-  grd.addColorStop(1, "rgba(" + col[0] + "," + col[1] + "," + col[2] + ",0)");
-  g.fillStyle = grd;
-  g.fillRect(0, 0, S, S);
-  sprites[key] = cv;
-  return cv;
-}
-
-function buildParticles(n) {
-  const perArm = n / ARMS;
-  /* 车道数随带宽与粒子预算走, 铺满加宽后的臂带 */
-  const L = Math.min(20, Math.max(6, Math.round(Math.sqrt(n / ARMS))));
-  const Q = Math.max(4, Math.round(n / (ARMS * L)));    // 沿臂横排数
-  const arr = [];
-  for (let k = 0; k < ARMS; k++) {
-    for (let q = 0; q < Q; q++) {
-      const s0 = S_MIN + (1 - S_MIN * 2) * (q + 0.5) / Q;
-      const spd = 0.93 + Math.random() * 0.14;
-      for (let i = 0; i < L; i++) {
-        const lo = L === 1 ? 0 : (i / (L - 1)) * 2 - 1;
-        const rr = Math.random();
-        arr.push({
-          arm: k, lo,
-          mode: rr < 0.10 ? 'glow' : (rr < 0.44 ? 'spark' : 'dot'),
-          s: s0 + (rr - 0.5) * (0.5 / Q),
-          spd,
-          sz: 0.75 + Math.random() * 0.6,
-          col: pickColor(),
-          ph: Math.random() * TAU,
-          rot: Math.random() * TAU,
-          mlen: 1.4 + Math.random() * 1.8,
-        });
+function resolveAnchor() {
+  if (_overlayMode) {
+    /* A. 画布已经是角色框本身 */
+    cx = CW * 0.5;
+    cy = CH * 0.40;
+    R = CH;
+    return;
+  }
+  /* B. 整屏画布：去量角色框 */
+  try {
+    const el = document.querySelector("#cult .bodyL") || document.getElementById("cult");
+    if (el) {
+      const b = el.getBoundingClientRect();
+      if (b.width > 8 && b.height > 8) {
+        cx = b.x + b.width * 0.5;
+        cy = b.y + b.height * 0.40;
+        R = b.height;
+        return;
       }
     }
-  }
-  const dustN = Math.max(60, Math.round(n * 0.3));
-  for (let i = 0; i < dustN; i++) {
-    arr.push({
-      arm: -1, mode: 'dust',
-      a: Math.random() * TAU,
-      s: 0.08 + Math.random() * 0.92,
-      sz: 0.5 + Math.random() * 0.6,
-      col: pickColor(),
-      ph: Math.random() * TAU,
-      tws: 0.6 + Math.random() * 1.4,
-    });
-  }
-  return arr;
+  } catch (e) { /* 落到下面的兜底 */ }
+  cx = CW * 0.5;
+  cy = CH * 0.72;
+  R = Math.min(CW, CH) * 0.5;
+}
+
+/* 由 40-app.js 的 overlay 宿主显式打开 overlay 模式 */
+export function setOverlayMode(on) { _overlayMode = !!on; }
+
+function capFxDpr() {
+  let low = false;
+  try { low = matchMedia("(pointer: coarse)").matches; } catch (e) {}
+  try { if (navigator.deviceMemory && navigator.deviceMemory <= 4) low = true; } catch (e) {}
+  return Math.min(window.devicePixelRatio || 1, low ? 1.5 : 2);
 }
 
 function fit() {
@@ -150,15 +121,13 @@ function fit() {
   if (!p) return;
   const w = p.clientWidth, h = p.clientHeight;
   if (!w || !h) return;
-  dpr = capFxDpr();   // v1.7.20 PERF-2: 低端收敛
+  dpr = capFxDpr();
   CW = w; CH = h;
   const bw = Math.round(w * dpr), bh = Math.round(h * dpr);
   if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
   ctx = cv.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  cx = CW / 2;
-  cy = CH * 0.56;
-  R = Math.min(CW, CH) * 0.5 * cfg.rw;
+  resolveAnchor();
 }
 
 /* v3.2 舞台驱动模式：canvas 由 60-stage 统一持有，尺寸由舞台给（逻辑像素），
@@ -168,19 +137,60 @@ function fitManaged(targetCtx, w, h) {
   CW = Math.max(1, w || 1);
   CH = Math.max(1, h || 1);
   if (!cfg) cfg = REALM_VIS[curBig()] || REALM_VIS["凡人"];
-  cx = CW / 2;
-  cy = CH * 0.56;
-  R = Math.min(CW, CH) * 0.5 * cfg.rw;
+  resolveAnchor();
 }
 
-function applyRealm(recreate) {
+function applyRealm() {
   cfg = REALM_VIS[curBig()] || REALM_VIS["凡人"];
-  eraT = 0;                                  // 每次换境界金丹重新"凝聚长大"
-  if (recreate) {
-    parts = buildParticles(cfg.n);
-    R = Math.min(CW, CH) * 0.5 * cfg.rw;
-    if (ctx) ctx.clearRect(0, 0, CW, CH);
-  }
+  eraT = 0;                                  // 每次换境界丹田重新"凝聚长大"
+}
+
+/* ── 丹田绘制 ─────────────────────────────────────────────────────
+ * 纯叠加发光：三层同心径向渐变，全部用 'lighter'。
+ * 这里用 lighter 是安全的 —— 三层是【同心圆】、不是四个散开的大光团，
+ * 叠加只让中心更亮，不会像 v3.2 旋臂层那样在大面积上泛色。
+ * 本层不吃身法倍速（呼吸是纯视觉，不该被 ×2 加速）。 */
+function draw(dt) {
+  resolveAnchor();   /* 每帧贴回角色身上（角色会随视口/呼吸微动） */
+  ctx.globalCompositeOperation = "lighter";
+  /* 换境界后 5 秒内从 55% 缓缓凝聚到 100% —— 保留原金丹的"成长"手感 */
+  const grow = Math.min(1, eraT / 5);
+  const coreR = R * CORE_K * (0.55 + 0.45 * grow);
+  const oc = cfg.outer, cc = cfg.core;
+
+  /* 1. 外圈柔光晕：慢呼吸，相位 0。刻意压淡 —— 它的职责是"托住"丹体，
+   *    不是自己发光。alpha 一高整块就糊成平光，单峰就没了。 */
+  const haloR = R * HALO_K * (0.94 + 0.06 * Math.sin(t * 0.55));
+  const g0 = ctx.createRadialGradient(cx, cy, 0, cx, cy, haloR);
+  g0.addColorStop(0.00, `rgba(${oc[0]},${oc[1]},${oc[2]},0.16)`);
+  g0.addColorStop(0.40, `rgba(${oc[0]},${oc[1]},${oc[2]},0.065)`);
+  g0.addColorStop(0.75, `rgba(${cc[0]},${cc[1]},${cc[2]},0.022)`);
+  g0.addColorStop(1.00, `rgba(${cc[0]},${cc[1]},${cc[2]},0)`);
+  ctx.fillStyle = g0;
+  ctx.beginPath(); ctx.arc(cx, cy, haloR, 0, Math.PI * 2); ctx.fill();
+
+  /* 2. 丹体：凝实的轮缘，呼吸比外晕快一档、相位错开 1.1，避免"整团一起胀"。
+   *    半径收在 coreR 内，保证亮度集中、外缘快速衰减。 */
+  const bodyR = coreR * (0.96 + 0.10 * Math.sin(t * 0.9 + 1.1));
+  const g1 = ctx.createRadialGradient(cx, cy, 0, cx, cy, bodyR);
+  g1.addColorStop(0.00, `rgba(${cc[0]},${cc[1]},${cc[2]},0.70)`);
+  g1.addColorStop(0.30, `rgba(${cc[0]},${cc[1]},${cc[2]},0.34)`);
+  g1.addColorStop(0.62, `rgba(${cc[0]},${cc[1]},${cc[2]},0.10)`);
+  g1.addColorStop(0.85, `rgba(${oc[0]},${oc[1]},${oc[2]},0.028)`);
+  g1.addColorStop(1.00, `rgba(${oc[0]},${oc[1]},${oc[2]},0)`);
+  ctx.fillStyle = g1;
+  ctx.beginPath(); ctx.arc(cx, cy, bodyR, 0, Math.PI * 2); ctx.fill();
+
+  /* 3. 最中心一点白热（凝实感）—— 原旋臂层的核心保留项 */
+  const r2 = bodyR * 0.46;
+  const g2 = ctx.createRadialGradient(cx, cy, 0, cx, cy, r2);
+  g2.addColorStop(0, "rgba(255,244,214,0.86)");
+  g2.addColorStop(0.45, "rgba(255,238,198,0.30)");
+  g2.addColorStop(1, "rgba(255,238,198,0)");
+  ctx.fillStyle = g2;
+  ctx.beginPath(); ctx.arc(cx, cy, r2, 0, Math.PI * 2); ctx.fill();
+
+  ctx.globalCompositeOperation = "source-over";
 }
 
 function loop(now) {
@@ -207,7 +217,7 @@ function loop(now) {
   }
   if (!ctx || CW < 4) return;
   const b = curBig();
-  if (b !== bigNow) { bigNow = b; applyRealm(true); }
+  if (b !== bigNow) { bigNow = b; applyRealm(); }
   t += dt;
   eraT += dt;
   draw(dt);
@@ -218,102 +228,10 @@ function loop(now) {
 function renderFrame(dt) {
   if (!ctx || CW < 4) return;
   const b = curBig();
-  if (b !== bigNow) { bigNow = b; applyRealm(true); }
+  if (b !== bigNow) { bigNow = b; applyRealm(); }
   t += dt;
   eraT += dt;
   draw(dt);
-}
-
-/* 白热十字星芒: 柔光核心 + 4 轴细芒 */
-function starBurst(x, y, size, col, alpha, rot, len) {
-  ctx.globalAlpha = alpha;
-  ctx.drawImage(softDot(col, true), x - size, y - size, size * 2, size * 2);
-  ctx.globalAlpha = alpha * 0.6;
-  ctx.strokeStyle = "rgba(255,252,244,1)";
-  ctx.lineWidth = Math.max(0.6, size * 0.14);
-  ctx.beginPath();
-  for (let d = 0; d < 4; d++) {
-    const a = rot + d * Math.PI / 2;
-    ctx.moveTo(x - Math.cos(a) * len, y - Math.sin(a) * len);
-    ctx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len);
-  }
-  ctx.stroke();
-}
-
-function draw(dt) {
-  ctx.clearRect(0, 0, CW, CH);
-  ctx.globalCompositeOperation = "lighter";
-
-  const sc = Math.min(1.3, Math.max(0.8, CW / 430));
-  const rot = t * cfg.spin * ROT_K;
-
-  /* 金丹(统一金色): 换境界后 5 秒内从约一半缓缓凝聚到上限 0.20R, 之后恒定 */
-  const grow = Math.min(1, eraT / 5);
-  const coreR = R * 0.20 * (0.55 + 0.45 * grow);
-  const gg = GOLD;
-  const g1 = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
-  g1.addColorStop(0, "rgba(" + gg[0] + "," + gg[1] + "," + gg[2] + ",0.68)");
-  g1.addColorStop(0.3, "rgba(" + gg[0] + "," + gg[1] + "," + gg[2] + ",0.30)");
-  g1.addColorStop(1, "rgba(255,190,110,0)");
-  ctx.fillStyle = g1;
-  ctx.globalAlpha = 1;
-  ctx.beginPath(); ctx.arc(cx, cy, coreR, 0, TAU); ctx.fill();
-  /* 金丹最中心一点白热(凝实感) */
-  const r2 = coreR * 0.5;
-  const g2 = ctx.createRadialGradient(cx, cy, 0, cx, cy, r2);
-  g2.addColorStop(0, "rgba(255,240,200,0.9)");
-  g2.addColorStop(1, "rgba(255,240,200,0)");
-  ctx.fillStyle = g2;
-  ctx.beginPath(); ctx.arc(cx, cy, r2, 0, TAU); ctx.fill();
-
-  const stepA = TAU / ARMS;
-  for (let i = 0; i < parts.length; i++) {
-    const p = parts[i];
-    const fall = 0.30 + 0.70 * p.s;
-    const rad = p.s * R;
-
-    if (p.mode === 'dust') {
-      p.a += dt * cfg.spin * ROT_K * 0.35;
-      const x = cx + Math.cos(p.a) * rad;
-      const y = cy + Math.sin(p.a) * rad * 0.94;
-      const tw = 0.55 + 0.45 * Math.sin(t * p.tws + p.ph);
-      const r = cfg.size * p.sz * fall * sc * 0.42;
-      ctx.globalAlpha = 0.30 * tw;
-      ctx.drawImage(softDot(p.col), x - r, y - r, r * 2, r * 2);
-      continue;
-    }
-
-    p.s -= dt * V_IN * p.spd * (0.55 + 0.45 * p.s);
-    if (p.s < S_MIN) {
-      p.s = 1.0;
-      p.col = pickColor();
-      continue;
-    }
-    const th = p.arm * stepA + WIND * (1 - p.s) + rot
-               + p.lo * LANE_HALF * Math.max(p.s, 0.5);
-    const x = cx + Math.cos(th) * rad;
-    const y = cy + Math.sin(th) * rad * 0.94;
-
-    const tw = 0.78 + 0.22 * Math.sin(t * 2.0 + p.ph * 3);
-    const base = cfg.size * p.sz * fall * sc;
-    const fIn = Math.min(1, (1 - p.s) / 0.07);
-    const fOut = Math.min(1, (p.s - S_MIN) / 0.14);
-    const fade = fIn < fOut ? fIn : fOut;
-    const a = tw * fade;
-
-    if (p.mode === 'glow') {
-      const r = base * 1.7;
-      ctx.globalAlpha = 0.9 * a;
-      ctx.drawImage(softDot(p.col, true), x - r, y - r, r * 2, r * 2);
-    } else if (p.mode === 'spark') {
-      starBurst(x, y, base * 0.9, p.col, 0.95 * a, p.rot, base * p.mlen);
-    } else {
-      const r = base * 0.55;
-      ctx.globalAlpha = 0.62 * a;
-      ctx.drawImage(softDot(p.col), x - r, y - r, r * 2, r * 2);
-    }
-  }
-  ctx.globalAlpha = 1;
 }
 
 export function initFx(canvas) {
@@ -322,7 +240,7 @@ export function initFx(canvas) {
   bigNow = curBig();
   fit();
   if (!ctx) return;
-  applyRealm(true);
+  applyRealm();
   last = performance.now();
   cancelAnimationFrame(raf);
   fxRunning = true;
@@ -332,14 +250,15 @@ export function initFx(canvas) {
 
 /* v3.2 舞台驱动版入口：返回 60-stage 契约对象 { name, draw, resize }。
  * 本层不再自持 rAF、不再监听 visibilitychange（舞台统一处理）、
- * 不再监听 fx-suspend / fx-resume（舞台统一暂停整条链）。 */
+ * 不再监听 fx-suspend / fx-resume（舞台统一暂停整条链）。
+ *
+ * v3.3: 层名从 "fx2d" 改为 "dantian" —— 它现在只画丹田，名字要跟内容一致。 */
 export function createFxLayer() {
   bigNow = curBig();
   cfg = REALM_VIS[bigNow] || REALM_VIS["凡人"];
-  parts = buildParticles(cfg.n);
   t = 0; eraT = 0;
   return {
-    name: "fx2d",
+    name: "dantian",
     resize(_W, _H) { /* 真实尺寸在首帧 draw 时由舞台注入，见下 */ },
     draw(targetCtx, W, H, dt) {
       if (CW !== W || CH !== H || ctx !== targetCtx) fitManaged(targetCtx, W, H);
@@ -361,3 +280,4 @@ document.addEventListener("fx-suspend", () => {
 document.addEventListener("fx-resume", () => {
   if (!fxRunning && !document.hidden) { fxRunning = true; last = performance.now(); raf = requestAnimationFrame(loop); }
 });
+

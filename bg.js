@@ -38,8 +38,16 @@ const NEB_CFG = [
 /* 银河: 对角微光丝带上的细小星尘 (确定性 mulberry32) */
 const GALAXY_N = 150;
 const GALAXY_A = 0.10;       // 单点峰值 alpha
-/* 纸月(右上角; fx/fy 为 0..1 屏幕分数坐标, 与 NEB_CFG 同规) */
-const MOON = { fx: 0.80, fy: 0.24, size: 0.125 };
+/* 纸月(右上角; fx/fy 为 0..1 屏幕分数坐标, 与 NEB_CFG 同规)
+ * v3.3: fy 从 0.24 上移到 0.135。
+ *   原因：v3.2 起战斗层是一条固定横带（top=92, height=0.56*vh-176），
+ *   它会在自己的区域内铺不透明底色。fy=0.24 在 860 高屏上 ≈ y207，
+ *   正好落进横带 —— 月亮被战斗区底色压住，观感上就是"月亮没了"。
+ *   上移到 0.135 后，月亮稳定待在**横带之上**的纯净夜空里（也避开顶部 HUD），
+ *   这才是"右上角挂一盏月亮"该在的位置。
+ * size 相应放大到 0.15：月亮本体 = 2*ms*rr/S ≈ 0.15*max(W,H)*0.80，
+ *   在 860 高屏上直径约 103px，清晰但不喧宾夺主。 */
+const MOON = { fx: 0.80, fy: 0.135, size: 0.15 };
 /* 流云(极淡横带, 缓慢漂移, 制造"墨气"层次) */
 const CLOUD_N = 2;
 const CLOUD_SPD = [7, 13];   // 横穿周期秒数(越长越慢)
@@ -123,39 +131,44 @@ function cloudStrip() {
   _sp[key] = cv;
   return cv;
 }
-// 纸月: 暖白月轮 + 内晕 + 外晕(旧金/纸白)
+/* 纸月: 暖白月轮 + 内晕 + 外晕(旧金/纸白)
+ *
+ * v3.3 修正：月轮本身做"实"而不是靠混合模式推亮。
+ *   背景是墨夜星空（很暗），一旦用 screen/lighter 去"提亮"，
+ *   月轮就会跟它自己的外晕糊成一片白斑，轮缘反而消失。
+ *   正解是 sprite 里就把轮体画成不透明实心（alpha 1.0）、
+ *   外晕压到极淡作为真·光环 —— 之后无论用什么混合模式，轮体都是实心的。 */
 function moonSprite() {
   const key = "moon";
   if (_sp[key]) return _sp[key];
   const S = 320, c = S / 2, cv = document.createElement("canvas");
   cv.width = cv.height = S;
   const g = cv.getContext("2d");
-  const moon = [242, 236, 218];
-  // 外晕(极淡金)
-  let grd = g.createRadialGradient(c, c, 0, c, c, c * 0.94);
-  grd.addColorStop(0, "rgba(231,206,150,0.20)");
-  grd.addColorStop(0.45, "rgba(231,206,150,0.10)");
-  grd.addColorStop(0.75, "rgba(233,226,208,0.035)");
+  /* 外晕(极淡金) —— 收窄、压淡，让它只是"光环" */
+  let grd = g.createRadialGradient(c, c, 0, c, c, c * 0.90);
+  grd.addColorStop(0, "rgba(226,206,164,0.14)");
+  grd.addColorStop(0.40, "rgba(228,212,178,0.065)");
+  grd.addColorStop(0.74, "rgba(233,226,208,0.022)");
   grd.addColorStop(1, "rgba(233,226,208,0)");
   g.fillStyle = grd; g.fillRect(0, 0, S, S);
-  // 内晕(纸白)
-  grd = g.createRadialGradient(c, c, 0, c, c, c * 0.55);
-  grd.addColorStop(0, "rgba(242,236,218,0.18)");
-  grd.addColorStop(1, "rgba(242,236,218,0)");
-  g.fillStyle = grd; g.fillRect(0, 0, S, S);
-  // 月轮(非纯圆: 左侧略"纸边"阴影, 见 DESIGN 的不完美)
-  const rr = c * 0.30;
-  grd = g.createRadialGradient(c - rr * 0.1, c - rr * 0.08, rr * 0.1, c, c, rr);
-  grd.addColorStop(0.00, "rgba(250,246,232,1)");
-  grd.addColorStop(0.62, "rgba(242,236,218,0.98)");
-  grd.addColorStop(0.88, "rgba(226,216,196,0.72)");
-  grd.addColorStop(1.00, "rgba(226,216,196,0)");
+
+  /* 月轮 —— 实心、不透明；外缘只留 3% 做 1 像素级柔和收边（防锯齿）
+   * rr = c*0.40：sprite 会被拉到 2*ms，月轮在屏上占 2*ms*0.40 ≈ 0.8*ms，
+   * 即"月亮本体比它的光晕小一圈"，这才是月亮该有的比例。 */
+  const rr = c * 0.40;
+  grd = g.createRadialGradient(c - rr * 0.12, c - rr * 0.10, rr * 0.06, c, c, rr);
+  grd.addColorStop(0.00, "rgba(255,253,247,1)");
+  grd.addColorStop(0.42, "rgba(250,246,234,1)");
+  grd.addColorStop(0.80, "rgba(243,237,220,1)");
+  grd.addColorStop(0.97, "rgba(234,225,204,1)");
+  grd.addColorStop(1.00, "rgba(232,222,200,0)");
   g.fillStyle = grd; g.beginPath(); g.arc(c, c, rr, 0, TAU); g.fill();
-  // 月面两三点淡影(砚渍意象, 极淡)
-  g.fillStyle = "rgba(190,178,150,0.16)";
-  g.beginPath(); g.arc(c + rr * 0.18, c - rr * 0.22, rr * 0.16, 0, TAU); g.fill();
-  g.fillStyle = "rgba(190,178,150,0.10)";
-  g.beginPath(); g.arc(c - rr * 0.30, c + rr * 0.10, rr * 0.22, 0, TAU); g.fill();
+
+  /* 月面两三点淡影(砚渍意象, 极淡) */
+  g.fillStyle = "rgba(186,174,148,0.15)";
+  g.beginPath(); g.arc(c + rr * 0.20, c - rr * 0.24, rr * 0.17, 0, TAU); g.fill();
+  g.fillStyle = "rgba(186,174,148,0.09)";
+  g.beginPath(); g.arc(c - rr * 0.32, c + rr * 0.12, rr * 0.23, 0, TAU); g.fill();
   _sp[key] = cv;
   return cv;
 }
@@ -339,11 +352,18 @@ function initDeepSpace(canvas, opts) {
     const ms = MOON.size * Math.max(W, H);
     moon.x = (MOON.fx * W) + camX * 0.3;
     moon.y = (MOON.fy * H) + camY * 0.3;
-    const breathe = 0.96 + 0.04 * Math.sin(T * 0.16 + 1.2);
-    g.globalAlpha = 0.92 * breathe;
-    g.drawImage(moonCv, moon.x - ms, moon.y - ms, ms * 2, ms * 2);
-
+    const breathe = 0.97 + 0.03 * Math.sin(T * 0.16 + 1.2);
+    /* v3.3: 改回 source-over（普通混合）。
+     *   月轮 sprite 本身已经是【不透明实心 + 极淡外晕】，这正是月亮该有的样子 ——
+     *   不需要任何混合模式帮忙"提亮"。
+     *   screen 会把轮体与背景一起 `1-(1-a)(1-b)` 推白、轮缘消失（v3.2 实测变成一团
+     *   灰白云雾）；lighter 更糟（直接曝掉）。普通混合保留 sprite 原样，
+     *   轮体就是实心的暖白盘，外晕叠在夜空中自然衰减。
+     *   呼吸只动 alpha 0.97~1.0，不动机位 —— 月亮不该"闪"。 */
     g.globalCompositeOperation = "source-over";
+    g.globalAlpha = breathe;
+    g.drawImage(moonCv, moon.x - ms, moon.y - ms, ms * 2, ms * 2);
+    g.globalAlpha = 1;
 
     /* 5. 流云(极淡, 普通混合更"墨") */
     for (let i = 0; i < CLOUD_N; i++) {
