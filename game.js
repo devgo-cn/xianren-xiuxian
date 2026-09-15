@@ -3779,11 +3779,16 @@ function startGame() {
   initFxDiag();
   initFxLayer();
   let lastLoop = performance.now();
+  /* v2.6 PERF: 30fps 限帧 —— 主循环原为无上限 rAF(120Hz手机全速空转, 耗电主因之一);
+   * UI 均为缓动动画, 30fps 观感无损, 帧率减半即功耗减半。 */
+  let _lastPaint = 0;
   (function main() {
     const now = performance.now();
+    requestAnimationFrame(main);
+    if (now - _lastPaint < 33) return;   // ≈30fps: 不足33ms跳过本帧(仍续帧)
+    _lastPaint = now;
     const dt = Math.min(.1, (now - lastLoop) / 1000); lastLoop = now;
     loop(dt);
-    requestAnimationFrame(main);
   })();
 }
 
@@ -4558,6 +4563,8 @@ function enterDim() {
   SND.mute(true);                                  // 音乐 + 音效 全关(硬静音, 音效不会自己跳出来)
   try { if (window.__bgCtrl && window.__bgCtrl.pause) window.__bgCtrl.pause(); } catch (e) {}
   try { if (window.BattleAPI && window.BattleAPI.pause) window.BattleAPI.pause(); } catch (e) {}
+  /* v2.6 省电: 黑屏挂机页面盖住主页 → 停掉 fx2d 旋臂动画的 rAF */
+  try { document.dispatchEvent(new CustomEvent("fx-suspend")); } catch (e) {}
   resetDimKnob();
 }
 
@@ -4569,6 +4576,8 @@ function exitDim() {
   SND.mute(false);                                 // 按玩家原有开关恢复
   try { if (window.__bgCtrl && window.__bgCtrl.resume) window.__bgCtrl.resume(); } catch (e) {}
   try { if (window.BattleAPI && window.BattleAPI.resume) window.BattleAPI.resume(); } catch (e) {}
+  /* v2.6 省电: 回到主页 → 恢复 fx2d 旋臂动画 */
+  try { document.dispatchEvent(new CustomEvent("fx-resume")); } catch (e) {}
 }
 
 /* 滑动解锁: 拖到 88% 处松手才进游戏 */

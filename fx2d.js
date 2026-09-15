@@ -304,3 +304,11 @@ function onVisFx() {
   if (document.hidden) { fxRunning = false; cancelAnimationFrame(raf); }
   else if (!fxRunning) { fxRunning = true; last = performance.now(); raf = requestAnimationFrame(loop); }
 }
+/* v2.6 省电: 黑屏挂机(body.dimmed)时主页被盖住, 由 game.js enterDim/exitDim 派发事件停/启 rAF
+ * (visibilitychange 只管页面切走, 管不了页内黑屏场景) */
+document.addEventListener("fx-suspend", () => {
+  if (fxRunning) { fxRunning = false; cancelAnimationFrame(raf); }
+});
+document.addEventListener("fx-resume", () => {
+  if (!fxRunning && !document.hidden) { fxRunning = true; last = performance.now(); raf = requestAnimationFrame(loop); }
+});
