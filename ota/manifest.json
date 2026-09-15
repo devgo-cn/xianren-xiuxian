@@ -140,12 +140,12 @@
     "assets/ui_icons/icon_skill.webp": "9f4120ba7855ce3ed6012766534ff8f068521508f4814b763463337447d9ccd6",
     "assets/ui_icons/icon_story.webp": "92ff84146f80a3d7f9a6479c477113caf2e4017ffe10767dd866be4ea378c003",
     "assets/ui_icons/icon_treasure.webp": "fe0b83d8ece23ab09b23a013e18299de7335ba1917666a7970726e00b7eb7e17",
-    "bg.js": "d61cf11f268274f8bcdbea5aac1da08eb3f58b59e82b650b0d1f178803343954",
+    "bg.js": "1087cce6f416df6afa9b9baa086bcc175e51e386c023a5105b3946a323ebfd6e",
     "dt-theme.css": "966776886a5ee4495e35b181e2be9cf0cae55637b7a494b48ec39eb779864505",
-    "fx2d.js": "4e1608e45c805bcee9360d9b7d873ca49b1425633c7adcb445a19d4fcd059149",
-    "game.js": "09db74f81d835f01f9101bff3e7911fe79c7d81402155fefc4ccde914705fc07",
-    "index.html": "c47d8b5083de2403366392cbca27d9f46c39079eb2bb9684f8cc447eaf825ca9"
+    "fx2d.js": "77b1960de50c40a2a0be652c3ce56e7c613bbdd79b45640dd1a13cccf4640497",
+    "game.js": "1b28533f3bd1f3409a485e153cdf4d6270f9caf5be04b2030636ccc0d6d4d44a",
+    "index.html": "7e54ab17db0508ee76aac1f0e8d8723f21d41df9b2844241a9760f17eaeb8d50"
   },
-  "rev": "e86e697a217802c8",
+  "rev": "a746ff60b11f2725",
   "version": "2.4"
 }
