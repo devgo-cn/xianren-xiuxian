@@ -59,9 +59,10 @@ import { SND } from './10-base.js';
   const spriteImg = new Image();
   spriteImg.onload = function() { G.sprite = spriteImg; G.spriteReady = true; };
   spriteImg.src = 'assets/cultivator_sheet.webp';
+  /* 怪物素材: 幽夜森林(像素风, v3.7 换新背景) */
   const bgImg = new Image();
   bgImg.onload = function() { G.bgImg = bgImg; G.bgReady = true; };
-  bgImg.src = 'assets/main-bg.jpg';
+  bgImg.src = 'assets/battle-forest-bg.webp';
   /* 怪物素材: 绿色史莱姆 */
   const slimeImg = new Image();
   slimeImg.onload = function() { G.slimeSprite = slimeImg; G.slimeReady = true; };
@@ -282,7 +283,7 @@ import { SND } from './10-base.js';
   };
 
   function makePlayer() {
-    return { x:0,y:0, hp:PST.hp,maxHp:PST.hp, atk:PST.atk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0,stun:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false, attackTarget:null, hit1:false, hit2:false, hit3:false, sanlianTriggered:false, atkBuff:0, atkBuffTimer:0, skillAnim:false, skillFrame:0, skillTimer:0, skillHit:false, skillCooldown:0, skillTarget:null };
+    return { x:0,y:laneOff(1), lane:1, hp:PST.hp,maxHp:PST.hp, atk:PST.atk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0,stun:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false, attackTarget:null, hit1:false, hit2:false, hit3:false, sanlianTriggered:false, atkBuff:0, atkBuffTimer:0, skillAnim:false, skillFrame:0, skillTimer:0, skillHit:false, skillCooldown:0, skillTarget:null };
   }
   /* 怪物成长系统: 三围随玩家境界 lv 线性成长(怪只吃境界, 不吃装备 → 换装备=变快) */
   function makeEnemy(type) {
@@ -293,7 +294,8 @@ import { SND } from './10-base.js';
     let atk = Math.round((8 + 5*lv)   * def.atkK);
     const dfn = Math.round((2 + 2*lv)   * def.defK);
     if (elite) { hp = Math.round(hp*DROP.eliteHp); atk = Math.round(atk*1.2); }
-    const r = { type,name:def.name,role:def.role, elite, x:0,y:0, hp,maxHp:hp, atk, def:dfn,
+    const lane = (Math.random() * LANES) | 0;   /* v3.7: 三车道随机刷怪 */
+    const r = { type,name:def.name,role:def.role, elite, lane, y:laneOff(lane), x:0, hp,maxHp:hp, atk, def:dfn,
       atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2)*(elite?0.85:1), color:def.color,
       atkT:Math.random()*0.6, anim:0,hurtT:0,stun:0, alive:true,dying:0,reach:1, animFrame:0, animTimer:0, moving:false };
     /* 骨骼怪: 工厂就绪时建一只独立骨架实例(每只怪动画独立推进) */
@@ -311,6 +313,7 @@ import { SND } from './10-base.js';
       const e = makeEnemy('boss');
       e.x = G.camX + stageW() + BC.enemySpawnOffset;
       e.elite = true;  /* BOSS标记为精英 */
+      e.lane = 1; e.y = laneOff(1);   /* BOSS 固定中道, 突出存在感 */
       G.enemies.push(e);
       G.bossActive = true;
       G.smallKillsSinceBoss = 0;
@@ -434,12 +437,12 @@ import { SND } from './10-base.js';
       try { if (window.BattleAPI.onDrop) window.BattleAPI.onDrop({ spirit: val, elite: !!elite, enemy: e.name }); } catch (err) {}
       return;
     }
-    G.drops.push({ kind: 'spirit', wx: e.x, x: worldToScreen(e.x), y: floorY() - 12, vy: -70,
+    G.drops.push({ kind: 'spirit', wx: e.x, x: worldToScreen(e.x), y: floorY() + e.y - 12, gy: e.y, vy: -70,
       val, elite: !!elite, enemy: e.name, t: 0, flyAt: 1.0 + Math.random() * 0.8, phase: 'land' });
   }
   function spawnEquipDrop(e, eq) {
     const img = new Image(); img.src = eq.icon; img.onerror = function () {};
-    G.drops.push({ kind: 'equip', wx: e.x, x: worldToScreen(e.x), y: floorY() - 14, vy: -80,
+    G.drops.push({ kind: 'equip', wx: e.x, x: worldToScreen(e.x), y: floorY() + e.y - 14, gy: e.y, vy: -80,
       eq, img, t: 0, t2: 0, scale: 0, phase: 'wait', claimed: false });
   }
   function updateDrops(dt) {
@@ -449,7 +452,7 @@ import { SND } from './10-base.js';
       if (d.kind === 'spirit') {
         if (d.phase === 'land') {
           d.x = worldToScreen(d.wx); d.y += d.vy * dt; d.vy += 320 * dt;
-          const fy = floorY() - 12;
+          const fy = floorY() + (d.gy || 0) - 12;   /* v3.7: 落在自己车道上 */
           if (d.y >= fy) { d.y = fy; d.vy = 0; d.phase = 'wait'; }
         } else if (d.phase === 'wait') {
           d.x = worldToScreen(d.wx);
@@ -494,7 +497,7 @@ import { SND } from './10-base.js';
         /* 贴地阴影(未起飞时) */
         if (d.phase === 'wait' || d.phase === 'fetch' || d.phase === 'land') {
           ctx.save(); ctx.globalAlpha = 0.22; ctx.fillStyle = '#000';
-          ctx.beginPath(); ctx.ellipse(d.x, floorY() - 4, 10 * sc, 3 * sc, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+          ctx.beginPath(); ctx.ellipse(d.x, floorY() + (d.gy || 0) - 4, 10 * sc, 3 * sc, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
         }
         ctx.save(); ctx.translate(d.x, d.y - 14 * sc); ctx.scale(sc, sc);
         ctx.globalAlpha = 0.5; ctx.strokeStyle = dropRarityColor(d.eq.q); ctx.lineWidth = 2;
@@ -573,9 +576,10 @@ import { SND } from './10-base.js';
       if (!target.alive) return;
     }
   }
-  function findNearestEnemy(fromX, maxDist) {
+  /* v3.7: 寻怪限定车道 —— 同道才算"可打目标"; 跨道由玩家换道解决(见 updatePlayer 寻道块) */
+  function findNearestEnemy(lane, fromX, maxDist) {
     let best=null, bestD=maxDist||Infinity;
-    for (const e of G.enemies) { if (!e.alive||e.dying>0) continue; const d=Math.abs(e.x-fromX); if (d<bestD){bestD=d;best=e;} }
+    for (const e of G.enemies) { if (!e.alive||e.dying>0||e.lane!==lane) continue; const d=Math.abs(e.x-fromX); if (d<bestD){bestD=d;best=e;} }
     return best;
   }
   function dealDamage(target, amount, color, crit) {
@@ -690,7 +694,25 @@ import { SND } from './10-base.js';
         if (p.animFrame === 18 && p.moving) playSfx('footstep', 0.5);
       }
     }
-    const near = findNearestEnemy(p.x, p.atkRange+200);
+    /* v3.7 三车道寻道: 攻击/技能动画不打断; 本道还有活怪就就地清, 清空了才换到
+     * "最近有怪"的车道; 三道全清回中道(中间起步位, 视觉均衡)。
+     * 换道只改 p.lane, 纵向位移由下面的 y 平滑过渡完成 —— 走位感而不是瞬移。 */
+    if (!p.attackAnim && !p.skillAnim) {
+      const sameLaneAlive = G.enemies.some(e => e.alive && e.dying <= 0 && e.lane === p.lane);
+      if (!sameLaneAlive) {
+        let best = -1, bestD = Infinity;
+        for (let L = 0; L < LANES; L++) {
+          if (L === p.lane) continue;
+          const e = findNearestEnemy(L, p.x, Infinity);
+          if (e) { const d = Math.abs(e.x - p.x); if (d < bestD) { bestD = d; best = L; } }
+        }
+        p.lane = best >= 0 ? best : 1;
+      }
+    }
+    /* 车道 y 平滑过渡(带轻微跳跃弧线: 换道时先快后慢) */
+    p.y += (laneOff(p.lane) - p.y) * Math.min(1, dt * 7);
+
+    const near = findNearestEnemy(p.lane, p.x, p.atkRange+200);
     /* 攻击动画播放期间不中断，保持攻击状态 */
     if (p.attackAnim) {
       p.moving = 0;
@@ -757,7 +779,7 @@ import { SND } from './10-base.js';
       }
       if (pet.fetch && pet.fetch.state === 'carry') {
         const d = pet.fetch.drop;
-        const tx = p.x + pet.offsetX, ty = floorY() + pet.offsetY, dx = tx - pet.x, dy = ty - pet.y, dist = Math.hypot(dx, dy), spd = 380;
+        const tx = p.x + pet.offsetX, ty = floorY() + p.y + pet.offsetY, dx = tx - pet.x, dy = ty - pet.y, dist = Math.hypot(dx, dy), spd = 380;
         if (dist <= spd * dt || dist < 8) { pet.x = tx; pet.y = ty; }
         else { pet.x += dx / dist * spd * dt; pet.y += dy / dist * spd * dt; }
         d.x = worldToScreen(pet.x); d.y = pet.y - 6;             // 装备贴在宠物身上
@@ -774,9 +796,9 @@ import { SND } from './10-base.js';
       }
       /* 上下浮动 */
       pet.bobT += dt * 2.5;
-      /* 跟随玩家: 左上方, 平滑跟随 (基于地板位置, 不是p.y=0) */
+      /* 跟随玩家: 左上方, 平滑跟随 (v3.7: 跟玩家所在车道, 不是固定地板) */
       const targetX = p.x + pet.offsetX;
-      const targetY = floorY() + pet.offsetY + Math.sin(pet.bobT) * 3;
+      const targetY = floorY() + p.y + pet.offsetY + Math.sin(pet.bobT) * 3;
       pet.x += (targetX - pet.x) * Math.min(1, dt * 6);
       pet.y += (targetY - pet.y) * Math.min(1, dt * 6);
 
@@ -847,13 +869,16 @@ import { SND } from './10-base.js';
   }
   function updateEnemies(dt) {
     const p = G.player;
-    /* 排队: 近的先站位, 后面的依次后挪一个身位 —— 否则所有怪挤在同一点完全重叠 */
-    const queue = G.enemies.filter(e => e.alive && e.dying <= 0).sort((a, b) => a.x - b.x);
-    let prevX = -1e9;
-    for (const e of queue) {
-      const stopX = Math.max(p.x + e.atkRange, prevX + BC.queueGap);
-      e.stopX = stopX;
-      prevX = Math.max(e.x, stopX);
+    /* v3.7 排队按车道分组: 每条车道独立排队 —— 近的先站位, 后面的依次后挪一个身位。
+     * 不同车道互不影响(各道都有一列纵队向玩家逼近)。 */
+    for (let L = 0; L < LANES; L++) {
+      const queue = G.enemies.filter(e => e.alive && e.dying <= 0 && e.lane === L).sort((a, b) => a.x - b.x);
+      let prevX = -1e9;
+      for (const e of queue) {
+        const stopX = Math.max(p.x + e.atkRange, prevX + BC.queueGap);
+        e.stopX = stopX;
+        prevX = Math.max(e.x, stopX);
+      }
     }
     for (const e of G.enemies) {
       if (e.dying>0) { e.dying-=dt; if (e.armature) advanceRatty(e, dt, true); continue; }
@@ -887,7 +912,8 @@ import { SND } from './10-base.js';
       e.moving = e.x > stopX+2;
       if (e.x > stopX+2) e.x = Math.max(stopX, e.x-e.speed*dt);
       const wasAttacking = e.anim > 0;
-      if (Math.abs(e.x-p.x) <= e.atkRange+5 && e.atkT <= 0) {
+      /* v3.7 攻击判定加同道条件: 不同车道的怪贴得再近也打不到玩家(各道独立交战) */
+      if (e.lane === p.lane && Math.abs(e.x-p.x) <= e.atkRange+5 && e.atkT <= 0) {
         e.anim = 1; e.atkT = 1/(0.8+Math.random()*0.5); e.animFrame = 0;
         /* 攻击音效: 攻击开始时 */
         if (!wasAttacking) {
@@ -959,6 +985,14 @@ import { SND } from './10-base.js';
   function stageW() { return CW; }
   function stageH() { return CH; }
   function floorY() { return CH * 0.82; }
+  /* v3.7 三车道: lane 0 最近(地板基线), 1 居中, 2 最远(靠上), 纵向错开 26px 制造纵深。
+   * 实体的 y 字段 = 车道偏移(负值) —— 特效/伤害数字/宠物/掉落全部从实体 y 推导,
+   * 因此只要实体带 y, 整条表现链自动跟道, 无需逐处改坐标。 */
+  const LANES = 3;
+  const LANE_GAP = 26;
+  function laneOff(lane) { return -(LANES - 1 - lane) * LANE_GAP; }
+  /* 纵深缩放: 越远的道越小一档(0.88/0.94/1.0), 强化三车道空间感 */
+  function laneScale(lane) { return 1 - (LANES - 1 - lane) * 0.06; }
   function initCanvas() {
     cv = document.getElementById('battleCanvas');
     if (!cv) return false;
@@ -1033,17 +1067,35 @@ import { SND } from './10-base.js';
     }
   }
   function drawBg() {
-    /* 战斗区背景完全透明，直接叠加在原游戏墨夜星空(canvas#bg)上 */
+    /* v3.7 幽夜森林背景: 随摄像机 0.5 视差滚动, 【镜像交替平铺】实现左右无限无缝拼接。
+     * 手法: 把图按宽度切成份, 全局份序号奇偶交替 —— 偶数份原图、奇数份水平翻转。
+     * 任何图与自身镜像在边缘处像素级对称(数学保证), 相邻份交接处必然无缝,
+     * 不要求素材本身可循环平铺。周期 = 2×drawW(正+反一循环)。 */
     const fy = floorY();
-    drawClouds();
-    /* 地板线：2px 旧金色细线 + 上缘高光 */
-    ctx.strokeStyle = 'rgba(180,170,140,0.28)';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(0, fy); ctx.lineTo(CW, fy); ctx.stroke();
-    ctx.strokeStyle = 'rgba(240,230,200,0.10)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, fy - 1.5); ctx.lineTo(CW, fy - 1.5); ctx.stroke();
-    drawGround();
+    if (G.bgReady && G.bgImg) {
+      const drawH = CH;                           /* 画满整条战斗横带(地板下方延续石板路, 无黑边) */
+      const drawW = drawH * (G.bgImg.width / G.bgImg.height);
+      const period = drawW * 2;
+      const off = ((G.camX * 0.5) % period + period) % period;   // 远景半速视差
+      const y0 = CH - drawH;
+      const n0 = Math.floor(off / drawW);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, CW, CH); ctx.clip();
+      for (let n = n0; ; n++) {
+        const x = n * drawW - off;
+        if (x > CW) break;
+        if (n % 2 === 0) {
+          ctx.drawImage(G.bgImg, x, y0, drawW, drawH);
+        } else {
+          ctx.save(); ctx.translate(x + drawW, y0); ctx.scale(-1, 1);
+          ctx.drawImage(G.bgImg, 0, 0, drawW, drawH);
+          ctx.restore();
+        }
+      }
+      ctx.restore();
+    } else {
+      drawClouds();   /* 背景图未就绪时保留旧的程序云天 */
+    }
   }
 
   function drawEliteRing(x, y, r) {          // 精英怪: 脚下金色法环
@@ -1114,7 +1166,7 @@ import { SND } from './10-base.js';
   function drawPlayerSprite() {
     const p = G.player;
     const sx = worldToScreen(p.x);
-    const sy = floorY();
+    const sy = floorY() + p.y;   /* v3.7: 玩家随车道(y 为车道偏移, 平滑过渡) */
 
     /* 技能动画渲染 (剑气斩) */
     if (p.skillAnim && G.skillReady && G.skillSprite) {
@@ -1123,8 +1175,8 @@ import { SND } from './10-base.js';
       const row = Math.floor(frameIdx / SKILL.cols);
       const srcX = col * SKILL.fw;
       const srcY = row * SKILL.fh;
-      /* 技能帧较大(480x256), 但角色应与普通攻击一样大, 不按帧高比例放大 */
-      const drawH = Math.min(CH * 0.55, 80);
+      /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放) */
+      const drawH = Math.min(CH * 0.55, 80) * laneScale(p.lane);
       const drawW = drawH * (SKILL.fw / SKILL.fh);
       ctx.save();
       ctx.translate(sx, sy);
@@ -1162,8 +1214,8 @@ import { SND } from './10-base.js';
     const row = Math.floor(frameIdx / SPRITE.cols);
     const srcX = col * SPRITE.fw;
     const srcY = row * SPRITE.fh;
-    /* 渲染尺寸: 适配战斗区高度 */
-    const drawH = Math.min(CH * 0.55, 80);
+    /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放) */
+    const drawH = Math.min(CH * 0.55, 80) * laneScale(p.lane);
     const drawW = drawH * (SPRITE.fw / SPRITE.fh);
     /* 疾风步/缩地成寸残影: 加速期间玩家身后显示3个半透明残影, 倍速越高残影越多 */
     if (G.speedMult > 1 && !p.attackAnim) {
@@ -1251,7 +1303,7 @@ import { SND } from './10-base.js';
   function drawEnemies() {
     for (const e of G.enemies) {
       if (!e.alive && e.dying <= 0) continue;
-      const sx = worldToScreen(e.x); const sy = floorY();
+      const sx = worldToScreen(e.x); const sy = floorY() + e.y;   /* v3.7: 怪站自己的车道 */
       /* 史莱姆真实 sprite 渲染 */
       if (G.slimeReady && G.slimeSprite && e.type === 'slime') {
         /* 根据状态选择帧 */
@@ -1273,7 +1325,7 @@ import { SND } from './10-base.js';
         const srcX = col * SLIME_SPRITE.fw;
         const srcY = row * SLIME_SPRITE.fh;
         /* 渲染尺寸: 到玩家肩膀高度(精英怪体型 ×1.28) */
-        const drawH = Math.min(CH * 0.5, 72) * (e.elite ? 1.28 : 1);
+        const drawH = Math.min(CH * 0.5, 72) * (e.elite ? 1.28 : 1) * laneScale(e.lane);
         const drawW = drawH * (SLIME_SPRITE.fw / SLIME_SPRITE.fh);
         /* 脚底在帧中的y=120(距底部8px), 用这个偏移让脚底踩在地板上 */
         const footOffset = 120 * (drawH / SLIME_SPRITE.fh);
@@ -1307,7 +1359,7 @@ import { SND } from './10-base.js';
         const row = Math.floor(frameIdx / WATER_SPRITE.cols);
         const srcX = col * WATER_SPRITE.fw;
         const srcY = row * WATER_SPRITE.fh;
-        const drawH = Math.min(CH * 0.5, 70) * (e.elite ? 1.28 : 1);
+        const drawH = Math.min(CH * 0.5, 70) * (e.elite ? 1.28 : 1) * laneScale(e.lane);
         const drawW = drawH * (WATER_SPRITE.fw / WATER_SPRITE.fh);
         /* 脚底在帧中的y=118(距底部10px) */
         const footOffset = 118 * (drawH / WATER_SPRITE.fh);
@@ -1341,7 +1393,7 @@ import { SND } from './10-base.js';
         const srcX = col * BOSS_SPRITE.fw;
         const srcY = row * BOSS_SPRITE.fh;
         /* BOSS 2倍大, 漂浮不踩地板 */
-        const drawH = Math.min(CH * 0.7, 140);
+        const drawH = Math.min(CH * 0.7, 140) * laneScale(e.lane);
         const drawW = drawH * (BOSS_SPRITE.fw / BOSS_SPRITE.fh);
         const floatY = BOSS_SPRITE.floatHeight + Math.sin(G.t * 1.5) * 8;  /* 漂浮上下浮动 */
         ctx.save();
@@ -1366,7 +1418,7 @@ import { SND } from './10-base.js';
          * 落地对齐用当前姿态 AABB 底边中心 —— 任何动画下脚底都踩地板。素材面朝左, 与其它怪一致不翻转。
          * v3.6.1 调参: 基准高 76→56(Ratty 无帧留白, 同基准下视觉比史莱姆大半档); 素材色彩
          * 偏亮偏饱和, 整体 saturate(0.72)+brightness(0.85) 压一档融入夜色, 受击白闪保留降饱和。 */
-        const drawH = Math.min(CH * 0.5, 56) * (e.elite ? 1.28 : 1);
+        const drawH = Math.min(CH * 0.5, 56) * (e.elite ? 1.28 : 1) * laneScale(e.lane);
         const s = drawH / Math.max(1, RATTY.baseH || 100);
         const bb = window.CanvasDragonBones.armatureAABB(e.armature);
         ctx.save();
