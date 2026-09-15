@@ -150,14 +150,14 @@
     "src/20-core.js": "801d09ca8fe1680044620e85c03f5cb757a6569178f96022e28c92629f8eccba",
     "src/30-systems.js": "dd06aa051b79740e9281ccef7b71d810a34e41a3070d9f481764296e8f7063bf",
     "src/40-app.js": "e51ab126baa31dffbb902294c57af4750a947bd631041fbe32b6286922322931",
-    "src/50-battle.js": "95fdb4223c741f4fff0a4074a8f3ea361f295454659d208a38c96391893c7d47",
+    "src/50-battle.js": "318ffe5a9fe998cb897826d4a699f2229e0cb7fb0ebcd191cd961d22a3e1058a",
     "src/60-stage.js": "812015531c39c243ac61092717669f736aa06a642ea2dd5e7eae3438c4bc23ec",
     "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb",
     "src/monsters/registry.js": "1a5b33c3740e7df2e24e8c4ece3fdd0ef42d72072c2d1f06e5a0f7d355e13da6",
-    "src/render/pixi.js": "6d508d16ea6f9706444e21e37ba037df0ed4e3e6878414a7eb9e7a4ad650cf3f",
+    "src/render/pixi.js": "def3de8f1ae020d2f0a69a74744db31eccd1ff978819571ebe25d771caa95969",
     "src/render/status.js": "2d2e3d24aa61263d4853abba61495e597bd1ae80097c8bdfb7b5743293c7d5f5",
     "vendor/pixi.min.mjs": "efc469a3839f80d6b55f8041c498e84fa271991166d45f37c9d8511f914a65f4"
   },
-  "rev": "0f54169428fdf973",
+  "rev": "899b58cf5753290a",
   "version": "3.3"
 }
