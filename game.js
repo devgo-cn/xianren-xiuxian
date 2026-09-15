@@ -11,17 +11,15 @@ const CACHE_VER = window.APP_VER || "dev";   /* 所有静态资源 ?v= 缓存戳
   document.title = "闲人修仙 " + GAME_VER;
 })();
 
-/* ============ v1.7.9 声音系统(免费素材 + 合成兜底) ============
- * 音效素材(assets/sound/*.mp3, 来自 Mixkit 免费许可, 可商用无需署名):
- *   alert 遇敌战鼓(与技能呼啸/命中完全不同频)/
- *   hit 玩家命中/ crit 暴击/ hurt 受击/ swing 出招呼啸/ myst 秘境风铃/ win 获胜/ lose 落败。
- * 同步铁律: 单发音效只在「页面可见 且 战报横幅在台」时播(SND.setStage),
- *   出场即静音/横幅隐藏则无音 —— 杜绝"听得到打斗、看不到演出"。
- * BGM: assets/music/bgm.mp3 存在即循环(低音量), 素材未就绪时自动回退为合成音。 */
+/* ============ 声音系统(BGM) ============
+ * v2.6: 文字战斗时代的 mp3 音效子系统(assets/sound/*.mp3: hit/crit/hurt/alert/
+ *   swing/myst/win/lose + WebAudio 合成兜底)已随旧战斗整体删除 —— 现在的战斗
+ *   音效由战斗画面内的 assets/sfx/*.ogg 通道负责, 读取本对象的 sfxOn 开关。
+ * 本对象保留: BGM(assets/music/bgm.mp3, HTMLAudio 独立通道) + 音效开关存储 +
+ *   硬静音(黑屏挂机) + 原生层 suspend/resume 钩子。 */
 const SND = (function () {
   /* v1.7.60: 音乐与音效拆成两个独立开关。
    * 旧版只有一个 dt_snd, 首次升级时音乐沿用它的值, 不改变玩家原有感受。 */
-  let ctx = null;
   const LS_BGM = "dt_bgm", LS_SFX = "dt_snd";
   function lsOn(key, fallbackKey) {
     try {
@@ -32,85 +30,24 @@ const SND = (function () {
   }
   let bgmOn = lsOn(LS_BGM, LS_SFX);
   let sfxOn = lsOn(LS_SFX);
-  /* v1.7.62 硬静音(黑屏挂机用): 期间连音频上下文都不允许恢复。
-   * 只 suspend 上下文是不够的 —— ac() 会在每次播音效时把它 resume 回来,
-   * 表现就是"进了挂机音效还会跳出来"。 */
+  /* v1.7.62 硬静音(黑屏挂机用): 期间 BGM 一律停, 回前台也不自动恢复。 */
   let hardMute = false;
   function silent() {
     if (hardMute) return true;
     try { return document.hidden; } catch (e) { return false; }
   }
-  /* v1.9.0: 胜利结算音换素材(号角+和声) —— 递增缓存戳强制客户端重拉 */
-  const SFX_V = CACHE_VER;                // v2.3: 音效缓存戳统一用全局版本号
-  const files = { hit: 1, crit: 1, hurt: 1, alert: 1, swing: 1, myst: 1, win: 1, lose: 1 };
-  const vol = { hit: 0.5, crit: 0.55, hurt: 0.42, alert: 0.6, swing: 0.42, myst: 0.5, win: 0.6, lose: 0.5 };
-  const buf = {};            // name -> AudioBuffer | null(缺素材)
-  const ext = {};            // v1.7.9: 不再给遇敌叠 boom/呼啸, 遇敌=独立战鼓素材
-  let bgmEl = null, bgmStarted = false, stage = 0;   // stage: 战斗/秘境横幅是否正在台上
-  function ac() {
-    if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ctx = null; } }
-    if (silent()) return ctx;          // v1.7.62: 静音期间不 resume(关键修复)
-    if (ctx && ctx.state === "suspended") { try { ctx.resume(); } catch (e) {} }
-    return ctx;
-  }
-  /* 合成兜底(素材缺失/未载好时应急, 不再是主通道) */
-  /* v1.7.8/v1.7.9: 只有「页面可见 && 战斗/秘境横幅在台上」才播单发音效 ——
-   * 杜绝后台/横幅未起时的"有声无画"; BGM 走 HTMLAudio 不受影响 */
-  function sfxAudible() {
-    if (silent()) return false;
-    return stage === 1;
-  }
-  function tone(f, dur, type, v, when, slideTo) {
-    const c = ac(); if (!c || !sfxOn || !sfxAudible()) return;
-    const t0 = c.currentTime + (when || 0), o = c.createOscillator(), g = c.createGain();
-    o.type = type || "triangle"; o.frequency.setValueAtTime(f, t0);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(30, slideTo), t0 + dur);
-    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(v || 0.3, t0 + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + dur + 0.05);
-  }
-  const fallback = {
-    hit: () => { tone(200, 0.1, "sine", 0.3, 0, 80); }, crit: () => tone(880, 0.14, "square", 0.16, 0),
-    hurt: () => tone(110, 0.18, "sine", 0.3, 0, 50),
-    /* v1.7.9 遇敌兜底: 两声低频战鼓(与出招/命中音完全两路), 素材缺失也不至于"像技能音" */
-    alert: () => { tone(170, 0.26, "sine", 0.55, 0, 55); tone(145, 0.32, "sine", 0.5, 0.32, 45); },
-    myst: () => tone(1175, 0.6, "sine", 0.2, 0),
-    win: () => { [[523,0],[659,.13],[784,.26],[1046,.4]].forEach(x => tone(x[0], .3, "triangle", .24, x[1])); },
-    lose: () => { tone(220, .6, "sine", .26, 0, 98); },
-  };
-  function play(name, at) {
-    if (!sfxOn || !sfxAudible()) return;
-    const c = ac(); if (!c) return;
-    const t0 = c.currentTime + (at || 0);
-    if (buf[name] instanceof AudioBuffer) {
-      const src = c.createBufferSource(); src.buffer = buf[name];
-      const g = c.createGain(); g.gain.value = vol[name] || 0.5;
-      src.connect(g); g.connect(c.destination); src.start(t0);
-    } else if (fallback[name]) { fallback[name](); }
-  }
-  function playLayers(name) { play(name); const ex = ext[name]; if (ex) for (const [n, d] of ex) play(n, d); }
-  async function load(name) {
-    try {
-      const r = await fetch("assets/sound/" + name + ".mp3?v=" + SFX_V);
-      if (!r.ok) { buf[name] = null; return; }
-      const ab = await r.arrayBuffer();
-      const c = ac(); if (!c) { buf[name] = null; return; }
-      buf[name] = await c.decodeAudioData(ab).catch(() => null);
-    } catch (e) { buf[name] = null; }
-  }
+  let bgmEl = null;
   /* v1.7.60: 页面不可见时不播 BGM —— 修掉"切到后台音乐还在响" */
   function _bgmPlay() {
     if (!bgmOn || !bgmEl || silent()) return;
     const p = bgmEl.play(); if (p && p.catch) p.catch(() => {});
   }
-  /* 切后台: 停 BGM + 挂起音频上下文(音效一并静音); 回前台: 恢复 */
+  /* 切后台: 停 BGM; 回前台: 恢复(硬静音期间除外) */
   function suspendAll() {
     if (bgmEl) { try { bgmEl.pause(); } catch (e) {} }
-    if (ctx && ctx.state === "running") { try { ctx.suspend(); } catch (e) {} }
   }
   function resumeAll() {
     if (silent()) return;          // 硬静音(挂机中)时, 回前台也不恢复
-    ac();
     if (bgmOn) _bgmPlay();
   }
   function _armBgm() {
@@ -129,7 +66,7 @@ const SND = (function () {
         try { bgmEl.currentTime = 0; const p = bgmEl.play(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
       });
     } catch (e) { return; }
-    const _armOnce = () => { ac(); _bgmPlay(); };
+    const _armOnce = () => { _bgmPlay(); };
     document.addEventListener("pointerdown", _armOnce);
     document.addEventListener("keydown", _armOnce);
     _bgmPlay();                                        // 立即尝试; 浏览器允许则无需任何点击
@@ -148,24 +85,16 @@ const SND = (function () {
     /* v1.7.62 硬静音开关: 挂机期间置 true, 任何音效都不会把上下文救活 */
     mute(v) { hardMute = !!v; if (hardMute) suspendAll(); else resumeAll(); },
     get muted() { return hardMute; },
-    setStage(v) { stage = v ? 1 : 0; },          // 横幅上台/收台 由 warStart/warEnd 驱动
-    hit() { playLayers("hit"); }, crit() { playLayers("crit"); }, hurt() { playLayers("hurt"); },
-    swing() { playLayers("swing"); },
-    alert() { playLayers("alert"); }, chime() { playLayers("myst"); },
-    victory() { playLayers("win"); }, fail() { playLayers("lose"); },
+    /* v1.7.62 硬静音开关: 挂机期间置 true, BGM 停且回前台不自恢复 */
+    mute(v) { hardMute = !!v; if (hardMute) suspendAll(); else resumeAll(); },
+    get muted() { return hardMute; },
+    /* initFiles 名字沿用旧接口; 现在只负责拉起 BGM 与页面可见性联动 */
     initFiles() {
-      for (const k of Object.keys(files)) load(k);
-      /* v1.7.7 BGM: 不再依赖 HEAD 探测 —— 直接建 Audio 立即试播(允许时刷新即响),
-       * 被浏览器拦截则等首次点击/按键再播; 文件缺失/解码错误会触发 error 自动停手, 不产生噪音重试 */
+      /* BGM: 直接建 Audio 立即试播(允许时刷新即响), 被浏览器拦截则等首次点击/按键再播;
+       * 文件缺失/解码错误会触发 error 自动停手, 不产生噪音重试 */
       _armBgm();
-      /* v1.7.10 手势唤醒: AudioContext 需在用户手势中 resume 才会出声。
-       * 若第一场遭遇发生在玩家还没点过页面时, 音效会整场静音(之后又正常) —— 表现为"时有时无";
-       * 这里在任意点击/按键/触摸/回到前台时都尝试恢复上下文, 确保一旦开始交互, 后续战斗必有音。 */
+      /* v1.7.60: 切后台停音乐(修"最小化还在响"), 回前台恢复 */
       try {
-        const wake = () => { ac(); };
-        ["pointerdown", "keydown", "touchstart"].forEach(ev =>
-          document.addEventListener(ev, wake, { passive: true }));
-        /* v1.7.60: 切后台停音乐(修"最小化还在响"), 回前台恢复 */
         document.addEventListener("visibilitychange", () => {
           if (document.hidden) suspendAll(); else resumeAll();
         });
@@ -1810,7 +1739,7 @@ function pickQ() {
   for (let i = 0; i < pool.length; i++) { x -= pool[i].w; if (x <= 0) return i; }
   return 0;
 }
-function makeArt() {          // 六槽部位: 槽0兵 1兵 2护 3护 4佩 5诀
+function makeArt() {          // 四部位: 槽0兵器 1护体 2灵佩 3功法
   const q = pickQ();
   const arts = state.arts || [];
   const slot = arts.length < 4 ? arts.length : Math.floor(Math.random() * 4);
@@ -1945,7 +1874,7 @@ function 段名(r) {
 
 /* 境界突破(全手动 v2.5): 小境界简版金光, 大境界天劫蓄力 */
 function doBreak() {
-  if (breaking) return;
+  if (breaking || settleBlocked()) return;
   const r = realm();
   if (state.exp < r.need || state.realmIdx >= TOTAL_SEGS - 1) return;
   breaking = true;
@@ -2006,6 +1935,7 @@ function manualBreak() { doBreak(); }
 /* 聚灵阵 */
 function arrayCostNow() { return ARRAY_COST(state.arrayLv); }
 function tapArray() {
+  if (settleBlocked()) return;
   if (state.arrayLv >= ARRAY_MAX_LV) {
     pushMsg("main", `聚灵阵已至圆满 Lv.${state.arrayLv}，周天流转自足，灵石另作他用`);
     return;
@@ -3764,12 +3694,13 @@ function loop(dt) {
     const _g = rateNow() * dt;
     state.exp += _g; _pred.exp += _g;
     /* v2.5: 所有境界突破均改为手动 —— 移除自动小境界升级循环, 修为满后玩家点"突破"按钮 */
-    realmPlot(); // 剧情推进(幂等, 手动突破后也会调)
+    /* v2.6 PERF: realmPlot 每帧 → 并入下方 100ms HUD 节流(幂等, 触发时机无感差异) */
   }
   tickDsp(dt);
-  tickAura(dt);
+  /* v2.6 PERF: 黑屏挂机时主屏不可见, 辉光/粒子层停绘省电 */
+  if (!DIMSTAT.on) tickAura(dt);
   _hudAcc += dt; if (_hudAcc >= 0.1) { _hudAcc = 0; updateHUD(); realmPlot(); checkMilestones(); if (Math.random() < 0.035) adventure(); if (Math.random() < 0.006) mainMoment(); }   // PERF-1: HUD ~10FPS; PERF-3: adventure/mainMoment 从每帧 60 次随机检查降到 10fps(概率等价换算: 0.35*0.1 / 0.06*0.1)
-  tickBurst(dt);
+  if (!DIMSTAT.on) tickBurst(dt);
 }
 
 /* ============ 启动 ============ */
@@ -4311,6 +4242,7 @@ function recipeCardHTML(id) {
   </div>`;
 }
 function craftPill(id) {
+  if (settleBlocked()) return;
   const rp = RECIPES[id]; if (!rp) return;
   if (rp.h && !hiddenUnlocked(rp.big)) { pushMsg("main", "丹方残页未集齐，此丹方还锁在雾里"); return; }
   for (const mid in rp.need) {
@@ -4393,6 +4325,7 @@ function showTravelMail(mail) {
 async function stayMailCheck() {
   if (!window.fetch || !cld.id || !cld.ready) return;
   if (!state.travel || !state.travel.loc) return;          // 化身不在外无需寄信
+  if (_settling) return;                                   // settle 往返中, 下轮心跳再问
   /* v1.9.0: 寄信周期 30 分钟, 故心跳每 2 分钟问一次足矣(周期远大于轮询间隔)。
    * 服务端 stayTravel 是幂等的 —— 多问几次不会多发信, 只保证"到点即寄"。 */
   const now0 = Date.now();
@@ -4421,8 +4354,21 @@ async function stayMailCheck() {
   } catch (e) { clearTimeout(tm); }
 }
 /* ==================== v0.8.0 丹方残页(Cloud Settle) 辅助 ==================== */
+/* v2.6 settle 软锁: 上云往返(最长 8s 弱网窗口)内, 服务端账本会经 adoptKeep 整体
+ * 覆盖本地 state —— 期间发生的升阵/炼丹/领信/突破会被旧账回滚。故往返期间冻结
+ * 一切动账本的入口, 落账后立刻放行; 顺带防 settle 自身重入。 */
+let _settling = false;
+function settleBlocked() {
+  if (!_settling) return false;
+  pushMsg("main", "云端结算中，稍候片刻再操作");
+  return true;
+}
 async function cloudSettle() {
-  if (!window.fetch || !cld.id) return null;
+  if (!window.fetch || !cld.id || _settling) return null;
+  _settling = true;
+  try { return await _cloudSettleRun(); } finally { _settling = false; }
+}
+async function _cloudSettleRun() {
   cldUI("sync");
   const t0 = Date.now();
   /* v1.8.0: 客户端不再报"离线基准"、也不再指定区间终点 —— 区间完全由服务端自己的两次写入间隔决定。
@@ -4596,20 +4542,6 @@ function dimRender() {
   l.innerHTML = DIMSTAT.loot.slice(-8).map(x =>
     `<div class="li q${x.q || 0}">拾获 <b>「${x.n}」</b> ${x.qn}·${x.slot}</div>`).join("");
 }
-/* 战斗结算时调用(btlWin / btlLose) */
-function dimNoteWin(g, ge, drop) {
-  if (!DIMSTAT.on) return;
-  DIMSTAT.battles++; DIMSTAT.win++;
-  DIMSTAT.spirit += g; DIMSTAT.exp += ge;
-  if (drop) DIMSTAT.loot.push(drop);
-  dimRender();
-}
-function dimNoteLose() {
-  if (!DIMSTAT.on) return;
-  DIMSTAT.battles++;
-  dimRender();
-}
-
 function resetDimKnob() {
   const k = $("dimKnob");
   if (k) { k.style.transition = "left .22s ease"; k.style.left = "4px"; }
@@ -4715,6 +4647,7 @@ function renderMailBox() {
  * 不这么做的话, 下一次 settle 会拿服务端旧档的信匣去合并, 玩家收了信还会被"退回" → 重复收取。
  * claim 成功则由服务端落档(信已删); 失败(断网)只标脏, 下次心跳再补。 */
 async function mailClaim(idOrAll) {
+  if (settleBlocked()) return;
   if (!window.fetch || !cld.id || !cld.ready) { cloudSoon(); return; }
   try {
     const r = await fetch(CLD_API + "?id=" + encodeURIComponent(cld.id) + "&claim=" + encodeURIComponent(idOrAll), {
@@ -4730,6 +4663,7 @@ async function mailClaim(idOrAll) {
   } catch (e) { cloudSoon(); }
 }
 function collectAllMail() {
+  if (settleBlocked()) return;
   const ml = state.mails || [];
   if (!ml.length) return;
   const total = {};
@@ -4826,16 +4760,9 @@ const TRACE_ACT = [
   "在崖边盘膝打坐，吐纳调息",
   "向路过的樵夫问路，绕了个远",
 ];
-const MYST_TALE = [
-  "洞中石壁上刻着半卷心法残篇，你默诵三遍，略有所悟",
-  "一只通体雪白的守洞灵兽与你对视良久，让开了路",
-  "洞底灵泉涌出三滴乳白灵液，你小心收好",
-  "石匣空空，只压着一句旧语：「机缘不取，亦是机缘」",
-];
-let BTL = null;                       // 战斗状态(不入存档)
-let MYST = null;                      // 秘境探索状态
+let BTL = null;                       // 战斗状态(不入存档) —— 文字战斗已删, 恒为 null
+let MYST = null;                      // 秘境探索状态(同上, 恒为 null)
 let _traceT = 0, _tracePool = [], _traceLoc = "", _encNext = 0;
-const slp = ms => new Promise(r => setTimeout(r, ms));
 
 /* ============ v1.3.0 巡猎波次(在线/离线同一模型) / v1.4.0 周期收紧 ============
  * 一波 = 一次遭遇（八成斗法 / 两成秘境），周期固定 ENC_PERIOD 秒，自上一波收场起算。
@@ -4851,8 +4778,6 @@ const slp = ms => new Promise(r => setTimeout(r, ms));
    const ENC_PERIOD = 90;      // 波次周期(秒)
    const FIGHT_EXP_W = 155;    // 每战修为 = rateNow × 此秒数
    const FIGHT_SP_W = 90;      // 每战灵石 = spiritRate × 此秒数 */
-const MYST_W = 45;             // 秘境机缘等效秒数
-const HUNT_FIGHT_RATE = 0.8;   // 波次中斗法占比(余下为秘境)
 
 /* ============ v1.4.0 自动斗法(在线表现层) ============
  * 「自动斗法」开启 → 主身持续巡山, 搜寻 SEARCH_MIN~MAX 秒后遇妖开打(行迹下方有搜寻动态提示);
@@ -4861,16 +4786,8 @@ const HUNT_FIGHT_RATE = 0.8;   // 波次中斗法占比(余下为秘境)
  * v1.7.8 节奏收紧: 战斗演出拉到 ~20s 后, 搜寻再收短, 让「一波到下一波」稳定 ~30s:
  *   搜 8~15s + 斗法演出 ~16~20s(含结算驻留) ≈ 30s 一波, 秘境更短。 */
 const SEARCH_MIN = 8, SEARCH_MAX = 15;
-const SEEK_TALE = [
-  "沿溪涧循妖气而上", "拨开雾色，四下张望", "忽闻林深处有异响",
-  "剑意微鸣，前方有物", "踏破山脊，搜寻妖踪", "拾级而上，草木皆兵",
-  "风里有腥气，循迹而去", "拨草寻径，屏息前行",
-];
-function autoHuntOn() { return false; /* 原战斗系统已移除 */ }     // 默认开(懒人)
+function autoHuntOn() { return false; /* 原战斗系统已移除 */ }     // 恒关(文字战斗已删)
 function searchMs() { return (SEARCH_MIN + Math.random() * (SEARCH_MAX - SEARCH_MIN)) * 1000; }
-function toggleAutoHunt() {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
 function renderAutoHunt() {
   /* v1.5.0: 小开关 —— 文案恒为「⚔ 自动」, 开/关只切 .on 激活态(朱砂亮 / 熄墨灰) */
   const b = $("btnAuto"); if (!b) return;
@@ -4879,25 +4796,8 @@ function renderAutoHunt() {
   b.title = on ? "自动战斗 · 开（点击关闭）" : "自动战斗 · 关（点击开启）";
   if (!on) seekHide();
 }
-function seekPick() {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-let _seekLine = SEEK_TALE[0];
-/* 只在换句时重绘: traceBeat 每 2.5s 调一次 seekShow, 整锅重设会把跳动/淡入动画掐断重放 */
-let _seekShown = "", _seekAt = 0;
-function seekShow() {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
 function seekHide() {
   /* 战斗系统已移除，新战斗动画后续接入 */
-}
-function huntBarShow(v) { const bar = $("huntBar"); if (bar) bar.style.display = v ? "flex" : "none"; }
-function huntNext() {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-
-function warZone() {                   // 斗法地界 = 主身当前大境地界(与化身云游无关)
-  return zoneOfBig(bigIdx());
 }
 /* ---------- 节拍: 行迹句 2.5 分钟一换; 主身巡猎按固定波次周期(与离线同频) ---------- */
 function traceBeat() {
@@ -4905,202 +4805,6 @@ function traceBeat() {
   if (document.hidden) return;
   /* 原战斗系统已移除，新战斗动画后续接入资源结算 */
   if (Date.now() - _traceT > 150000) { _traceT = Date.now(); traceRefresh(); }
-}
-function fireEvent() {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}function fireFight() {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-async function btlRun() {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-/* 速战: 懒人按钮 —— 不再逐合播报, 直接同步结算到分出胜负 */
-function warSkip() {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-window.warSkip = warSkip;/* v1.7.13 通用判定: 命中(闪避→落空) → 破甲(无视目标防御%) → 会心(×1.5)/暴击(×2.0) → 爆伤增幅 */
-function tryStrike(atk, sAtk, tDef, tDodge) {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-async function btlHeroAct() {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-async function btlFoeAct() {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-/* v1.7.5 战场日志演出: 出招细节点即时整行, 描述句逐字滚动; 行上限 9, typing 串行不打架 */
-let _warQueue = [], _warTyping = false;
-function _mkWarLine(cls) {
-  const el = $("warLog"); if (!el) return null;
-  const d = document.createElement("div");
-  d.className = "wl" + (cls ? " " + cls : "");
-  el.appendChild(d);
-  while (el.children.length > 9) el.removeChild(el.firstChild);
-  return d;
-}
-/* 即时整行: 技能名/招式名瞬时出现(攻击特效随即跟上) */
-function warNow(s, cls) {
-  if (!BTL && !MYST) return;
-  _warQueue.length = 0; _warTyping = false;
-  const d = _mkWarLine(cls); if (d) d.innerHTML = s;
-}
-/* 逐字滚动: 把 <b>…</b> 还原成加粗节点, 其余逐字 append */
-function warType(s, cls) {
-  _warQueue.push({ s: s, cls: cls });
-  if (!_warTyping) _typeNext();
-}
-function warAppend(s, cls) { warType(s, cls); }
-function btlLog(s, cls) {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-function btlNow(s, cls) {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-function _typeNext() {
-  const el = $("warLog");
-  if (!el || !_warQueue.length) { _warTyping = false; return; }
-  _warTyping = true;
-  const { s, cls } = _warQueue.shift();
-  const d = _mkWarLine(cls);
-  if (!d) { _warTyping = false; return; }
-  const toks = (s.match(/<[^>]+>|[^<]+/g) || []).filter(Boolean);
-  let ti = 0, openB = false, curB = null;
-  function pushChar(ch) {
-    if (openB) {
-      if (!curB) { curB = document.createElement("b"); d.appendChild(curB); }
-      curB.appendChild(document.createTextNode(ch));
-    } else { curB = null; d.appendChild(document.createTextNode(ch)); }
-  }
-  function tagDone(tag) {
-    if (/^<\/?b/i.test(tag)) { if (/^<b/i.test(tag)) openB = true; else openB = false; curB = null; }
-    if (/^<br/i.test(tag)) d.appendChild(document.createElement("br"));
-  }
-  function textStep(text) {
-    if (!d.isConnected) { _warTyping = false; _typeNext(); return; }
-    if (text.length) { pushChar(text.charAt(0)); setTimeout(() => textStep(text.slice(1)), 16); }
-    else nextToken();
-  }
-  function nextToken() {
-    if (ti >= toks.length) { _warTyping = false; _typeNext(); return; }
-    const t = toks[ti++];
-    if (t.charAt(0) === "<") { tagDone(t); nextToken(); } else textStep(t);
-  }
-  nextToken();
-}
-
-/* 实时血条: 妖(赤,左) / 主身(青碧,右), 数值叠条显示, 每合即时刷新
-   残影条(.bar-ghost): 掉血时白色幽灵条停留 180ms 后缓缓追上, 直观展示"掉了多少" */
-function fieldLine() {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-
-/* ============ 战斗演出函数 ============ */
-
-/* 伤害飘字: side='foe'(打在妖身上, 左侧) / 'hero'(打在主身, 右侧)
-   kind: normal / crit / critb / dodge / heal
-   飘字从血条下方弹出, 带物理上升+淡出, 暴击放大弹跳 */
-function spawnDmg(side, num, kind) {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-
-/* 血条震动: 只震 hprow(血条行), 不震文字日志 — 震整个横幅会导致阅读困难
-   light(普通命中) / mid(会心) / heavy(暴击) */
-function shakeBanner(level) {
-  const row = $("warHpRow"); if (!row) return;
-  const cls = "shake-" + (level || "light");
-  row.classList.remove("shake-light", "shake-mid", "shake-heavy");
-  void row.offsetWidth;   /* 强制重排, 允许同帧重复触发动画 */
-  row.classList.add(cls);
-}
-
-/* 出招光效: 横幅顶部一道天青光束扫过, 与技能行(camp)颜色呼应 */
-function castFlash() {
-  const wb = $("warBanner"); if (!wb) return;
-  const el = document.createElement("div");
-  el.className = "cast-flash";
-  wb.appendChild(el);
-  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 500);
-}
-
-/* 受击红闪: 主身被击中时横幅内层径向红光, 0.3s 淡出 */
-function hitFlash() {
-  const bd = $("warBd"); if (!bd) return;
-  const el = document.createElement("div");
-  el.className = "hit-flash";
-  bd.appendChild(el);
-  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 350);
-}
-
-/* 血条受击白闪: side='foe'(妖血条) / 'hero'(主身血条), 命中时条内白光一闪 */
-function barHitFlash(side) {
-  const bar = $(side === "foe" ? "hpFoe" : "hpHero"); if (!bar) return;
-  bar.classList.remove("hit-flash");
-  void bar.offsetWidth;
-  bar.classList.add("hit-flash");
-  setTimeout(() => bar.classList.remove("hit-flash"), 300);
-}
-
-/* ============ Canvas 水墨血条组件 ============
-   水墨笔触外形(遮罩) + 液态波动填充 + 渐变变色 + 受击墨滴粒子 + 低血红光 + 分段刻度 */
-const HP_MASK_IMG = new Image();
-HP_MASK_IMG.src = "assets/hpbar-ink-mask.png?v=" + CACHE_VER;
-let HP_MASK_READY = false;
-HP_MASK_IMG.onload = () => { HP_MASK_READY = true; };
-const HP_BG_IMG = new Image();
-HP_BG_IMG.src = "assets/hpbar-ink-bg.png?v=" + CACHE_VER;
-let HP_BG_READY = false;
-HP_BG_IMG.onload = () => { HP_BG_READY = true; };
-
-class CanvasHpBar {
-  /* 战斗血条已移除 */
-}
-
-function traceSay(txt) {
-  const el = $("traceArea"); if (!el) return;
-  el.dataset.k = "fight";
-  el.className = "trace fight";
-  el.innerHTML = `<span class="t-row"><span class="t-ic">战</span><span class="t-txt">${txt}</span></span>`;
-}
-function warStart(title, lead) {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-function warEnd(finalTxt, cls, extra) {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-function btlWin() {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-function btlLose() {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-/* ---------- 秘境机缘: 文字探索(主身奇遇) ---------- */
-function fireMyst() {
-  /* 战斗系统已移除，新战斗动画后续接入 */
-}
-async function mystRun() {
-  const lines = [
-    "沿湿滑石阶下行，壁上青苔泛着微光……",
-    MYST_TALE[Math.floor(Math.random() * MYST_TALE.length)],
-    "忽闻阴风呼啸 —— ",
-  ];
-  for (const ln of lines) {
-    if (!MYST) return;
-    await slp(950);
-    MYST.logs.push(ln); warAppend(ln);
-  }
-  if (!MYST) return;
-  // 洞中也可能撞妖(30%): 顺接成一场主身斗法
-  // if (Math.random() < 0.3) { MYST = null; fireFight(); if (BTL) warAppend("话音未落，洞中妖气骤起 —— "); }  // 文字斗法已废(空 stub), 注释留档
-  else {
-    const kind = Math.random();
-    let txt;
-    if (kind < 0.45) { const g = Math.round(spiritRate() * MYST_W * 1.2); state.spirit += g; txt = `你寻到一匣旧藏灵石 —— <b>+${fmt(g)} 灵石</b>`; }
-    else if (kind < 0.8) { const g = Math.round(rateNow() * MYST_W); state.exp += g; txt = `壁刻心法令你顿悟片刻 —— 修为+${fmt(g)}`; }
-    else txt = "此处只有一室清风，你原路退出，不虚此行。";
-    pushMsg("main", `你探秘境归来，${txt.replace(/<[^>]+>/g, "")}`);
-    warEnd(txt);
-    setTimeout(() => { if (MYST) { MYST = null; huntNext(); traceRefresh(); save(); cloudSoon(); } }, 3200);
-  }
 }
 /* ---------- 行迹刷新(含战斗/秘境中的顶行) ---------- */
 function traceRefresh() {

@@ -671,25 +671,6 @@
 </div>
 
 
-<div class="modal" id="btlModal">
-  <div class="card story-card btl-card">
-    <div class="btl-foe">
-      <div class="btl-tag" id="btlMTag">野狼妖</div>
-      <div class="btl-fig foe" id="btlFoeFig"></div>
-      <div class="hp"><i id="btlMhp" style="width:100%"></i></div>
-      <em class="hp-num" id="btlMhpTxt"></em>
-    </div>
-    <div class="btl-log" id="btlLog"></div>
-    <div class="btl-hero">
-      <em class="hp-num" id="btlPhpTxt"></em>
-      <div class="hp h2"><i id="btlPhp" style="width:100%"></i></div>
-      <div class="btl-tag you" id="btlPTag">你 · 炼气</div>
-    </div>
-    <div class="btl-acts" id="btlActs"></div>
-    <div class="btl-hint">妖不除,此路难行;斗法得胜,自有斩获</div>
-  </div>
-</div>
-
 <div class="modal" id="mailModal">
   <div class="card story-card" style="--bgart:url(assets/modals/bg-mail.webp)">
     <div class="mhead"><h3>信 匣<i>MAIL</i></h3><button class="xbtn" onclick="closeMail()">✕</button></div>
@@ -860,6 +841,7 @@
   }
   function playSfx(name, vol) {
     if (!sfx.ready || !sfx[name]) return;
+    if (typeof SND !== 'undefined' && !SND.sfxOn) return;   /* 设置页「音效」开关统一管控战斗音效 */
     const a = sfx[name].cloneNode();
     a.volume = vol || 0.6;
     a.play().catch(() => {});
@@ -1246,8 +1228,12 @@
     }
 
     /* 动画帧更新 + 双段攻击伤害判定 */
+    /* v2.6 攻速生效: 攻击动画帧速率随攻速等比加快(以基础 1.1 为锚点)。
+     * 否则 40帧@24fps≈1.67s 的固定动画时长主导实际出手节奏, 攻速词条形同虚设;
+     * 按锚点缩放后实际出手周期 = 1.67/aspd, 基础节奏不变, 高攻速真实变快 */
     p.animTimer += dt;
-    const frameDur = 1 / SPRITE.fps;
+    const frameDur = p.attackAnim ? 1 / (SPRITE.fps * (p.aspd || 1.1) / 1.1)
+                                  : 1 / SPRITE.fps;
     if (p.animTimer >= frameDur) {
       p.animTimer -= frameDur;
       if (p.attackAnim) {
@@ -1608,24 +1594,61 @@
     ctx.beginPath(); ctx.ellipse(0, 0, r, r*0.3, 0, 0, Math.PI*2); ctx.stroke();
     ctx.restore();
   }
+  /* v2.6 PERF: 血条渐变按(宽度,配色桶)缓存 —— 原实现每条血条每帧新建 LinearGradient
+   * (满屏怪 + 玩家 + BOSS 可达十几条/帧)。渐变用相对坐标, 绘制前 translate 到位 */
+  const HPBAR_GRAD = {};
   function drawHpBar(x, y, w, hp, maxHp, isEnemy) {
     const p = Math.max(0, hp/maxHp); const h = 3;
     ctx.fillStyle = 'rgba(8,12,20,0.6)';
     roundRect(x-w/2, y, w, h, 1.5); ctx.fill();
-    const grad = ctx.createLinearGradient(x-w/2, y, x+w/2, y);
-    if (isEnemy) {
-      /* 怪物血条: 红色 */
-      grad.addColorStop(0,'#ff6050'); grad.addColorStop(1,'#d82020');
-    } else if (p>0.5) { grad.addColorStop(0,'#6fe0a8'); grad.addColorStop(1,'#3ab878'); }
-    else if (p>0.25) { grad.addColorStop(0,'#f0d070'); grad.addColorStop(1,'#d8a838'); }
-    else { grad.addColorStop(0,'#ff8070'); grad.addColorStop(1,'#e84030'); }
-    ctx.fillStyle = grad; roundRect(x-w/2, y, w*p, h, 1.5); ctx.fill();
+    const bucket = isEnemy ? 'e' : (p > 0.5 ? 'g' : p > 0.25 ? 'y' : 'r');
+    const key = w + bucket;
+    let grad = HPBAR_GRAD[key];
+    if (!grad) {
+      grad = ctx.createLinearGradient(-w/2, 0, w/2, 0);
+      if (bucket === 'e') { grad.addColorStop(0,'#ff6050'); grad.addColorStop(1,'#d82020'); }
+      else if (bucket === 'g') { grad.addColorStop(0,'#6fe0a8'); grad.addColorStop(1,'#3ab878'); }
+      else if (bucket === 'y') { grad.addColorStop(0,'#f0d070'); grad.addColorStop(1,'#d8a838'); }
+      else { grad.addColorStop(0,'#ff8070'); grad.addColorStop(1,'#e84030'); }
+      HPBAR_GRAD[key] = grad;
+    }
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = grad;
+    roundRect(-w/2, 0, w*p, h, 1.5); ctx.fill();
+    ctx.restore();
   }
   function roundRect(x, y, w, h, r) {
     r = Math.min(r, w/2, h/2);
     ctx.beginPath(); ctx.moveTo(x+r, y);
     ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r);
     ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath();
+  }
+
+  /* v2.6 PERF: BOSS 攻击帧"左侧渐隐"掩码按帧预渲染 —— 原实现攻击期间每帧新建
+   * 离屏 canvas + 渐变(60fps 下每秒 60 次分配), 现在只在尺寸变化时重建 22 张 */
+  const BOSS_MASK = { w: 0, h: 0, frames: null };
+  function bossMaskedFrame(fi, drawW, drawH) {
+    if (!BOSS_MASK.frames || BOSS_MASK.w !== drawW || BOSS_MASK.h !== drawH) {
+      BOSS_MASK.w = drawW; BOSS_MASK.h = drawH;
+      const cw = Math.max(1, Math.ceil(drawW)), chh = Math.max(1, Math.ceil(drawH));
+      BOSS_MASK.frames = [];
+      for (let i = 0; i < BOSS_SPRITE.attackCount; i++) {
+        const src = BOSS_SPRITE.attackStart + i;
+        const off = document.createElement('canvas');
+        off.width = cw; off.height = chh;
+        const octx = off.getContext('2d');
+        octx.drawImage(G.bossSprite, (src % BOSS_SPRITE.cols) * BOSS_SPRITE.fw,
+          Math.floor(src / BOSS_SPRITE.cols) * BOSS_SPRITE.fh, BOSS_SPRITE.fw, BOSS_SPRITE.fh, 0, 0, cw, chh);
+        octx.globalCompositeOperation = 'destination-in';
+        const grad = octx.createLinearGradient(0, 0, cw * 0.4, 0);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, 'rgba(0,0,0,1)');
+        octx.fillStyle = grad;
+        octx.fillRect(0, 0, cw, chh);  /* 必须填充整个画布, 否则右侧变透明 */
+        BOSS_MASK.frames.push(off);
+      }
+    }
+    return BOSS_MASK.frames[fi] || null;
   }
 
   function drawPlayerSprite() {
@@ -1852,20 +1875,11 @@
         ctx.translate(sx, sy - floatY);  /* 漂浮在地板上方 */
         if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
         if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
-        /* 攻击帧左侧特效渐隐: 用离屏canvas + destination-in做alpha渐变, 消除割裂感 */
+        /* 攻击帧左侧特效渐隐: 预渲染掩码帧直接贴图(原每帧离屏重建, 见 bossMaskedFrame) */
         if (e.anim > 0) {
-          const off = document.createElement('canvas');
-          off.width = drawW; off.height = drawH;
-          const octx = off.getContext('2d');
-          octx.drawImage(G.bossSprite, srcX, srcY, BOSS_SPRITE.fw, BOSS_SPRITE.fh, 0, 0, drawW, drawH);
-          /* 左侧40%区域渐隐: 从左边缘完全透明到40%位置完全不透明, 右侧保持不透明 */
-          octx.globalCompositeOperation = 'destination-in';
-          const grad = octx.createLinearGradient(0, 0, drawW * 0.4, 0);
-          grad.addColorStop(0, 'rgba(0,0,0,0)');
-          grad.addColorStop(1, 'rgba(0,0,0,1)');
-          octx.fillStyle = grad;
-          octx.fillRect(0, 0, drawW, drawH);  /* 必须填充整个画布, 否则右侧变透明 */
-          ctx.drawImage(off, -drawW*0.5, -drawH);
+          const fi = Math.min(frameIdx - BOSS_SPRITE.attackStart, BOSS_SPRITE.attackCount - 1);
+          const off = bossMaskedFrame(fi, drawW, drawH);
+          if (off) ctx.drawImage(off, -drawW*0.5, -drawH, drawW, drawH);
         } else {
           /* 漂浮帧直接绘制 */
           ctx.drawImage(G.bossSprite, srcX, srcY, BOSS_SPRITE.fw, BOSS_SPRITE.fh, -drawW*0.5, -drawH, drawW, drawH);
