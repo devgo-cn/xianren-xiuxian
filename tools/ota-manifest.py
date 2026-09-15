@@ -27,6 +27,13 @@ INCLUDE_DIRS = ["assets"]
 # v3.1: index.html 改为直接加载 src/main.js（唯一 ES Module 入口），
 #       src/50-battle.js 也由 index.html 内联脚本抽取而来 —— 二者都在本目录扫描范围内。
 INCLUDE_JS_DIRS = ["src"]
+# 自托管第三方库目录（目前只有 vendor/pixi.min.mjs，PixiJS 8.20.1，约 801KB）
+#   v3.4 起纳入热更清单，这样 App 内切 ?render=pixi 才能直接生效。
+#   代价：每个用户【一次性】多下约 800KB —— 清单是按文件 sha256 比对的，
+#         pixi 内容不变就不会重复下载，不会每次热更都背上这 800KB。
+#   只收 .js/.mjs，避免把 source map / README 之类也打进清单。
+INCLUDE_LIB_DIRS = ["vendor"]
+LIB_EXT = (".js", ".mjs")
 # 不参与热更新的目录（素材源文件、参考项目）
 EXCLUDE_PREFIX = ("assets/raw/", "assets/ref/")
 
@@ -52,6 +59,16 @@ def collect():
         for dirpath, _dirnames, filenames in os.walk(base):
             for fn in filenames:
                 if not fn.endswith(".js"):
+                    continue
+                rel = os.path.relpath(os.path.join(dirpath, fn), ROOT).replace(os.sep, "/")
+                files.add(rel)
+    for d in INCLUDE_LIB_DIRS:
+        base = os.path.join(ROOT, d)
+        if not os.path.isdir(base):
+            continue
+        for dirpath, _dirnames, filenames in os.walk(base):
+            for fn in filenames:
+                if not fn.endswith(LIB_EXT):
                     continue
                 rel = os.path.relpath(os.path.join(dirpath, fn), ROOT).replace(os.sep, "/")
                 files.add(rel)
