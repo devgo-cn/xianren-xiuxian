@@ -1440,14 +1440,14 @@ import { SND } from './10-base.js';
          * 体型缩放用 idle 基准高度(RATTY.baseH, 建工厂时测定) —— 避免不同姿态 AABB 高度变化导致呼吸式缩放;
          * 落地对齐用当前姿态 AABB 底边中心 —— 任何动画下脚底都踩地板。素材面朝左, 与其它怪一致不翻转。
          * v3.6.1 调参: 基准高 76→56(Ratty 无帧留白, 同基准下视觉比史莱姆大半档); 素材色彩
-         * 偏亮偏饱和, 整体 saturate(0.72)+brightness(0.85) 压一档融入夜色, 受击白闪保留降饱和。 */
+         * 偏亮偏饱和, 整体 saturate(0.85)+brightness(0.93) 轻压融入夜色(0.72/0.85 灰暗感像半透, 已回调), 受击白闪保留。 */
         const drawH = Math.min(CH * 0.5, 56) * (e.elite ? 1.28 : 1) * laneScale(e.lane);
         const s = drawH / Math.max(1, RATTY.baseH || 100);
         const bb = window.CanvasDragonBones.armatureAABB(e.armature);
         ctx.save();
         ctx.translate(sx, sy);
         if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
-        ctx.filter = e.hurtT > 0 ? 'saturate(0.72) brightness(1.8)' : 'saturate(0.72) brightness(0.85)';
+        ctx.filter = e.hurtT > 0 ? 'saturate(0.85) brightness(1.8)' : 'saturate(0.85) brightness(0.93)';
         ctx.scale(s, s);
         ctx.translate(-(bb.minX + bb.maxX) / 2, -bb.maxY);
         window.CanvasDragonBones.drawArmature(ctx, e.armature);
