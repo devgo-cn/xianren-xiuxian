@@ -26,11 +26,18 @@
 
 | 职责 | 归属 |
 |---|---|
-| 玩家推进、刷怪、攻击、受击、死亡消散 | 战斗系统（`index.html` 内战斗 IIFE） |
-| 存档、境界、灵石、弹窗 UI | 主游戏（`game.js`） |
+| 玩家推进、刷怪、攻击、受击、死亡消散 | 战斗系统（`src/50-battle.js`） |
+| 存档、境界、灵石、弹窗 UI | 主游戏（`src/00-pure.js` ~ `src/40-app.js`） |
 | 二者唯一耦合点 | `window.BattleAPI`（§5） |
 
 **边界铁律**：主游戏**不得**直接读写战斗内部状态（`G` / `BC`），一律走 `BattleAPI`。
+
+> **v3.1 位置变更**：战斗系统原先内联在 `index.html` 底部（1535 行 IIFE），
+> 现已抽为独立 ES Module `src/50-battle.js`。**逻辑零改动**，只做了两件事：
+> 把对 `SND` 的裸引用改成显式 `import`；把 `init()` 的启动时机交给模块加载。
+> 对外接口 `window.BattleAPI` 与 §5 的契约完全不变。
+> 抽取由 `tools/refactor/extract_battle.js` 完成，
+> `tools/refactor/verify_battle.js` 逐条比对 111 条语句确认零差异。
 
 ---
 

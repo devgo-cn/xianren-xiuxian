@@ -10,13 +10,37 @@
 
 ```
 index.html
-  └─ window.APP_VER = "2.3"          ← 唯一来源，改这里
-       ├─ game.js: GAME_VER / CACHE_VER  (运行时派生)
+  └─ window.APP_VER = "3.1"          ← 唯一来源，改这里
+       ├─ src/main.js 入口 URL: ?v=APP_VER  (运行时派生，见下方「入口缓存戳」)
+       ├─ src/*.js: 模块内部【不带】?v=  (模块图 URL 必须唯一，见下方警告)
        ├─ bg.js / fx2d.js: 资源缓存戳 ?v= (运行时派生)
        ├─ ota/manifest.json: version 字段 (构建时生成)
        ├─ download/index.html: 页面显示 / APK 链接 (脚本同步)
        └─ _probe_*.html: 探测页 APP_VER (脚本同步)
 ```
+
+### ⚠️ 入口缓存戳：为什么只有一处
+
+`src/*.js` 是同一条 ES Module 依赖图，模块之间用**静态 import**：
+
+```js
+// src/40-app.js
+import { SND } from './10-base.js';   // ← 不能写 './10-base.js?v=' + APP_VER
+```
+
+一旦给某处 import 加了 `?v=`，浏览器会把 `10-base.js?v=3.1` 与 `10-base.js`
+当成**两个不同的模块**，各自实例化一份。后果是 `state` / `SND` / 各级缓存
+分裂成两份 —— 表现为音效开关失效、rAF 与事件监听重复注册。
+
+因此 `?v=` 只允许出现在 `index.html` 的入口 URL 上：
+
+```html
+<script type="module" src="./src/main.js?v=APP_VER"></script>
+```
+
+模块图内部的缓存失效**不靠 query**，而是：
+- App / 平台端：`ota/manifest.json` 的 `rev` 变化驱动资源热更（与 query 无关）
+- 浏览器端：由部署侧的 HTTP `Cache-Control` 负责
 
 ## 二、版本号分布全景
 
@@ -25,7 +49,7 @@ index.html
 | 文件 | 字段 / 位置 | 说明 |
 |------|------------|------|
 | `index.html` | `window.APP_VER` | **唯一来源**，运行时所有版本号的根 |
-| `game.js` | `GAME_VER`, `CACHE_VER` | 运行时从 `window.APP_VER` 派生，无需手动改 |
+| `src/main.js` 入口 URL | `?v=APP_VER` | 运行时从 `window.APP_VER` 派生，模块内部不带 query |
 | `ota/manifest.json` | `version` | 由 `tools/ota-manifest.py` 从 index.html 读取后生成 |
 | `download/index.html` | meta description / 版本 chip / 热更提示 / APK 下载链接 / 正文版本引用 | 全部由 bump-version.py 替换 |
 | `_probe_e2e.html` / `_probe_pills.html` | `window.APP_VER` | 探测/测试页，由 bump-version.py 同步 |
@@ -34,7 +58,7 @@ index.html
 
 | 位置 | 示例 | 说明 |
 |------|------|------|
-| `game.js` `SAVE_KEY` | `"dongtian_save_v1"` | 存档格式 schema 版本，仅在存档结构不兼容时才 +1 |
+| `src/00-pure.js` `SAVE_KEY` | `"dongtian_save_v1"` | 存档格式 schema 版本，仅在存档结构不兼容时才 +1 |
 | `docs/save-system.md` 标题 | `v1.10.1` | 文档撰写时的版本快照，保留历史 |
 | 代码注释中的 `v1.7.x` / `v1.9.x` | 变更日志注释 | 历史记录，**永远不要改** |
 | `ota/manifest.json` `rev` | `b76407630b9fb0b2` | 所有资源文件 sha256 汇总，内容一变自动变，无需手动管 |

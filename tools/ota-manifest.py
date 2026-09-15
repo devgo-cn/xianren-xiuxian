@@ -14,6 +14,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "ota", "manifest.json")
 
 # 运行时必需文件
+#   game.js 现在是兼容占位（仅转发到 src/main.js），保留在清单里是因为
+#   平台注入脚本/旧书签仍可能请求它，缺失会导致 404。
 INCLUDE_FILES = ["index.html", "game.js", "dt-theme.css", "bg.js", "fx2d.js"]
 # 运行时资源目录
 INCLUDE_DIRS = ["assets"]
@@ -22,6 +24,8 @@ INCLUDE_DIRS = ["assets"]
 #       App 端加载到旧模块 → 白屏 / 版本错乱。
 #       故必须一并纳入，且纳入方式用目录扫描而非写死文件名，
 #       这样后续再拆模块时无需再改本脚本。
+# v3.1: index.html 改为直接加载 src/main.js（唯一 ES Module 入口），
+#       src/50-battle.js 也由 index.html 内联脚本抽取而来 —— 二者都在本目录扫描范围内。
 INCLUDE_JS_DIRS = ["src"]
 # 不参与热更新的目录（素材源文件、参考项目）
 EXCLUDE_PREFIX = ("assets/raw/", "assets/ref/")

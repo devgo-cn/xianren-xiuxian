@@ -66,15 +66,28 @@ python3 -m http.server 8080
 
 ```
 ├── index.html      # 页面骨架 + 开屏页（健康游戏忠告）+ 内联主题
-├── game.js         # 核心玩法：境界数值 / 剧情纪事 / 战斗 / 丹道 / 存档与云同步
+├── src/            # 玩法源码（v3.1 起按拓扑层拆分，全 ES Module）
+│   ├── main.js         # 唯一入口：静态 import 全模块 + 把旧全局桥回 window
+│   ├── 00-pure.js      # 纯数据/常量（无依赖）
+│   ├── 10-base.js      # 基础工具与协议（编码 / 存档编解码 / 数值公式 / 音效 SND）
+│   ├── 20-core.js      # 核心服务（存档读写 / 云同步 / 境界推进 / 界面刷新）
+│   ├── 30-systems.js   # 玩法系统（云游 / 丹房 / 装备 / 巡猎 / 里程碑 / 心跳）
+│   ├── 40-app.js       # 应用装配（云引导 / 开屏门禁 / 启动 / 主循环）
+│   └── 50-battle.js    # 战斗系统（无尽边界式横向推进，挂 window.BattleAPI）
+├── game.js         # 兼容占位，转发到 src/main.js（勿在此写业务逻辑）
 ├── bg.js           # 墨夜背景（纯 Canvas 2D：雾霭 / 视差星点 / 银河 / 纸月）
 ├── fx2d.js         # 灵气特效层（Canvas 2D 粒子 / 流光）
 ├── dt-theme.css    # 墨线主题样式（墨形按钮 / 卡片 / 品质辉光）
+├── tools/refactor/ # 拆分工具链（拓扑分层 + 三重门禁，见其 README）
 └── assets/
     ├── cultivator_*.png   # 打坐修士立绘（发 / 身 / 袍 三层呼吸）
     ├── main-bg.jpg        # 底图
     └── music/bgm.mp3      # 背景音乐
 ```
+
+> **模块依赖严格单向**：`00-pure ← 10-base ← 20-core ← 30-systems ← 40-app`，
+> 另加 `50-battle → 10-base`（只依赖 `SND`）。无环，由拓扑分层保证。
+> 新增代码请放进对应层的文件，不要往 `game.js` 或 `index.html` 里写。
 
 ## 🧭 修行指引
 
