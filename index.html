@@ -796,6 +796,7 @@
     petFoxSprite:null, petFoxReady:false,
     skillSprite:null, skillReady:false,
     smallKillsSinceBoss:0, bossActive:false, bossSpawnEvery:10,
+    skillCall:null,          /* 技能名播报槽: 覆盖式大字快闪, {name,t,dur} */
   };
 
   /* 加载素材 */
@@ -875,7 +876,11 @@
   }
 
   /* Sprite 帧配置: 玩家 */
-  const SPRITE = { cols:9, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:40, fps:24 };
+  const SPRITE = { cols:9, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:24, fps:24 };
+  /* v2.8 攻击动画抽帧映射(24 帧): 素材攻击段 0..39(源帧32..71), 冗余在"起手抬剑 8 帧 + 收势长尾 11 帧"。
+   * 节奏: 0~3 抬剑 → 4~12 第一剑刺出(帧12 命中判定, 对齐源帧39 剑尖最远) → 13~17 收剑 →
+   *       18~21 第二剑(源帧51~53, 向左下扫, 帧18 判定) → 22~23 补刀收势(帧22 判定) */
+  const ATTACK_MAP = [0, 2, 4, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 8, 9, 10, 11, 13, 19, 20, 21, 21, 21, 24];
   /* 技能: 剑气斩 (24帧, 1秒, 6列x4行, 480x256每帧) */
   const SKILL = { name:'剑气斩', cols:6, fw:480, fh:256, count:24, fps:24, hitFrame:12, damageMult:2.5, cooldown:4.0, triggerChance:0.3 };
   /* 横扫千军特效配置: 7列7行, 49帧, 左右渐现渐隐 */
@@ -897,6 +902,15 @@
   function skVal(id)  { const api = window.SkillAPI; return api ? api.val(id) : null; }   // {chance, dmg, ...} 已按等级插值
   function skLv(id)   { const api = window.SkillAPI; return api ? api.lv(id) : 1; }
   function skExp(id,n){ const api = window.SkillAPI; if (api) api.addExp(id, n); }
+  /* ---------- 技能名播报: 战斗画布中央书法大字, 弹入→停→快淡出(~0.75s 即隐) ----------
+   * 覆盖式单槽不叠字; 同名 0.9s 冷却防高频 proc 连刷拖长显示 */
+  const _callCd = {};
+  function skillCall(name) {
+    const now = performance.now();
+    if (_callCd[name] && now - _callCd[name] < 900) return;
+    _callCd[name] = now;
+    G.skillCall = { name, t: 0, dur: 0.75 };
+  }
   function skExpAll(n){ const api = window.SkillAPI; if (api) api.addExpAll(n); }
 
   window.BattleAPI = {
@@ -937,6 +951,12 @@
         .sort((a, b) => a.x - b.x).map(e => ({ t: e.type, x: Math.round(e.x), hp: Math.round(e.hp), maxHp: e.maxHp, elite: !!e.elite })),
       playerX: G.player ? Math.round(G.player.x) : 0, dodge: G.speedDodge, nextCrit: G.nextStrikeCrit,
       pAtk: G.player ? Math.round(G.player.atk) : 0, pMaxHp: G.player ? G.player.maxHp : 0,
+      /* 只读攻击段状态(回归测试探针: 验证普攻单段/三连斩补刀) */
+      anim: G.player ? {
+        attacking: !!G.player.attackAnim, frame: G.player.animFrame,
+        hit1: !!G.player.hit1, hit2: !!G.player.hit2, hit3: !!G.player.hit3,
+        sanlian: !!G.player.sanlianTriggered, count: SPRITE.attackCount,
+      } : null,
     }),
     addPet: (petDef) => {
       const pet = { id:petDef.id||'pet_'+Date.now(), name:petDef.name||'宠物', atk:petDef.atk||5, aspd:petDef.aspd||1.0, atkRange:petDef.atkRange||50, hp:petDef.hp||80, maxHp:petDef.hp||80, color:petDef.color||'#ffd76b', offsetX:petDef.offsetX||-30, offsetY:petDef.offsetY||0, x:0,y:0, atkT:Math.random()*0.5, anim:0, hurtT:0, alive:true };
@@ -1013,6 +1033,7 @@
     if (s.mult >= G.speedMult || G.speedMultTimer <= 0) { G.speedMult = s.mult; G.speedDodge = s.dodge || 0; }
     else if ((s.dodge || 0) > G.speedDodge) G.speedDodge = s.dodge || 0;
     G.speedMultTimer = Math.max(G.speedMultTimer, s.dur);
+    skillCall(id === 'jifeng' ? '疾风步' : '缩地成寸');   /* 身法播报 */
     updateHUD();
     return id;
   }
@@ -1044,6 +1065,7 @@
     const zl = skVal('zhuilie');       // 追猎: 击杀后立刻再出手一次, 衔尾一击暴击率大增
     if (zl && Math.random()*100 < zl.chance) {
       skExp('zhuilie', 3); G.extraStrike = true; G.nextStrikeCrit = zl.crit || 0;
+      skillCall('追猎');
     }
   }
   /* ---------- 掉落物: 灵石/装备落在地板; 灵石飞向顶部统计区; 装备由飞行宠物拾取 ---------- */
@@ -1146,17 +1168,19 @@
    * 一律不写回面板属性(不做常驻光环), 攻防血仍只由境界与装备决定。 */
   function playerStrike(p, target, seg) {
     if (!target || !target.alive) return;
-    let base = seg === 1 ? (0.9 + Math.random()*0.2) : (0.95 + Math.random()*0.25);
+    /* v2.8 普攻单段: 主段(seg1)一次全额; 三连斩的 seg2/seg3 是同一轮攻击内的补刀,
+     * 各按自己的节奏给倍率, 不再出现"两段各全额"把普攻 DPS 顶到技能之上 */
+    let base = seg === 3 ? 1 : seg === 2 ? (0.5 + Math.random()*0.15) : (1.0 + Math.random()*0.25);
     let pen = PST.pen || 0;
     /* 破甲击: 这一击无视目标 Y% 防御 */
     const pj = skVal('pojia');
     if (pj && Math.random()*100 < pj.chance) {
-      pen = Math.min(90, pen + pj.pen); skExp('pojia', 2);
+      pen = Math.min(90, pen + pj.pen); skExp('pojia', 2); skillCall('破甲击');
       G.fx.push({ kind:'hitSpark', x:target.x, y:target.y-20, color:'#ffd76b', t:0, dur:0.3 });
     }
     /* 斩杀: 目标残血(低于 X%)时, 这一击伤害翻倍 */
     const zs = skVal('zhansha');
-    if (zs && target.hp / target.maxHp * 100 < zs.threshold) { base *= 2; skExp('zhansha', 2); }
+    if (zs && target.hp / target.maxHp * 100 < zs.threshold) { base *= 2; skExp('zhansha', 2); skillCall('斩杀'); }
     /* 会心(×1.5) / 暴击(×2.0) / 爆伤增幅(critD%); 追猎的衔尾一击额外加暴击率 */
     const critBonus = G.nextStrikeCrit; G.nextStrikeCrit = 0;
     let kind = 0;
@@ -1175,8 +1199,8 @@
     /* 横扫千军: 普攻命中即触发, 即使目标被打死也播放特效波及周围 */
     const hs = skVal('hengsao');
     if (hs && Math.random()*100 < hs.chance) {
-      skExp('hengsao', 2);
-      G.fx.push({ kind:'hengsao', x:p.x, y:-30, color:'#ffc98a', t:0, dur:0.6, frame:0, startX:p.x, endX:p.x+200 });
+      skExp('hengsao', 2); skillCall('横扫千军');
+      G.fx.push({ kind:'hengsao', x:p.x, y:-30, color:'#ffc98a', t:0, dur:0.38, frame:0, startX:p.x, endX:p.x+200 });  /* v2.7 爆发提速: 0.6→0.38s 扫得更干脆 */
       playSfx('hengsao', 0.8);
       const n = Math.max(1, Math.round(hs.n || 1));
       let hit = 0;
@@ -1192,7 +1216,7 @@
     /* 剑气斩: 追加一段自带攻击力加成的剑气 */
     const jq = skVal('jianqi');
     if (jq && Math.random()*100 < jq.chance) {
-      skExp('jianqi', 2);
+      skExp('jianqi', 2); skillCall('剑气斩');
       G.fx.push({ kind:'slash', x:target.x, y:target.y-24, color:'#bfe8ff', t:0, dur:0.28 });
       dealDamage(target, calcDmg(PST.atk, mult*(jq.dmg||0)/100, target.def, pen), '#bfe8ff', big);
       if (!target.alive) return;
@@ -1265,16 +1289,23 @@
       p.animTimer -= frameDur;
       if (p.attackAnim) {
         p.animFrame++;
-        /* 攻击音效同步: 第一段在帧8(挥剑前), 第二段在帧24(第二段刺剑前), 第三段在帧34(三连斩补刀前) */
+        /* v2.8 攻击动画抽帧: 原 40 帧(起手8 + 首剑刺出10~26 + 收势26~39, 末段 11 帧纯收势)裁到 24 帧。
+         * 普攻 = 起手(0~9) + 第一剑刺出(10~13) + 收剑(14~23) 一段判定;
+         * 三连斩触发时在收剑段插入第二剑 + 补刀(帧 18 / 22), 观感"一剑+补两刀", 不再有两段全额伤害。 */
         if (p.animFrame === 8) playSfx('attack1', 0.7);
-        if (p.animFrame === 24) playSfx('attack2', 0.8);
-        if (p.animFrame === 34 && p.sanlianTriggered) playSfx('attack2', 0.9);
-        /* 双段攻击: 第一段刺剑在帧10, 第二段刺剑在帧26 —— 统一走 playerStrike(读装备暴击/破甲/减伤) */
-        if (p.animFrame === 10 && !p.hit1 && p.attackTarget && p.attackTarget.alive) {
+        /* 普攻主段: 第一剑刺出, 帧 12 判定一次(全额) */
+        if (p.animFrame === 12 && !p.hit1 && p.attackTarget && p.attackTarget.alive) {
           p.hit1 = true;
           if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
             playerStrike(p, p.attackTarget, 1);
-            /* 一段刺死就中断, 不刺第二下 */
+            /* 三连斩: 主段命中即 roll 补刀(第二剑 + 第三刀) */
+            const sl = skVal('sanlian');
+            if (sl && p.attackTarget.alive && Math.random()*100 < sl.chance) {
+              p.sanlianTriggered = true;
+              skExp('sanlian', 2);
+              skillCall('三连斩');
+            }
+            /* 主段刺死就收招, 不再补刀 */
             if (!p.attackTarget.alive) {
               p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false; p.hit3 = false; p.sanlianTriggered = false;
               /* v2.5 基础攻速: 秒杀中断也吃满攻击间隔 —— 否则高攻秒怪时只剩 ~0.5s/杀的连环速攻 */
@@ -1283,20 +1314,16 @@
             }
           }
         }
-        if (p.animFrame === 26 && !p.hit2 && p.attackTarget && p.attackTarget.alive) {
+        /* 三连斩第二剑: 帧 18, 追加一段(走 seg=2, 非全额基数, 只是补刀的第二下) */
+        if (p.animFrame === 18 && p.sanlianTriggered && !p.hit2 && p.attackTarget && p.attackTarget.alive) {
           p.hit2 = true;
           if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
+            playSfx('attack2', 0.8);
             playerStrike(p, p.attackTarget, 2);
-            /* 三连斩: 第二段后概率触发第三段, 补刀必会心 */
-            const sl = skVal('sanlian');
-            if (sl && p.attackTarget.alive && Math.random()*100 < sl.chance) {
-              p.sanlianTriggered = true;
-              skExp('sanlian', 2);
-            }
           }
         }
-        /* 第三段攻击: 三连斩补刀, animFrame=36, 必会心(至少×1.5) */
-        if (p.animFrame === 36 && p.sanlianTriggered && !p.hit3 && p.attackTarget && p.attackTarget.alive) {
+        /* 三连斩补刀(第三刀): 帧 22, 必会心(至少×1.5) */
+        if (p.animFrame === 22 && p.sanlianTriggered && !p.hit3 && p.attackTarget && p.attackTarget.alive) {
           p.hit3 = true;
           if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
             playerStrike(p, p.attackTarget, 3);
@@ -1324,6 +1351,7 @@
         if (p.skillCooldown <= 0 && G.skillReady && Math.random() < SKILL.triggerChance) {
           p.skillAnim = true; p.skillFrame = 0; p.skillTimer = 0; p.skillHit = false; p.skillTarget = near;
           p.attackAnim = false; p.animFrame = 0;
+          skillCall(SKILL.name);          /* 大技能播报: 剑气斩 */
         } else {
           p.anim = 1; p.atkT = 1/p.aspd; p.attackAnim = true; p.animFrame = 0; p.animTimer = 0; p.attackTarget = near; p.hit1 = false; p.hit2 = false; p.hit3 = false; p.sanlianTriggered = false;
         }
@@ -1544,6 +1572,8 @@
     _pushT -= dt;
     if (_pushT <= 0) { _pushT = 5; if (typeof window.pushBattleStats === 'function') window.pushBattleStats(); }
     updatePlayer(sdt); updatePets(sdt); updateEnemies(sdt); updateFx(sdt); updateDrops(sdt); updateCamera(sdt);
+    /* 技能名播报: 独立推进(不吃身法倍速, 固定节奏即隐) */
+    if (G.skillCall) { G.skillCall.t += dt; if (G.skillCall.t >= G.skillCall.dur) G.skillCall = null; }
   }
 
   /* 渲染 */
@@ -1743,7 +1773,7 @@
     /* 真实 sprite 渲染 */
     /* 计算帧索引和位置 */
     let frameIdx;
-    if (p.attackAnim) frameIdx = SPRITE.attackStart + Math.min(p.animFrame, SPRITE.attackCount-1);
+    if (p.attackAnim) frameIdx = SPRITE.attackStart + ATTACK_MAP[Math.min(p.animFrame, ATTACK_MAP.length - 1)];
     else frameIdx = SPRITE.walkStart + (p.animFrame % SPRITE.walkCount);
     const col = frameIdx % SPRITE.cols;
     const row = Math.floor(frameIdx / SPRITE.cols);
@@ -2075,7 +2105,35 @@
 
   function render() {
     ctx.clearRect(0, 0, CW, CH);
-    drawBg(); drawEnemies(); drawDrops(); drawPlayerSprite(); drawPets(); drawFx(); drawDmg();
+    drawBg(); drawEnemies(); drawDrops(); drawPlayerSprite(); drawPets(); drawFx(); drawDmg(); drawSkillCall();
+  }
+
+  /* ---------- 技能名播报绘制: 书法大字金渐变+深描边, 弹入→稳住→末30%快淡出上飘(瞬间隐藏) ---------- */
+  function drawSkillCall() {
+    const c = G.skillCall; if (!c) return;
+    const k = c.t / c.dur;
+    let scale;
+    if (k < 0.16) scale = 0.5 + (k / 0.16) * 0.62;          // 0.5 → 1.12 弹入
+    else if (k < 0.3) scale = 1.12 - ((k - 0.16) / 0.14) * 0.12;   // 回落到 1.0
+    else scale = 1;
+    const fade = k < 0.7 ? 1 : Math.max(0, 1 - (k - 0.7) / 0.3);
+    const rise = k < 0.7 ? 0 : (k - 0.7) * 50;
+    const size = Math.round(Math.min(CW * 0.075, 30) + 6);
+    ctx.save();
+    ctx.globalAlpha = fade;
+    ctx.translate(CW / 2, CH * 0.30 - rise);
+    ctx.scale(scale, scale);
+    ctx.font = '600 ' + size + 'px "Kaiti SC","STKaiti","KaiTi","DFKai-SB","BiauKai",serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(3, size * 0.14);
+    ctx.strokeStyle = 'rgba(18,12,4,.88)';
+    ctx.strokeText(c.name, 0, 0);
+    const grad = ctx.createLinearGradient(0, -size * 0.6, 0, size * 0.6);
+    grad.addColorStop(0, '#ffe9b0'); grad.addColorStop(1, '#f0b95a');
+    ctx.fillStyle = grad;
+    ctx.fillText(c.name, 0, 0);
+    ctx.restore();
   }
 
   function updateHUD() {
