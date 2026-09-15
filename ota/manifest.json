@@ -144,7 +144,7 @@
     "dt-theme.css": "c76cae50681e1e546130c83eb868cbbb1a3321e2063fb8e9399b2d710b748beb",
     "fx2d.js": "f1da1174d9b8d1c399b4be6257f68aae36d7d8d56986481b015ad60ec73c5de0",
     "game.js": "9754940a93231e14afc252557041836597a525a0c9c458498fbf564343e4e717",
-    "index.html": "f4eef19f7bcf2e350aa728c0dcc8249d55e14f799e2d75a43b89425a44fb1d5a",
+    "index.html": "d386e4b8ae2d2e3373f2627e29f236401f32a15bf677023e3eaa9d4d0ccf22f7",
     "src/00-pure.js": "adc79b0c6b6fc20c9ce6d1a87d8cbe0b761804177f94f861d038084f76c2b41b",
     "src/10-base.js": "f095cefa2b4ea7a8d624c4882546e0fed498e3eef3b80f0fc6295a8aaa9b1681",
     "src/20-core.js": "801d09ca8fe1680044620e85c03f5cb757a6569178f96022e28c92629f8eccba",
@@ -154,6 +154,6 @@
     "src/60-stage.js": "812015531c39c243ac61092717669f736aa06a642ea2dd5e7eae3438c4bc23ec",
     "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
   },
-  "rev": "4bb6f8d9870fc97d",
-  "version": "3.3"
+  "rev": "1e29bbd4a3b535b8",
+  "version": "3.5"
 }
