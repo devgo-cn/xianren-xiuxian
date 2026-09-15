@@ -5222,7 +5222,7 @@ const SKILL_DEFS = [
     fmt: v => `二段后 ${v.chance.toFixed(0)}% 补刀 · <b>×${v.dmg.toFixed(0)}% 攻</b> 必会心` },
   { id: "hengsao", name: "横扫千军", ico: "◠",
     from: { chance: 20, n: 2, dmg: 40 },    to: { chance: 20, n: 5, dmg: 80 },  /* 临时调试: Lv1概率拉到20% */
-    fmt: v => `命中 ${v.chance.toFixed(0)}% 波及身周 ${v.n.toFixed(0)} 个 · <b>×${v.dmg.toFixed(0)}% 攻</b>` },
+    fmt: v => `触发概率 ${v.chance.toFixed(0)}% · 波及身周 ${v.n.toFixed(0)} 个 · <b>×${v.dmg.toFixed(0)}% 攻</b>` },
   { id: "zhansha", name: "斩杀", ico: "✖",
     from: { threshold: 5 },                to: { threshold: 25 },
     fmt: v => `目标残血 <b>${v.threshold.toFixed(0)}%</b> 以下 · 该击伤害翻倍` },

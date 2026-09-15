@@ -1166,23 +1166,12 @@
     const mult = base * (kind ? cmul * (1 + (PST.critD || 0)/100) : 1);
     const big = kind === 2;
     dealDamage(target, calcDmg(PST.atk, mult, target.def, pen), kind ? '#ffd76b' : '#7fe0ff', big);
-    if (!target.alive) return;
-    /* 剑气斩: 追加一段自带攻击力加成的剑气 */
-    const jq = skVal('jianqi');
-    if (jq && Math.random()*100 < jq.chance) {
-      skExp('jianqi', 2);
-      G.fx.push({ kind:'slash', x:target.x, y:target.y-24, color:'#bfe8ff', t:0, dur:0.28 });
-      dealDamage(target, calcDmg(PST.atk, mult*(jq.dmg||0)/100, target.def, pen), '#bfe8ff', big);
-      if (!target.alive) return;
-    }
-    /* 横扫千军: 波及周围 N 个 */
+    /* 横扫千军: 普攻命中即触发, 即使目标被打死也播放特效波及周围 */
     const hs = skVal('hengsao');
     if (hs && Math.random()*100 < hs.chance) {
       skExp('hengsao', 2);
-      /* 概率命中就播放特效, 不管波及几个敌人 */
-      G.fx.push({ kind:'hengsao', x:p.x, y:-30, color:'#ffc98a', t:0, dur:1.2, frame:0, startX:p.x, endX:p.x+120 });
-      playSfx('hengsao', 0.7);
-      /* 波及周围敌人 */
+      G.fx.push({ kind:'hengsao', x:p.x, y:-30, color:'#ffc98a', t:0, dur:0.6, frame:0, startX:p.x, endX:p.x+200 });
+      playSfx('hengsao', 0.8);
       const n = Math.max(1, Math.round(hs.n || 1));
       let hit = 0;
       for (const o of G.enemies) {
@@ -1192,6 +1181,15 @@
         dealDamage(o, calcDmg(PST.atk, mult*(hs.dmg||0)/100, o.def, pen), '#ffc98a', big);
         hit++;
       }
+    }
+    if (!target.alive) return;
+    /* 剑气斩: 追加一段自带攻击力加成的剑气 */
+    const jq = skVal('jianqi');
+    if (jq && Math.random()*100 < jq.chance) {
+      skExp('jianqi', 2);
+      G.fx.push({ kind:'slash', x:target.x, y:target.y-24, color:'#bfe8ff', t:0, dur:0.28 });
+      dealDamage(target, calcDmg(PST.atk, mult*(jq.dmg||0)/100, target.def, pen), '#bfe8ff', big);
+      if (!target.alive) return;
     }
     /* 三连斩: 第二段之后补一刀, 补刀必会心(至少 ×1.5) */
     if (seg === 2) {
@@ -1965,7 +1963,12 @@
           const moveSx = worldToScreen(moveX);
           ctx.save();
           ctx.translate(moveSx, fy);
-          ctx.globalAlpha = (1-k) * 0.95;  /* 快速淡出 */
+          /* 透明度曲线: 前15%快速渐入, 中间保持最亮, 后40%快速淡出 */
+          let alpha;
+          if (k < 0.15) alpha = k / 0.15;
+          else if (k < 0.6) alpha = 1.0;
+          else alpha = (1 - k) / 0.4;
+          ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
           /* 左右渐现渐隐: 离屏canvas + destination-in做alpha渐变 */
           const off = document.createElement('canvas');
           off.width = drawW; off.height = drawH;
