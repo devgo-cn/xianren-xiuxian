@@ -825,6 +825,10 @@
   const skillImg = new Image();
   skillImg.onload = function() { G.skillSprite = skillImg; G.skillReady = true; };
   skillImg.src = 'assets/cultivator_skill_sheet.webp';
+  /* 技能素材: 横扫千军 */
+  const hengsaoImg = new Image();
+  hengsaoImg.onload = function() { G.hengsaoSprite = hengsaoImg; G.hengsaoReady = true; };
+  hengsaoImg.src = 'assets/skill_hengsao_sheet.webp';
 
   /* 音效加载 */
   const sfx = {
@@ -839,11 +843,12 @@
     water_attack: new Audio('assets/sfx/water_attack.ogg'),
     water_hurt: new Audio('assets/sfx/water_hurt.ogg'),
     boss_attack: new Audio('assets/sfx/boss_attack.ogg'),
+    hengsao: new Audio('assets/sfx/hengsao.ogg'),
     ready: false
   };
   let sfxLoaded = 0;
-  const sfxTotal = 11;
-  for (const key of ['footstep', 'attack1', 'attack2', 'skill_attack', 'slime_footstep', 'slime_attack', 'slime_hurt', 'water_footstep', 'water_attack', 'water_hurt', 'boss_attack']) {
+  const sfxTotal = 12;
+  for (const key of ['footstep', 'attack1', 'attack2', 'skill_attack', 'slime_footstep', 'slime_attack', 'slime_hurt', 'water_footstep', 'water_attack', 'water_hurt', 'boss_attack', 'hengsao']) {
     sfx[key].addEventListener('canplaythrough', () => {
       sfxLoaded++;
       if (sfxLoaded >= sfxTotal) sfx.ready = true;
@@ -873,6 +878,8 @@
   const SPRITE = { cols:9, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:40, fps:24 };
   /* 技能: 剑气斩 (24帧, 1秒, 6列x4行, 480x256每帧) */
   const SKILL = { name:'剑气斩', cols:6, fw:480, fh:256, count:24, fps:24, hitFrame:12, damageMult:2.5, cooldown:4.0, triggerChance:0.3 };
+  /* 横扫千军特效配置: 7列7行, 49帧, 左右渐现渐隐 */
+  const HENGSAO_SPRITE = { cols:7, fw:320, fh:160, count:49, fps:12 };
   /* 史莱姆帧配置: 12列8行, walk32+attack51+hurt11 */
   const SLIME_SPRITE = { cols:12, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:51, hurtStart:83, hurtCount:11, fps:24 };
   /* 水精灵帧配置: 10列8行, walk32+attack33+hurt13 */
@@ -1181,7 +1188,10 @@
         dealDamage(o, calcDmg(PST.atk, mult*(hs.dmg||0)/100, o.def, pen), '#ffc98a', big);
         hit++;
       }
-      if (hit) G.fx.push({ kind:'sweep', x:p.x, y:-30, color:'#ffc98a', t:0, dur:0.3 });   /* v2.6: y 统一相对地板线 */
+      if (hit) {
+        G.fx.push({ kind:'hengsao', x:p.x, y:-30, color:'#ffc98a', t:0, dur:49/12, frame:0 });
+        playSfx('hengsao', 0.7);
+      }
     }
     /* 三连斩: 第二段之后补一刀, 补刀必会心(至少 ×1.5) */
     if (seg === 2) {
@@ -1486,6 +1496,10 @@
   function updateFx(dt) {
     for (const f of G.fx) {
       f.t += dt;
+      /* 横扫千军帧更新 */
+      if (f.kind === 'hengsao') {
+        f.frame = Math.floor(f.t * HENGSAO_SPRITE.fps);
+      }
       /* 粒子运动 */
       if (f.kind === 'healParticle' || f.kind === 'atkParticle') {
         f.x += (f.vx || 0) * dt;
@@ -1937,7 +1951,35 @@
         const w = 26 + k*34;
         ctx.beginPath(); ctx.moveTo(-w*0.5, 6+k*4); ctx.lineTo(w*0.5, -2-k*6); ctx.stroke();
         ctx.restore();
-      } else if (f.kind === 'sweep') {                    // 横扫千军: 一道贴地弧光
+      } else if (f.kind === 'hengsao') {                    // 横扫千军: sprite特效, 左右渐现渐隐
+        if (G.hengsaoReady && G.hengsaoSprite) {
+          const frameIdx = Math.min(f.frame, HENGSAO_SPRITE.count - 1);
+          const col = frameIdx % HENGSAO_SPRITE.cols;
+          const row = Math.floor(frameIdx / HENGSAO_SPRITE.cols);
+          const srcX = col * HENGSAO_SPRITE.fw;
+          const srcY = row * HENGSAO_SPRITE.fh;
+          const drawW = 280;
+          const drawH = drawW * (HENGSAO_SPRITE.fh / HENGSAO_SPRITE.fw);
+          ctx.save();
+          ctx.translate(sx, fy);
+          /* 左右渐现渐隐: 离屏canvas + destination-in做alpha渐变 */
+          const off = document.createElement('canvas');
+          off.width = drawW; off.height = drawH;
+          const octx = off.getContext('2d');
+          octx.drawImage(G.hengsaoSprite, srcX, srcY, HENGSAO_SPRITE.fw, HENGSAO_SPRITE.fh, 0, 0, drawW, drawH);
+          octx.globalCompositeOperation = 'destination-in';
+          /* 左侧20%渐现, 右侧20%渐隐, 中间保持不透明 */
+          const grad = octx.createLinearGradient(0, 0, drawW, 0);
+          grad.addColorStop(0, 'rgba(0,0,0,0)');
+          grad.addColorStop(0.2, 'rgba(0,0,0,1)');
+          grad.addColorStop(0.8, 'rgba(0,0,0,1)');
+          grad.addColorStop(1, 'rgba(0,0,0,0)');
+          octx.fillStyle = grad;
+          octx.fillRect(0, 0, drawW, drawH);
+          ctx.drawImage(off, -drawW*0.5, -drawH*0.5);
+          ctx.restore();
+        }
+      } else if (f.kind === 'sweep') {                    // 横扫千军: 一道贴地弧光(兜底)
         ctx.save(); ctx.translate(sx, fy); ctx.globalAlpha = (1-k)*0.9;
         ctx.strokeStyle = f.color; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
         ctx.beginPath(); ctx.arc(0, 0, 18 + k*46, -Math.PI*0.15, Math.PI*0.42); ctx.stroke();
