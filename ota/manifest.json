@@ -141,11 +141,11 @@
     "assets/ui_icons/icon_story.webp": "92ff84146f80a3d7f9a6479c477113caf2e4017ffe10767dd866be4ea378c003",
     "assets/ui_icons/icon_treasure.webp": "fe0b83d8ece23ab09b23a013e18299de7335ba1917666a7970726e00b7eb7e17",
     "bg.js": "d61cf11f268274f8bcdbea5aac1da08eb3f58b59e82b650b0d1f178803343954",
-    "dt-theme.css": "30c5193916cc3689f3e3d766efa5766a722fec224e1b8fffb76892ee1654936c",
+    "dt-theme.css": "966776886a5ee4495e35b181e2be9cf0cae55637b7a494b48ec39eb779864505",
     "fx2d.js": "4e1608e45c805bcee9360d9b7d873ca49b1425633c7adcb445a19d4fcd059149",
-    "game.js": "1eb7a6958c19b56bfb70bf891092d3abc0f7725630faa5674f067bcda2b2652e",
-    "index.html": "15764ff08549a0749170c956e45e8420ea01449f5456254d139ad52d470e5b31"
+    "game.js": "f3964bb60e88db5e8855bb87d4229eb88f18684d6e6b13bc3e85d7e257d28e5e",
+    "index.html": "7a19cd4b0097ae29bb0c5447c1d839771f5650a463d33fdf57e2f7b502ed1598"
   },
-  "rev": "e260e2f1000d2a79",
+  "rev": "bfe3ac66762d45f5",
   "version": "2.4"
 }
