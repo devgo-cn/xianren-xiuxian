@@ -951,7 +951,7 @@
   };
 
   function makePlayer() {
-    return { x:0,y:0, hp:PST.hp,maxHp:PST.hp, atk:PST.atk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0,stun:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false, attackTarget:null, hit1:false, hit2:false, atkBuff:0, atkBuffTimer:0, skillAnim:false, skillFrame:0, skillTimer:0, skillHit:false, skillCooldown:0, skillTarget:null };
+    return { x:0,y:0, hp:PST.hp,maxHp:PST.hp, atk:PST.atk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0,stun:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false, attackTarget:null, hit1:false, hit2:false, hit3:false, sanlianTriggered:false, atkBuff:0, atkBuffTimer:0, skillAnim:false, skillFrame:0, skillTimer:0, skillHit:false, skillCooldown:0, skillTarget:null };
   }
   /* 怪物成长系统: 三围随玩家境界 lv 线性成长(怪只吃境界, 不吃装备 → 换装备=变快) */
   function makeEnemy(type) {
@@ -1160,12 +1160,18 @@
     /* 会心(×1.5) / 暴击(×2.0) / 爆伤增幅(critD%); 追猎的衔尾一击额外加暴击率 */
     const critBonus = G.nextStrikeCrit; G.nextStrikeCrit = 0;
     let kind = 0;
-    if (Math.random()*100 < (PST.crit || 0) + critBonus) kind = 2;
+    if (seg === 3) {
+      /* 三连斩第三段: 补刀必会心(至少×1.5) */
+      kind = 1;
+    } else if (Math.random()*100 < (PST.crit || 0) + critBonus) kind = 2;
     else if (Math.random()*100 < (PST.critB || 0)) kind = 1;
     const cmul = kind === 2 ? 2 : kind === 1 ? 1.5 : 1;
-    const mult = base * (kind ? cmul * (1 + (PST.critD || 0)/100) : 1);
+    /* 三连斩第三段伤害倍率 */
+    const sl = seg === 3 ? skVal('sanlian') : null;
+    const slMult = sl ? (sl.dmg || 0) / 100 : 1;
+    const mult = base * slMult * (kind ? cmul * (1 + (PST.critD || 0)/100) : 1);
     const big = kind === 2;
-    dealDamage(target, calcDmg(PST.atk, mult, target.def, pen), kind ? '#ffd76b' : '#7fe0ff', big);
+    dealDamage(target, calcDmg(PST.atk, mult, target.def, pen), seg === 3 ? '#ffe7a8' : (kind ? '#ffd76b' : '#7fe0ff'), big);
     /* 横扫千军: 普攻命中即触发, 即使目标被打死也播放特效波及周围 */
     const hs = skVal('hengsao');
     if (hs && Math.random()*100 < hs.chance) {
@@ -1190,15 +1196,6 @@
       G.fx.push({ kind:'slash', x:target.x, y:target.y-24, color:'#bfe8ff', t:0, dur:0.28 });
       dealDamage(target, calcDmg(PST.atk, mult*(jq.dmg||0)/100, target.def, pen), '#bfe8ff', big);
       if (!target.alive) return;
-    }
-    /* 三连斩: 第二段之后补一刀, 补刀必会心(至少 ×1.5) */
-    if (seg === 2) {
-      const sl = skVal('sanlian');
-      if (sl && Math.random()*100 < sl.chance) {
-        skExp('sanlian', 2);
-        const m2 = (sl.dmg||0)/100 * Math.max(cmul, 1.5) * (1 + (PST.critD || 0)/100);
-        dealDamage(target, calcDmg(PST.atk, m2, target.def, pen), '#ffe7a8', big);
-      }
     }
   }
   function findNearestEnemy(fromX, maxDist) {
@@ -1268,9 +1265,10 @@
       p.animTimer -= frameDur;
       if (p.attackAnim) {
         p.animFrame++;
-        /* 攻击音效同步: 第一段在帧8(挥剑前), 第二段在帧24(第二段刺剑前) */
+        /* 攻击音效同步: 第一段在帧8(挥剑前), 第二段在帧24(第二段刺剑前), 第三段在帧34(三连斩补刀前) */
         if (p.animFrame === 8) playSfx('attack1', 0.7);
         if (p.animFrame === 24) playSfx('attack2', 0.8);
+        if (p.animFrame === 34 && p.sanlianTriggered) playSfx('attack2', 0.9);
         /* 双段攻击: 第一段刺剑在帧10, 第二段刺剑在帧26 —— 统一走 playerStrike(读装备暴击/破甲/减伤) */
         if (p.animFrame === 10 && !p.hit1 && p.attackTarget && p.attackTarget.alive) {
           p.hit1 = true;
@@ -1278,7 +1276,7 @@
             playerStrike(p, p.attackTarget, 1);
             /* 一段刺死就中断, 不刺第二下 */
             if (!p.attackTarget.alive) {
-              p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false;
+              p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false; p.hit3 = false; p.sanlianTriggered = false;
               /* v2.5 基础攻速: 秒杀中断也吃满攻击间隔 —— 否则高攻秒怪时只剩 ~0.5s/杀的连环速攻 */
               p.atkT = Math.max(p.atkT, 1 / p.aspd);
               if (G.extraStrike) { G.extraStrike = false; p.atkT = 0; }   // 追猎: 立刻再出手(技能特性保留)
@@ -1287,10 +1285,25 @@
         }
         if (p.animFrame === 26 && !p.hit2 && p.attackTarget && p.attackTarget.alive) {
           p.hit2 = true;
-          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) playerStrike(p, p.attackTarget, 2);
+          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
+            playerStrike(p, p.attackTarget, 2);
+            /* 三连斩: 第二段后概率触发第三段, 补刀必会心 */
+            const sl = skVal('sanlian');
+            if (sl && p.attackTarget.alive && Math.random()*100 < sl.chance) {
+              p.sanlianTriggered = true;
+              skExp('sanlian', 2);
+            }
+          }
+        }
+        /* 第三段攻击: 三连斩补刀, animFrame=36, 必会心(至少×1.5) */
+        if (p.animFrame === 36 && p.sanlianTriggered && !p.hit3 && p.attackTarget && p.attackTarget.alive) {
+          p.hit3 = true;
+          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
+            playerStrike(p, p.attackTarget, 3);
+          }
         }
         if (p.animFrame >= SPRITE.attackCount) {
-          p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false;
+          p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false; p.hit3 = false; p.sanlianTriggered = false;
           if (G.extraStrike) { G.extraStrike = false; p.atkT = 0; }        // 追猎: 立刻再出手
         }
       } else {
@@ -1312,7 +1325,7 @@
           p.skillAnim = true; p.skillFrame = 0; p.skillTimer = 0; p.skillHit = false; p.skillTarget = near;
           p.attackAnim = false; p.animFrame = 0;
         } else {
-          p.anim = 1; p.atkT = 1/p.aspd; p.attackAnim = true; p.animFrame = 0; p.animTimer = 0; p.attackTarget = near; p.hit1 = false; p.hit2 = false;
+          p.anim = 1; p.atkT = 1/p.aspd; p.attackAnim = true; p.animFrame = 0; p.animTimer = 0; p.attackTarget = near; p.hit1 = false; p.hit2 = false; p.hit3 = false; p.sanlianTriggered = false;
         }
       }
     } else if (near) {
