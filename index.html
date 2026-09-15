@@ -1189,7 +1189,8 @@
         hit++;
       }
       if (hit) {
-        G.fx.push({ kind:'hengsao', x:p.x, y:-30, color:'#ffc98a', t:0, dur:49/12, frame:0 });
+        /* 横扫千军: 从角色正前方左端点向右扫, 1.2秒快速播放 */
+        G.fx.push({ kind:'hengsao', x:p.x, y:-30, color:'#ffc98a', t:0, dur:1.2, frame:0, startX:p.x, endX:p.x+120 });
         playSfx('hengsao', 0.7);
       }
     }
@@ -1496,9 +1497,9 @@
   function updateFx(dt) {
     for (const f of G.fx) {
       f.t += dt;
-      /* 横扫千军帧更新 */
+      /* 横扫千军帧更新: 1.2秒播完49帧(约41fps), 快速播放完整特效 */
       if (f.kind === 'hengsao') {
-        f.frame = Math.floor(f.t * HENGSAO_SPRITE.fps);
+        f.frame = Math.min(HENGSAO_SPRITE.count - 1, Math.floor(f.t / f.dur * HENGSAO_SPRITE.count));
       }
       /* 粒子运动 */
       if (f.kind === 'healParticle' || f.kind === 'atkParticle') {
@@ -1951,7 +1952,7 @@
         const w = 26 + k*34;
         ctx.beginPath(); ctx.moveTo(-w*0.5, 6+k*4); ctx.lineTo(w*0.5, -2-k*6); ctx.stroke();
         ctx.restore();
-      } else if (f.kind === 'hengsao') {                    // 横扫千军: sprite特效, 左右渐现渐隐
+      } else if (f.kind === 'hengsao') {                    // 横扫千军: sprite特效, 从左向右扫, 快速淡出
         if (G.hengsaoReady && G.hengsaoSprite) {
           const frameIdx = Math.min(f.frame, HENGSAO_SPRITE.count - 1);
           const col = frameIdx % HENGSAO_SPRITE.cols;
@@ -1960,8 +1961,12 @@
           const srcY = row * HENGSAO_SPRITE.fh;
           const drawW = 280;
           const drawH = drawW * (HENGSAO_SPRITE.fh / HENGSAO_SPRITE.fw);
+          /* 特效从左向右移动: startX到endX插值 */
+          const moveX = (f.startX || f.x) + ((f.endX || f.x+120) - (f.startX || f.x)) * k;
+          const moveSx = worldToScreen(moveX);
           ctx.save();
-          ctx.translate(sx, fy);
+          ctx.translate(moveSx, fy);
+          ctx.globalAlpha = (1-k) * 0.95;  /* 快速淡出 */
           /* 左右渐现渐隐: 离屏canvas + destination-in做alpha渐变 */
           const off = document.createElement('canvas');
           off.width = drawW; off.height = drawH;
