@@ -7,3 +7,6 @@ tools/refactor/package-lock.json
 *.swp
 *~
 node_modules/
+
+# 本地验证用 mock 服务（绕过云端门禁，仅本地调试，绝不入库）
+server8090.py

@@ -2,31 +2,39 @@
  * 战斗系统（无尽边界式横向推进战斗）
  * 接入真实素材: cultivator_sheet.png(玩家) + main-bg.jpg(背景)
  *
- * 由 tools/extract_battle.js 从 index.html 内联 <script> 抽取（逻辑零改动）。
- * 原为经典脚本 IIFE，现改为 ES Module：
+ * 历史: 本文件最初由 tools/refactor/extract_battle.js 从 index.html 内联 <script>
+ * 抽取而来。该重建管线依赖的原始 game.js 及其入口已不存在（build.sh 指向
+ * 另一个沙箱路径），**管线已废弃**，本文件即权威源，可直接修改。
+ *
+ * 原为经典脚本 IIFE，现为 ES Module：
  *   - 原来直接读写的全局 state / SND / pushBattleStats 改为显式 import；
  *   - window.BattleAPI / window.pushBattleStats 仍显式挂载，外部接口不变；
  *   - 模块加载即初始化（保留原 IIFE 的副作用语义）。
  *
- * ⚠️ 本文件由工具生成，手改会在下次重建时丢失。
+ * 怪物定义见 src/monsters/registry.js —— 新增怪物只需编辑该文件的
+ * MONSTER_DEFS（或补 meta.json），本文件不再持有怪物硬编码分支。
  */
 
 import { SND } from './10-base.js';
+import {
+  initRegistry, getMonster, allMonsters, statsTable, pickFrame, measure,
+} from './monsters/registry.js';
 
 
   const BC = {
     /* 占位怪 demon(妖将)/raptor(妖弓) 已移除 —— 只保留两种有真实素材的怪 */
     playerAtkRange: 75, playerAspd: 1.1, playerSpeed: 28,
     spawnInterval: 1.0, enemySpawnOffset: 40, maxAlive: 14, queueGap: 34,
-    enemies: {
-      /* hpK/atkK/defK: 按玩家境界(lv)线性成长 —— 怪只随境界长, 玩家随境界+装备长, 换装即提速。
-       * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。 */
-      slime: { name:'妖卒', role:'melee', w:60, atkRange:30, speed:120, hpK:1.0, atkK:0.55, defK:0.35, color:'#6fe0a8' },
-      water: { name:'水灵', role:'melee', w:40, atkRange:35, speed:80,  hpK:1.6, atkK:0.75, defK:0.60, color:'#6fd0e8' },
-      /* v2.6 调参: hpK 80→52(实测过厚约-35%), atkRange 70→45(玩家攻距75, 贴身才能互殴, 修复"剑够不到") */
-      boss:  { name:'史莱姆王', role:'ranged', w:5,  atkRange:45, speed:40, hpK:52, atkK:3.0, defK:3.0, color:'#a0ff80', isBoss:true, floatHeight:10, sizeMult:2.0 },
-    },
+    /* 怪物属性表由注册表提供（唯一数据源: src/monsters/registry.js）。
+     * 新增怪物改注册表即可，这里不再硬编码。
+     * hpK/atkK/defK: 按玩家境界(lv)线性成长 —— 怪只随境界长, 玩家随境界+装备长, 换装即提速。
+     * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。 */
+    get enemies() { return ENEMY_STATS; },
   };
+  /* 注册表装载 + 属性表快照。注册表是同步可用的（图集 onload 异步翻 ready），
+   * 所以这里 initRegistry() 后立刻取表，与原先写死 enemies 的行为等价。 */
+  initRegistry();
+  const ENEMY_STATS = statsTable();
 
   /* 玩家属性(主游戏 pushBattleStats 注入) —— 战斗内一切数值伤害以此为准 */
   let PST = { lv:1, atk:56, hp:430, def:31, crit:0, critB:0, critD:0, pen:0, dodge:0 };
@@ -59,18 +67,40 @@ import { SND } from './10-base.js';
   const bgImg = new Image();
   bgImg.onload = function() { G.bgImg = bgImg; G.bgReady = true; };
   bgImg.src = 'assets/main-bg.jpg';
-  /* 怪物素材: 绿色史莱姆 */
-  const slimeImg = new Image();
-  slimeImg.onload = function() { G.slimeSprite = slimeImg; G.slimeReady = true; };
-  slimeImg.src = 'assets/monster_001_green_slime.webp';
-  /* 怪物素材: 水精灵 */
-  const waterSpriteImg = new Image();
-  waterSpriteImg.onload = function() { G.waterSprite = waterSpriteImg; G.waterReady = true; };
-  waterSpriteImg.src = 'assets/monster_002_water_sprite.webp';
-  /* BOSS素材: 史莱姆王(飘着, 2倍大) */
-  const bossSpriteImg = new Image();
-  bossSpriteImg.onload = function() { G.bossSprite = bossSpriteImg; G.bossReady = true; };
-  bossSpriteImg.src = 'assets/monster_003_slime_king.webp';
+  /* ── 渲染后端（可插拔）────────────────────────────────────────────
+   * 默认 canvas2d：与改造前完全一致，零风险，且【不会加载 801KB 的 PixiJS】。
+   * 选 pixi 时才动态 import src/render/pixi.js（两级懒加载）。
+   * 后端只负责"怎么画怪物"，不参与任何时间推进 —— 倍速乘法始终在 update() 首行。 */
+  let _pixiBackend = null;
+  (function initBackend() {
+    let kind = 'canvas2d';
+    try {
+      const q = new URLSearchParams(location.search).get('render');
+      if (q === 'pixi' || q === 'canvas2d') kind = q;
+      else {
+        const ls = localStorage.getItem('xrRenderBackend');
+        if (ls === 'pixi' || ls === 'canvas2d') kind = ls;
+      }
+    } catch (e) {}
+    if (kind !== 'pixi') return;                 // 默认路径：到此为止
+    import('./render/pixi.js').then(mod => {
+      _pixiBackend = mod.createPixiBackend();
+      /* 尺寸沿用舞台横带；battleLayer 每帧会按需调用 resize */
+      _pixiBackend.ensureInit ? _pixiBackend.ensureInit(CW || 300, CH || 150)
+                              : _pixiBackend.resize(CW || 300, CH || 150);
+    }).catch(() => { _pixiBackend = null; });     /* 加载失败 → 静默回退 */
+  })();
+
+  /* 怪物素材: 由注册表统一加载（原先每个怪一段 new Image + onload + G.xxxReady）。
+   * 新增怪物只需在 src/monsters/registry.js 的 MONSTER_DEFS 登记，此处无需改动。 */
+  for (const m of allMonsters()) {
+    /* 注册表已发起加载，这里只把 Image 挂到 G 上保持既有调试接口可用
+     * （G.slimeSprite 等字段原本是硬编码的，现在按 key 动态生成保持兼容）。 */
+    G[m.key + 'Sprite'] = m.sprite.img;
+    Object.defineProperty(G, m.key + 'Ready', {
+      get() { return m.sprite.ready; }, configurable: true,
+    });
+  }
   /* 宠物素材: 灵狐 */
   const petFoxImg = new Image();
   petFoxImg.onload = function() { G.petFoxSprite = petFoxImg; G.petFoxReady = true; };
@@ -138,12 +168,9 @@ import { SND } from './10-base.js';
   const SKILL = { name:'剑气斩', cols:6, fw:480, fh:256, count:24, fps:24, hitFrame:12, damageMult:2.5, cooldown:4.0, triggerChance:0.3 };
   /* 横扫千军特效配置: 7列7行, 49帧, 左右渐现渐隐 */
   const HENGSAO_SPRITE = { cols:7, fw:320, fh:160, count:49, fps:12 };
-  /* 史莱姆帧配置: 12列8行, walk32+attack51+hurt11 */
-  const SLIME_SPRITE = { cols:12, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:51, hurtStart:83, hurtCount:11, fps:24 };
-  /* 水精灵帧配置: 10列8行, walk32+attack33+hurt13 */
-  const WATER_SPRITE = { cols:10, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:33, hurtStart:65, hurtCount:13, fps:24 };
-  /* BOSS史莱姆王: 飘着的, 2倍大, 帧0-17漂浮, 帧18-39攻击, 帧40-47恢复 */
-  const BOSS_SPRITE = { cols:8, fw:240, fh:200, walkStart:0, walkCount:18, attackStart:18, attackCount:22, hurtStart:0, hurtCount:0, fps:8, isBoss:true, floatHeight:10, sizeMult:2.0 };
+  /* 怪物帧配置已迁至 src/monsters/registry.js（含 meta.json 覆盖），
+   * 此处不再保留 SLIME_SPRITE / WATER_SPRITE / BOSS_SPRITE 硬编码常量。
+   * BOSS 的 2 倍体量 / 漂浮 / 掩码攻击帧由注册表 visual 字段描述。 */
 
   function fmtNum(n) {
     n = Math.round(n || 0);
@@ -349,7 +376,7 @@ import { SND } from './10-base.js';
   }
   /* ---------- 击杀结算: 灵石 + (装备由主游戏 roll) + 技能经验 + 追猎/加速 ---------- */
   function onKill(e) {
-    const isBoss = e.type === 'boss';
+    const isBoss = !!(getMonster(e.type)?.isBoss);
     /* BOSS/小怪击杀计数 */
     if (isBoss) {
       G.bossActive = false;
@@ -810,10 +837,10 @@ import { SND } from './10-base.js';
       e.atkT -= dt; e.anim = Math.max(0, e.anim-dt*1.5);
       const wasHurt = e.hurtT > 0;
       e.hurtT = Math.max(0, e.hurtT-dt);
-      /* 受击音效: 受击开始时 */
+      /* 受击音效: 受击开始时（音效键来自注册表 sfx.hurt，无则静音） */
       if (!wasHurt && e.hurtT > 0) {
-        if (e.type === 'slime') playSfx('slime_hurt', 0.5);
-        else if (e.type === 'water') playSfx('water_hurt', 0.5);
+        const sfxKey = getMonster(e.type)?.sfx?.hurt;
+        if (sfxKey) playSfx(sfxKey, 0.5);
       }
       /* 动画帧跟踪 */
       e.animTimer += dt;
@@ -824,10 +851,12 @@ import { SND } from './10-base.js';
           e.animFrame++;
         } else {
           e.animFrame = (e.animFrame + 1) % 32;
-          /* 脚步声: walk特定帧, 仅在移动时 */
+          /* 脚步声: walk特定帧, 仅在移动时（触发帧与音效键均由注册表描述） */
           if (e.moving) {
-            if (e.type === 'slime' && (e.animFrame === 4 || e.animFrame === 20)) playSfx('slime_footstep', 0.4);
-            else if (e.type === 'water' && (e.animFrame === 8 || e.animFrame === 24)) playSfx('water_footstep', 0.4);
+            const M2 = getMonster(e.type);
+            const stepFrames = M2?.visual?.stepFrames;
+            const stepKey = M2?.sfx?.footstep;
+            if (stepKey && stepFrames && stepFrames.includes(e.animFrame)) playSfx(stepKey, 0.4);
           }
         }
       }
@@ -837,11 +866,11 @@ import { SND } from './10-base.js';
       const wasAttacking = e.anim > 0;
       if (Math.abs(e.x-p.x) <= e.atkRange+5 && e.atkT <= 0) {
         e.anim = 1; e.atkT = 1/(0.8+Math.random()*0.5); e.animFrame = 0;
-        /* 攻击音效: 攻击开始时 */
+        /* 攻击音效: 攻击开始时（BOSS 音量 0.8，其余 0.5 —— 由注册表 attackVol 描述） */
         if (!wasAttacking) {
-          if (e.type === 'slime') playSfx('slime_attack', 0.5);
-          else if (e.type === 'water') playSfx('water_attack', 0.5);
-          else if (e.type === 'boss') playSfx('boss_attack', 0.8);
+          const M2 = getMonster(e.type);
+          const atkKey = M2?.sfx?.attack;
+          if (atkKey) playSfx(atkKey, M2.sfx.attackVol != null ? M2.sfx.attackVol : 0.5);
         }
         /* 闪避判定(装备词条 + 身法技能时效加成) —— 落空则不进伤害 */
         if (Math.random()*100 < ((PST.dodge || 0) + G.speedDodge)) {
@@ -1040,13 +1069,14 @@ import { SND } from './10-base.js';
       BOSS_MASK.w = drawW; BOSS_MASK.h = drawH;
       const cw = Math.max(1, Math.ceil(drawW)), chh = Math.max(1, Math.ceil(drawH));
       BOSS_MASK.frames = [];
-      for (let i = 0; i < BOSS_SPRITE.attackCount; i++) {
-        const src = BOSS_SPRITE.attackStart + i;
+      const BS = getMonster('boss').frames;
+      for (let i = 0; i < BS.attack.count; i++) {
+        const src = BS.attack.start + i;
         const off = document.createElement('canvas');
         off.width = cw; off.height = chh;
         const octx = off.getContext('2d');
-        octx.drawImage(G.bossSprite, (src % BOSS_SPRITE.cols) * BOSS_SPRITE.fw,
-          Math.floor(src / BOSS_SPRITE.cols) * BOSS_SPRITE.fh, BOSS_SPRITE.fw, BOSS_SPRITE.fh, 0, 0, cw, chh);
+        octx.drawImage(G.bossSprite, (src % BS.cols) * BS.fw,
+          Math.floor(src / BS.cols) * BS.fh, BS.fw, BS.fh, 0, 0, cw, chh);
         octx.globalCompositeOperation = 'destination-in';
         const grad = octx.createLinearGradient(0, 0, cw * 0.4, 0);
         grad.addColorStop(0, 'rgba(0,0,0,0)');
@@ -1057,6 +1087,22 @@ import { SND } from './10-base.js';
       }
     }
     return BOSS_MASK.frames[fi] || null;
+  }
+
+  /* BOSS 攻击帧的左侧渐隐特效。两条渲染路径（Canvas2D / pixi）共用同一实现，
+   * 避免"pixi 只画精灵、忘补特效"的偏移。函数自带 translate/restore。 */
+  function drawMaskedAttack(e, M, geo, sx, sy) {
+    const fr = pickFrame(M, e, G.t);
+    const { drawW, drawH, floatY, scaleY, footOffset } = geo;
+    const fi = Math.min(fr.frameIdx - M.frames.attack.start, M.frames.attack.count - 1);
+    const off = bossMaskedFrame(fi, drawW, drawH);
+    ctx.save();
+    ctx.translate(sx, sy - floatY);
+    if (scaleY !== 1) { ctx.translate(0, -footOffset * (1 - scaleY)); ctx.scale(1, scaleY); }
+    if (off) ctx.drawImage(off, -drawW * 0.5, -drawH, drawW, drawH);
+    else ctx.drawImage(M.sprite.img, fr.srcX, fr.srcY, fr.fw, fr.fh,
+                       -drawW * 0.5, -drawH, drawW, drawH);
+    ctx.restore();
   }
 
   function drawPlayerSprite() {
@@ -1197,124 +1243,87 @@ import { SND } from './10-base.js';
   }
 
   function drawEnemies() {
+    /* ── 渲染后端分流 ──────────────────────────────────────────────
+     * pixi 后端把怪物画到离屏画布，再在【本函数原本的位置】blit 回 #stage，
+     * 因此 bg → 怪物 → drops → player → ... 的层序与 Canvas2D 路径完全一致。
+     * 后端不可用时（WebGL 缺失/加载失败）自动回退 Canvas2D，观感不变。 */
+    const pixiActive = !!(_pixiBackend && _pixiBackend.available);
+    if (pixiActive) {
+      const cv = _pixiBackend.drawEnemies(G.enemies, {
+        W: CW, H: CH, floorY: floorY(), camX: G.camX, now: G.t,
+      });
+      if (cv) ctx.drawImage(cv, 0, 0);
+      /* 返回 null 说明本帧渲染失败 → pixiActive 置 false，落到下面 Canvas2D 兜底 */
+      else pixiActive = false;
+    }
     for (const e of G.enemies) {
       if (!e.alive && e.dying <= 0) continue;
       const sx = worldToScreen(e.x); const sy = floorY();
-      /* 史莱姆真实 sprite 渲染 */
-      if (G.slimeReady && G.slimeSprite && e.type === 'slime') {
-        /* 根据状态选择帧 */
-        let frameIdx;
-        if (e.hurtT > 0) {
-          /* 受击动画: hurtT从0.25递减到0, 映射到hurt帧范围 */
-          const hurtProgress = 1 - (e.hurtT / 0.25);
-          frameIdx = SLIME_SPRITE.hurtStart + Math.min(Math.floor(hurtProgress * SLIME_SPRITE.hurtCount), SLIME_SPRITE.hurtCount-1);
-        } else if (e.anim > 0) {
-          /* 攻击动画: anim从1递减到0, 映射到attack帧范围 */
-          const atkProgress = 1 - e.anim;
-          frameIdx = SLIME_SPRITE.attackStart + Math.min(Math.floor(atkProgress * SLIME_SPRITE.attackCount), SLIME_SPRITE.attackCount-1);
-        } else {
-          /* 走路/待机循环: 用时间驱动 */
-          frameIdx = SLIME_SPRITE.walkStart + (Math.floor(G.t * SLIME_SPRITE.fps) % SLIME_SPRITE.walkCount);
-        }
-        const col = frameIdx % SLIME_SPRITE.cols;
-        const row = Math.floor(frameIdx / SLIME_SPRITE.cols);
-        const srcX = col * SLIME_SPRITE.fw;
-        const srcY = row * SLIME_SPRITE.fh;
-        /* 渲染尺寸: 到玩家肩膀高度(精英怪体型 ×1.28) */
-        const drawH = Math.min(CH * 0.5, 72) * (e.elite ? 1.28 : 1);
-        const drawW = drawH * (SLIME_SPRITE.fw / SLIME_SPRITE.fh);
-        /* 脚底在帧中的y=120(距底部8px), 用这个偏移让脚底踩在地板上 */
-        const footOffset = 120 * (drawH / SLIME_SPRITE.fh);
-        ctx.save();
-        ctx.translate(sx, sy);
-        /* 变形纠正: 轻微垂直压缩(scaleY=0.92)让底部变平贴合地板, 同时补偿高度 */
-        const scaleY = 0.92;
-        const compensatedH = drawH / scaleY;
-        ctx.translate(0, -footOffset * (1 - scaleY));
-        ctx.scale(1, scaleY);
-        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
-        if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
-        /* 史莱姆面朝左, 素材本身就是面朝左, 不需要翻转 */
-        ctx.drawImage(G.slimeSprite, srcX, srcY, SLIME_SPRITE.fw, SLIME_SPRITE.fh, -drawW*0.5, -footOffset, drawW, compensatedH);
-        ctx.restore();
+      const M = getMonster(e.type);
+
+      /* pixi 已画过精灵，这里只补它以 Canvas2D 画的伴生元素：
+       * 精英光环 / 血条 / 掩码特效。与 Canvas2D 路径共用同一套几何计算。 */
+      if (pixiActive) {
+        if (!M || !M.sprite.ready) continue;
+        const geo = measure(M, CH, e.elite, G.t);
+        const { drawW, drawH, footOffset, floatY } = geo;
+        if (M.visual.maskedAttack && e.anim > 0) drawMaskedAttack(e, M, geo, sx, sy);
         if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
-        if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp, true);
-      } else if (G.waterReady && G.waterSprite && e.type === 'water') {
-        /* 水精灵真实 sprite 渲染 */
-        let frameIdx;
-        if (e.hurtT > 0) {
-          const hurtProgress = 1 - (e.hurtT / 0.25);
-          frameIdx = WATER_SPRITE.hurtStart + Math.min(Math.floor(hurtProgress * WATER_SPRITE.hurtCount), WATER_SPRITE.hurtCount-1);
-        } else if (e.anim > 0) {
-          const atkProgress = 1 - e.anim;
-          frameIdx = WATER_SPRITE.attackStart + Math.min(Math.floor(atkProgress * WATER_SPRITE.attackCount), WATER_SPRITE.attackCount-1);
-        } else {
-          frameIdx = WATER_SPRITE.walkStart + (Math.floor(G.t * WATER_SPRITE.fps) % WATER_SPRITE.walkCount);
+        if (e.alive) {
+          if (M.visual.footBase != null) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp, true);
+          else drawHpBar(sx + drawW*0.2, sy - floatY - drawH - 8, 50, e.hp, e.maxHp, true);
         }
-        const col = frameIdx % WATER_SPRITE.cols;
-        const row = Math.floor(frameIdx / WATER_SPRITE.cols);
-        const srcX = col * WATER_SPRITE.fw;
-        const srcY = row * WATER_SPRITE.fh;
-        const drawH = Math.min(CH * 0.5, 70) * (e.elite ? 1.28 : 1);
-        const drawW = drawH * (WATER_SPRITE.fw / WATER_SPRITE.fh);
-        /* 脚底在帧中的y=118(距底部10px) */
-        const footOffset = 118 * (drawH / WATER_SPRITE.fh);
+        continue;
+      }
+
+      /* 有注册表且有图集 → 统一绘制路径。
+       * 原先 slime / water / boss 三段几乎相同的代码已合并；差异全部由
+       * 注册表的 visual 字段描述（drawHMax / footBase / scaleY / skewX / float / maskedAttack）。 */
+      if (M && M.sprite.ready) {
+        const fr = pickFrame(M, e, G.t);
+        const geo = measure(M, CH, e.elite, G.t);
+        const { drawH, drawW, scaleY, footOffset, compensatedH, floatY, skewX } = geo;
+
         ctx.save();
-        ctx.translate(sx, sy);
-        /* 变形纠正: 轻微垂直压缩(scaleY=0.92)让底部变平贴合地板 + 轻微倾斜校正 */
-        const scaleY = 0.92;
-        const compensatedH = drawH / scaleY;
-        ctx.translate(0, -footOffset * (1 - scaleY));
-        /* 水精灵身体微微向右倾斜, 用skew校正(-0.03弧度约-1.7度) */
-        ctx.transform(1, 0, -0.03, 1, 0, 0);
-        ctx.scale(1, scaleY);
+        ctx.translate(sx, sy - floatY);
+        /* 变形纠正: 轻微垂直压缩让底部贴合地板（boss 的 scaleY=1 即不压缩） */
+        if (scaleY !== 1) {
+          ctx.translate(0, -footOffset * (1 - scaleY));
+          ctx.scale(1, scaleY);
+        }
+        /* 待机倾斜校正（水灵 -0.03 弧度 ≈ -1.7°） */
+        if (skewX) ctx.transform(1, 0, skewX, 1, 0, 0);
         if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
         if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
-        /* 水精灵面朝左, 素材本身就是面朝左, 不需要翻转 */
-        ctx.drawImage(G.waterSprite, srcX, srcY, WATER_SPRITE.fw, WATER_SPRITE.fh, -drawW*0.5, -footOffset, drawW, compensatedH);
+
+        /* boss 攻击帧有左侧特效渐隐（预渲染掩码帧，避免每帧离屏重建） */
+        if (M.visual.maskedAttack && e.anim > 0) {
+          drawMaskedAttack(e, M, geo, sx, sy);
+        } else {
+          /* 踩地板的怪用 footOffset 对齐脚底; 漂浮的怪(boss)用 drawH 顶对齐 */
+          const dy = M.visual.footBase != null ? -footOffset : -drawH;
+          const dh = M.visual.footBase != null ? compensatedH : drawH;
+          ctx.drawImage(M.sprite.img, fr.srcX, fr.srcY, fr.fw, fr.fh, -drawW*0.5, dy, drawW, dh);
+        }
         ctx.restore();
+
         if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
-        if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp, true);
-      } else if (G.bossReady && G.bossSprite && e.type === 'boss') {
-        /* BOSS史莱姆王: 飘着的, 2倍大, 攻击/漂浮分帧 */
-        let frameIdx;
-        if (e.anim > 0) {
-          const atkProgress = 1 - e.anim;
-          frameIdx = BOSS_SPRITE.attackStart + Math.min(Math.floor(atkProgress * BOSS_SPRITE.attackCount), BOSS_SPRITE.attackCount-1);
-        } else {
-          frameIdx = BOSS_SPRITE.walkStart + (Math.floor(G.t * BOSS_SPRITE.fps) % BOSS_SPRITE.walkCount);
+        if (e.alive) {
+          if (M.visual.footBase != null) {
+            drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp, true);
+          } else {
+            /* BOSS 血条在头顶, 右移对齐头部 */
+            drawHpBar(sx + drawW*0.2, sy - floatY - drawH - 8, 50, e.hp, e.maxHp, true);
+          }
         }
-        const col = frameIdx % BOSS_SPRITE.cols;
-        const row = Math.floor(frameIdx / BOSS_SPRITE.cols);
-        const srcX = col * BOSS_SPRITE.fw;
-        const srcY = row * BOSS_SPRITE.fh;
-        /* BOSS 2倍大, 漂浮不踩地板 */
-        const drawH = Math.min(CH * 0.7, 140);
-        const drawW = drawH * (BOSS_SPRITE.fw / BOSS_SPRITE.fh);
-        const floatY = BOSS_SPRITE.floatHeight + Math.sin(G.t * 1.5) * 8;  /* 漂浮上下浮动 */
-        ctx.save();
-        ctx.translate(sx, sy - floatY);  /* 漂浮在地板上方 */
-        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
-        if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
-        /* 攻击帧左侧特效渐隐: 预渲染掩码帧直接贴图(原每帧离屏重建, 见 bossMaskedFrame) */
-        if (e.anim > 0) {
-          const fi = Math.min(frameIdx - BOSS_SPRITE.attackStart, BOSS_SPRITE.attackCount - 1);
-          const off = bossMaskedFrame(fi, drawW, drawH);
-          if (off) ctx.drawImage(off, -drawW*0.5, -drawH, drawW, drawH);
-        } else {
-          /* 漂浮帧直接绘制 */
-          ctx.drawImage(G.bossSprite, srcX, srcY, BOSS_SPRITE.fw, BOSS_SPRITE.fh, -drawW*0.5, -drawH, drawW, drawH);
-        }
-        ctx.restore();
-        /* BOSS血条在头顶, 右移对齐头部 */
-        if (e.alive) drawHpBar(sx + drawW*0.2, sy - floatY - drawH - 8, 50, e.hp, e.maxHp, true);
       } else {
-        /* 素材未就绪时的兜底占位(正常不会走到这里) */
+        /* 素材未就绪 / 未注册类型 → 兜底占位（与原逻辑等价） */
         ctx.save(); ctx.translate(sx, sy);
         if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
         if (e.hurtT > 0) { ctx.globalAlpha *= 0.6; ctx.filter = 'brightness(2)'; }
         const bodyH = Math.min(25, CH*0.2);
-        ctx.fillStyle = e.color; ctx.beginPath(); ctx.ellipse(0,-bodyH/2,10,bodyH/2,0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle = e.color || (M && M.stats.color) || '#8fa8c0';
+        ctx.beginPath(); ctx.ellipse(0,-bodyH/2,10,bodyH/2,0,0,Math.PI*2); ctx.fill();
         ctx.restore();
         if (e.alive) drawHpBar(sx, sy-35, 24, e.hp, e.maxHp, true);
       }
