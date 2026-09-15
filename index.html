@@ -1939,9 +1939,14 @@
       /* v2.6 FIX: f.y 是相对地板线的偏移(敌人/玩家 y=0), 屏幕坐标须加 floorY(); 原直接当屏幕 y 画到了画布顶外, 特效从未显示 */
       const k = f.t/f.dur; const sx = worldToScreen(f.x); const fy = floorY() + f.y;
       if (f.kind === 'hitSpark') {
-        ctx.save(); ctx.translate(sx, fy); ctx.rotate(f.t*3);
+        /* 受击火花: 不旋转, 4条向外扩散的短线 */
+        ctx.save(); ctx.translate(sx, fy);
         ctx.strokeStyle = f.color; ctx.globalAlpha = 1-k; ctx.lineWidth = 1.2;
-        for (let i=0; i<4; i++) { ctx.rotate(Math.PI/4); ctx.beginPath(); ctx.moveTo(0,2); ctx.lineTo(0,6); ctx.stroke(); }
+        for (let i=0; i<4; i++) {
+          const ang = i * Math.PI/2 + Math.PI/4;
+          const r1 = 2 + k*4, r2 = 6 + k*8;
+          ctx.beginPath(); ctx.moveTo(Math.cos(ang)*r1, Math.sin(ang)*r1); ctx.lineTo(Math.cos(ang)*r2, Math.sin(ang)*r2); ctx.stroke();
+        }
         ctx.restore();
       } else if (f.kind === 'slash') {                    // 剑气斩: 一道横掠的剑气
         ctx.save(); ctx.translate(sx, fy); ctx.globalAlpha = 1-k;
