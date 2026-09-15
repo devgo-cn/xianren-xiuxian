@@ -17,6 +17,12 @@ OUT = os.path.join(ROOT, "ota", "manifest.json")
 INCLUDE_FILES = ["index.html", "game.js", "dt-theme.css", "bg.js", "fx2d.js"]
 # 运行时资源目录
 INCLUDE_DIRS = ["assets"]
+# v3.0: game.js 已按拓扑层拆入 src/*.js，这些模块同样是【运行时必需】——
+#       不纳入清单会导致热更新下发新 game.js（垫片）却不下发新模块，
+#       App 端加载到旧模块 → 白屏 / 版本错乱。
+#       故必须一并纳入，且纳入方式用目录扫描而非写死文件名，
+#       这样后续再拆模块时无需再改本脚本。
+INCLUDE_JS_DIRS = ["src"]
 # 不参与热更新的目录（素材源文件、参考项目）
 EXCLUDE_PREFIX = ("assets/raw/", "assets/ref/")
 
@@ -33,6 +39,17 @@ def collect():
                 rel = os.path.relpath(os.path.join(dirpath, fn), ROOT).replace(os.sep, "/")
                 if rel.startswith(EXCLUDE_PREFIX):
                     continue
+                files.add(rel)
+    # 拆分后的模块目录：只收 .js，避免把临时文件/编辑器备份也打进清单
+    for d in INCLUDE_JS_DIRS:
+        base = os.path.join(ROOT, d)
+        if not os.path.isdir(base):
+            continue
+        for dirpath, _dirnames, filenames in os.walk(base):
+            for fn in filenames:
+                if not fn.endswith(".js"):
+                    continue
+                rel = os.path.relpath(os.path.join(dirpath, fn), ROOT).replace(os.sep, "/")
                 files.add(rel)
     return sorted(files)
 
