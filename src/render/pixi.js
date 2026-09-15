@@ -28,6 +28,7 @@ export function createPixiBackend() {
   let root = null;
   let ready = false;
   let _initPromise = null;
+  let lastError = '';          // 初始化失败原因，供角标显示
   /* Pixi v8 用 ImageSource + Texture({source, frame})，
    * 不再是 v7 的 BaseTexture —— 见 vendor/pixi.min.mjs 导出清单。 */
   const _srcCache = new Map();     // spritePath -> ImageSource
@@ -60,9 +61,11 @@ export function createPixiBackend() {
       ready = true;
       return true;
     } catch (e) {
-      /* WebGL 不可用 / 加载失败：返回 false，调用方回退 Canvas2D */
+      /* 库加载失败 / WebGL 不可用：返回 false，并把原因交给角标显示。
+         注意【不回退 Canvas2D】—— 见 src/render/index.js 的"不静默兜底"铁律。 */
       app = null;
       _initPromise = null;
+      lastError = (e && e.message ? e.message : String(e)) || '未知错误';
       return false;
     }
     })();
@@ -107,6 +110,9 @@ export function createPixiBackend() {
 
     /** 是否可用（WebGL 初始化成功且已就绪）。不可用则调用方回退 Canvas2D。 */
     get available() { return ready; },
+
+    /** 初始化失败原因（成功则为空串） */
+    get lastError() { return lastError; },
 
     /** 异步初始化（幂等）。返回 Promise<boolean>。 */
     ensureInit(w, h) { _cw = w; _ch = h; return ensureApp(w, h); },

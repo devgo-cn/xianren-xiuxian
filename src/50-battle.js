@@ -16,6 +16,7 @@
  */
 
 import { SND } from './10-base.js';
+import { resolveBackend, reportBackend, BACKENDS } from './render/index.js';
 import {
   initRegistry, getMonster, allMonsters, statsTable, pickFrame, measure,
 } from './monsters/registry.js';
@@ -70,25 +71,28 @@ import {
   /* ── 渲染后端（可插拔）────────────────────────────────────────────
    * 默认 canvas2d：与改造前完全一致，零风险，且【不会加载 801KB 的 PixiJS】。
    * 选 pixi 时才动态 import src/render/pixi.js（两级懒加载）。
-   * 后端只负责"怎么画怪物"，不参与任何时间推进 —— 倍速乘法始终在 update() 首行。 */
+   * 后端只负责"怎么画怪物"，不参与任何时间推进 —— 倍速乘法始终在 update() 首行。
+   *
+   * ★ 不静默兜底：pixi 起不来就是起不来，怪物不画 + 角标红字写明原因，
+   *   绝不偷偷改用 Canvas2D（否则看着正常，实际跑哪套技术栈无从判断）。 */
   let _pixiBackend = null;
+  const _wantPixi = resolveBackend() === BACKENDS.PIXI;
+  if (!_wantPixi) reportBackend(BACKENDS.CANVAS2D, true, '');
   (function initBackend() {
-    let kind = 'canvas2d';
-    try {
-      const q = new URLSearchParams(location.search).get('render');
-      if (q === 'pixi' || q === 'canvas2d') kind = q;
-      else {
-        const ls = localStorage.getItem('xrRenderBackend');
-        if (ls === 'pixi' || ls === 'canvas2d') kind = ls;
-      }
-    } catch (e) {}
-    if (kind !== 'pixi') return;                 // 默认路径：到此为止
-    import('./render/pixi.js').then(mod => {
+    if (!_wantPixi) return;                      // 默认路径：到此为止
+    import('./render/pixi.js').then(async mod => {
       _pixiBackend = mod.createPixiBackend();
       /* 尺寸沿用舞台横带；battleLayer 每帧会按需调用 resize */
-      _pixiBackend.ensureInit ? _pixiBackend.ensureInit(CW || 300, CH || 150)
-                              : _pixiBackend.resize(CW || 300, CH || 150);
-    }).catch(() => { _pixiBackend = null; });     /* 加载失败 → 静默回退 */
+      const ok = _pixiBackend.ensureInit
+        ? await _pixiBackend.ensureInit(CW || 300, CH || 150)
+        : true;
+      reportBackend(BACKENDS.PIXI, !!ok && _pixiBackend.available,
+        ok ? '' : (_pixiBackend.lastError || 'WebGL 初始化失败'));
+    }).catch(err => {
+      _pixiBackend = null;                       /* 不置 Canvas2D —— 保持"未生效"状态 */
+      reportBackend(BACKENDS.PIXI, false,
+        '模块加载失败: ' + (err && err.message ? err.message : err));
+    });
   })();
 
   /* 怪物素材: 由注册表统一加载（原先每个怪一段 new Image + onload + G.xxxReady）。
@@ -1247,14 +1251,21 @@ import {
      * pixi 后端把怪物画到离屏画布，再在【本函数原本的位置】blit 回 #stage，
      * 因此 bg → 怪物 → drops → player → ... 的层序与 Canvas2D 路径完全一致。
      * 后端不可用时（WebGL 缺失/加载失败）自动回退 Canvas2D，观感不变。 */
-    const pixiActive = !!(_pixiBackend && _pixiBackend.available);
-    if (pixiActive) {
+    /* pixiDrew = 本帧确实由 PixiJS 画出了怪物。
+     * 指定 pixi 但没画成（未就绪 / 初始化失败 / 本帧抛错）时保持 false，
+     * 并且【不回退到 Canvas2D】—— 怪物整帧不绘制，角标红字说明原因。 */
+    let pixiDrew = false;
+    if (_wantPixi) {
+      if (!_pixiBackend || !_pixiBackend.available) return;   /* ★ 不兜底 */
       const cv = _pixiBackend.drawEnemies(G.enemies, {
         W: CW, H: CH, floorY: floorY(), camX: G.camX, now: G.t,
       });
-      if (cv) ctx.drawImage(cv, 0, 0);
-      /* 返回 null 说明本帧渲染失败 → pixiActive 置 false，落到下面 Canvas2D 兜底 */
-      else pixiActive = false;
+      if (!cv) {                                              /* ★ 不兜底 */
+        reportBackend(BACKENDS.PIXI, false, '本帧渲染失败');
+        return;
+      }
+      ctx.drawImage(cv, 0, 0);
+      pixiDrew = true;
     }
     for (const e of G.enemies) {
       if (!e.alive && e.dying <= 0) continue;
@@ -1263,7 +1274,7 @@ import {
 
       /* pixi 已画过精灵，这里只补它以 Canvas2D 画的伴生元素：
        * 精英光环 / 血条 / 掩码特效。与 Canvas2D 路径共用同一套几何计算。 */
-      if (pixiActive) {
+      if (pixiDrew) {
         if (!M || !M.sprite.ready) continue;
         const geo = measure(M, CH, e.elite, G.t);
         const { drawW, drawH, footOffset, floatY } = geo;
