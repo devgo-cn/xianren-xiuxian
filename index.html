@@ -750,6 +750,12 @@
   </div>
 </div>
 
+<!-- ── DragonBones 骨骼渲染(Canvas2D 桥) ──────────────────────────────────
+     经典脚本先于模块加载: dragonBones.js 为官方 UMD(仅用其 core, 不用 Pixi 渲染器),
+     canvas-dragonbones.js 为自写 Canvas2D 渲染桥(全局 CanvasDragonBones)。 -->
+<script src="./assets/db/dragonBones.js"></script>
+<script src="./assets/db/canvas-dragonbones.js"></script>
+
 <!-- ── 游戏入口（唯一）────────────────────────────────────────────────────
      用 type="module" 加载 src/main.js：
        · 模块之间全部静态 import，浏览器模块图里每个文件只有一个 URL，

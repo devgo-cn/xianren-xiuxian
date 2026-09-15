@@ -23,6 +23,9 @@ import { SND } from './10-base.js';
        * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。 */
       slime: { name:'妖卒', role:'melee', w:60, atkRange:30, speed:120, hpK:1.0, atkK:0.55, defK:0.35, color:'#6fe0a8' },
       water: { name:'水灵', role:'melee', w:40, atkRange:35, speed:80,  hpK:1.6, atkK:0.75, defK:0.60, color:'#6fd0e8' },
+      /* v3.6 骨骼怪: 鼠妖 —— DragonBones 骨骼动画(assets/db/)经 Canvas2D 桥实时渲染,
+       * 与序列帧怪并存。bone 字段 = 骨架名(Ratty 包内 armature 名), 有 bone 字段即走骨骼管线。 */
+      rat:   { name:'鼠妖', role:'melee', w:35, atkRange:32, speed:150, hpK:0.8, atkK:0.5, defK:0.25, color:'#c9b28f', bone:'Ratty' },
       /* v2.6 调参: hpK 80→52(实测过厚约-35%), atkRange 70→45(玩家攻距75, 贴身才能互殴, 修复"剑够不到") */
       boss:  { name:'史莱姆王', role:'ranged', w:5,  atkRange:45, speed:40, hpK:52, atkK:3.0, defK:3.0, color:'#a0ff80', isBoss:true, floatHeight:10, sizeMult:2.0 },
     },
@@ -83,6 +86,36 @@ import { SND } from './10-base.js';
   const hengsaoImg = new Image();
   hengsaoImg.onload = function() { G.hengsaoSprite = hengsaoImg; G.hengsaoReady = true; };
   hengsaoImg.src = 'assets/skill_hengsao_sheet.webp';
+
+  /* ---------- 骨骼怪(DragonBones → Canvas2D 桥) ----------
+   * Ratty 骨骼包(_ske.json + _tex.json + _tex.png)预构建一个工厂,
+   * 每只鼠妖 makeEnemy 时 buildArmature 出独立骨架实例(动画互不干扰)。
+   * 桥/UMD 由 index.html 以经典脚本先于模块加载 —— 失败则鼠妖自动走兜底占位渲染。 */
+  const RATTY = { ready:false, factory:null, anims:{}, baseH:0, armName:'Ratty' };
+  (function loadRatty() {
+    if (!window.CanvasDragonBones) { console.warn('[battle] CanvasDragonBones 未加载, 鼠妖走兜底渲染'); return; }
+    const img = new Image();
+    let ske = null, tex = null;
+    const tryBuild = () => {
+      if (!ske || !tex || !img.naturalWidth || RATTY.ready) return;
+      try {
+        RATTY.factory = window.CanvasDragonBones.buildFactory(ske, tex, img);
+        /* 探针骨架: 确认动画齐备 + 记录 idle 姿态的基准高度(渲染缩放用, 避免动画间呼吸式缩放) */
+        const probe = RATTY.factory.buildArmature(RATTY.armName);
+        const A = probe.animation;
+        for (const n of ['idle','dead','attack','hurt','walk']) RATTY.anims[n] = A.hasAnimation(n);
+        const bb = window.CanvasDragonBones.armatureAABB(probe);
+        RATTY.baseH = Math.max(1, bb.maxY - bb.minY);
+        probe.dispose();
+        RATTY.ready = true;
+        console.log('[battle] 鼠妖骨骼工厂就绪 baseH=' + RATTY.baseH.toFixed(1) + ' anims=' + JSON.stringify(RATTY.anims));
+      } catch (err) { console.error('[battle] Ratty 骨骼工厂构建失败', err); }
+    };
+    fetch('assets/db/ratty_ske.json').then(r => r.json()).then(j => { ske = j; tryBuild(); }).catch(err => console.error('[battle] ratty_ske 加载失败', err));
+    fetch('assets/db/ratty_tex.json').then(r => r.json()).then(j => { tex = j; tryBuild(); }).catch(err => console.error('[battle] ratty_tex 加载失败', err));
+    img.onload = tryBuild;
+    img.src = 'assets/db/ratty_tex.png';
+  })();
 
   /* 音效加载 */
   const sfx = {
@@ -260,9 +293,14 @@ import { SND } from './10-base.js';
     let atk = Math.round((8 + 5*lv)   * def.atkK);
     const dfn = Math.round((2 + 2*lv)   * def.defK);
     if (elite) { hp = Math.round(hp*DROP.eliteHp); atk = Math.round(atk*1.2); }
-    return { type,name:def.name,role:def.role, elite, x:0,y:0, hp,maxHp:hp, atk, def:dfn,
+    const r = { type,name:def.name,role:def.role, elite, x:0,y:0, hp,maxHp:hp, atk, def:dfn,
       atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2)*(elite?0.85:1), color:def.color,
       atkT:Math.random()*0.6, anim:0,hurtT:0,stun:0, alive:true,dying:0,reach:1, animFrame:0, animTimer:0, moving:false };
+    /* 骨骼怪: 工厂就绪时建一只独立骨架实例(每只怪动画独立推进) */
+    if (def.bone && RATTY.ready && def.bone === RATTY.armName) {
+      try { r.armature = RATTY.factory.buildArmature(def.bone); r.boneAnim = 'walk'; } catch (err) { console.error('[battle] buildArmature 失败', err); }
+    }
+    return r;
   }
   function spawnWave() {
     /* BOSS活跃时不刷新小怪 */
@@ -794,6 +832,19 @@ import { SND } from './10-base.js';
       if (p.atkBuffTimer <= 0) { p.atkBuff = 0; p.atkBuffTimer = 0; }
     }
   }
+  /* 骨骼怪动画状态机: 游戏状态(hurt/anim/moving/dying) → Ratty 动作, fadeIn 平滑过渡。
+   * playTimes=-1 走动画数据自带循环设置(循环动作无限循环, attack/hurt/dead 播一次定格)。 */
+  function advanceRatty(e, dt, dead) {
+    const A = e.armature.animation;
+    let want = 'walk';
+    if (dead && RATTY.anims.dead) want = 'dead';
+    else if (e.hurtT > 0 && RATTY.anims.hurt) want = 'hurt';
+    else if (e.anim > 0 && RATTY.anims.attack) want = 'attack';
+    else if (!e.moving && RATTY.anims.idle) want = 'idle';
+    if (!A.hasAnimation(want)) want = 'walk';
+    if (e.boneAnim !== want) { e.boneAnim = want; A.fadeIn(want, 0.12, -1); }
+    e.armature.advanceTime(dt);
+  }
   function updateEnemies(dt) {
     const p = G.player;
     /* 排队: 近的先站位, 后面的依次后挪一个身位 —— 否则所有怪挤在同一点完全重叠 */
@@ -805,8 +856,9 @@ import { SND } from './10-base.js';
       prevX = Math.max(e.x, stopX);
     }
     for (const e of G.enemies) {
-      if (e.dying>0) { e.dying-=dt; continue; }
+      if (e.dying>0) { e.dying-=dt; if (e.armature) advanceRatty(e, dt, true); continue; }
       if (!e.alive) continue;
+      if (e.armature) advanceRatty(e, dt, false);   /* 骨骼怪: 推进动画(吃倍速 dt, 与移动节奏一致) */
       e.atkT -= dt; e.anim = Math.max(0, e.anim-dt*1.5);
       const wasHurt = e.hurtT > 0;
       e.hurtT = Math.max(0, e.hurtT-dt);
@@ -1308,6 +1360,23 @@ import { SND } from './10-base.js';
         ctx.restore();
         /* BOSS血条在头顶, 右移对齐头部 */
         if (e.alive) drawHpBar(sx + drawW*0.2, sy - floatY - drawH - 8, 50, e.hp, e.maxHp, true);
+      } else if (e.type === 'rat' && e.armature && window.CanvasDragonBones) {
+        /* v3.6 骨骼怪(鼠妖): DragonBones→Canvas2D 桥实时渲染, 非序列帧。
+         * 体型缩放用 idle 基准高度(RATTY.baseH, 建工厂时测定) —— 避免不同姿态 AABB 高度变化导致呼吸式缩放;
+         * 落地对齐用当前姿态 AABB 底边中心 —— 任何动画下脚底都踩地板。素材面朝左, 与其它怪一致不翻转。 */
+        const drawH = Math.min(CH * 0.5, 76) * (e.elite ? 1.28 : 1);
+        const s = drawH / Math.max(1, RATTY.baseH || 100);
+        const bb = window.CanvasDragonBones.armatureAABB(e.armature);
+        ctx.save();
+        ctx.translate(sx, sy);
+        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
+        if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
+        ctx.scale(s, s);
+        ctx.translate(-(bb.minX + bb.maxX) / 2, -bb.maxY);
+        window.CanvasDragonBones.drawArmature(ctx, e.armature);
+        ctx.restore();
+        if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
+        if (e.alive) drawHpBar(sx, sy - drawH - 4, 28, e.hp, e.maxHp, true);
       } else {
         /* 素材未就绪时的兜底占位(正常不会走到这里) */
         ctx.save(); ctx.translate(sx, sy);
