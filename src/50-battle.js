@@ -1664,6 +1664,9 @@ import { SND } from './10-base.js';
    *   完全等价（横带内所有像素回到夜空底色），但裁剪区域外的像素一个都不动。
    *   save/restore 保证底色只作用于横带内部，也不会污染 worldToScreen 平移。 */
   function render(clear) {
+    /* v3.6: 每帧强制归位 —— 上帧任何残留 alpha/混合模式都不许带进来 */
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
     if (clear) {
       ctx.clearRect(0, 0, CW, CH);
     } else {
@@ -1775,16 +1778,27 @@ import { SND } from './10-base.js';
           : { top: 92, height: Math.max(1, 0.56 * H - 176) };
         const savedCtx = ctx, savedCW = CW, savedCH = CH;
         CW = W; CH = band.height; ctx = targetCtx;
+        /* v3.6 纵深防御：舞台画布由 bg/aura/burst 共享，任何一层泄漏
+         * globalAlpha / GCO / filter 都会让战斗层全体"半透明"（bg 层
+         * lighter 泄漏正是真机全员半透明的根因）。进入前强制归位。 */
+        targetCtx.globalAlpha = 1;
+        targetCtx.globalCompositeOperation = 'source-over';
+        try { targetCtx.filter = 'none'; } catch (err) {}
         /* 逻辑坐标系仍是"整屏宽 × 横带高"，与原来独立画布完全一致；
          * 只是绘制被 clip 到横带、并平移到横带顶端。 */
         targetCtx.save();
-        targetCtx.beginPath();
-        targetCtx.rect(0, band.top, W, band.height);
-        targetCtx.clip();
-        targetCtx.translate(0, band.top);
-        render(false);   /* 舞台模式：只铺自己那条横带，绝不清共享画布 */
-        targetCtx.restore();
-        ctx = savedCtx; CW = savedCW; CH = savedCH;
+        try {
+          targetCtx.beginPath();
+          targetCtx.rect(0, band.top, W, band.height);
+          targetCtx.clip();
+          targetCtx.translate(0, band.top);
+          render(false);   /* 舞台模式：只铺自己那条横带，绝不清共享画布 */
+        } finally {
+          /* try/finally：render 内若抛异常，restore 也必须执行 ——
+           * 否则 clip/translate 残留会把后续帧的绘制区域越裁越小。 */
+          targetCtx.restore();
+          ctx = savedCtx; CW = savedCW; CH = savedCH;
+        }
       },
     };
   }

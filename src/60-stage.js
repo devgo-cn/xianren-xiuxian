@@ -110,6 +110,12 @@ function tick(now) {
     /* 诊断钩子：逐层记录它收到的 dt。验收「倍速不泄漏」时靠它取证 ——
      * 舞台把【同一个原始 dt】给每一层，任何一层拿到的 dt 都不含 G.speedMult。 */
     if (_diag) _diag(L.name, dt);
+    /* v3.6 状态隔离：clearRect 只清像素、不清画笔状态，globalAlpha /
+     * globalCompositeOperation / filter 会跨层、跨帧残留。任何一层泄漏
+     * 都会污染后续所有层（曾致 battle 层全体半透明）。每层进入前强制归位。 */
+    _ctx.globalAlpha = 1;
+    _ctx.globalCompositeOperation = "source-over";
+    try { _ctx.filter = "none"; } catch (e) {}
     try { L.draw(_ctx, _W, _H, dt, now); }
     catch (e) {
       /* 单层异常不应拖垮整条渲染链：报一次，之后跳过该层 */

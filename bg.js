@@ -308,6 +308,13 @@ function initDeepSpace(canvas, opts) {
       g.drawImage(cloudCv, x, yBase - 26, cw, 52);
     }
     g.globalAlpha = 1;
+    /* v3.6 修复「真机全员半透明」：本层以 lighter(加法混合)作画，但此前
+     * 从不把 globalCompositeOperation 复位回 source-over。舞台模式(60-stage)
+     * 下 4 个层共享同一块画布 —— battle 层的森林背景/玩家/怪物/BOSS 全部
+     * 被迫跑在加法混合下：素材暗部与明亮背景相加直接变成背景色，视觉上
+     * 就是"半透明/被冲淡"。旧版战斗区是近黑底色，黑+素材=素材，所以
+     * "黑屏背景下看不出来"；换成明亮森林背景后问题立刻显形。 */
+    g.globalCompositeOperation = "source-over";
   }
 
   /* ---- 独立运行模式（managed=false）的调度：仅调试页使用 ---- */

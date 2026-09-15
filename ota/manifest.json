@@ -146,7 +146,7 @@
     "assets/ui_icons/icon_skill.webp": "9f4120ba7855ce3ed6012766534ff8f068521508f4814b763463337447d9ccd6",
     "assets/ui_icons/icon_story.webp": "92ff84146f80a3d7f9a6479c477113caf2e4017ffe10767dd866be4ea378c003",
     "assets/ui_icons/icon_treasure.webp": "fe0b83d8ece23ab09b23a013e18299de7335ba1917666a7970726e00b7eb7e17",
-    "bg.js": "31bac76e7354e4115e99350b3ef73cabfe8f430fcf38a7f384a548e6097872cb",
+    "bg.js": "bc746c574ededb93cd6cee342c05924b0d4ccb3911bb32fe24895bdfb0f4e4e9",
     "dt-theme.css": "c76cae50681e1e546130c83eb868cbbb1a3321e2063fb8e9399b2d710b748beb",
     "fx2d.js": "f1da1174d9b8d1c399b4be6257f68aae36d7d8d56986481b015ad60ec73c5de0",
     "game.js": "9754940a93231e14afc252557041836597a525a0c9c458498fbf564343e4e717",
@@ -156,10 +156,10 @@
     "src/20-core.js": "801d09ca8fe1680044620e85c03f5cb757a6569178f96022e28c92629f8eccba",
     "src/30-systems.js": "dd06aa051b79740e9281ccef7b71d810a34e41a3070d9f481764296e8f7063bf",
     "src/40-app.js": "e51ab126baa31dffbb902294c57af4750a947bd631041fbe32b6286922322931",
-    "src/50-battle.js": "e4d040c1cb66048fed0555a2ff3ecce406ec042024c1b8249f25c3cd76efbc80",
-    "src/60-stage.js": "812015531c39c243ac61092717669f736aa06a642ea2dd5e7eae3438c4bc23ec",
+    "src/50-battle.js": "c33586a20ddcb9325150415c7a9f46672077811d210a54d6126403bca99e84cd",
+    "src/60-stage.js": "f9d2da3f9cd58804ca2fdcbaf42cded7c43ac05a91f7b10fd22d2ca79275192f",
     "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
   },
-  "rev": "9c9a45019d8c6717",
+  "rev": "eb12d84eb3caf773",
   "version": "3.5"
 }
