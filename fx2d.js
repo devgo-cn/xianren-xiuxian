@@ -161,6 +161,18 @@ function fit() {
   R = Math.min(CW, CH) * 0.5 * cfg.rw;
 }
 
+/* v3.2 舞台驱动模式：canvas 由 60-stage 统一持有，尺寸由舞台给（逻辑像素），
+ * 本层不再改 canvas.width / 不再 setTransform。 */
+function fitManaged(targetCtx, w, h) {
+  ctx = targetCtx;
+  CW = Math.max(1, w || 1);
+  CH = Math.max(1, h || 1);
+  if (!cfg) cfg = REALM_VIS[curBig()] || REALM_VIS["凡人"];
+  cx = CW / 2;
+  cy = CH * 0.56;
+  R = Math.min(CW, CH) * 0.5 * cfg.rw;
+}
+
 function applyRealm(recreate) {
   cfg = REALM_VIS[curBig()] || REALM_VIS["凡人"];
   eraT = 0;                                  // 每次换境界金丹重新"凝聚长大"
@@ -193,6 +205,17 @@ function loop(now) {
       if (w && h && (w !== CW || h !== CH)) fit();
     }
   }
+  if (!ctx || CW < 4) return;
+  const b = curBig();
+  if (b !== bigNow) { bigNow = b; applyRealm(true); }
+  t += dt;
+  eraT += dt;
+  draw(dt);
+}
+
+/* v3.2 舞台驱动：不含调度，由 60-stage 按统一 30fps 调用。
+ * ⚠️ dt 是【原始 dt】，本层不吃身法倍速。 */
+function renderFrame(dt) {
   if (!ctx || CW < 4) return;
   const b = curBig();
   if (b !== bigNow) { bigNow = b; applyRealm(true); }
@@ -306,12 +329,32 @@ export function initFx(canvas) {
   raf = requestAnimationFrame(loop);
   document.addEventListener("visibilitychange", onVisFx);
 }
+
+/* v3.2 舞台驱动版入口：返回 60-stage 契约对象 { name, draw, resize }。
+ * 本层不再自持 rAF、不再监听 visibilitychange（舞台统一处理）、
+ * 不再监听 fx-suspend / fx-resume（舞台统一暂停整条链）。 */
+export function createFxLayer() {
+  bigNow = curBig();
+  cfg = REALM_VIS[bigNow] || REALM_VIS["凡人"];
+  parts = buildParticles(cfg.n);
+  t = 0; eraT = 0;
+  return {
+    name: "fx2d",
+    resize(_W, _H) { /* 真实尺寸在首帧 draw 时由舞台注入，见下 */ },
+    draw(targetCtx, W, H, dt) {
+      if (CW !== W || CH !== H || ctx !== targetCtx) fitManaged(targetCtx, W, H);
+      renderFrame(dt);
+    },
+  };
+}
+
 function onVisFx() {
   if (document.hidden) { fxRunning = false; cancelAnimationFrame(raf); }
   else if (!fxRunning) { fxRunning = true; last = performance.now(); raf = requestAnimationFrame(loop); }
 }
 /* v2.6 省电: 黑屏挂机(body.dimmed)时主页被盖住, 由 game.js enterDim/exitDim 派发事件停/启 rAF
- * (visibilitychange 只管页面切走, 管不了页内黑屏场景) */
+ * (visibilitychange 只管页面切走, 管不了页内黑屏场景)
+ * v3.2: 仅独立模式需要；舞台模式下由 60-stage 统一 pause/resume。 */
 document.addEventListener("fx-suspend", () => {
   if (fxRunning) { fxRunning = false; cancelAnimationFrame(raf); }
 });

@@ -167,6 +167,10 @@ import { SND } from './10-base.js';
   function skExpAll(n){ const api = window.SkillAPI; if (api) api.addExpAll(n); }
 
   window.BattleAPI = {
+    /* v3.2: 统一舞台接入点 ---- 返回 60-stage 契约层对象 { name, draw(ctx,W,H,dt) }。
+     * 调用后本层不再自持 rAF，逻辑与绘制都由舞台按统一 30fps 驱动。
+     * ⚠️ 舞台传进来的 dt 必须是原始 dt —— 倍速乘法留在 update() 内部。 */
+    createStageLayer: () => battleLayer(),
     getKills: () => G.kills,
     resetKills: () => { G.kills = 0; },
     triggerSpeedSkill: (mult, duration) => { if (mult<=1) return false; G.speedMult=mult; G.speedMultTimer=duration||5; return true; },
@@ -177,6 +181,15 @@ import { SND } from './10-base.js';
       return hit ? { name: hit, mult: G.speedMult, duration: G.speedMultTimer } : null;
     },
     getSpeedMult: () => G.speedMult,
+    /* v3.2 验收用：直接设定倍速（跳过技能随机 proc），让 A/B 对照可复现。
+     * 传 1 即清除加速。 */
+    __setSpeedMultForTest: (m, dur) => {
+      G.speedMult = Math.max(1, m || 1);
+      G.speedMultTimer = G.speedMult > 1 ? (dur || 30) : 0;
+      if (G.speedMult <= 1) { G.speedDodge = 0; }
+      updateHUD();
+      return G.speedMult;
+    },
     /* 主游戏注入玩家三围(境界+装备汇总后的面板值)
      * 注意: 必须同步进 p.atk / p.maxHp —— 战斗逻辑读的是 player 身上的字段,
      * 只更新 PST 会导致"面板数字涨了、打出去还是建号那把剑"(v2.5 回归修复)。 */
@@ -224,6 +237,11 @@ import { SND } from './10-base.js';
     pause: () => { G.paused = true; if (_sleepT) { clearTimeout(_sleepT); _sleepT = 0; } _rafOn = false; },
     resume: () => { G.paused = false; lastT = performance.now(); _lastPaint = 0; if (_sleepT) { clearTimeout(_sleepT); _sleepT = 0; } if (!_rafOn) { _rafOn = true; requestAnimationFrame(loop); } },
     getState: () => ({ kills:G.kills, spirit:G.spirit, speedMult:G.speedMult, state:G.state, playerHp:G.player?G.player.hp:0, pets:G.pets.length, enemies:G.enemies.filter(e=>e.alive).length }),
+    /* v3.2 验收探针：战斗世界的内部时钟。
+     * G.t 由 `G.t += dt * G.speedMult` 推进 —— 它是"倍速确实生效"的最直接证据，
+     * 且与渲染解耦（渲染层收到的永远是原始 dt）。 */
+    worldTime: () => G.t,
+    camX: () => G.camX,
   };
 
   function makePlayer() {
@@ -1451,6 +1469,16 @@ import { SND } from './10-base.js';
     drawBg(); drawEnemies(); drawDrops(); drawPlayerSprite(); drawPets(); drawFx(); drawDmg(); drawSkillCall();
   }
 
+  /* v3.2 舞台模式绘制：把战斗画到统一舞台画布的一条横带上。
+   *
+   * 关键：只有【绘制】被限制在横带内，游戏逻辑仍在整屏宽坐标系里跑
+   * （floorY = CH*0.82 用的 CH 是横带自身高度，与原来独立画布完全一致），
+   * 所以合并不会改变任何运动学数值。
+   *
+   * ⚠️ dt 必须由调用方传入【原始 dt】——倍速乘法只发生在 update() 第一行。
+   * 见下方 battleLayer()。
+   */
+
   /* ---------- 技能名播报绘制: 书法字金渐变+深描边, 弹入→稳住→末段快淡出上飘(瞬间隐藏) ----------
    * v2.9: 字号放大到战斗动画区可读(原 12.5px 太小, 看不出在播报什么);
    *       淡出窗口收到末 18% —— 前半段"看得清", 后半段"秒没", 不拖泥带水。 */
@@ -1496,12 +1524,17 @@ import { SND } from './10-base.js';
     if (stateEl) stateEl.textContent = G.state === 'fight' ? '战斗中' : '推进中';
   }
 
-  /* v2.6 PERF: ① 30fps 限帧(素材24fps, 高刷屏不再全速空转省电) ② 暂停放泵 —— G.paused 时不再空转 rAF, 由 BattleAPI.resume 重启 */
+  /* v2.6 PERF: ① 30fps 限帧(素材24fps, 高刷屏不再全速空转省电) ② 暂停放泵 —— G.paused 时不再空转 rAF, 由 BattleAPI.resume 重启
+   * v3.2: 调度权交给 60-stage（统一 ticker）。
+   *   独立模式（standalone，旧行为）走 runLoop；
+   *   舞台模式只暴露 step(dt) —— 由 60-stage 按统一 30fps 调用，
+   *   本层不再自持 rAF、不再自己限帧。 */
   let lastT = 0;
   let _rafOn = false;
   let _lastPaint = 0;
   let _sleepT = 0;              /* v2.9: 限帧 setTimeout 句柄 —— 暂停/恢复时必须清掉, 否则双链跑帧 */
   const BATTLE_FRAME_MS = 33;   // ≈30fps
+  let _managed = false;         // v3.2: true = 由 60-stage 驱动
   function loop(t) {
     if (G.paused) { _rafOn = false; lastT = t; return; }   // 停泵: 下一帧不再续 rAF, resume 负责重启
     _rafOn = true;
@@ -1517,6 +1550,35 @@ import { SND } from './10-base.js';
     _lastPaint = t;
     const dt = Math.min(0.05, (t-lastT)/1000); lastT = t;
     update(dt); render();
+  }
+
+  /* v3.2: 交给 60-stage 的层对象，绘制顺序排在 bg 之后、aura 之前 */
+  function battleLayer() {
+    return {
+      name: 'battle',
+      resize() { /* 几何由 battleBand() 决定，随舞台尺寸即时计算 */ },
+      draw(targetCtx, W, H, dt) {
+        if (!G || !G.player) return;
+        if (G.paused) return;                 /* 黑屏挂机：逻辑也停 */
+        /* ⚠️ dt 是【原始 dt】。倍速乘法在 update() 第一行完成，舞台绝不代劳。 */
+        update(dt);
+        const band = (typeof window !== 'undefined' && window.__stageBand)
+          ? window.__stageBand()
+          : { top: 92, height: Math.max(1, 0.56 * H - 176) };
+        const savedCtx = ctx, savedCW = CW, savedCH = CH;
+        CW = W; CH = band.height; ctx = targetCtx;
+        /* 逻辑坐标系仍是"整屏宽 × 横带高"，与原来独立画布完全一致；
+         * 只是绘制被 clip 到横带、并平移到横带顶端。 */
+        targetCtx.save();
+        targetCtx.beginPath();
+        targetCtx.rect(0, band.top, W, band.height);
+        targetCtx.clip();
+        targetCtx.translate(0, band.top);
+        render();
+        targetCtx.restore();
+        ctx = savedCtx; CW = savedCW; CH = savedCH;
+      },
+    };
   }
 
   function init() {
@@ -1539,7 +1601,22 @@ import { SND } from './10-base.js';
     });
     updateHUD();
     if (typeof window.pushBattleStats === 'function') window.pushBattleStats();
-    requestAnimationFrame(loop);
+    /* v3.2: 舞台模式下由 60-stage 驱动，自己不启 rAF */
+    if (!_managed) requestAnimationFrame(loop);
+  }
+
+  /* v3.2: 初始化但不启动自持循环（舞台模式） */
+  function initManaged() {
+    _managed = true;
+    let tries = 0;
+    return new Promise((resolve) => {
+      const go = () => {
+        if (document.getElementById('battleCanvas')) { init(); resolve(battleLayer()); return; }
+        if (++tries > 50) { resolve(null); return; }
+        setTimeout(go, 100);
+      };
+      go();
+    });
   }
 
 /* ── 模块加载即初始化（保留原 IIFE 的副作用语义，仅执行一次）─────────

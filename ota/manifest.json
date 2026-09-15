@@ -140,19 +140,20 @@
     "assets/ui_icons/icon_skill.webp": "9f4120ba7855ce3ed6012766534ff8f068521508f4814b763463337447d9ccd6",
     "assets/ui_icons/icon_story.webp": "92ff84146f80a3d7f9a6479c477113caf2e4017ffe10767dd866be4ea378c003",
     "assets/ui_icons/icon_treasure.webp": "fe0b83d8ece23ab09b23a013e18299de7335ba1917666a7970726e00b7eb7e17",
-    "bg.js": "1087cce6f416df6afa9b9baa086bcc175e51e386c023a5105b3946a323ebfd6e",
-    "dt-theme.css": "966776886a5ee4495e35b181e2be9cf0cae55637b7a494b48ec39eb779864505",
-    "fx2d.js": "77b1960de50c40a2a0be652c3ce56e7c613bbdd79b45640dd1a13cccf4640497",
+    "bg.js": "b4a9ad806604219973f7eddbc9016a5c9e59f64222c82907c14d23c25cb43907",
+    "dt-theme.css": "c76cae50681e1e546130c83eb868cbbb1a3321e2063fb8e9399b2d710b748beb",
+    "fx2d.js": "305ac2d0fb4f93a105992122496abcc9f33f6fce149e588e549ced0d5e5729d5",
     "game.js": "9754940a93231e14afc252557041836597a525a0c9c458498fbf564343e4e717",
-    "index.html": "f370bca68be35c3714c6ca380043e8ce00fa2c6558042e691d20d08ac19de327",
+    "index.html": "c46c21d58bce195201f1975c7879ec8a79d0cdbaf9c6ae47e4d43326fafde832",
     "src/00-pure.js": "adc79b0c6b6fc20c9ce6d1a87d8cbe0b761804177f94f861d038084f76c2b41b",
-    "src/10-base.js": "587b1f72f4be79d3cc8c6f49cd126e0d2bae511816d820367225738c6dd9117b",
+    "src/10-base.js": "7dc7037d41b1a21c1c60220db18e1cad826ed0b6779f4e6dbe0c31a853b5e69d",
     "src/20-core.js": "801d09ca8fe1680044620e85c03f5cb757a6569178f96022e28c92629f8eccba",
-    "src/30-systems.js": "12d4506ef3565becd5daa936d503d9c551983bef7dfb932152db41bb5e6705da",
-    "src/40-app.js": "de68b49a4b48aa00abd1e137aa0797998fb20868e524895f2d6ab7df0a4d754f",
-    "src/50-battle.js": "1d79ea80cddbf56de66f0e1c3a850f8b7f4f7ec4492feba68a2848654c23ee17",
-    "src/main.js": "ee8ff50695aaac0f7d19aa29513f34456a53f345edcb6b60612b596dec02fea9"
+    "src/30-systems.js": "00a6fc7d95615de54eac3c135075d17bedf83b5f5e144fac9a7b04eb70ec2c1d",
+    "src/40-app.js": "6513da6f46122c8e267c35b70fd21183bc59c0ba70069769fe6d44bc139cb345",
+    "src/50-battle.js": "ec7ce22fbb054a0d29a7e7e06a54024ccd005668337276bb8931896a049fe5a1",
+    "src/60-stage.js": "812015531c39c243ac61092717669f736aa06a642ea2dd5e7eae3438c4bc23ec",
+    "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
   },
-  "rev": "00a1cd42909ebd40",
-  "version": "3.1"
+  "rev": "3d0b6425d39bcc0f",
+  "version": "3.2"
 }

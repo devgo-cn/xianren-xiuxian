@@ -449,9 +449,12 @@ function pickNoRepeat(arr, key) {
   return arr[idx];
 }
 
-const bcv = $("burst"), bctx = bcv.getContext("2d");
+/* v3.2: #burst 已并入统一舞台 #stage。
+ * 独立模式（调试页）下仍要求存在 #burst；舞台模式下由外部注入 ctx，这里允许为 null。 */
+const bcv = $("burst");
+const bctx = bcv ? bcv.getContext("2d") : null;
 
-function sizeBurst() { bcv.width = innerWidth; bcv.height = innerHeight; }
+function sizeBurst() { if (bcv) { bcv.width = innerWidth; bcv.height = innerHeight; } }
 
 function burstBoom() {
   const cx = innerWidth / 2, cy = innerHeight * 0.46;
@@ -462,24 +465,36 @@ function burstBoom() {
   }
 }
 
-function tickBurst(dt) {
+/* 爆发粒子层。
+ *   tickBurst(dt)                    —— 独立模式：画到 #burst 自己的 canvas
+ *   tickBurst(dt, { ctx, W, H })     —— 舞台模式（v3.2）：画到统一舞台的 ctx
+ * 舞台模式下不能 clearRect（会抹掉背景/战斗/灵气），粒子自然衰减到 0 即可。
+ * ⚠️ dt 一律是【原始 dt】，本层不吃身法倍速。 */
+function tickBurst(dt, target) {
   __set_parts(parts.filter(p => p.life > 0));
-  if (!parts.length) { bctx.clearRect(0, 0, bcv.width, bcv.height); return; }
-  bctx.clearRect(0, 0, bcv.width, bcv.height);
-  bctx.globalCompositeOperation = "lighter";
+  const tctx = (target && target.ctx) || bctx;
+  if (!tctx) return;
+  const W = (target && target.W) || (bcv ? bcv.width : innerWidth);
+  const H = (target && target.H) || (bcv ? bcv.height : innerHeight);
+  if (!parts.length) { if (!target) tctx.clearRect(0, 0, W, H); return; }
+  if (!target) tctx.clearRect(0, 0, W, H);
+  tctx.globalCompositeOperation = "lighter";
   for (const p of parts) {
     p.x += p.vx; p.y += p.vy; p.vy += .09; p.life -= dt * 1.2;
-    bctx.fillStyle = `rgba(${p.color},${Math.max(0, p.life)})`;
-    bctx.beginPath(); bctx.arc(p.x, p.y, Math.max(0, p.size * p.life), 0, 7); bctx.fill();
+    tctx.fillStyle = `rgba(${p.color},${Math.max(0, p.life)})`;
+    tctx.beginPath(); tctx.arc(p.x, p.y, Math.max(0, p.size * p.life), 0, 7); tctx.fill();
   }
-  bctx.globalCompositeOperation = "source-over";
+  tctx.globalCompositeOperation = "source-over";
 }
 
 function closeOffline() { $("offlineModal").classList.remove("show"); }
 
+/* v3.2：统一舞台模式下，fx2d 不再自建 #cultFx（那是第 3 张全屏画布），
+ * 改为返回一个符合 60-stage 契约的层对象 { name, draw(ctx,W,H,dt) }。
+ * standalone 版保留，供单独调试页使用。 */
 function initFxLayer() {
   const cult = document.getElementById("cult");
-  if (!cult || document.getElementById("cultFx")) return;
+  if (!cult || document.getElementById("cultFx")) return null;
   const cv = document.createElement("canvas");
   cv.id = "cultFx";
   cv.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;"
@@ -488,6 +503,14 @@ function initFxLayer() {
   import('../fx2d.js?v=' + CACHE_VER)
     .then(m => { try { m.initFx(cv); } catch (e) { console.error("[fx2d] init:", e); } })
     .catch(e => console.error("[fx2d] load:", e));
+  return null;
+}
+
+/* 旋臂星点带（原 #cultFx 上的第三张全屏画布）。舞台模式下作为层交给 60-stage。 */
+function createFxLayer() {
+  return import('../fx2d.js?v=' + CACHE_VER)
+    .then(m => { try { return m.createFxLayer(); } catch (e) { console.error("[fx2d] layer:", e); return null; } })
+    .catch(e => { console.error("[fx2d] load:", e); return null; });
 }
 
 async function initBg() {
@@ -495,16 +518,40 @@ async function initBg() {
   catch (e) { console.warn("背景初始化失败，CSS 兜底", e); document.body.classList.add("no-webgl"); }
 }
 
-async function initBg2D() {
-  const canvas = $("bg");
+/* 背景层。舞台模式下 canvas 是统一的 #stage，本层只返回绘制器，
+ * 不接管 canvas 尺寸、不自持 rAF（managed: true）。 */
+async function initBg2D(sharedCanvas) {
+  const canvas = sharedCanvas || $("bg");
+  if (!canvas) return null;
   const mod = await import('../bg.js?v=' + CACHE_VER);
+  if (sharedCanvas) return mod.initDeepSpace(canvas, { managed: true });
   window.__bgCtrl = await mod.initDeepSpace(canvas);
+  return null;
+}
+
+/* v3.2：一次性建好统一舞台的所有层并交给 60-stage。
+ * 顺序即绘制顺序（后者盖前者）：bg → battle → aura → burst。
+ * battle 层由 50-battle.js 提供，在 40-app.js 里装配时补入。 */
+async function createStageLayers(stageCanvas) {
+  const bgLayer = await initBg2D(stageCanvas);
+  return { bgLayer };
 }
 
 let _auraCv, _auraCtx, _auraP = [], _auraT = 0, _auraColor = AURA_COLORS[0].slice(), _auraAcc = 0;
 
-function initAura() {
-  __set_auraCv($("aura")); if (!_auraCv) return;
+/* v3.2 舞台模式：灵气层不再自持 canvas，绘制由 60-stage 统一驱动。
+ * standalone 版仍保留，供单独调试页使用。 */
+function initAura(sharedCtx) {
+  if (sharedCtx) {
+    __set_auraCtx(sharedCtx);
+    __set_auraCv(null);
+    _auraP.length = 0;                       // 就地清空：_auraP 是模块级绑定，
+                                             // 重新赋值需要 __set_ 包装，数组清空则不用
+    for (let i = 0; i < 36; i++)
+      _auraP.push({ x: Math.random()*innerWidth, y: Math.random()*innerHeight, r: 1+Math.random()*2.4, s: 8+Math.random()*22, a: .25+Math.random()*.5, ph: Math.random()*7 });
+    return true;
+  }
+  __set_auraCv($("aura")); if (!_auraCv) return false;
   __set_auraCtx(_auraCv.getContext("2d"));
   const fit = () => {
     const dpr = capDeviceDpr();                    // v1.7.20 PERF-2: 低端收敛
@@ -514,6 +561,7 @@ function initAura() {
   fit(); addEventListener("resize", fit);
   for (let i = 0; i < 36; i++)
     _auraP.push({ x: Math.random()*innerWidth, y: Math.random()*innerHeight, r: 1+Math.random()*2.4, s: 8+Math.random()*22, a: .25+Math.random()*.5, ph: Math.random()*7 });
+  return true;
 }
 
 function zoneOfBig(bi) { const z = ZONES[bi]; return z ? z : ZONES[ZONES.length - 1]; }
@@ -804,6 +852,9 @@ function enterDim() {
   DIMSTAT.battles = 0; DIMSTAT.win = 0; DIMSTAT.spirit = 0; DIMSTAT.exp = 0; DIMSTAT.loot = [];
   dimRender();
   SND.mute(true);                                  // 音乐 + 音效 全关(硬静音, 音效不会自己跳出来)
+  /* v3.2: 合并后只需停【一条链】—— 统一舞台自己会转发给各层。
+   * 合并前要分别停 bg / 战斗 / fx2d 三处，容易漏（漏一层就白烧电）。 */
+  try { if (window.__stage && window.__stage.pause) window.__stage.pause(); } catch (e) {}
   try { if (window.__bgCtrl && window.__bgCtrl.pause) window.__bgCtrl.pause(); } catch (e) {}
   try { if (window.BattleAPI && window.BattleAPI.pause) window.BattleAPI.pause(); } catch (e) {}
   /* v2.6 省电: 黑屏挂机页面盖住主页 → 停掉 fx2d 旋臂动画的 rAF */
@@ -817,6 +868,7 @@ function exitDim() {
   document.body.classList.remove("dimmed");
   DIMSTAT.on = false;
   SND.mute(false);                                 // 按玩家原有开关恢复
+  try { if (window.__stage && window.__stage.resume) window.__stage.resume(); } catch (e) {}
   try { if (window.__bgCtrl && window.__bgCtrl.resume) window.__bgCtrl.resume(); } catch (e) {}
   try { if (window.BattleAPI && window.BattleAPI.resume) window.BattleAPI.resume(); } catch (e) {}
   /* v2.6 省电: 回到主页 → 恢复 fx2d 旋臂动画 */
@@ -1077,6 +1129,8 @@ export {
   handleKicked,
   hbFail,
   hiddenUnlocked,
+  createFxLayer,
+  createStageLayers,
   initAura,
   initBg,
   initBg2D,

@@ -17,6 +17,7 @@
 | `src/40-app.js` | 754 | 应用装配与顶层副作用（L8~14） |
 | `src/50-battle.js` | 1553 | 战斗系统（自 `index.html` 内联脚本抽取） |
 | `src/main.js` | 394 | 唯一入口：静态 import + 全局桥接 |
+| `src/60-stage.js` | 176 | **v3.2 统一舞台层**：把 4 张 canvas 合成 1 张 |
 
 依赖严格单向：`00-pure ← 10-base ← 20-core ← 30-systems ← 40-app`，另有
 `50-battle → 10-base`（只依赖 `SND`）。无环。
@@ -75,3 +76,77 @@ v3.1 的修法：`index.html` 直接 `<script type="module" src="./src/main.js?v
 > 顺带一提：`import map` **做不到**这件事。它的映射值必须是合法 URL 前缀，
 > 塞 query 进去（`"./src/": "./src/?v=3.0&"`）会被浏览器判定为
 > `blocked by a null value`。别在这上面浪费时间。
+
+
+---
+
+## v3.2 统一舞台层（`src/60-stage.js`）
+
+### 问题
+
+v3.1 之前有 **4 张各自独立的 canvas**，各自跑一个 `requestAnimationFrame` 循环：
+
+| canvas | z-index | 尺寸 | 刷新率 | 内容 |
+|---|---|---|---|---|
+| `#bg` | 0 | 全屏 0.36 MPx | ~24fps | 雾霭 / 星点 / 银河 / 纸月 / 流云 |
+| `#battleCanvas` | 1 | 条带 0.13 MPx | ~24fps | 战斗（裁剪到 battle-stage 横带） |
+| `#aura` | 3 | 全屏 0.36 MPx | ~18fps | 灵气粒子，且带 `mix-blend-mode:screen` |
+| `#burst` | 30 | 全屏 0.36 MPx | ~22fps | 点击 / 渡劫爆发粒子 |
+| **合计** | | **1.21 MPx/帧** | **4 份调度** | **4 次全屏合成** |
+
+三个开销点：① 4 次全屏位图混合；② `mix-blend-mode:screen` 会强制 `#aura` 走
+**独立合成通道**，无法并入轻量合成路径；③ 4 个 rAF 相位不齐（24/18/24/22fps），
+限帧逻辑各自实现，白白多跑。
+
+### 做法
+
+合并为 `1 张 #stage`、`1 个 ticker`、`1 次合成`，混合在绘制期用
+`globalCompositeOperation = "lighter"` 完成。像素量 **1.21 → 0.36 MPx（降 70%）**。
+
+绘制顺序由**代码顺序**保证，不再依赖 z-index：
+
+```
+bg  →  battle（clip 到横带）  →  aura（加法）  →  burst（加法）
+```
+
+### 铁律：ticker 只管「何时调用」，不管「传什么 dt」
+
+每一层自己算自己的 dt，**ticker 一律传原始 dt**。
+
+这不是风格问题，是**倍速不泄漏**的正确性约束：
+
+> 战斗层的「疾风步 / 缩地成寸」会让战斗实体按 `dt × speedMult` 推进。
+> 该乘法**必须留在 `50-battle.js` 的 `update()` 内部第一行**
+> （`const sdt = dt * G.speedMult;`）。一旦提到 ticker 里统一乘，
+> 背景 / 灵气 / 爆发粒子就会跟着一起加速 —— 那是错误的。
+
+同理，战斗层内部这些**刻意不吃倍速**的量也必须保持不变（它们都用原始 `dt`）：
+
+- `_pushT` —— 每 5s 拉取一次玩家属性
+- `G.skillCall.t` —— 技能名播报节奏（注释明写"不吃身法倍速"）
+
+### 验收
+
+`verify_speed_scope.py` 用 `60-stage.js` 暴露的 `setDiag()` 钩子逐层记录
+每层实际收到的 `dt`，强制把 `speedMult` 设成 1 / 2 对照：
+
+| 指标 | ×1 | ×2 |
+|---|---|---|
+| 各层收到的 dt（中位） | 0.03340 | **0.03340（一字不差）** |
+| 战斗世界时钟 `G.t` | 1.995 世界秒/真实秒 | **3.912（≈1.96×）** |
+
+即：加速确实生效在战斗内部，渲染层 dt 分毫未动。
+
+### 各层接口
+
+```js
+// 60-stage 契约
+{ name, draw(ctx, W, H, dt, now), resize?(W, H) }
+
+// 加层 / 插层（战斗层是动态 import 的，就绪比 bg 晚）
+stage.addLayer(L)
+stage.insertLayerBefore("aura", L)
+```
+
+各层的独立运行模式（`initFx` / `initDeepSpace(canvas)` / `initAura()` 无参）
+**全部保留**，供单独调试页使用；主流程走 `managed` / `createFxLayer()` 分支。

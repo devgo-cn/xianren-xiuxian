@@ -210,33 +210,50 @@ function renderStory() {
 
 function auraColorNow() { return AURA_COLORS[Math.min(bigIdx(), AURA_COLORS.length - 1)]; }
 
-function tickAura(dt) {
-  if (!_auraCtx) return;
+/* 灵气粒子层。
+ *   tickAura(dt)                    —— 独立模式：画到 #aura 自己的 canvas
+ *   tickAura(dt, { ctx, W, H })     —— 舞台模式（v3.2）：画到统一舞台的 ctx，尺寸由舞台给
+ *
+ * 两种模式共用同一套粒子状态与时序；区别只在"画到哪、按谁的尺寸算"。
+ * ⚠️ dt 一律是【原始 dt】，本层不吃身法倍速。 */
+function tickAura(dt, target) {
+  const tctx = target && target.ctx ? target.ctx : _auraCtx;
+  if (!tctx) return;
   __set_auraAcc(_auraAcc + (dt));
   if (_auraAcc < 1 / AURA_FPS) return;          // 限帧 30fps: 不足一帧间隔直接跳过(粒子位置用累计 realDt 补偿, 不丢物理)
   const realDt = _auraAcc; __set_auraAcc(0);
   __set_auraT(_auraT + (realDt));
-  const W = innerWidth, H = innerHeight, c = auraColorNow();
+  const W = (target && target.W) || innerWidth;
+  const H = (target && target.H) || innerHeight;
+  const c = auraColorNow();
   for (let i = 0; i < 3; i++) _auraColor[i] += (c[i] - _auraColor[i]) * Math.min(1, realDt * 1.5);
   const [r,g,b] = _auraColor.map(v => Math.round(v));
-  _auraCtx.clearRect(0, 0, W, H);
-  _auraCtx.globalCompositeOperation = "lighter";
+  if (target) {
+    /* 舞台模式：不清屏 —— 背景/战斗已经画在同一块画布上，clearRect 会把它们抹掉。
+     * 直接叠加绘制，退出时统一复位混合模式。 */
+  } else {
+    tctx.clearRect(0, 0, W, H);
+  }
+  /* 合并后统一用 globalCompositeOperation 加法混合（原先靠 CSS mix-blend-mode:screen，
+   * 那是"画布级"合成，会迫使本层走独立合成通道 —— 正是要消掉的开销）。 */
+  tctx.globalCompositeOperation = "lighter";
   const blobs = [[.25,.3,.5],[.7,.25,.42],[.5,.7,.55],[.82,.72,.4]];
+  const aScale = target ? 1.75 : 1;   // 舞台模式下背景已复合，原 alpha 偏淡 → 补偿
   for (let i = 0; i < blobs.length; i++) {
     const [bx,by,bz] = blobs[i];
     const cx = (bx + Math.sin(_auraT*0.06 + i)*0.05)*W, cy = (by + Math.cos(_auraT*0.05 + i*1.3)*0.05)*H, rad = bz*Math.min(W,H)*0.6;
-    const grd = _auraCtx.createRadialGradient(cx, cy, 0, cx, cy, rad);
-    grd.addColorStop(0, `rgba(${r},${g},${b},.07)`); grd.addColorStop(1, `rgba(${r},${g},${b},0)`);
-    _auraCtx.fillStyle = grd; _auraCtx.beginPath(); _auraCtx.arc(cx, cy, rad, 0, 7); _auraCtx.fill();
+    const grd = tctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    grd.addColorStop(0, `rgba(${r},${g},${b},${.07*aScale})`); grd.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    tctx.fillStyle = grd; tctx.beginPath(); tctx.arc(cx, cy, rad, 0, 7); tctx.fill();
   }
   for (const p of _auraP) {
     p.y -= p.s*realDt; p.x += Math.sin(_auraT*0.6 + p.ph)*6*realDt;
     if (p.y < -10) { p.y = H + 10; p.x = Math.random()*W; }
     const a = p.a * (0.5 + 0.5*Math.sin(_auraT*1.2 + p.ph));
-    _auraCtx.fillStyle = `rgba(${r},${g},${b},${a*0.5})`;
-    _auraCtx.beginPath(); _auraCtx.arc(p.x, p.y, p.r, 0, 7); _auraCtx.fill();
+    tctx.fillStyle = `rgba(${r},${g},${b},${a*0.5*aScale})`;
+    tctx.beginPath(); tctx.arc(p.x, p.y, p.r, 0, 7); tctx.fill();
   }
-  _auraCtx.globalCompositeOperation = "source-over";
+  tctx.globalCompositeOperation = "source-over";
 }
 
 function mainMoment() {

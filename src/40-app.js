@@ -5,7 +5,7 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, ARRAY_MAX_LV, BIGS, CLD_KEY, DIMSTAT, DROP_CFG, EVENTS, MAIL_CAP, MAIN_STORY, MATS, PET_BONUS, PET_COIN, PET_FORGE, PET_STILL, PLOT, QUALITY, RECIPES, SAVE_KEY, SLOT_TYPES, __set_breaking, __set_cauldron, __set_dropSaveT, __set_encNext, __set_equipId, __set_hiddenAt, __set_hudAcc, __set_selRecipe, __set_state, __set_stayLast, _dropSaveT, _dsp, _equipId, _equipQueue, _floatPrev, _hiddenAt, _hudAcc, _pred, _rate, _settling, _srvOffset, _stayLast, _syncAt, autoHuntOn, breaking, cld, cnNum, fmt, hbOk, initFxDiag, selRecipe, state } from './00-pure.js';
+import { $, ARRAY_MAX_LV, BIGS, CACHE_VER, CLD_KEY, DIMSTAT, DROP_CFG, EVENTS, MAIL_CAP, MAIN_STORY, MATS, PET_BONUS, PET_COIN, PET_FORGE, PET_STILL, PLOT, QUALITY, RECIPES, SAVE_KEY, SLOT_TYPES, __set_breaking, __set_cauldron, __set_dropSaveT, __set_encNext, __set_equipId, __set_hiddenAt, __set_hudAcc, __set_selRecipe, __set_state, __set_stayLast, _dropSaveT, _dsp, _equipId, _equipQueue, _floatPrev, _hiddenAt, _hudAcc, _pred, _rate, _settling, _srvOffset, _stayLast, _syncAt, autoHuntOn, breaking, cld, cnNum, fmt, hbOk, initFxDiag, selRecipe, state } from './00-pure.js';
 import { CLD_API, TOTAL_SEGS, adopt, arrayCostNow, buffAtCap, buffHintOf, burstBoom, cldApi, cldFlash, cldId, cldUI, closeTravel, cloudSnap, cloudSoon, ensureScrollFx, fitsRecipe, g1Pack, g1Unpack, hbFail, hiddenUnlocked, initAura, initBg, initFxLayer, journalHasKey, locById, mailDot, pickNoRepeat, pushBattleStats, pushBuff, pushMsg, renderAutoHunt, renderPName, renderPillHints, searchMs, seg, settleBlocked, spiritRate, srvNow, tickBurst, tickDsp, traceRefresh, travelBtnLbl, zoneOfLoc } from './10-base.js';
 import { addJournal, adoptKeep, bigIdx, cldFail, keepArtQuiet, load, realm, renderMailBox, save, showTravelMail, smartEquip, updateArts, updateRealmUI } from './20-core.js';
 import { checkMilestones, cldPush, cloudPushNow, cloudSettle, mainMoment, makeArt, openAlchemy, openStory, openTravel, pickLoc, rateNow, tickAura, updateHUD } from './30-systems.js';
@@ -272,10 +272,11 @@ function loop(dt) {
     /* v2.6 PERF: realmPlot 每帧 → 并入下方 100ms HUD 节流(幂等, 触发时机无感差异) */
   }
   tickDsp(dt);
-  /* v2.6 PERF: 黑屏挂机时主屏不可见, 辉光/粒子层停绘省电 */
-  if (!DIMSTAT.on) tickAura(dt);
+  /* v3.2: 灵气层与爆发粒子层已并入统一舞台 #stage，由 60-stage 的 ticker 驱动。
+   * 原先是 `if (!DIMSTAT.on) tickAura(dt)` / `tickBurst(dt)` 两处 —— 它们各自
+   * 有一份 30fps 限帧逻辑，和主循环/背景/战斗的限帧相位不齐，白白多跑。
+   * 下面这个 loop 现在只管【游戏逻辑】（修为结算 / HUD 节流），不再碰渲染。 */
   __set_hudAcc(_hudAcc + (dt)); if (_hudAcc >= 0.1) { __set_hudAcc(0); updateHUD(); realmPlot(); checkMilestones(); if (Math.random() < 0.035) adventure(); if (Math.random() < 0.006) mainMoment(); }   // PERF-1: HUD ~10FPS; PERF-3: adventure/mainMoment 从每帧 60 次随机检查降到 10fps(概率等价换算: 0.35*0.1 / 0.06*0.1)
-  if (!DIMSTAT.on) tickBurst(dt);
 }
 
 async function bootGate() {
@@ -340,10 +341,11 @@ function startGame() {
   cloudInit();                  // 云存档面板交互 + 断网恢复
   startHeartbeat();             // v1.8.0 周期心跳(90s)
   setInterval(stayMailCheck, 60000);   // 在线寄包: iOS 常驻标签页也能收到化身手札
-  initAura();
-  initBg();
   initFxDiag();
-  initFxLayer();
+  /* v3.2: 装配统一舞台 —— 原先这里是 initAura() + initBg() + initFxLayer() 三次调用,
+   * 各自启一张全屏 canvas + 一个 rAF。现在合成为 1 张 #stage / 1 个 ticker。
+   * 战斗层稍后挂入（BattleAPI 由动态 import 加载，需要轮询等待）。 */
+  mountStage();
   let lastLoop = performance.now();
   /* v2.6 PERF: 30fps 限帧 —— 主循环原为无上限 rAF(120Hz手机全速空转, 耗电主因之一);
    * UI 均为缓动动画, 30fps 观感无损, 帧率减半即功耗减半。 */
@@ -660,6 +662,76 @@ function bindBattleHooks() {                    // 战斗 IIFE 是内联脚本, 
   api.requestEquipDrop = requestEquipDrop;
   api.applyEquipDrop = applyEquipDrop;
   pushBattleStats();
+}
+
+/* ── v3.2 统一舞台装配 ───────────────────────────────────────────────
+ * 把原先 4 张独立 canvas（bg / battleCanvas / aura / burst）+ 4 个 rAF 循环
+ * 合成 1 张 #stage + 1 个 ticker。
+ *
+ * 层的加入顺序 = 绘制顺序（后者盖前者）：
+ *     bg  →  battle  →  aura  →  burst
+ * 与原 z-index（0 / 1 / 3 / 30）一致。
+ *
+ * 战斗层是动态 import 的（见 main.js 尾部说明），所以轮询等它就绪后再插入。
+ */
+const _stageLayers = { bg: null, battle: null };
+function mountStage() {
+  if (window.__stage) return;                       // 幂等
+  const canvas = document.getElementById("stage");
+  if (!canvas) { console.warn("[stage] 找不到 #stage，回退到分层渲染"); initAura(); initBg(); initFxLayer(); return; }
+
+  /* 统一舞台持有 canvas 与 ctx。灵气层与爆发层直接画到它上面，
+   * 不再各自 clearRect（那会抹掉别的层）。 */
+  const ctx = canvas.getContext("2d", { alpha: false });
+
+  /* 层壳子：真正的绘制函数在创建后回填，保证插入顺序在装配时就固定。 */
+  const auraLayer = {
+    name: "aura",
+    draw(c, W, H, dt) { if (!DIMSTAT.on) tickAura(dt, { ctx: c, W, H }); },
+  };
+  const burstLayer = {
+    name: "burst",
+    draw(c, W, H, dt) { if (!DIMSTAT.on) tickBurst(dt, { ctx: c, W, H }); },
+  };
+
+  /* 先建 stage（bg 层要拿到它给的真实尺寸），再按顺序挂层。 */
+  import("./60-stage.js").then(mod => {
+    const stage = mod.initStage(canvas, []);
+    window.__stage = stage;
+    /* 灵气层的 ctx 需要注入（它内部用自己的 _auraCtx 判断是否就绪）。
+     * 单独 try —— 任何一层初始化失败都不应让整条舞台装配中断。 */
+    try { initAura(ctx); } catch (e) { console.error("[stage] aura 层初始化失败:", e); }
+    try { stage.addLayer(auraLayer); } catch (e) { console.error("[stage] aura 层挂载失败:", e); }
+    try { stage.addLayer(burstLayer); } catch (e) { console.error("[stage] burst 层挂载失败:", e); }
+    /* bg 层：managed 模式，不自持 rAF、不改 canvas 尺寸 */
+    import('../bg.js?v=' + CACHE_VER).then(bgMod => {
+      try {
+        const bgLayer = bgMod.initDeepSpace(canvas, { managed: true });
+        /* bg 必须在最底层：插到 aura 之前（此时 layer 顺序是 [aura, burst]） */
+        stage.insertLayerBefore("aura", bgLayer);
+      } catch (e) { console.error("[stage] bg 层初始化失败:", e); }
+      pollBattleLayer(stage);
+    }).catch(e => { console.error("[stage] bg 层加载失败:", e); pollBattleLayer(stage); });
+  }).catch(e => console.error("[stage] 加载失败:", e));
+}
+
+/* 战斗层就绪后插到 bg 与 aura 之间（绘制顺序：bg → battle → aura → burst） */
+let _battlePoll = 0;
+function pollBattleLayer(stage) {
+  const api = window.BattleAPI;
+  if (!api) {
+    if (++_battlePoll > 100) return;                // 10s 后放弃
+    setTimeout(() => pollBattleLayer(stage), 100);
+    return;
+  }
+  if (window.__stageHasBattle) return;
+  window.__stageHasBattle = true;
+  setTimeout(() => {
+    if (typeof api.createStageLayer !== "function") return;
+    const L = api.createStageLayer();
+    if (L && typeof stage.insertLayerBefore === "function") stage.insertLayerBefore("aura", L);
+    else if (L) stage.addLayer(L);
+  }, 300);
 }
 
 (function initSplash() {

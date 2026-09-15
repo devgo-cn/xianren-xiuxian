@@ -160,14 +160,23 @@ function moonSprite() {
   return cv;
 }
 
-/* ---------- 主入口 ---------- */
-function initDeepSpace(canvas) {
+/* ---------- 主入口 ----------
+ *
+ * v3.2 起背景【不再自持 rAF 循环】，改为暴露 draw() 由统一舞台层驱动。
+ * 原因见 src/60-stage.js 文件头：4 张独立 canvas 叠在一起 = 4 份调度 + 4 次全屏合成，
+ * 是手机发烫的首要单点。合并后本层只提供"给定 ctx / 尺寸 / dt，画一帧"。
+ *
+ * 兼容期保留：不传 opts 时按老方式自持 rAF（供单独调试页使用）。
+ */
+function initDeepSpace(canvas, opts) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return { destroy() {} };
+  /* opts.managed === true → 由 60-stage 驱动：不自持 rAF、不管 visibility、不改 canvas 尺寸 */
+  const managed = !!(opts && opts.managed);
 
   let W = 0, H = 0, dpr = 1;
   let stars = [], neb = [], moon = null;
-  let t = 0, last = performance.now(), raf = 0, running = true;
+  let t = 0, last = performance.now(), raf = 0, running = !managed, _sleepT = 0;
   let userPaused = false;   // v1.7.60 黑屏挂机: 用户主动暂停(与 document.hidden 的暂停分开)
   /* v1.7.56 省电: 背景是极缓动画(雾霭漂移/星点闪烁), 30fps 观感无损 → 主线程占用减半 */
   let _lastPaint = 0;
@@ -180,7 +189,16 @@ function initDeepSpace(canvas) {
     return Math.min(raw, 1.5);
   }
 
-  function resize() {
+  /* managed 模式下尺寸由舞台层给（W/H 是逻辑像素），本层不碰 canvas.width，
+   * 也不 setTransform —— 舞台已设好统一变换，重复设置会叠乘。 */
+  function resize(nw, nh) {
+    if (managed) {
+      W = Math.max(1, nw || canvas.clientWidth || window.innerWidth || 1);
+      H = Math.max(1, nh || canvas.clientHeight || window.innerHeight || 1);
+      dpr = 1;
+      build();
+      return;
+    }
     const rect = canvas.getBoundingClientRect();
     W = Math.max(1, rect.width || window.innerWidth || 1);
     H = Math.max(1, rect.height || window.innerHeight || 1);
@@ -253,36 +271,33 @@ function initDeepSpace(canvas) {
     }
   }
 
-  function tick(now) {
-    if (!running) return;
-    const wait = FRAME_MS - (now - _lastPaint);
-    if (wait > 4) {
-      /* v2.9 PERF: 限帧期间用 setTimeout 让出主线程(原先无条件续 rAF 会按屏幕刷新率空转)。
-       * 阈值 >4ms 才睡, 余量过小会退化成紧凑循环。 */
-      setTimeout(() => { if (running) raf = requestAnimationFrame(tick); }, wait);
-      return;
-    }
-    raf = requestAnimationFrame(tick);
-    _lastPaint = now;
-    const dt = Math.min(0.05, (now - last) / 1000);
-    last = now;
+  /* 画一帧（不含调度）：由统一舞台层调用，或由独立 tick 调用。
+   * ⚠️ dt 是【原始 dt】，本层不吃身法倍速。 */
+  function renderFrame(dt) {
     t += dt;
     const T = t;
-    ctx.clearRect(0, 0, W, H);
+    draw(T);
+  }
+
+  /* 纯绘制：给定时间点 T，把整层画到 ctx。
+   * 与调度、dt 完全解耦 —— renderFrame 与 staticFrame 都走这里。 */
+  function draw(T) {
+    const g = ctx;
+    g.clearRect(0, 0, W, H);
 
     // 相机极缓漂移(视差): 两层反向微移
     const camX = Math.sin(T * 0.021) * 14;
     const camY = Math.sin(T * 0.013 + 1.3) * 9;
     layoutNeb(camX);
 
-    ctx.globalCompositeOperation = "lighter";
+    g.globalCompositeOperation = "lighter";
 
     /* 1. 雾霭(墨色低饱和) */
     for (const n of neb) {
       const c = n.cfg;
       const br = 0.82 + 0.18 * Math.sin(T * 0.11 + c.ph * 2.7);
-      ctx.globalAlpha = c.a * br;
-      ctx.drawImage(n.sp, n.x - n.r, n.y - n.r, n.r * 2, n.r * 2);
+      g.globalAlpha = c.a * br;
+      g.drawImage(n.sp, n.x - n.r, n.y - n.r, n.r * 2, n.r * 2);
     }
 
     /* 2. 银河(对角微光带) */
@@ -298,8 +313,8 @@ function initDeepSpace(canvas) {
       const lx = p.u * gSpan, ly = p.v * gSpan * 0.30;
       const x = gx0 + lx * ca - ly * sa;
       const y = gy0 + lx * sa + ly * ca;
-      ctx.globalAlpha = a;
-      ctx.drawImage(softDot(C.paper, false), x - rr, y - rr, rr * 2, rr * 2);
+      g.globalAlpha = a;
+      g.drawImage(softDot(C.paper, false), x - rr, y - rr, rr * 2, rr * 2);
     }
 
     /* 3. 星点(尘星 → 主星) */
@@ -315,8 +330,8 @@ function initDeepSpace(canvas) {
         if (x < -m) x += W + m * 2; else if (x > W + m) x -= W + m * 2;
         if (y < -m) y += H + m * 2; else if (y > H + m) y -= H + m * 2;
         const rr = s.r * (s.main ? 2.0 : 1.25);
-        ctx.globalAlpha = Math.min(0.95, a);
-        ctx.drawImage(softDot(s.col, s.hot), x - rr, y - rr, rr * 2, rr * 2);
+        g.globalAlpha = Math.min(0.95, a);
+        g.drawImage(softDot(s.col, s.hot), x - rr, y - rr, rr * 2, rr * 2);
       }
     }
 
@@ -325,10 +340,10 @@ function initDeepSpace(canvas) {
     moon.x = (MOON.fx * W) + camX * 0.3;
     moon.y = (MOON.fy * H) + camY * 0.3;
     const breathe = 0.96 + 0.04 * Math.sin(T * 0.16 + 1.2);
-    ctx.globalAlpha = 0.92 * breathe;
-    ctx.drawImage(moonCv, moon.x - ms, moon.y - ms, ms * 2, ms * 2);
+    g.globalAlpha = 0.92 * breathe;
+    g.drawImage(moonCv, moon.x - ms, moon.y - ms, ms * 2, ms * 2);
 
-    ctx.globalCompositeOperation = "source-over";
+    g.globalCompositeOperation = "source-over";
 
     /* 5. 流云(极淡, 普通混合更"墨") */
     for (let i = 0; i < CLOUD_N; i++) {
@@ -337,15 +352,25 @@ function initDeepSpace(canvas) {
       const yBase = H * (0.16 + i * 0.34) + Math.sin(T * 0.05 + i * 2.4) * 12;
       const cw = W * 1.6;
       const x = -cw * 0.25 + prog * (cw * 1.4);
-      ctx.globalAlpha = 0.05;
-      ctx.drawImage(cloudCv, x, yBase - 26, cw, 52);
+      g.globalAlpha = 0.05;
+      g.drawImage(cloudCv, x, yBase - 26, cw, 52);
     }
-    ctx.globalAlpha = 1;
-
-    raf = requestAnimationFrame(tick);
+    g.globalAlpha = 1;
   }
 
+  /* ---- 独立运行模式（managed=false）的调度：仅调试页使用 ---- */
+  function tick(now) {
+    if (!running) return;
+    const wait = FRAME_MS - (now - _lastPaint);
+    if (wait > 4) { _sleepT = setTimeout(() => { _sleepT = 0; if (running) raf = requestAnimationFrame(tick); }, wait); return; }
+    raf = requestAnimationFrame(tick);
+    _lastPaint = now;
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    renderFrame(dt);
+  }
   function onVis() {
+    if (managed) return;
     if (document.hidden) {
       running = false; cancelAnimationFrame(raf);
     } else if (!running && !userPaused) {
@@ -353,36 +378,50 @@ function initDeepSpace(canvas) {
       raf = requestAnimationFrame(tick);
     }
   }
-
-  /* v1.7.60 黑屏挂机: 停掉背景动画, 省电 */
   function pause() {
+    if (managed) return;          // 统一舞台层负责暂停
     userPaused = true;
     running = false; cancelAnimationFrame(raf);
   }
   function resume() {
-    if (!userPaused) return;
+    if (managed || !userPaused) return;
     userPaused = false;
     if (!document.hidden) { running = true; last = performance.now(); raf = requestAnimationFrame(tick); }
   }
   function onReduced(e) {
+    if (managed) return;
     if (e.matches) { staticFrame(); }
-    else if (!running && !document.hidden) {          // 用户取消 reduced-motion → 恢复动画
+    else if (!running && !document.hidden) {
       running = true; last = performance.now();
       raf = requestAnimationFrame(tick);
     }
   }
   function staticFrame() {                    // prefers-reduced-motion: 只画一帧
     running = false; cancelAnimationFrame(raf);
-    _lastPaint = 0;                           // 绕过限帧, 确保这一帧真的画出来
-    t = 3.1415; tick(performance.now());
-    running = false; cancelAnimationFrame(raf);
+    _lastPaint = 0;
+    t = 3.1415; draw(t);
   }
 
   /* 布局对象(月) */
   moon = { x: 0, y: 0 };
 
+  if (managed) {
+    /* 舞台驱动：尺寸由舞台给，不自持 rAF */
+    resize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight);
+    return {
+      name: "bg",
+      resize,
+      /* 舞台层契约：draw(ctx, W, H, dt, now) */
+      draw(_ctx, _W, _H, dt) { renderFrame(dt); },
+      /* 供调试/截图：按指定时间点画一帧，不推进内部时钟 */
+      staticFrame() { staticFrame(); },
+      pause() {}, resume() {},
+      destroy() {},
+    };
+  }
+
   resize();
-  const ro = new ResizeObserver(resize);
+  const ro = new ResizeObserver(() => resize());
   ro.observe(canvas);
   document.addEventListener("visibilitychange", onVis);
   let rmq = null;
@@ -393,12 +432,17 @@ function initDeepSpace(canvas) {
   } catch (e) { raf = requestAnimationFrame(tick); }
 
   return {
+    name: "bg",
+    resize: () => resize(),
+    draw(_ctx, _W, _H, dt) { renderFrame(dt); },
+    staticFrame,
     pause,
     resume,
     destroy() {
       running = false;
       userPaused = false;
       cancelAnimationFrame(raf);
+      if (_sleepT) { clearTimeout(_sleepT); _sleepT = 0; }
       document.removeEventListener("visibilitychange", onVis);
       if (rmq) { try { rmq.removeEventListener("change", onReduced); } catch (e) {} }
       ro.disconnect();

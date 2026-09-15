@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<script>window.APP_VER="3.1";</script>
+<script>window.APP_VER="3.2";</script>
 <title>闲人修仙</title>
 <meta name="description" content="闲人修仙：主身巡猎斗法、分身云游寻宝，离线亦在成长。">
 <link rel="icon" href="data:,">
@@ -17,7 +17,7 @@
     background:#070b16;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
     user-select:none;-webkit-user-select:none;
   }
-  #bg{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+  #stage{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
   .bg-img{position:fixed;inset:0;background:center/cover no-repeat url(assets/main-bg.jpg);opacity:.14;z-index:1;filter:saturate(1.1);pointer-events:none}
   .vignette{position:fixed;inset:0;z-index:2;pointer-events:none;
     background:
@@ -118,7 +118,10 @@
   /* 战斗区（无尽边界式横向推进战斗） */
   .battle-stage{position:fixed;left:0;right:0;top:92px;bottom:calc(44vh + 84px);z-index:1;pointer-events:none !important;overflow:hidden}
   .battle-stage *{pointer-events:none !important}
-  .battle-stage canvas{display:block;width:100%;height:100%;pointer-events:none !important}
+  /* v3.2: 战斗层已并入 #stage。这里只留一个零尺寸占位 canvas 作为几何参照，
+     不再显示任何内容（保留 #battleStage 容器是因为战斗 HUD 挂在里面）。 */
+  .battle-stage canvas{display:none} 
+  .battle-stage{pointer-events:none}
   .battle-hud{position:absolute;left:0;right:0;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:3px 10px;font-size:10px;color:#c8d4e8;pointer-events:none !important;text-shadow:0 1px 3px rgba(0,0,0,.8)}
   .battle-hud .kills{color:#e8c56b;font-weight:700}
   .battle-hud .speed{color:#ff8a4a;font-weight:700}
@@ -501,9 +504,9 @@
 <linearGradient id="progGreen" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4a3a22" stop-opacity=".24"/><stop offset=".55" stop-color="#3e2f1a" stop-opacity=".27"/><stop offset="1" stop-color="#332614" stop-opacity=".30"/></linearGradient>
 <linearGradient id="progJade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#463024" stop-opacity=".24"/><stop offset="1" stop-color="#33231a" stop-opacity=".30"/></linearGradient>
 </defs></svg>
-<canvas id="bg"></canvas>
+<canvas id="stage"></canvas> <!-- v3.2 统一舞台：bg+battle+aura+burst 合成到这一张 -->
 <div class="bg-img"></div>
-<canvas id="aura"></canvas>
+<!-- v3.2: 灵气层已并入 #stage -->
 <div class="vignette"></div>
 
 <div class="hud">
@@ -535,7 +538,9 @@
 
 <!-- 战斗区（无尽边界式横向推进战斗） -->
 <div class="battle-stage" id="battleStage">
-  <canvas id="battleCanvas"></canvas>
+  <!-- v3.2: 战斗层已并入 #stage（按 battleBand() 裁剪到本容器对应的横带）,
+       此处仅保留 HUD 与一个零尺寸占位 canvas 作为几何基准 -->
+  <canvas id="battleCanvas" width="1" height="1" aria-hidden="true"></canvas>
   <div class="battle-hud">
     <span class="kills">击杀 <b id="battleKills">0</b></span>
     <span class="kills">灵石 <b id="battleSpirit">0</b></span>
@@ -581,7 +586,7 @@
 
 <div class="ver-float"><span class="ver-tag" id="verTag"></span></div>
 
-<canvas id="burst"></canvas>
+<!-- v3.2: 爆发粒子层已并入 #stage -->
 <div class="flash" id="flash"></div>
 <div class="trib" id="trib"></div>
 

@@ -795,7 +795,11 @@
   .res-float.neg{color:#ff9a8a;text-shadow:0 0 8px rgba(255,120,100,.6)}
   @keyframes resFloat{0%{opacity:0;transform:translate(-50%,6px)}25%{opacity:1}100%{opacity:0;transform:translate(-50%,-20px)}}
   /* v1.6.0-B 灵气道场叠加层 canvas: 叠在深空背景之上, 灵气以 screen 混合发光 */
-  #aura{position:fixed;inset:0;z-index:3;pointer-events:none;mix-blend-mode:screen}
+  /* v3.2: 灵气层已并入统一舞台 #stage。
+     mix-blend-mode:screen 移除 —— 它会让整张画布走【独立合成通道】，
+     而加法混合现在改由绘制期的 globalCompositeOperation="lighter" 完成，
+     这样合成器可以把 #stage 并回轻量路径（省电的关键一点）。 */
+  #aura{display:none}
   /* v1.6.0-C 突破雷劫蓄力: 屏幕四边电光框 + 主角灵光蓄力(不动 transform, 零布局风险) */
   .trib{position:fixed;inset:0;z-index:30;pointer-events:none;opacity:0;transition:opacity .15s;
     box-shadow:inset 0 0 40px rgba(120,170,255,.18)}

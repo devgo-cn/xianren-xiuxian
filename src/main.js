@@ -18,6 +18,7 @@ import * as NS_src_10_base_js from './10-base.js';
 import * as NS_src_20_core_js from './20-core.js';
 import * as NS_src_30_systems_js from './30-systems.js';
 import * as NS_src_40_app_js from './40-app.js';
+import * as NS_src_60_stage_js from './60-stage.js';
 
 /* 把模块内声明桥接到 window（只补缺失的，不覆盖已有全局）*/
 const BRIDGE = {
@@ -383,6 +384,9 @@ const BRIDGE = {
   "zoneOfBig": function () { return NS_src_10_base_js["zoneOfBig"]; },
   "zoneOfLoc": function () { return NS_src_10_base_js["zoneOfLoc"]; },
   "段名": function () { return NS_src_10_base_js["段名"]; },
+  /* v3.2 统一舞台层 */
+  "initStage": function () { return NS_src_60_stage_js["initStage"]; },
+  "battleBand": function () { return NS_src_60_stage_js["battleBand"]; },
   "$": function () { return NS_src_00_pure_js["$"]; },
 };
 for (const k in BRIDGE) {
