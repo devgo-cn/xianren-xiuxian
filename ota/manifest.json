@@ -120,6 +120,7 @@
     "assets/sfx/attack2.ogg": "89ee51ee4cac1e101107e68610c1b815a303bd9009d36747bb6d80f57aa71e2f",
     "assets/sfx/boss_attack.ogg": "115ae50fddb3bb168a18eff55dafa76f272c45b421d96d847aa3697b60c706d5",
     "assets/sfx/footstep.ogg": "609f738673b63dda5b904d27e9ee9296910b547b348a627f60250a0a35d97e43",
+    "assets/sfx/hengsao.ogg": "37354d2c89c11b7bfe2f881f0573d6ead58a7c78db0451a5d0230ffc34a778fc",
     "assets/sfx/skill_attack.ogg": "bd5377598a07113ccf4efa6be7f7668901cfe5a367e59c7802d05667feb573fc",
     "assets/sfx/slime_attack.ogg": "1825b4ec66f26049dba4d7111533cfc5c6bd1686c46e5b6a63e0d32e30e9d6d5",
     "assets/sfx/slime_footstep.ogg": "66ca6ff89b88ff82ec95f9745ec7a53683f9b338a324d9a1ede7de49889a42d8",
@@ -127,6 +128,7 @@
     "assets/sfx/water_attack.ogg": "2255df80b2be0678e063bf713ce97c78705e1510851b8ac67fa7d944536b0b81",
     "assets/sfx/water_footstep.ogg": "6cf4533faeae71ea5ecc6000583feb272de717d165785deff9e5edd995540ab2",
     "assets/sfx/water_hurt.ogg": "e73056e800bd4b8dfbfd21e62d292910844c9094dcab471e7d326440f28d46c3",
+    "assets/skill_hengsao_sheet.webp": "db192abf8c9d982bf42092a1272ea05d5513af4572de04d97044d4fead89e226",
     "assets/ui_icons/btn_array.webp": "ca434c9518f3d12b269a9e9617cb987911ef708557d57001b4bd31397a4d1a87",
     "assets/ui_icons/btn_array_flip.webp": "a2844c6c76013d72d8386cf3df46b184cf295ff61d0f76ada788eb1f9cb2e82e",
     "assets/ui_icons/btn_break.webp": "b7afa86e2f0e06ce27412a3f4cc4cb5595bd471a9bee70982d2a40a7f959a239",
@@ -142,8 +144,8 @@
     "dt-theme.css": "30c5193916cc3689f3e3d766efa5766a722fec224e1b8fffb76892ee1654936c",
     "fx2d.js": "4e1608e45c805bcee9360d9b7d873ca49b1425633c7adcb445a19d4fcd059149",
     "game.js": "d7b0d092f309e8d6fc376f6655de087d2ba811f9c10248c8e048d4c0265c7ecd",
-    "index.html": "a3709177a3ca3c0140742475fd04bd534cb570c68a5483dc7e8096e08bcb60bd"
+    "index.html": "0c4c42787ae653a8990b5e4bceb5ceb2edc0f3786c9d2b1c9a9ade078233ed97"
   },
-  "rev": "3727cf4939745e1e",
+  "rev": "fcf0236c7640ca7f",
   "version": "2.4"
 }
