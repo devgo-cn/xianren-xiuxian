@@ -1179,6 +1179,10 @@
     const hs = skVal('hengsao');
     if (hs && Math.random()*100 < hs.chance) {
       skExp('hengsao', 2);
+      /* 概率命中就播放特效, 不管波及几个敌人 */
+      G.fx.push({ kind:'hengsao', x:p.x, y:-30, color:'#ffc98a', t:0, dur:1.2, frame:0, startX:p.x, endX:p.x+120 });
+      playSfx('hengsao', 0.7);
+      /* 波及周围敌人 */
       const n = Math.max(1, Math.round(hs.n || 1));
       let hit = 0;
       for (const o of G.enemies) {
@@ -1187,11 +1191,6 @@
         if (Math.abs(o.x - p.x) > p.atkRange + 60) continue;
         dealDamage(o, calcDmg(PST.atk, mult*(hs.dmg||0)/100, o.def, pen), '#ffc98a', big);
         hit++;
-      }
-      if (hit) {
-        /* 横扫千军: 从角色正前方左端点向右扫, 1.2秒快速播放 */
-        G.fx.push({ kind:'hengsao', x:p.x, y:-30, color:'#ffc98a', t:0, dur:1.2, frame:0, startX:p.x, endX:p.x+120 });
-        playSfx('hengsao', 0.7);
       }
     }
     /* 三连斩: 第二段之后补一刀, 补刀必会心(至少 ×1.5) */
