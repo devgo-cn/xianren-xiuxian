@@ -883,6 +883,11 @@
   const ATTACK_MAP = [0, 2, 4, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 8, 9, 10, 11, 13, 19, 20, 21, 21, 21, 24];
   /* 技能: 剑气斩 (24帧, 1秒, 6列x4行, 480x256每帧) */
   const SKILL = { name:'剑气斩', cols:6, fw:480, fh:256, count:24, fps:24, hitFrame:12, damageMult:2.5, cooldown:4.0, triggerChance:0.3 };
+  /* v2.8 技能独立节拍: 每隔 SKILL_SEEK_MS 给一次触发机会。
+   * 与出手/秒杀解耦 —— 原先挂在"出手瞬间", 小怪常被普攻秒杀导致收招+atkT顶满,
+   * 高攻玩家打小怪几乎没机会 roll; 打 BOSS(厚血)每周期完整走完, 触发观感远高于小怪。
+   * 节拍 = 1.2s 与平均攻击周期同量级, 保证"有怪在旁"时的机会密度稳定。 */
+  const SKILL_SEEK_MS = 1.2;
   /* 横扫千军特效配置: 7列7行, 49帧, 左右渐现渐隐 */
   const HENGSAO_SPRITE = { cols:7, fw:320, fh:160, count:49, fps:12 };
   /* 史莱姆帧配置: 12列8行, walk32+attack51+hurt11 */
@@ -951,11 +956,12 @@
         .sort((a, b) => a.x - b.x).map(e => ({ t: e.type, x: Math.round(e.x), hp: Math.round(e.hp), maxHp: e.maxHp, elite: !!e.elite })),
       playerX: G.player ? Math.round(G.player.x) : 0, dodge: G.speedDodge, nextCrit: G.nextStrikeCrit,
       pAtk: G.player ? Math.round(G.player.atk) : 0, pMaxHp: G.player ? G.player.maxHp : 0,
-      /* 只读攻击段状态(回归测试探针: 验证普攻单段/三连斩补刀) */
+      /* 只读攻击段状态(回归测试探针: 验证普攻单段/三连斩补刀/技能节拍) */
       anim: G.player ? {
         attacking: !!G.player.attackAnim, frame: G.player.animFrame,
         hit1: !!G.player.hit1, hit2: !!G.player.hit2, hit3: !!G.player.hit3,
         sanlian: !!G.player.sanlianTriggered, count: SPRITE.attackCount,
+        seekT: G.player.skillSeekT || 0, skillAnim: !!G.player.skillAnim, skillCd: G.player.skillCooldown,
       } : null,
     }),
     addPet: (petDef) => {
@@ -971,7 +977,7 @@
   };
 
   function makePlayer() {
-    return { x:0,y:0, hp:PST.hp,maxHp:PST.hp, atk:PST.atk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0,stun:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false, attackTarget:null, hit1:false, hit2:false, hit3:false, sanlianTriggered:false, atkBuff:0, atkBuffTimer:0, skillAnim:false, skillFrame:0, skillTimer:0, skillHit:false, skillCooldown:0, skillTarget:null };
+    return { x:0,y:0, hp:PST.hp,maxHp:PST.hp, atk:PST.atk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0,stun:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false, attackTarget:null, hit1:false, hit2:false, hit3:false, sanlianTriggered:false, atkBuff:0, atkBuffTimer:0, skillAnim:false, skillFrame:0, skillTimer:0, skillHit:false, skillCooldown:0, skillTarget:null, skillSeekT:0 };
   }
   /* 怪物成长系统: 三围随玩家境界 lv 线性成长(怪只吃境界, 不吃装备 → 换装备=变快) */
   function makeEnemy(type) {
@@ -1244,6 +1250,9 @@
     if (!p.alive) return;
     p.atkT -= dt; p.anim = Math.max(0, p.anim-dt*1.5); p.hurtT = Math.max(0, p.hurtT-dt); p.stun = Math.max(0, p.stun-dt*3);
     p.skillCooldown = Math.max(0, p.skillCooldown - dt);
+    /* v2.8 技能节拍器: 只在"技能可用 + 无动画在播"时累计, 到点触发。
+     * 触发机会只与时间有关, 与怪是否被秒杀无关 —— 修掉"打小怪触发低、打BOSS触发高"。 */
+    if (p.skillCooldown <= 0 && G.skillReady && !p.skillAnim && !p.attackAnim) p.skillSeekT += dt;
 
     /* 技能动画更新 (剑气斩) */
     if (p.skillAnim) {
@@ -1347,12 +1356,21 @@
       /* 进入攻击范围，开始攻击（触发时不立即造成伤害，伤害在动画帧中触发） */
       p.moving = 0;
       if (p.atkT <= 0) {
-        /* 技能触发判定: 冷却好 + 概率触发 */
-        if (p.skillCooldown <= 0 && G.skillReady && Math.random() < SKILL.triggerChance) {
-          p.skillAnim = true; p.skillFrame = 0; p.skillTimer = 0; p.skillHit = false; p.skillTarget = near;
-          p.attackAnim = false; p.animFrame = 0;
-          skillCall(SKILL.name);          /* 大技能播报: 剑气斩 */
-        } else {
+        /* 技能触发: 由节拍器驱动(见 updatePlayer)。
+         * 到点(>=SKILL_SEEK_MS)且有怪在攻击范围内时才 roll 一次, roll 后清零重新计时。
+         * 与"是否秒杀/是否高攻"无关, 小怪与 BOSS 的触发机会密度一致。 */
+        const canSkill = p.skillCooldown <= 0 && G.skillReady && p.skillSeekT >= SKILL_SEEK_MS;
+        let usedSkill = false;
+        if (canSkill) {
+          p.skillSeekT = 0;                                   // 消费本次机会
+          if (Math.random() < SKILL.triggerChance) {
+            p.skillAnim = true; p.skillFrame = 0; p.skillTimer = 0; p.skillHit = false; p.skillTarget = near;
+            p.attackAnim = false; p.animFrame = 0;
+            skillCall(SKILL.name);        /* 大技能播报: 剑气斩 */
+            usedSkill = true;
+          }
+        }
+        if (!usedSkill) {
           p.anim = 1; p.atkT = 1/p.aspd; p.attackAnim = true; p.animFrame = 0; p.animTimer = 0; p.attackTarget = near; p.hit1 = false; p.hit2 = false; p.hit3 = false; p.sanlianTriggered = false;
         }
       }
