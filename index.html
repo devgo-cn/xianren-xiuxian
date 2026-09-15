@@ -1799,12 +1799,15 @@
     /* 渲染尺寸: 适配战斗区高度 */
     const drawH = Math.min(CH * 0.55, 80);
     const drawW = drawH * (SPRITE.fw / SPRITE.fh);
-    /* 疾风步/缩地成寸残影: 加速期间玩家身后显示2个半透明残影 */
+    /* 疾风步/缩地成寸残影: 加速期间玩家身后显示3个半透明残影, 倍速越高残影越多 */
     if (G.speedMult > 1 && !p.attackAnim) {
-      for (let i = 2; i >= 1; i--) {
+      const trailCount = G.speedMult >= 3 ? 4 : 3;
+      for (let i = trailCount; i >= 1; i--) {
         ctx.save();
-        ctx.translate(sx - i * 12, sy);  /* 向后偏移 */
-        ctx.globalAlpha = 0.15 * (3 - i);  /* 透明度递减 */
+        ctx.translate(sx - i * 10, sy);  /* 向后偏移, 距离递增 */
+        ctx.globalAlpha = 0.12 * (trailCount + 1 - i) / trailCount;  /* 透明度递减 */
+        /* 残影轻微水平拉伸, 增强速度感 */
+        ctx.scale(1 + i * 0.03, 1);
         ctx.drawImage(G.sprite, srcX, srcY, SPRITE.fw, SPRITE.fh, -drawW*0.35, -drawH, drawW, drawH);
         ctx.restore();
       }
@@ -1818,10 +1821,11 @@
       ctx.shadowColor = `rgba(255,170,85,${0.5 + pulse*0.3})`;
       ctx.shadowBlur = 10 + pulse*6;
     }
-    /* 加速期间玩家发青光 */
+    /* 加速期间玩家发光: 疾风步青绿, 缩地成寸蓝紫 */
     if (G.speedMult > 1) {
-      ctx.shadowColor = 'rgba(128,255,192,0.7)';
-      ctx.shadowBlur = 12;
+      const glowColor = G.speedMult >= 3 ? 'rgba(160,180,255,0.8)' : 'rgba(128,255,192,0.7)';
+      ctx.shadowColor = glowColor;
+      ctx.shadowBlur = G.speedMult >= 3 ? 16 : 12;
     }
     ctx.drawImage(G.sprite, srcX, srcY, SPRITE.fw, SPRITE.fh, -drawW*0.35, -drawH, drawW, drawH);
     ctx.restore();
@@ -2020,6 +2024,24 @@
   const GLOW = { heal: makeGlow('120,255,175'), atk: makeGlow('255,175,95') };
 
   function drawFx() {
+    /* 加速期间屏幕速度线: 横向线条从右向左流动, 增强速度感 */
+    if (G.speedMult > 1) {
+      ctx.save();
+      ctx.globalAlpha = 0.15 + (G.speedMult - 1) * 0.1;
+      ctx.strokeStyle = G.speedMult >= 3 ? 'rgba(160,180,255,0.5)' : 'rgba(128,255,192,0.5)';
+      ctx.lineWidth = 1;
+      const lineCount = G.speedMult >= 3 ? 12 : 8;
+      for (let i = 0; i < lineCount; i++) {
+        const y = (i / lineCount) * CH + (G.t * 200 * G.speedMult + i * 37) % CH;
+        const x = (G.t * 300 * G.speedMult + i * 53) % CW;
+        const len = 30 + Math.random() * 50;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - len, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     for (const f of G.fx) {
       /* v2.6 FIX: f.y 是相对地板线的偏移(敌人/玩家 y=0), 屏幕坐标须加 floorY(); 原直接当屏幕 y 画到了画布顶外, 特效从未显示 */
       const k = f.t/f.dur; const sx = worldToScreen(f.x); const fy = floorY() + f.y;
@@ -2097,17 +2119,32 @@
         }
         ctx.restore();
       } else if (f.kind === 'speedBurst') {
-        /* 身法触发: 速度爆发, 向后扩散的气流线 */
-        ctx.save(); ctx.translate(sx, fy);
-        ctx.globalAlpha = (1-k) * 0.8;
-        ctx.strokeStyle = f.color; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
-        for (let i=0; i<6; i++) {
-          const ang = Math.PI + (Math.random()-0.5)*0.8;  /* 向后扩散 */
-          const r1 = 5 + k*10, r2 = 15 + k*30;
+        /* 身法触发: 速度爆发 —— 冲击波圆环 + 向后气流线 + 粒子飞溅 */
+        ctx.save(); ctx.translate(sx, fy - 25);
+        /* 冲击波圆环: 从中心向外扩散 */
+        ctx.globalAlpha = (1-k) * 0.6;
+        ctx.strokeStyle = f.color; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(0, 0, 5 + k*35, 0, Math.PI*2); ctx.stroke();
+        /* 向后气流线: 8条, 从中心向后扩散 */
+        ctx.globalAlpha = (1-k) * 0.9;
+        ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+        ctx.shadowColor = f.color; ctx.shadowBlur = 6;
+        for (let i=0; i<8; i++) {
+          const ang = Math.PI + (i/7 - 0.5) * 1.2;  /* 向后扇形扩散 */
+          const r1 = 3 + k*8, r2 = 12 + k*40;
           ctx.beginPath();
-          ctx.moveTo(Math.cos(ang)*r1, Math.sin(ang)*r1 - 20);
-          ctx.lineTo(Math.cos(ang)*r2, Math.sin(ang)*r2 - 20);
+          ctx.moveTo(Math.cos(ang)*r1, Math.sin(ang)*r1);
+          ctx.lineTo(Math.cos(ang)*r2, Math.sin(ang)*r2);
           ctx.stroke();
+        }
+        /* 粒子飞溅: 6个小光点向后飞 */
+        ctx.shadowBlur = 0;
+        for (let i=0; i<6; i++) {
+          const ang = Math.PI + (Math.random()-0.5)*1.5;
+          const r = 8 + k*45;
+          ctx.globalAlpha = (1-k) * 0.7;
+          ctx.fillStyle = f.color;
+          ctx.beginPath(); ctx.arc(Math.cos(ang)*r, Math.sin(ang)*r, 1.5*(1-k)+0.5, 0, Math.PI*2); ctx.fill();
         }
         ctx.restore();
       } else if (f.kind === 'healParticle' || f.kind === 'atkParticle') {
