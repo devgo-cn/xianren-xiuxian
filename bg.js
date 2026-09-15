@@ -255,10 +255,14 @@ function initDeepSpace(canvas) {
 
   function tick(now) {
     if (!running) return;
-    if (now - _lastPaint < FRAME_MS) {                 // 距上帧不足 33ms → 跳过绘制(仍续帧)
-      raf = requestAnimationFrame(tick);
+    const wait = FRAME_MS - (now - _lastPaint);
+    if (wait > 4) {
+      /* v2.9 PERF: 限帧期间用 setTimeout 让出主线程(原先无条件续 rAF 会按屏幕刷新率空转)。
+       * 阈值 >4ms 才睡, 余量过小会退化成紧凑循环。 */
+      setTimeout(() => { if (running) raf = requestAnimationFrame(tick); }, wait);
       return;
     }
+    raf = requestAnimationFrame(tick);
     _lastPaint = now;
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;

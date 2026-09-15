@@ -909,7 +909,7 @@
     const now = performance.now();
     if (_callCd[name] && now - _callCd[name] < 900) return;
     _callCd[name] = now;
-    G.skillCall = { name, t: 0, dur: 0.75 };
+    G.skillCall = { name, t: 0, dur: 0.68 };   /* v2.9: 0.75→0.68s, 末 18% 淡出 → 实际"看得清"约 0.56s 后瞬间消失 */
   }
   function skExpAll(n){ const api = window.SkillAPI; if (api) api.addExpAll(n); }
 
@@ -966,8 +966,10 @@
     removePet: (petId) => { G.pets = G.pets.filter(p => p.id !== petId); },
     getPets: () => G.pets,
     spawnWave: () => spawnWave(),
-    pause: () => { G.paused = true; },   // 战斗 loop 下一帧自行停泵
-    resume: () => { G.paused = false; lastT = performance.now(); if (!_rafOn) { _rafOn = true; requestAnimationFrame(loop); } },
+    /* v2.9: 暂停时清掉限帧 sleep 句柄 —— 否则那枚 setTimeout 醒来时 G.paused 已为 true,
+     * 会直接 return 且把 _rafOn 留成 true, 导致 resume 认为"泵还在跑"而不重启(死锁)。 */
+    pause: () => { G.paused = true; if (_sleepT) { clearTimeout(_sleepT); _sleepT = 0; } _rafOn = false; },
+    resume: () => { G.paused = false; lastT = performance.now(); _lastPaint = 0; if (_sleepT) { clearTimeout(_sleepT); _sleepT = 0; } if (!_rafOn) { _rafOn = true; requestAnimationFrame(loop); } },
     getState: () => ({ kills:G.kills, spirit:G.spirit, speedMult:G.speedMult, state:G.state, playerHp:G.player?G.player.hp:0, pets:G.pets.length, enemies:G.enemies.filter(e=>e.alive).length }),
   };
 
@@ -1191,17 +1193,20 @@
     } else if (Math.random()*100 < (PST.crit || 0) + critBonus) kind = 2;
     else if (Math.random()*100 < (PST.critB || 0)) kind = 1;
     const cmul = kind === 2 ? 2 : kind === 1 ? 1.5 : 1;
-    /* 三连斩第三段伤害倍率 */
+    /* 三连斩第三段伤害倍率: sl.dmg 是"这一补刀相对本段的加成", 不是整段倍率替代 */
     const sl = seg === 3 ? skVal('sanlian') : null;
     const slMult = sl ? (sl.dmg || 0) / 100 : 1;
     const mult = base * slMult * (kind ? cmul * (1 + (PST.critD || 0)/100) : 1);
     const big = kind === 2;
     dealDamage(target, calcDmg(PST.atk, mult, target.def, pen), seg === 3 ? '#ffe7a8' : (kind ? '#ffd76b' : '#7fe0ff'), big);
-    /* 横扫千军: 普攻命中即触发, 即使目标被打死也播放特效波及周围 */
+    /* 横扫千军: 普攻命中即触发, 即使目标被打死也播放特效波及周围。
+     * v2.9 FIX: 横扫走"本段基础倍率"(base), 不再叠乘会心/爆伤/三连斩加成 ——
+     * 原实现沿用 mult 导致每段命中都再乘一次会心/补刀倍率, 一轮三连斩里横扫触发 2~3 次、
+     * 单轮总伤冲到 12x 攻击力(实测), 反超技能单发, 这才是"技能没普攻伤害高"的真凶。 */
     const hs = skVal('hengsao');
     if (hs && Math.random()*100 < hs.chance) {
       skExp('hengsao', 2); skillCall('横扫千军');
-      G.fx.push({ kind:'hengsao', x:p.x, y:-30, color:'#ffc98a', t:0, dur:0.38, frame:0, startX:p.x, endX:p.x+200 });  /* v2.7 爆发提速: 0.6→0.38s 扫得更干脆 */
+      G.fx.push({ kind:'hengsao', x:p.x, y:-30, color:'#ffc98a', t:0, dur:0.30, frame:0, startX:p.x, endX:p.x+200 });  /* v2.9 再提速: 0.6→0.38→0.30s, 起手即爆 */
       playSfx('hengsao', 0.8);
       const n = Math.max(1, Math.round(hs.n || 1));
       let hit = 0;
@@ -1209,17 +1214,17 @@
         if (hit >= n) break;
         if (o === target || !o.alive || o.dying > 0) continue;
         if (Math.abs(o.x - p.x) > p.atkRange + 60) continue;
-        dealDamage(o, calcDmg(PST.atk, mult*(hs.dmg||0)/100, o.def, pen), '#ffc98a', big);
+        dealDamage(o, calcDmg(PST.atk, base*(hs.dmg||0)/100, o.def, pen), '#ffc98a', false);
         hit++;
       }
     }
     if (!target.alive) return;
-    /* 剑气斩: 追加一段自带攻击力加成的剑气 */
+    /* 剑气斩: 追加一段自带攻击力加成的剑气(同样只吃本段基础倍率) */
     const jq = skVal('jianqi');
     if (jq && Math.random()*100 < jq.chance) {
       skExp('jianqi', 2); skillCall('剑气斩');
       G.fx.push({ kind:'slash', x:target.x, y:target.y-24, color:'#bfe8ff', t:0, dur:0.28 });
-      dealDamage(target, calcDmg(PST.atk, mult*(jq.dmg||0)/100, target.def, pen), '#bfe8ff', big);
+      dealDamage(target, calcDmg(PST.atk, base*(jq.dmg||0)/100, target.def, pen), '#bfe8ff', false);
       if (!target.alive) return;
     }
   }
@@ -1537,7 +1542,8 @@
   function updateFx(dt) {
     for (const f of G.fx) {
       f.t += dt;
-      /* 横扫千军帧更新: 1.2秒播完49帧(约41fps), 快速播放完整特效 */
+      /* 横扫千军帧更新: 帧序号按 f.t/f.dur 线性映射到 49 帧 —— 特效时长缩短后自动加速,
+       * 无需改精灵配置(v2.9: dur 0.38→0.30s, 剑气扫出更干脆) */
       if (f.kind === 'hengsao') {
         f.frame = Math.min(HENGSAO_SPRITE.count - 1, Math.floor(f.t / f.dur * HENGSAO_SPRITE.count));
       }
@@ -1594,7 +1600,10 @@
   function resize() {
     const rect = cv.parentElement.getBoundingClientRect();
     CW = rect.width; CH = rect.height;
-    const dpr = window.devicePixelRatio || 1;
+    /* v2.9 PERF: DPR 封顶 1.5 —— 原 dpr=3 手机按 9× 像素渲染(战斗层是唯一未收敛的画布,
+     * bg.js/fx2d.js 早已封顶 1.5)。GPU 填充率随像素数线性上升, 这是 App 端发烫的最大单点。
+     * 1.5x 在手机上肉眼无差(行业通行做法), 像素量降至 1/4。 */
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     cv.width = CW*dpr; cv.height = CH*dpr;
     cv.style.width = CW+'px'; cv.style.height = CH+'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1706,6 +1715,8 @@
   /* v2.6 PERF: BOSS 攻击帧"左侧渐隐"掩码按帧预渲染 —— 原实现攻击期间每帧新建
    * 离屏 canvas + 渐变(60fps 下每秒 60 次分配), 现在只在尺寸变化时重建 22 张 */
   const BOSS_MASK = { w: 0, h: 0, frames: null };
+  /* v2.9 PERF: 横扫千军帧级离屏缓存(左右渐隐贴图), 尺寸固定 280×drawH 故只需按帧号缓存 */
+  const HENGSAO_MASK = { frames: null };
   function bossMaskedFrame(fi, drawW, drawH) {
     if (!BOSS_MASK.frames || BOSS_MASK.w !== drawW || BOSS_MASK.h !== drawH) {
       BOSS_MASK.w = drawW; BOSS_MASK.h = drawH;
@@ -2029,20 +2040,27 @@
           else if (k < 0.6) alpha = 1.0;
           else alpha = (1 - k) / 0.4;
           ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-          /* 左右渐现渐隐: 离屏canvas + destination-in做alpha渐变 */
-          const off = document.createElement('canvas');
-          off.width = drawW; off.height = drawH;
-          const octx = off.getContext('2d');
-          octx.drawImage(G.hengsaoSprite, srcX, srcY, HENGSAO_SPRITE.fw, HENGSAO_SPRITE.fh, 0, 0, drawW, drawH);
-          octx.globalCompositeOperation = 'destination-in';
-          /* 左侧20%渐现, 右侧20%渐隐, 中间保持不透明 */
-          const grad = octx.createLinearGradient(0, 0, drawW, 0);
-          grad.addColorStop(0, 'rgba(0,0,0,0)');
-          grad.addColorStop(0.2, 'rgba(0,0,0,1)');
-          grad.addColorStop(0.8, 'rgba(0,0,0,1)');
-          grad.addColorStop(1, 'rgba(0,0,0,0)');
-          octx.fillStyle = grad;
-          octx.fillRect(0, 0, drawW, drawH);
+          /* v2.9 PERF: 左右渐现渐隐的离屏合成原为**每帧重建**(createElement+渐变+destination-in),
+           * 横扫 0.38s≈12帧就重建 12 次, 是纯浪费。改为按帧号缓存(同 BOSS_MASK 模式),
+           * 首次播放时建一次, 后续直接复用 —— 视觉完全一致。 */
+          if (!HENGSAO_MASK.frames) HENGSAO_MASK.frames = [];
+          let off = HENGSAO_MASK.frames[frameIdx];
+          if (!off) {
+            off = document.createElement('canvas');
+            off.width = drawW; off.height = drawH;
+            const octx = off.getContext('2d');
+            octx.drawImage(G.hengsaoSprite, srcX, srcY, HENGSAO_SPRITE.fw, HENGSAO_SPRITE.fh, 0, 0, drawW, drawH);
+            octx.globalCompositeOperation = 'destination-in';
+            /* 左侧20%渐现, 右侧20%渐隐, 中间保持不透明 */
+            const grad = octx.createLinearGradient(0, 0, drawW, 0);
+            grad.addColorStop(0, 'rgba(0,0,0,0)');
+            grad.addColorStop(0.2, 'rgba(0,0,0,1)');
+            grad.addColorStop(0.8, 'rgba(0,0,0,1)');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            octx.fillStyle = grad;
+            octx.fillRect(0, 0, drawW, drawH);
+            HENGSAO_MASK.frames[frameIdx] = off;
+          }
           ctx.drawImage(off, -drawW*0.5, -drawH*0.5);
           ctx.restore();
         }
@@ -2110,17 +2128,20 @@
     drawBg(); drawEnemies(); drawDrops(); drawPlayerSprite(); drawPets(); drawFx(); drawDmg(); drawSkillCall();
   }
 
-  /* ---------- 技能名播报绘制: 书法字金渐变+深描边, 弹入→稳住→末30%快淡出上飘(瞬间隐藏) ---------- */
+  /* ---------- 技能名播报绘制: 书法字金渐变+深描边, 弹入→稳住→末段快淡出上飘(瞬间隐藏) ----------
+   * v2.9: 字号放大到战斗动画区可读(原 12.5px 太小, 看不出在播报什么);
+   *       淡出窗口收到末 18% —— 前半段"看得清", 后半段"秒没", 不拖泥带水。 */
   function drawSkillCall() {
     const c = G.skillCall; if (!c) return;
     const k = c.t / c.dur;
     let scale;
-    if (k < 0.16) scale = 0.42 + (k / 0.16) * 0.66;          // 0.42 → 1.08 弹入
-    else if (k < 0.3) scale = 1.08 - ((k - 0.16) / 0.14) * 0.08;   // 回落到 1.0
-    else scale = 1;
-    const fade = k < 0.7 ? 1 : Math.max(0, 1 - (k - 0.7) / 0.3);
-    const rise = k < 0.7 ? 0 : (k - 0.7) * 50;
-    const size = Math.round(Math.min(CW * 0.028, 11) + 1.5);   // ≈12.5px: 只在动作区轻点一下
+    if (k < 0.16) scale = 0.46 + (k / 0.16) * 0.66;          // 0.46 → 1.12 弹入
+    else if (k < 0.3) scale = 1.12 - ((k - 0.16) / 0.14) * 0.10;   // 回落到 1.02
+    else scale = 1.02;
+    const fade = k < 0.82 ? 1 : Math.max(0, 1 - (k - 0.82) / 0.18);
+    const rise = k < 0.82 ? 0 : (k - 0.82) * 46;
+    /* 字号: 屏宽 3.4% 起, 夹在 15~24px —— 手机上既醒目又不糊成一团 */
+    const size = Math.round(Math.max(15, Math.min(CW * 0.034, 24)));
     ctx.save();
     ctx.globalAlpha = fade;
     ctx.translate(CW / 2, CH * 0.30 - rise);
@@ -2128,8 +2149,8 @@
     ctx.font = '600 ' + size + 'px "Kaiti SC","STKaiti","KaiTi","DFKai-SB","BiauKai",serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.lineJoin = 'round';
-    ctx.lineWidth = Math.max(1.8, size * 0.13);
-    ctx.strokeStyle = 'rgba(18,12,4,.88)';
+    ctx.lineWidth = Math.max(2.2, size * 0.15);
+    ctx.strokeStyle = 'rgba(18,12,4,.9)';
     ctx.strokeText(c.name, 0, 0);
     const grad = ctx.createLinearGradient(0, -size * 0.6, 0, size * 0.6);
     grad.addColorStop(0, '#ffe9b0'); grad.addColorStop(1, '#f0b95a');
@@ -2156,12 +2177,20 @@
   let lastT = 0;
   let _rafOn = false;
   let _lastPaint = 0;
+  let _sleepT = 0;              /* v2.9: 限帧 setTimeout 句柄 —— 暂停/恢复时必须清掉, 否则双链跑帧 */
   const BATTLE_FRAME_MS = 33;   // ≈30fps
   function loop(t) {
     if (G.paused) { _rafOn = false; lastT = t; return; }   // 停泵: 下一帧不再续 rAF, resume 负责重启
     _rafOn = true;
+    const wait = BATTLE_FRAME_MS - (t - _lastPaint);
+    if (wait > 4) {
+      /* v2.9 PERF: 限帧期间真正让出主线程 —— 原先无条件续 rAF, 高刷屏上按屏幕刷新率
+       * (实测 110fps)空转, 白烧 ~3.7× 合成开销。改为睡到下一帧时间点。
+       * 阈值 >4ms 才睡: 余量过小 setTimeout 会立即返回, 退化成紧凑循环。 */
+      _sleepT = setTimeout(() => { _sleepT = 0; if (!G.paused) requestAnimationFrame(loop); else _rafOn = false; }, wait);
+      return;
+    }
     requestAnimationFrame(loop);
-    if (t - _lastPaint < BATTLE_FRAME_MS) return;          // 不足33ms跳过绘制(仍续帧)
     _lastPaint = t;
     const dt = Math.min(0.05, (t-lastT)/1000); lastT = t;
     update(dt); render();

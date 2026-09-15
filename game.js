@@ -3782,10 +3782,17 @@ function startGame() {
   /* v2.6 PERF: 30fps 限帧 —— 主循环原为无上限 rAF(120Hz手机全速空转, 耗电主因之一);
    * UI 均为缓动动画, 30fps 观感无损, 帧率减半即功耗减半。 */
   let _lastPaint = 0;
+  let _sleepT = 0;            /* v2.9: 限帧 sleep 句柄(便于外部/异常时清理, 防双链跑帧) */
   (function main() {
     const now = performance.now();
+    const wait = 33 - (now - _lastPaint);
+    if (wait > 4) {
+      /* v2.9 PERF: 限帧期间用 setTimeout 让出主线程(原先无条件续 rAF 会按屏幕刷新率空转)。
+       * 阈值 >4ms 才睡: 余量过小会导致 setTimeout 立即返回, 退化成紧凑循环(实测 5000 次/秒)。 */
+      _sleepT = setTimeout(() => { _sleepT = 0; requestAnimationFrame(main); }, wait);
+      return;
+    }
     requestAnimationFrame(main);
-    if (now - _lastPaint < 33) return;   // ≈30fps: 不足33ms跳过本帧(仍续帧)
     _lastPaint = now;
     const dt = Math.min(.1, (now - lastLoop) / 1000); lastLoop = now;
     loop(dt);
