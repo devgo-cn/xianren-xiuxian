@@ -1037,6 +1037,10 @@
     else if ((s.dodge || 0) > G.speedDodge) G.speedDodge = s.dodge || 0;
     G.speedMultTimer = Math.max(G.speedMultTimer, s.dur);
     skillCall(id === 'jifeng' ? '疾风步' : '缩地成寸');   /* 身法播报 */
+    /* 身法触发特效: 玩家位置速度爆发 */
+    if (G.player) {
+      G.fx.push({ kind:'speedBurst', x:G.player.x, y:-20, color: id==='suodi' ? '#a0d8ff' : '#80ffc0', t:0, dur:0.5 });
+    }
     updateHUD();
     return id;
   }
@@ -1795,6 +1799,16 @@
     /* 渲染尺寸: 适配战斗区高度 */
     const drawH = Math.min(CH * 0.55, 80);
     const drawW = drawH * (SPRITE.fw / SPRITE.fh);
+    /* 疾风步/缩地成寸残影: 加速期间玩家身后显示2个半透明残影 */
+    if (G.speedMult > 1 && !p.attackAnim) {
+      for (let i = 2; i >= 1; i--) {
+        ctx.save();
+        ctx.translate(sx - i * 12, sy);  /* 向后偏移 */
+        ctx.globalAlpha = 0.15 * (3 - i);  /* 透明度递减 */
+        ctx.drawImage(G.sprite, srcX, srcY, SPRITE.fw, SPRITE.fh, -drawW*0.35, -drawH, drawW, drawH);
+        ctx.restore();
+      }
+    }
     ctx.save();
     ctx.translate(sx, sy);
     if (p.hurtT > 0) { ctx.globalAlpha = 0.5+0.5*Math.sin(p.hurtT*40); ctx.filter = 'brightness(2.2) saturate(0.3)'; }
@@ -1803,6 +1817,11 @@
       const pulse = 0.5 + 0.5 * Math.sin(G.t * 6);
       ctx.shadowColor = `rgba(255,170,85,${0.5 + pulse*0.3})`;
       ctx.shadowBlur = 10 + pulse*6;
+    }
+    /* 加速期间玩家发青光 */
+    if (G.speedMult > 1) {
+      ctx.shadowColor = 'rgba(128,255,192,0.7)';
+      ctx.shadowBlur = 12;
     }
     ctx.drawImage(G.sprite, srcX, srcY, SPRITE.fw, SPRITE.fh, -drawW*0.35, -drawH, drawW, drawH);
     ctx.restore();
@@ -2075,6 +2094,20 @@
           const ang = i/8*6.28, r = k*15;
           ctx.fillStyle = f.color; ctx.globalAlpha = (1-k)*0.9;
           ctx.beginPath(); ctx.arc(Math.cos(ang)*r, Math.sin(ang)*r, 1.8*(1-k)+0.5, 0, 6.28); ctx.fill();
+        }
+        ctx.restore();
+      } else if (f.kind === 'speedBurst') {
+        /* 身法触发: 速度爆发, 向后扩散的气流线 */
+        ctx.save(); ctx.translate(sx, fy);
+        ctx.globalAlpha = (1-k) * 0.8;
+        ctx.strokeStyle = f.color; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+        for (let i=0; i<6; i++) {
+          const ang = Math.PI + (Math.random()-0.5)*0.8;  /* 向后扩散 */
+          const r1 = 5 + k*10, r2 = 15 + k*30;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(ang)*r1, Math.sin(ang)*r1 - 20);
+          ctx.lineTo(Math.cos(ang)*r2, Math.sin(ang)*r2 - 20);
+          ctx.stroke();
         }
         ctx.restore();
       } else if (f.kind === 'healParticle' || f.kind === 'atkParticle') {
