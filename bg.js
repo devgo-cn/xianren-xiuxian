@@ -39,15 +39,16 @@ const NEB_CFG = [
 const GALAXY_N = 150;
 const GALAXY_A = 0.10;       // 单点峰值 alpha
 /* 纸月(右上角; fx/fy 为 0..1 屏幕分数坐标, 与 NEB_CFG 同规)
- * v3.3: fy 从 0.24 上移到 0.135。
- *   原因：v3.2 起战斗层是一条固定横带（top=92, height=0.56*vh-176），
- *   它会在自己的区域内铺不透明底色。fy=0.24 在 860 高屏上 ≈ y207，
- *   正好落进横带 —— 月亮被战斗区底色压住，观感上就是"月亮没了"。
- *   上移到 0.135 后，月亮稳定待在**横带之上**的纯净夜空里（也避开顶部 HUD），
- *   这才是"右上角挂一盏月亮"该在的位置。
- * size 相应放大到 0.15：月亮本体 = 2*ms*rr/S ≈ 0.15*max(W,H)*0.80，
- *   在 860 高屏上直径约 103px，清晰但不喧宾夺主。 */
-const MOON = { fx: 0.80, fy: 0.135, size: 0.15 };
+ * v3.3: 月亮已拆成独立层 moonLayer()，插在 battle 之后。
+ *
+ * 位置约束（420x860 实测）：
+ *   · 顶部 HUD 占 y 0~60
+ *   · 战斗横带 top=92, height=0.56*vh-176 → y 92~398（会铺不透明底色）
+ *   横带【之上】的纯净天空只剩 y 60~92（32px），装不下 ~90px 的月亮。
+ *   所以月亮改由独立层画在 battle 之后，位置取 fy=0.105（center y≈90），
+ *   月轮上半在 HUD 之下、下半自然垂在夜空与战斗区交界 —— 就是"右上角挂一盏月亮"。
+ *   fx 取 0.815 避开右上角图标列（x 352~412）与"战斗中"文字。 */
+const MOON = { fx: 0.815, fy: 0.105, size: 0.115 };
 /* 流云(极淡横带, 缓慢漂移, 制造"墨气"层次) */
 const CLOUD_N = 2;
 const CLOUD_SPD = [7, 13];   // 横穿周期秒数(越长越慢)
@@ -348,22 +349,11 @@ function initDeepSpace(canvas, opts) {
       }
     }
 
-    /* 4. 纸月(右上) */
-    const ms = MOON.size * Math.max(W, H);
-    moon.x = (MOON.fx * W) + camX * 0.3;
-    moon.y = (MOON.fy * H) + camY * 0.3;
-    const breathe = 0.97 + 0.03 * Math.sin(T * 0.16 + 1.2);
-    /* v3.3: 改回 source-over（普通混合）。
-     *   月轮 sprite 本身已经是【不透明实心 + 极淡外晕】，这正是月亮该有的样子 ——
-     *   不需要任何混合模式帮忙"提亮"。
-     *   screen 会把轮体与背景一起 `1-(1-a)(1-b)` 推白、轮缘消失（v3.2 实测变成一团
-     *   灰白云雾）；lighter 更糟（直接曝掉）。普通混合保留 sprite 原样，
-     *   轮体就是实心的暖白盘，外晕叠在夜空中自然衰减。
-     *   呼吸只动 alpha 0.97~1.0，不动机位 —— 月亮不该"闪"。 */
-    g.globalCompositeOperation = "source-over";
-    g.globalAlpha = breathe;
-    g.drawImage(moonCv, moon.x - ms, moon.y - ms, ms * 2, ms * 2);
-    g.globalAlpha = 1;
+    /* 4. 纸月 —— v3.3 已【移出本层】，改由独立的 moonLayer 在 battle 之后绘制。
+     *    原因：战斗横带（top 92, height 0.56*vh-176）会铺不透明底色，
+     *    而横带上方的纯净天空只剩 y 66~92 这 26px（再往上就是 HUD）——
+     *    月亮塞不进这条缝。把它独立成层、插在 battle 之后，就能自由落在
+     *    横带区域之上而不被压住。见下方 moonLayer()。 */
 
     /* 5. 流云(极淡, 普通混合更"墨") */
     for (let i = 0; i < CLOUD_N; i++) {
@@ -471,4 +461,44 @@ function initDeepSpace(canvas, opts) {
 }
 
 export { initDeepSpace };
+
+/* ── 纸月独立层（v3.3）────────────────────────────────────────────────
+ * 为什么把月亮从 bg 里拆出来：
+ *   战斗横带 (top=92, height=0.56*vh-176) 会铺不透明夜空底色。
+ *   横带【之上】的纯净天空只剩 y 66~92 这 26px（y<66 是 HUD），
+ *   月亮（直径 ~90px）根本塞不进去；
+ *   而留在 bg 里排在 battle 之前，就必然被横带底色压住。
+ *
+ * 解法：让月亮成为独立一层，插在 battle 之后。
+ *   这样它既能落在横带区域内（不被底色压），又不遮战斗（battle 在它下面）。
+ *   位置取 fy=0.105（860 高屏 center y≈90），月轮上半在 HUD 之下、
+ *   下半自然"挂"在夜空与战斗区交界处 —— 就是"右上角挂一盏月亮"的样子。
+ *
+ * 本层不持有 DOM、不自持 rAF，完全跟随舞台 ticker。
+ * 呼吸只动 alpha 0.97~1.0，不动机位 —— 月亮不该"闪"。 */
+function moonLayer() {
+  const sprite = moonSprite();
+  let t = 0;
+  return {
+    name: "moon",
+    resize() {},
+    draw(g, W, H, dt) {
+      t += dt;
+      const ms = MOON.size * Math.max(W, H);
+      const x = MOON.fx * W, y = MOON.fy * H;
+      const breathe = 0.97 + 0.03 * Math.sin(t * 0.16 + 1.2);
+      g.save();
+      /* 普通混合（source-over）：sprite 本身就是【不透明实心月轮 + 极淡外晕】，
+       * 这正是月亮该有的样子，不需要任何混合模式帮忙"提亮"。
+       * screen 会把轮体与背景一起 1-(1-a)(1-b) 推白、轮缘消失；
+       * lighter 更糟（直接曝掉）。 */
+      g.globalCompositeOperation = "source-over";
+      g.globalAlpha = breathe;
+      g.drawImage(sprite, x - ms, y - ms, ms * 2, ms * 2);
+      g.restore();
+    },
+  };
+}
+
+export { moonLayer };
 export default initDeepSpace;
