@@ -1786,27 +1786,23 @@
         ctx.save();
         ctx.translate(sx, sy);
         if (pet.face === -1) ctx.scale(-1, 1);   /* 向左飞: 水平镜像(素材默认朝右) */
-        /* 施法特效: 柔和光晕扩散, 无明显线圈 */
+        /* v2.6.2 施法特效: lighter 柔光垫底(呼吸幅度收小), 替代大光圈脉冲 + 浓 shadowBlur 投影(整只狐糊一圈彩光, 又脏又糊) */
         if (pet.casting) {
-          const castColor = pet.castType === 'heal' ? '120,255,170' : '255,170,85';
-          const pulse = 0.5 + 0.5 * Math.sin(pet.castAnim * Math.PI * 4);
-          /* 柔和光晕扩散(无描边线圈) */
-          const glowR = drawH * (1.0 + pulse * 0.4);
-          const grad = ctx.createRadialGradient(0, -drawH*0.5, 0, 0, -drawH*0.5, glowR);
-          grad.addColorStop(0, `rgba(${castColor},${0.25 + pulse*0.15})`);
-          grad.addColorStop(0.5, `rgba(${castColor},${0.1 + pulse*0.08})`);
-          grad.addColorStop(1, `rgba(${castColor},0)`);
-          ctx.fillStyle = grad;
-          ctx.beginPath();
-          ctx.arc(0, -drawH*0.5, glowR, 0, Math.PI*2);
-          ctx.fill();
-          /* 施法时宠物更亮 */
-          ctx.shadowColor = `rgba(${castColor},0.9)`;
-          ctx.shadowBlur = 14 + pulse*10;
+          const pulse = 0.5 + 0.5 * Math.sin(pet.castAnim * Math.PI * 3);
+          const img = pet.castType === 'heal' ? GLOW.heal : GLOW.atk;
+          const glowR = drawH * (0.68 + pulse * 0.14);
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = 0.3 + pulse * 0.18;
+          ctx.drawImage(img, -glowR, -drawH*0.55 - glowR, glowR*2, glowR*2);
+          ctx.restore();
         } else {
-          /* 轻微发光效果 */
-          ctx.shadowColor = 'rgba(150,255,200,0.4)';
-          ctx.shadowBlur = 8;
+          /* 待机微光: 极淡柔光垫底(替代 shadowBlur, 干净不糊) */
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = 0.16;
+          ctx.drawImage(GLOW.heal, -drawH*0.6, -drawH*0.5 - drawH*0.6, drawH*1.2, drawH*1.2);
+          ctx.restore();
         }
         ctx.drawImage(G.petFoxSprite, srcX, srcY, PET_SPRITE.fw, PET_SPRITE.fh, -drawW*0.5, -drawH, drawW, drawH);
         ctx.restore();
@@ -1947,6 +1943,20 @@
     }
   }
 
+  /* v2.6.2 柔光贴图: 预渲染 radial-gradient 中心亮→边缘透, 供加法混合(lighter)绘制 ——
+     替代 arc 实心点+shadowBlur(高斯投影发灰发"脏", 且每粒子实时模糊费性能) */
+  function makeGlow(rgb) {
+    const S = 64, c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d');
+    const gr = g.createRadialGradient(S/2, S/2, 0, S/2, S/2, S/2);
+    gr.addColorStop(0, `rgba(${rgb},0.85)`);
+    gr.addColorStop(0.3, `rgba(${rgb},0.32)`);
+    gr.addColorStop(1, `rgba(${rgb},0)`);
+    g.fillStyle = gr; g.fillRect(0, 0, S, S);
+    return c;
+  }
+  const GLOW = { heal: makeGlow('120,255,175'), atk: makeGlow('255,175,95') };
+
   function drawFx() {
     for (const f of G.fx) {
       /* v2.6 FIX: f.y 是相对地板线的偏移(敌人/玩家 y=0), 屏幕坐标须加 floorY(); 原直接当屏幕 y 画到了画布顶外, 特效从未显示 */
@@ -2017,49 +2027,23 @@
           ctx.beginPath(); ctx.arc(Math.cos(ang)*r, Math.sin(ang)*r, 1.8*(1-k)+0.5, 0, 6.28); ctx.fill();
         }
         ctx.restore();
-      } else if (f.kind === 'healParticle') {
-        /* 治疗粒子: 绿色光点上升 */
+      } else if (f.kind === 'healParticle' || f.kind === 'atkParticle') {
+        /* v2.6.2: 柔光粒子(lighter 加法发光) —— 压在角色身上是"透亮"而非"盖色", 去掉发灰的 shadowBlur */
+        const img = f.kind === 'healParticle' ? GLOW.heal : GLOW.atk;
+        const r = (2.2 + (1-k)*2.6) * 2.4;
         ctx.save();
-        ctx.globalAlpha = (1-k) * 0.9;
-        ctx.fillStyle = f.color || '#7fffaa';
-        ctx.shadowColor = f.color || '#7fffaa';
-        ctx.shadowBlur = 6;
-        ctx.beginPath();
-        ctx.arc(sx, fy, 2 + (1-k)*1.5, 0, Math.PI*2);
-        ctx.fill();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = (1-k) * 0.7;
+        ctx.drawImage(img, sx - r, fy - r, r*2, r*2);
         ctx.restore();
-      } else if (f.kind === 'atkParticle') {
-        /* 攻击粒子: 橙色光点上升 */
+      } else if (f.kind === 'healBurst' || f.kind === 'atkBurst') {
+        /* v2.6.2: 施法完成 → 一团柔光从角色胸口绽开(lighter), 替代硬描边圆环 */
+        const img = f.kind === 'healBurst' ? GLOW.heal : GLOW.atk;
+        const r = 14 + k * 40;
         ctx.save();
-        ctx.globalAlpha = (1-k) * 0.9;
-        ctx.fillStyle = f.color || '#ffaa55';
-        ctx.shadowColor = f.color || '#ffaa55';
-        ctx.shadowBlur = 6;
-        ctx.beginPath();
-        ctx.arc(sx, fy, 2 + (1-k)*1.5, 0, Math.PI*2);
-        ctx.fill();
-        ctx.restore();
-      } else if (f.kind === 'healBurst') {
-        /* 治疗爆发: 绿色光环扩散 */
-        ctx.save();
-        ctx.translate(sx, fy);
-        const r = k * 35;
-        ctx.strokeStyle = `rgba(127,255,170,${(1-k)*0.8})`;
-        ctx.lineWidth = 3 * (1-k) + 1;
-        ctx.beginPath();
-        ctx.arc(0, 0, r, 0, Math.PI*2);
-        ctx.stroke();
-        ctx.restore();
-      } else if (f.kind === 'atkBurst') {
-        /* 攻击爆发: 橙色光环扩散 */
-        ctx.save();
-        ctx.translate(sx, fy);
-        const r = k * 35;
-        ctx.strokeStyle = `rgba(255,170,85,${(1-k)*0.8})`;
-        ctx.lineWidth = 3 * (1-k) + 1;
-        ctx.beginPath();
-        ctx.arc(0, 0, r, 0, Math.PI*2);
-        ctx.stroke();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = (1-k) * 0.75;
+        ctx.drawImage(img, sx - r, fy - r, r*2, r*2);
         ctx.restore();
       }
     }

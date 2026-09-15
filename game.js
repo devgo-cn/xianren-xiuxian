@@ -4843,15 +4843,16 @@ function traceTap() { if (!BTL && !MYST) openTravel(); }
 setInterval(traceBeat, 2500);
 traceRefresh();
 renderAutoHunt();                  // v1.4.0: 自动斗法按钮初态(跟存档里的 autoHunt 走)
-/* v1.5.0: 行迹起点跟随 HUD 实高 —— 窄屏顶部资源栏折行、HUD 变高时自动下移, 永不挤压 */
-(function () {
-  const ts = $("topStack"), hud = document.querySelector(".hud");
-  if (!ts || !hud) return;
-  const sync = () => { ts.style.top = Math.round(hud.getBoundingClientRect().bottom + 8) + "px"; };
-  if (window.ResizeObserver) new ResizeObserver(sync).observe(hud);
-  window.addEventListener("resize", sync);
-  sync();
-})();
+/* v2.6.2: 报幕条已移到战斗区地板线下方(dt-theme .top-stack 改 bottom 定位),
+ * 不再跟随 HUD 顶高 —— 原 ResizeObserver 写行内 top 会把条钉回顶部, 撤除留档。
+ * (function () {
+ *   const ts = $("topStack"), hud = document.querySelector(".hud");
+ *   if (!ts || !hud) return;
+ *   const sync = () => { ts.style.top = Math.round(hud.getBoundingClientRect().bottom + 8) + "px"; };
+ *   if (window.ResizeObserver) new ResizeObserver(sync).observe(hud);
+ *   window.addEventListener("resize", sync);
+ *   sync();
+ * })(); */
 /* ============ 调试入口: 立即遇妖 —— v1.4.2 已撤下 UI, 需要时在控制台敲 debugEncounter() ============ */
 function debugEncounter() {
   if (BTL || MYST) { pushMsg("main", "正在斗法/探秘中，且待收场。"); return; }

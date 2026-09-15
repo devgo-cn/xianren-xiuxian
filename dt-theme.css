@@ -385,26 +385,27 @@
   /* —— 行迹条: 屏中上部细长墨条, 无圆角矩形观感 —— */
 /* ============ v1.5.0 顶部纵向流容器: 行迹 / 搜寻妖踪 / 战斗横幅依次排布 ============
  * 自动战斗小开关已上移顶部资源栏, 这一层只管 行迹 → 搜寻提示 → 战斗横幅。
- * 行迹胶囊高度随文案折行浮动(窄屏可到 ~110px), 用 flex column 依次排布, 谁显示谁占位, 永不重叠。 */
-  .top-stack{position:fixed;top:88px;left:0;right:0;z-index:9;
-    display:flex;flex-direction:column;align-items:center;gap:7px;
+ * 行迹胶囊高度随文案折行浮动(窄屏可到 ~110px), 用 flex column 依次排布, 谁显示谁占位, 永不重叠。
+ * v2.6.2: 报幕从战斗画面顶部移到地板线下方(不挡天空与怪物), 字体 14.5→11px。 */
+  .top-stack{position:fixed;top:auto;bottom:calc(44vh + 38px);left:0;right:0;z-index:9;
+    display:flex;flex-direction:column-reverse;align-items:center;gap:5px;
     pointer-events:none}
   .top-stack > .trace{pointer-events:auto}
-  .trace{position:static;transform:none;width:min(62%,270px);z-index:auto;display:flex;justify-content:center}
+  .trace{position:static;transform:none;width:min(74%,320px);z-index:auto;display:flex;justify-content:center}
   .trace{filter:drop-shadow(0 4px 14px rgba(0,0,0,.5))}
   .trace > span{pointer-events:none}
   /* v1.2.1: 行迹居中胶囊容器, 避免文本横向撞右上元素, 又能让文字飘在立绘上不显突兀 */
   .trace > .t-row{pointer-events:auto;display:inline-block;text-align:center;
     padding:6px 10px;border-radius:12px;background:transparent;border:0;max-width:100%}
-  .trace > .t-row > .t-ic{display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;
-    margin-right:8px;vertical-align:middle}
+  .trace > .t-row > .t-ic{display:inline-flex;width:14px;height:14px;align-items:center;justify-content:center;
+    margin-right:6px;vertical-align:middle}
   .trace > .t-row > .t-txt{display:inline;vertical-align:middle;line-height:1.45}
   .trace > .t-row > .trace-go{display:inline-block;vertical-align:middle;margin-left:10px}
   .trace.fight > .t-row{background:transparent;border:0;
     animation:encPulse 1.6s ease-in-out infinite}
-  .trace.fight > .t-row > .t-txt{font-size:14.5px;line-height:1.45;color:#ffe4d8;font-weight:600}
+  .trace.fight > .t-row > .t-txt{font-size:11px;line-height:1.45;color:#ffe4d8;font-weight:600}
   .trace.fight > .t-row > .t-txt b{color:#ffb199}
-  .trace .t-txt{font-size:14.5px;line-height:1.55;color:#e6eaf3;letter-spacing:.04em;text-shadow:0 1px 6px rgba(0,0,0,.95),0 0 16px rgba(0,0,0,.6)}
+  .trace .t-txt{font-size:11px;line-height:1.55;color:#e6eaf3;letter-spacing:.04em;text-shadow:0 1px 5px rgba(0,0,0,.95),0 0 12px rgba(0,0,0,.6)}
   .trace.travel .t-txt b,.trace.idle .t-txt b{color:#d8b06a}
   .trace.enc .t-txt{color:#ffe4d8}
   .trace.enc .t-txt b{color:#ffb199}
