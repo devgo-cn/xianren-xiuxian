@@ -730,14 +730,6 @@ function mountStage() {
         const bgLayer = bgMod.initDeepSpace(canvas, { managed: true });
         /* bg 必须在最底层：插到 aura 之前（此时顺序是 [aura, burst]） */
         stage.insertLayerBefore("aura", bgLayer);
-        /* v3.3 纸月独立层：排在 bg 之后、battle 之前 —— 但战斗层是动态 import
-         * 的、还没就绪，所以先插在 aura 之前（= bg 之后），
-         * pollBattleLayer 就绪时会把 battle 插到这个 "moon" 之前。
-         * 最终顺序：bg → battle → moon → aura → burst。 */
-        try {
-          const mL = bgMod.moonLayer();
-          if (mL) stage.insertLayerBefore("aura", mL);
-        } catch (e) { console.error("[stage] moon 层初始化失败:", e); }
       } catch (e) { console.error("[stage] bg 层初始化失败:", e); }
       pollBattleLayer(stage);
     }).catch(e => { console.error("[stage] bg 层加载失败:", e); pollBattleLayer(stage); });
@@ -820,9 +812,9 @@ function mountDantianOverlay(stage, realLayer) {
   realLayer.resize(lastW || 1, lastH || 1);
 }
 
-/* 战斗层就绪后插到 bg 与 moon 之间。
- * 最终顺序：bg → battle → moon → aura → burst
- * （moon 排在 battle 之后，才能"挂"在横带区域上而不被横带底色压住） */
+/* 战斗层就绪后插到 bg 与 aura 之间。
+ * 最终顺序：bg → battle → aura → burst
+ * （v3.4: 纸月层已移除，用"右上角挂月亮"的思路让位给换战斗区背景图） */
 let _battlePoll = 0;
 function pollBattleLayer(stage) {
   const api = window.BattleAPI;
@@ -836,9 +828,7 @@ function pollBattleLayer(stage) {
   setTimeout(() => {
     if (typeof api.createStageLayer !== "function") return;
     const L = api.createStageLayer();
-    /* 插到 moon 之前；moon 不在（bg 加载失败）则退回插到 aura 之前 */
-    const anchor = stage.layerNames.includes("moon") ? "moon" : "aura";
-    if (L && typeof stage.insertLayerBefore === "function") stage.insertLayerBefore(anchor, L);
+    if (L && typeof stage.insertLayerBefore === "function") stage.insertLayerBefore("aura", L);
     else if (L) stage.addLayer(L);
   }, 300);
 }

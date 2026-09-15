@@ -40,15 +40,25 @@ export const REALM_VIS = {
  * 但真正决定"人物多大"的是高度（height:min(44vh,350px)，随视口变）。
  * 以高为基准，丹田在任何屏幕上都稳定是人物高度的固定比例，不会忽大忽小。
  *
- * CORE_K = 0.030 → 350px 高的角色框上，丹体半径 ≈ 10.5px、直径 ≈ 21px。
- *   这是"丹田"该有的存在感：一眼能看见，但不至于变成一颗大灯泡。
- * HALO_K = 0.075 → 外晕半径 ≈ 26px。
- *   ⚠️ 不要贪大：外晕是"托住丹体"的，半径一大、alpha 一高，
- *   整块区域就被抬成一片平光，反而看不出中间有颗丹田（实测 alpha 0.26 时
- *   剖面 -50..+50 全是 218~229，完全糊平）。
- *   收窄到 0.075 且中心 alpha 压到 0.16，才能保住"中间亮、四周暗"的单峰。 */
-const CORE_K = 0.030;    // 丹体半径 / 角色框高
-const HALO_K = 0.075;    // 外晕半径 / 角色框高
+ * ── v3.4 调整 ────────────────────────────────────────────────────────
+ * 【纵向位置 0.40 → 0.52】用户反馈"丹田往下一点，到他的腰部"。
+ *   角色是【盘腿打坐】姿势，不是站姿：拿 346x350 的角色框逐 10% 打刻度线
+ *   对照图片实测 —— 0.40 落在胸口（原值），0.52 正好压在腰带上。
+ *   所以锚点取 0.52（见 ANCHOR_Y）。
+ *
+ * 【尺寸】用户反馈"从炼气期开始都增大一倍"。
+ *   凡人境保持原样（新手期不需要太炸），炼气及以后丹体/外晕半径翻倍：
+ *     CORE_K  0.030 → 0.060
+ *     HALO_K  0.075 → 0.150
+ *   350px 高的角色框上，炼气+ 丹体半径 ≈ 21px（直径 42px）、外晕半径 ≈ 53px。
+ *   倍率由 isBigRealm() 判定，见 CORE_K_BIG / HALO_K_BIG。 */
+const CORE_K = 0.030;        // 丹体半径 / 角色框高（凡人境基准）
+const HALO_K = 0.075;        // 外晕半径 / 角色框高（凡人境基准）
+const CORE_K_BIG = 0.060;    // 炼气及以后：翻倍
+const HALO_K_BIG = 0.150;    // 炼气及以后：翻倍
+
+/* 丹田纵向锚点（角色框高度比例）—— 盘腿打坐的腰带位置 */
+const ANCHOR_Y = 0.52;
 
 let cv = null, ctx = null;
 let CW = 0, CH = 0, dpr = 1;
@@ -67,13 +77,21 @@ function curBig() {
   } catch (e) { return BIG_NAMES[0]; }
 }
 
+/* 炼气及以后 = 需要放大丹田的境界。BIG_NAMES[0]="凡人"，[1]="炼气"，
+ * 所以下标 >= 1 就是"炼气及以后"。取不到境界（DOM 异常）时按凡人处理，
+ * 宁可小一点也不要凭空放一颗大灯泡。 */
+function isBigRealm() {
+  const i = BIG_NAMES.indexOf(curBig());
+  return i >= 1;
+}
+
 /* ── 丹田锚点解析 ─────────────────────────────────────────────────
  * 丹田必须长在角色身上，不能是固定屏幕比例。
  *
  * 两种驱动方式，锚点算法不同：
  *   A. overlay 模式（主路径）：调用方给的就是一张【贴合角色框】的画布，
  *      所以本层坐标系原点 = 角色框左上角。丹田位置直接取
- *          (W/2, H*0.40)   —— 水平居中、垂直 40%（胸腔→下腹之间）
+ *          (W/2, H*ANCHOR_Y)  —— 水平居中、垂直 52%（盘腿坐姿的腰带处）
  *      尺寸基准 R = H（角色框高）。完全不碰 DOM，零重排。
  *   B. 独立模式（initFx）：画布是整屏的，此时才需要去 DOM 里量角色框。
  * 用 _overlayMode 区分：overlay 模式由 fitManaged 之后置位。 */
@@ -83,7 +101,7 @@ function resolveAnchor() {
   if (_overlayMode) {
     /* A. 画布已经是角色框本身 */
     cx = CW * 0.5;
-    cy = CH * 0.40;
+    cy = CH * ANCHOR_Y;
     R = CH;
     return;
   }
@@ -94,7 +112,7 @@ function resolveAnchor() {
       const b = el.getBoundingClientRect();
       if (b.width > 8 && b.height > 8) {
         cx = b.x + b.width * 0.5;
-        cy = b.y + b.height * 0.40;
+        cy = b.y + b.height * ANCHOR_Y;
         R = b.height;
         return;
       }
@@ -155,12 +173,17 @@ function draw(dt) {
   ctx.globalCompositeOperation = "lighter";
   /* 换境界后 5 秒内从 55% 缓缓凝聚到 100% —— 保留原金丹的"成长"手感 */
   const grow = Math.min(1, eraT / 5);
-  const coreR = R * CORE_K * (0.55 + 0.45 * grow);
+  /* v3.4: 炼气及以后整体翻倍（用户要求"从炼气期开始都增大一倍"） */
+  const ck = isBigRealm() ? CORE_K_BIG : CORE_K;
+  const hk = isBigRealm() ? HALO_K_BIG : HALO_K;
+  const coreR = R * ck * (0.55 + 0.45 * grow);
   const oc = cfg.outer, cc = cfg.core;
 
   /* 1. 外圈柔光晕：慢呼吸，相位 0。刻意压淡 —— 它的职责是"托住"丹体，
-   *    不是自己发光。alpha 一高整块就糊成平光，单峰就没了。 */
-  const haloR = R * HALO_K * (0.94 + 0.06 * Math.sin(t * 0.55));
+   *    不是自己发光。alpha 一高整块就糊成平光，单峰就没了。
+   *    ⚠️ v3.4 丹田翻倍后外晕也跟着翻倍，但 alpha 不跟着调高：
+   *       半径大了本来就更容易糊，保持中心 0.16 才守得住单峰。 */
+  const haloR = R * hk * (0.94 + 0.06 * Math.sin(t * 0.55));
   const g0 = ctx.createRadialGradient(cx, cy, 0, cx, cy, haloR);
   g0.addColorStop(0.00, `rgba(${oc[0]},${oc[1]},${oc[2]},0.16)`);
   g0.addColorStop(0.40, `rgba(${oc[0]},${oc[1]},${oc[2]},0.065)`);

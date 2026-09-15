@@ -173,7 +173,11 @@ import { SND } from './10-base.js';
     createStageLayer: () => battleLayer(),
     getKills: () => G.kills,
     resetKills: () => { G.kills = 0; },
-    triggerSpeedSkill: (mult, duration) => { if (mult<=1) return false; G.speedMult=mult; G.speedMultTimer=duration||5; return true; },
+    /* v3.4: 统一走 applySpeedBuff 的叠加规则（取 max 倍率 + 重置时长），
+     * 不能再无条件赋值 —— 否则 ×3 期间被一个 ×2 直接顶掉，违反用户规则。 */
+    triggerSpeedSkill: (mult, duration) => { if (mult<=1) return true; applySpeedBuff(mult, duration||5, 0); return true; },
+    /* 倍速状态快照：给验收脚本读剩余时长用 */
+    getSpeedState: () => ({ mult: G.speedMult, timer: G.speedMultTimer, dodge: G.speedDodge || 0 }),
     /* 兼容旧接口: 加速现在由「疾风步/缩地成寸」两个技能驱动 */
     trySpeedSkill: () => {
       const a = rollSpeedSkill('jifeng'), b = rollSpeedSkill('suodi');
@@ -298,15 +302,43 @@ import { SND } from './10-base.js';
     const cmul = kind === 2 ? 2 : kind === 1 ? 1.5 : 1;
     return { kind, cmul, crit: kind > 0, mult: kind ? cmul * (1 + (PST.critD || 0)/100) : 1 };
   }
+  /* ---------- 倍速叠加唯一入口（v3.4）----------------------------------
+   * 用户规则原文：
+   *   「二倍速、三倍速持续期间也可以获得 buff，只不过会把时间重置。
+   *     二倍速期间也可以获得三倍速 buff，但不要叠加成 5 倍。
+   *     三倍速同样道理，也可以获得后重置。」
+   *
+   * 提炼成两条不变量，所有授予倍速的路径都必须走这里：
+   *   1) 倍率 = max(当前, 新的)   —— 单调不减，永远不存在 ×5（2×3 是乘法的错）
+   *   2) 时长 = 本次技能满时长     —— "重置"而非"延长"，不吃 max 叠加
+   *
+   * 为什么把 dodge 也收进来：身法是"倍率+闪避"一体的，闪避同样只取高者，
+   * 免得出现"倍率被 ×3 盖住、闪避却按 ×2 挂着"的精神分裂状态。 */
+  function applySpeedBuff(mult, dur, dodge) {
+    G.speedMult = Math.max(G.speedMult, mult || 1);
+    G.speedDodge = Math.max(G.speedDodge || 0, dodge || 0);
+    G.speedMultTimer = dur;        /* 重置时间轴，不做 max 延长 */
+    return G.speedMult;
+  }
+
   /* ---------- 身法技能(疾风步 2x / 缩地成寸 3x): 独立 roll, 取高者, 时长可刷新 ----------
    * 身法不是光环: 只在生效的那几秒里加闪避(身形飘忽), 时效一到即散, 不进面板属性 */
   function rollSpeedSkill(id) {
     const s = skVal(id);
     if (!s || Math.random()*100 >= s.chance) return null;
     skExp(id, 3);
-    if (s.mult >= G.speedMult || G.speedMultTimer <= 0) { G.speedMult = s.mult; G.speedDodge = s.dodge || 0; }
-    else if ((s.dodge || 0) > G.speedDodge) G.speedDodge = s.dodge || 0;
-    G.speedMultTimer = Math.max(G.speedMultTimer, s.dur);
+    applySpeedBuff(s.mult, s.dur, s.dodge);
+    /* v3.4 倍速叠加规则（用户明确要求）：
+     *   · ×2 生效期间【也能】触发 ×2 → 时长重置（回满 dur），倍率不变，不会变成 ×4
+     *   · ×2 生效期间【也能】触发 ×3 → 取高者，直接升到 ×3，但【绝不叠成 ×5】
+     *   · ×3 期间触发 ×2 → 已被更高的盖住，倍率保持 ×3，但时长照样重置
+     *   · ×3 期间触发 ×3 → 时长重置
+     * 一句话：倍率永远取 max(旧, 新)，时长永远重置为本次技能满时长。
+     * 旧代码用 `s.mult >= G.speedMult || G.speedMultTimer <= 0` 做门槛，会导致
+     * ×2 期间再触发 ×2 被静默丢弃（buff 白放）；现在改为无条件取 max。 */
+    G.speedMult = Math.max(G.speedMult, s.mult);
+    G.speedDodge = Math.max(G.speedDodge || 0, s.dodge || 0);
+    G.speedMultTimer = s.dur;   /* 重置时间，而不是 max 延长 */
     skillCall(id === 'jifeng' ? '疾风步' : '缩地成寸');   /* 身法播报 */
     /* 身法触发特效: 玩家位置速度爆发 */
     if (G.player) {
@@ -652,9 +684,20 @@ import { SND } from './10-base.js';
     const p = G.player;
     for (const pet of G.pets) {
       if (!pet.alive) continue;
-      /* 朝向: 按水平移动方向决定是否镜像(素材默认头朝右, 跟随玩家时一直朝右) */
-      if (pet.x > (pet.lastX ?? pet.x) + 0.4) pet.face = 1;          // 向右飞 → 原素材
-      else if (pet.x < (pet.lastX ?? pet.x) - 0.4) pet.face = -1;    // 向左飞 → 镜像
+      /* 朝向: 按水平移动方向决定是否镜像(素材默认头朝右)
+       * v3.4 bugfix —— 旧代码用固定阈值 0.4px 判方向：
+       *   pet.x > lastX + 0.4 → face=1
+       *   平稳跟随阶段每帧位移只有 0.2~0.5px（临界），于是"向左飞"经常够不到
+       *   0.4 这个门限，face 就卡在上一帧的值不动 —— 表现为"归位后朝向随机不对"。
+       * 现在改成：累积位移跨过门限才转向，并且【位移足够大时直接把朝向钉死】。
+       * 门限同时按 dt 缩放，保证不同帧率下手感一致。 */
+      const dxFrame = pet.x - (pet.lastX ?? pet.x);
+      pet.faceAcc = (pet.faceAcc || 0) + dxFrame;
+      const faceThresh = Math.max(0.6, 12 * dt);   /* 约 12px/秒 的死区，足够小到不迟钝 */
+      if (pet.faceAcc > faceThresh) { pet.face = 1; pet.faceAcc = 0; }         /* 向右 → 原素材 */
+      else if (pet.faceAcc < -faceThresh) { pet.face = -1; pet.faceAcc = 0; }  /* 向左 → 镜像 */
+      /* 瞬时大位移（拾取飞扑/瞬移归位）直接钉朝向，不等累积 */
+      if (Math.abs(dxFrame) > 4) { pet.face = dxFrame > 0 ? 1 : -1; pet.faceAcc = 0; }
       pet.lastX = pet.x;
       /* 飞行动画帧更新 */
       pet.flyTimer += dt;
@@ -1133,14 +1176,12 @@ import { SND } from './10-base.js';
           ctx.globalAlpha = 0.3 + pulse * 0.18;
           ctx.drawImage(img, -glowR, -drawH*0.55 - glowR, glowR*2, glowR*2);
           ctx.restore();
-        } else {
-          /* 待机微光: 极淡柔光垫底(替代 shadowBlur, 干净不糊) */
-          ctx.save();
-          ctx.globalCompositeOperation = 'lighter';
-          ctx.globalAlpha = 0.16;
-          ctx.drawImage(GLOW.heal, -drawH*0.6, -drawH*0.5 - drawH*0.6, drawH*1.2, drawH*1.2);
-          ctx.restore();
         }
+        /* v3.4: 删掉了"待机微光"常亮垫底。
+         * 用户反馈"没放技能的时候也在发光" —— 真凶就是这里的 else 分支：
+         * 每帧都拿 GLOW.heal(青绿) 以 lighter 叠 0.16 alpha，×2/×3 倍速下
+         * 每帧叠加次数翻倍，整只狐就常年泛着一层绿光，看着像一直在施法。
+         * 现在灵狐本体只在 casting 期间发光，待机即干净贴图。 */
         ctx.drawImage(G.petFoxSprite, srcX, srcY, PET_SPRITE.fw, PET_SPRITE.fh, -drawW*0.5, -drawH, drawW, drawH);
         ctx.restore();
       } else {
