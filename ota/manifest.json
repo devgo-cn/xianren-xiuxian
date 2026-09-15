@@ -150,10 +150,13 @@
     "src/20-core.js": "801d09ca8fe1680044620e85c03f5cb757a6569178f96022e28c92629f8eccba",
     "src/30-systems.js": "dd06aa051b79740e9281ccef7b71d810a34e41a3070d9f481764296e8f7063bf",
     "src/40-app.js": "e51ab126baa31dffbb902294c57af4750a947bd631041fbe32b6286922322931",
-    "src/50-battle.js": "f6a9cb98f3490cf9e4dde12abc3063e4d47b2c300f44996766c9bff8268cb2c1",
+    "src/50-battle.js": "13fde56e0a7e01f86467251dc998ca2265d629733ad3065125a25068cad13ac8",
     "src/60-stage.js": "812015531c39c243ac61092717669f736aa06a642ea2dd5e7eae3438c4bc23ec",
-    "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
+    "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb",
+    "src/monsters/registry.js": "1a5b33c3740e7df2e24e8c4ece3fdd0ef42d72072c2d1f06e5a0f7d355e13da6",
+    "src/render/index.js": "18c280c41969202684b48e978bdca1de37f427370a4576d938755e5ede82a682",
+    "src/render/pixi.js": "9253223d645db330d7c94da74a294e6ca18587e7fcc3c6a15f411fc0d01cd6a4"
   },
-  "rev": "4bb6f8d9870fc97d",
+  "rev": "38efe4d656341938",
   "version": "3.3"
 }
