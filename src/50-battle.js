@@ -1613,11 +1613,21 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (labActive()) return;   /* 标定台: 玩家不追击不出手 —— 位置锁在 labLayout().px */
     if (window.__skillFreeze) { p.moving = 0; return; }   /* v4.8 弹道验收台: 玩家定桩 */
 
-    const near = findNearestEnemy(p.lane, p.x, p.atkRange+200);
+    /* v4.9 技能怪攻距适配: 技能怪的 atkRange 是弹道实测值(108~210, 见 SK_RANGE),
+     * 远大于玩家固定攻距 75。怪停在 p.x + e.atkRange 处, 玩家按 75 判定就永远
+     * 够不着 —— 表现为"顶着怪往前跑却不出手"。这里按本道最近的怪动态放宽玩家
+     * 攻距: 普通怪维持原值, 技能怪取"怪攻距 + 少量余量", 保证双方都能交手。 */
+    let reach = p.atkRange;
+    for (const e of G.enemies) {
+      if (!e.alive || e.dying > 0 || e.lane !== p.lane) continue;
+      if (e.__skillRange) reach = Math.max(reach, (e.atkRange || 0) + 8);
+    }
+
+    const near = findNearestEnemy(p.lane, p.x, reach+200);
     /* 攻击动画播放期间不中断，保持攻击状态 */
     if (p.attackAnim) {
       p.moving = 0;
-    } else if (near && Math.abs(near.x-p.x) <= p.atkRange+5) {
+    } else if (near && Math.abs(near.x-p.x) <= reach+5) {
       /* 进入攻击范围，开始攻击（触发时不立即造成伤害，伤害在动画帧中触发） */
       p.moving = 0;
       if (p.atkT <= 0) {
@@ -1634,7 +1644,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     } else if (near) {
       /* 有怪但不在攻击范围，向怪移动 */
       p.moving = 1; p.walkT += dt*8;
-      const targetX = near.x - p.atkRange*0.85;
+      const targetX = near.x - reach*0.85;
       p.x += Math.sign(targetX-p.x)*Math.min(Math.abs(targetX-p.x), BC.playerSpeed*1.5*dt);
     } else {
       /* v3.8.1 无怪(攻击视野内)时向前推进 —— 防穿越: 玩家若从站位怪身上走过,
@@ -1644,7 +1654,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       for (const e of G.enemies) {
         if (e.alive && e.dying <= 0 && e.lane === p.lane && e.x > p.x - 1 && e.x < nearest) nearest = e.x;
       }
-      if (nearest < Infinity) p.x = Math.min(p.x, nearest - p.atkRange*0.5);
+      if (nearest < Infinity) p.x = Math.min(p.x, nearest - reach*0.5);
     }
   }
   function updatePets(dt) {
