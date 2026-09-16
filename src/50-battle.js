@@ -2898,24 +2898,27 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     the_horde: 181, thunder_titan_dynamo: 127, witch_baba: 126,
   };
 
-  /* 由怪种 + 技能类发一条弹道。dir=1 面向右(怪在玩家左侧), dir=-1 面向左 */
+  /* 由怪种 + 技能类发一条弹道。v4.9 从怪身前胸口发射, 2 维瞄准玩家, 飞行中弱追踪。 */
   function spawnSkillFx(e, def, kind, dir) {
     if (SK_LIVE.length >= SK_MAX_LIVE) SK_LIVE.shift();   /* 超限丢最老的, 不排队 */
     const k = SKILL_KIND[kind] || SKILL_KIND[1];
     const dh = def.drawH || 84;
-    /* 起点: 怪身前一点(不是身内, 否则弹道从怪身上"长"出来) */
+    /* 起点: 怪身前一点(不是身内, 否则弹道从怪身上"长"出来), 高度由 alt 决定(胸口附近) */
     const ox = e.x + dir * dh * 0.16;
-    /* 纵向: f.y 在 drawFx 里是按【地板线相对量】消费的(fy = floorY() + f.y),
-     * 所以这里只能给"相对地板"的偏移, 绝不能再加一次 floorY() ——
-     * 早先写成 floorY()+e.y-dh*alt, 等于把地板算了两遍, 弹道整体沉到画面下方
-     * 100px 处(300px 高的横带直接看不到), 这是"技能明明发了却看不见"的真凶。
-     * e.y 是车道偏移(负值), 故"怪脚底"在地板相对坐标里就是 e.y。
-     * alt = 怪身高系数: 0 贴地, 1 头顶。 */
     const oy = e.y - dh * k.alt;
+    /* 2 维瞄准: 从发射点朝玩家当前位置算归一化方向向量; 玩家不存在时退化为水平朝向 */
+    let dx = dir, dy = 0;
+    if (G.player) {
+      const tdx = G.player.x - ox;
+      const tdy = G.player.y - oy;          /* 均为地板相对坐标, 可直接相减 */
+      const dist = Math.sqrt(tdx * tdx + tdy * tdy) || 1;
+      dx = tdx / dist; dy = tdy / dist;
+    }
     const rgb = skillTint(k.rgb, 1.0);
     const shot = (delay, spreadY) => ({
       kind: 'skillShot', sk: kind, rgb, tex: k.tex, blend: k.blend,
-      x: ox, y: oy + spreadY, dir, len: Math.max(k.len, (k.minLen || 0) * PLAYER_H), thick: k.thick,
+      x: ox, y: oy + spreadY, dir, dx, dy,
+      len: Math.max(k.len, (k.minLen || 0) * PLAYER_H), thick: k.thick,
       travel: (e.atkRange || 120) * k.speedK,
       ground: !!k.ground, drop: !!k.drop, cone: !!k.cone,
       t: -delay, dur: k.dur + delay,
@@ -3174,11 +3177,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         o.spr.blendMode = f.blend === 'NORMAL' ? PIXI.BLEND_MODES.NORMAL : PIXI.BLEND_MODES.ADD;
         o.spr.anchor.set(col ? 0.5 : f.dir < 0 ? 1 : 0, 0.5);
 
-        /* 位置曲线: 沿朝向推进 */
+        /* 位置曲线: v4.9 沿 2 维瞄准方向推进(dx/dy 为发射时朝玩家的归一化方向) */
         const adv = f.travel ? f.travel * Math.min(1, kx / 0.8) : 0;
-        let px = sx + f.dir * adv;
-        let py = fy;
-        /* v4.9 弹道追踪: 朝玩家位置偏移, 前20%不追踪(避免刚发射就拐弯), 后面逐渐追踪到 track 强度 */
+        let px = sx + (f.dx || f.dir) * adv;
+        let py = fy + (f.dy || 0) * adv;
+        /* v4.9 弹道追踪: 朝玩家当前位置偏移, 前20%不追踪(避免刚发射就拐弯), 后面逐渐追踪到 track 强度 */
         if (f.track && G.player) {
           const trackAmt = f.track * Math.max(0, (kx - 0.2) / 0.8);
           if (trackAmt > 0) {
