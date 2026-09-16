@@ -1,6 +1,7 @@
 {
   "files": {
     "assets/battle-forest-bg.webp": "fb2a4f25219f9c8ccd7ebf76fdd1dcc310f2cc3a14ff82234945ff01f0b0b851",
+    "assets/battle-forest-fg.webp": "86eacea01056398ff7ec0748ffbdd99435561d770341a93a1f8d4b2d9541d251",
     "assets/cultivator_body.webp": "a72d9d498231d77e7f8d131152f06059ddca1091e83889c38c3224ae26927b94",
     "assets/cultivator_hair.webp": "4e83df9dfe253be84dbbfb0a183b283ef75c9c362c522d24b012e3c2070c639d",
     "assets/cultivator_meta.json": "5ea21a40843b6fa40d875d8f10bc86b5bc9f1172e15f41690fc1bd92b77c1670",
@@ -396,10 +397,10 @@
     "src/20-core.js": "801d09ca8fe1680044620e85c03f5cb757a6569178f96022e28c92629f8eccba",
     "src/30-systems.js": "dd06aa051b79740e9281ccef7b71d810a34e41a3070d9f481764296e8f7063bf",
     "src/40-app.js": "944b82f6799996ac74c607646945f2338523cc0d54d23f04b96a9abe80ccb1c8",
-    "src/50-battle.js": "f8588def8c819376d3395307efe23ab8a459f2f8ac80b952aecf2fd11530453e",
+    "src/50-battle.js": "7e110e304e12774c997da5e87b194d48df4290422081e866e6b70a2b0c7d1e13",
     "src/60-stage.js": "58e1ee5df0b972d4271ca676e65622fee3544b9ab6f226ef3f8ffaa16205ae47",
     "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
   },
-  "rev": "781db64b29735d44",
+  "rev": "4b9479f82fd5994b",
   "version": "3.5"
 }
