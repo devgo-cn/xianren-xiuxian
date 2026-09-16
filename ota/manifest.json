@@ -472,14 +472,14 @@
     "game.js": "9754940a93231e14afc252557041836597a525a0c9c458498fbf564343e4e717",
     "index.html": "c8dfcee8065fe494b28eb0a5b8fb655e184e30e9f034a018aa91a4894dce415b",
     "src/00-pure.js": "f5cb4acb0ebcc74eee7cd3024fe08d777290ffc943f994587348a9c57983ecbe",
-    "src/10-base.js": "f0c99dc28e9aead2a50f5e45ccbba4d3eb8e578445b1ffd42512126800999367",
-    "src/20-core.js": "801d09ca8fe1680044620e85c03f5cb757a6569178f96022e28c92629f8eccba",
-    "src/30-systems.js": "8e8c6eaa0828eb56611db6b0882540af64afb3c9142599584559e55f75ad9cec",
+    "src/10-base.js": "8708cf5c53283c04af8fc9061c19d46bca4c5231d1befb70dc2a8a79019bd4ca",
+    "src/20-core.js": "0a91e421bc308dd63a5ff9cadb297d1290f425e7af2fdae6f0d7d9f298114de2",
+    "src/30-systems.js": "b6dbe0ddb4a78795042cffe943aa0ed8055a8f4263cab3625776044f39f5ab74",
     "src/40-app.js": "0a5ce4e9f696a5c8d707ac04d774323752558c1c1c56823f465ef9187161c82d",
-    "src/50-battle.js": "3214c25eb6fbe34472445e9c6e4d8ef6eb40e275925b7efd3737f3e83386a8c1",
+    "src/50-battle.js": "980b8f35c248884ddfb0a75c740e570d29ed70b90ed54272917d11a174454be5",
     "src/60-stage.js": "58e1ee5df0b972d4271ca676e65622fee3544b9ab6f226ef3f8ffaa16205ae47",
     "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
   },
-  "rev": "3a5d031be447ff7a",
+  "rev": "a1883ea33c75692b",
   "version": "3.5"
 }
