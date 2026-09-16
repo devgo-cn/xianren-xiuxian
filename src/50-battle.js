@@ -12,6 +12,7 @@
  */
 
 import { SND } from './10-base.js';
+import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档 */
 
 
   const BC = {
@@ -21,15 +22,29 @@ import { SND } from './10-base.js';
     enemies: {
       /* hpK/atkK/defK: 按玩家境界(lv)线性成长 —— 怪只随境界长, 玩家随境界+装备长, 换装即提速。
        * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。 */
-      slime: { name:'妖卒', role:'melee', w:60, atkRange:30, speed:120, hpK:1.0, atkK:0.55, defK:0.35, color:'#6fe0a8' },
-      water: { name:'水灵', role:'melee', w:40, atkRange:35, speed:80,  hpK:1.6, atkK:0.75, defK:0.60, color:'#6fd0e8' },
+      slime: { name:'妖卒', role:'melee', w:60, atkRange:30, speed:120, hpK:1.0, atkK:0.55, defK:0.35, color:'#6fe0a8', tier:1 },
+      water: { name:'水灵', role:'melee', w:40, atkRange:35, speed:80,  hpK:1.6, atkK:0.75, defK:0.60, color:'#6fd0e8', tier:3 },
       /* v3.6 骨骼怪: 鼠妖 —— DragonBones 骨骼动画(assets/db/)经 Canvas2D 桥实时渲染,
        * 与序列帧怪并存。bone 字段 = 骨架名(Ratty 包内 armature 名), 有 bone 字段即走骨骼管线。 */
-      rat:   { name:'鼠妖', role:'melee', w:35, atkRange:32, speed:150, hpK:0.8, atkK:0.5, defK:0.25, color:'#c9b28f', bone:'Ratty' },
+      rat:   { name:'鼠妖', role:'melee', w:35, atkRange:32, speed:150, hpK:0.8, atkK:0.5, defK:0.25, color:'#c9b28f', bone:'Ratty', tier:2 },
       /* v2.6 调参: hpK 80→52(实测过厚约-35%), atkRange 70→45(玩家攻距75, 贴身才能互殴, 修复"剑够不到") */
-      boss:  { name:'史莱姆王', role:'ranged', w:5,  atkRange:45, speed:40, hpK:52, atkK:3.0, defK:3.0, color:'#a0ff80', isBoss:true, floatHeight:10, sizeMult:2.0 },
+      boss:  { name:'史莱姆王', role:'ranged', w:5,  atkRange:45, speed:40, hpK:52, atkK:3.0, defK:3.0, color:'#a0ff80', isBoss:true, floatHeight:10, sizeMult:2.0, tier:5 },
     },
+    /* v3.9 怪物三维系统: 怪包统一池(每个境界都会刷到全怪种), 三维 = 境界基准 × 怪种K × 波次tier倍率。
+     * 波次内从 T1 最弱一路递进到 T5 —— tier 决定刷怪池权重与三维倍率。 */
+    tier: {
+      1: { name:'妖群', mul:1.00 },
+      2: { name:'妖锐', mul:1.30 },
+      3: { name:'妖将', mul:1.75 },
+      4: { name:'妖王', mul:2.40 },
+      5: { name:'妖皇', mul:3.20 },
+    },
+    tierNeedBase: 7,      /* 首档升档击杀数: T2@7, T3@9, T4@12, T5@15(累计43) —— 120s 产能约46只, 顶尖玩家压哨进 T5 */
+    tierNeedStep: 1.3,    /* 每档所需击杀数递增系数 */
+    trialSecs: 120,       /* 试炼轮时长: 120 秒结算, 击杀数计入纪录 → 离线补偿 */
   };
+  /* 升档所需击杀数: base × step^(t-1) */
+  function tierNeed(t) { return Math.round(BC.tierNeedBase * Math.pow(BC.tierNeedStep, (t||1) - 1)); }
 
   /* 玩家属性(主游戏 pushBattleStats 注入) —— 战斗内一切数值伤害以此为准 */
   let PST = { lv:1, atk:56, hp:430, def:31, crit:0, critB:0, critD:0, pen:0, dodge:0 };
@@ -53,6 +68,8 @@ import { SND } from './10-base.js';
     skillSprite:null, skillReady:false,
     smallKillsSinceBoss:0, bossActive:false, bossSpawnEvery:100,   /* v3.8.2 打满100只小怪才刷BOSS(原10) */
     skillCall:null,          /* 技能名播报槽: 覆盖式大字快闪, {name,t,dur} */
+    /* v3.9 试炼轮次: 120秒一场, 怪从T1一路刷到T5; 结算击杀数 → 纪录 → 离线补偿 */
+    trialT: BC.trialSecs, trialKills:0, trialTier:1, tierKills:0, trialSettled:false, trialRound:0, trialBossDone:false,
   };
 
   /* 加载素材 */
@@ -275,6 +292,8 @@ import { SND } from './10-base.js';
     removePet: (petId) => { G.pets = G.pets.filter(p => p.id !== petId); },
     getPets: () => G.pets,
     spawnWave: () => spawnWave(),
+    /* v3.9 试炼轮次: 结算面板「再战一轮」入口 */
+    trialRestart: () => trialRestart(),
     /* v2.9: 暂停时清掉限帧 sleep 句柄 —— 否则那枚 setTimeout 醒来时 G.paused 已为 true,
      * 会直接 return 且把 _rafOn 留成 true, 导致 resume 认为"泵还在跑"而不重启(死锁)。 */
     pause: () => { G.paused = true; if (_sleepT) { clearTimeout(_sleepT); _sleepT = 0; } _rafOn = false; },
@@ -290,17 +309,22 @@ import { SND } from './10-base.js';
   function makePlayer() {
     return { x:0,y:laneOff(1), lane:1, hp:PST.hp,maxHp:PST.hp, atk:PST.atk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0,stun:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false, attackTarget:null, hit1:false, hit2:false, hit3:false, sanlianTriggered:false, atkBuff:0, atkBuffTimer:0, skillAnim:false, skillFrame:0, skillTimer:0, skillHit:false, skillCooldown:0, skillTarget:null };
   }
-  /* 怪物成长系统: 三围随玩家境界 lv 线性成长(怪只吃境界, 不吃装备 → 换装备=变快) */
-  function makeEnemy(type) {
+  /* 怪物成长系统: 三围随玩家境界 lv 线性成长(怪只吃境界, 不吃装备 → 换装备=变快)。
+   * v3.9 三维系统: 三围 = 境界基准 × 怪种hpK/atkK/defK × 波次tier倍率 ——
+   * 怪包统一池, 每个境界都会刷到全怪种; 同一只怪随境界+波次档位三维缩放。 */
+  function tierMul(t) { const d = BC.tier[t || G.trialTier || 1]; return d ? d.mul : 1; }
+  function makeEnemy(type, tierOverride) {
     const def = BC.enemies[type] || BC.enemies.slime;
     const lv = Math.max(1, PST.lv || 1);
     const elite = Math.random() < DROP.eliteChance;
-    let hp  = Math.round((60 + 26*lv) * def.hpK);
-    let atk = Math.round((8 + 5*lv)   * def.atkK);
-    const dfn = Math.round((2 + 2*lv)   * def.defK);
+    const mul = tierMul(tierOverride);
+    let hp  = Math.round((60 + 26*lv) * def.hpK * mul);
+    let atk = Math.round((8 + 5*lv)   * def.atkK * mul);
+    const dfn = Math.round((2 + 2*lv)   * def.defK * mul);
     if (elite) { hp = Math.round(hp*DROP.eliteHp); atk = Math.round(atk*1.2); }
     const lane = (Math.random() * LANES) | 0;   /* v3.7: 三车道随机刷怪 */
     const r = { type,name:def.name,role:def.role, elite, lane, y:laneOff(lane), x:0, hp,maxHp:hp, atk, def:dfn,
+      tier:tierOverride||def.tier||1,
       atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2)*(elite?0.85:1), color:def.color,
       atkT:Math.random()*0.6, anim:0,hurtT:0,stun:0, alive:true,dying:0,reach:1, animFrame:0, animTimer:0, moving:false };
     /* 骨骼怪: 工厂就绪时建一只独立骨架实例(每只怪动画独立推进) */
@@ -312,8 +336,9 @@ import { SND } from './10-base.js';
   function spawnWave() {
     /* BOSS活跃时不刷新小怪 */
     if (G.bossActive) return null;
-    /* 每60只小怪刷一只BOSS */
-    if (G.smallKillsSinceBoss >= G.bossSpawnEvery) {
+    /* v3.9 试炼轮: BOSS = T5 妖皇波次的守关演出(120s 杀不满旧门槛100只, 改按档位触发);
+     * 一轮只出一次 —— trialBossDone 拦重复, restart 时清零。 */
+    if (G.smallKillsSinceBoss >= G.bossSpawnEvery || (G.trialTier >= 5 && !G.trialBossDone)) {
       if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= BC.maxAlive) return null;
       const e = makeEnemy('boss');
       e.x = G.camX + stageW() + BC.enemySpawnOffset;
@@ -322,14 +347,18 @@ import { SND } from './10-base.js';
       G.enemies.push(e);
       G.bossActive = true;
       G.smallKillsSinceBoss = 0;
+      G.trialBossDone = true;
       return e;
     }
-    const types = Object.keys(BC.enemies).filter(t => t !== 'boss');
-    const tw = types.reduce((s,t) => s + (BC.enemies[t].w || 1), 0);
+    /* v3.9 怪包统一池: 怪种带 tier, 刷怪池 = tier<=当前档的全部怪;
+     * 当前档怪权重 ×3(主流), 低档怪保底出现(质感: 越打怪越杂越强)。 */
+    const cur = G.trialTier || 1;
+    const types = Object.keys(BC.enemies).filter(t => t !== 'boss' && (BC.enemies[t].tier || 1) <= cur);
+    const tw = types.reduce((s,t) => s + (BC.enemies[t].w || 1) * ((BC.enemies[t].tier||1) === cur ? 3 : 1), 0);
     let r = Math.random()*tw, type = types[0];
-    for (const t of types) { r -= (BC.enemies[t].w || 1); if (r <= 0) { type = t; break; } }
+    for (const t of types) { r -= (BC.enemies[t].w || 1) * ((BC.enemies[t].tier||1) === cur ? 3 : 1); if (r <= 0) { type = t; break; } }
     if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= BC.maxAlive) return null;
-    const e = makeEnemy(type);
+    const e = makeEnemy(type, G.trialTier);   /* v3.9 三维系统: 小怪三维按当前波次档位缩放 */
     e.x = G.camX + stageW() + BC.enemySpawnOffset;
     G.enemies.push(e);
     return e;
@@ -402,6 +431,17 @@ import { SND } from './10-base.js';
       G.smallKillsSinceBoss = 0;
     } else {
       G.smallKillsSinceBoss++;
+    }
+    /* v3.9 试炼计数: 轮内击杀推进波次档位(T1→T5), 结算进纪录 */
+    if (!isBoss && !G.trialSettled) {
+      G.trialKills++; G.tierKills++;
+      const need = tierNeed(G.trialTier);
+      if (G.trialTier < 5 && G.tierKills >= need) {
+        G.tierKills = 0; G.trialTier++;
+        const td = BC.tier[G.trialTier];
+        skillCall('妖潮 · ' + td.name);
+      }
+      updateHUD();
     }
     const mul = e.elite ? DROP.eliteMul : 1;
     const jitter = 1 - DROP.spiritRand + Math.random()*DROP.spiritRand*2;
@@ -987,6 +1027,65 @@ import { SND } from './10-base.js';
     G.camX += (targetCam-G.camX)*Math.min(1, dt*6);
   }
   let _pushT = 0;
+  /* ── v3.9 试炼轮次状态机 ──────────────────────────────────────────
+   * 120 秒一场, 怪从 T1 妖群一路升到 T5 妖皇; 时间到结算:
+   *   本轮击杀 → 与纪录(trialBest)比较 → 按档位给离线游历收益加成(trialBoost)。
+   * 【计时器与倍速分离】倒计时吃原始 dt(真实时间); 身法倍速只加速战斗实体 ——
+   *   运气好触发倍速多, 同样 120 秒里刷的怪就更多, 击杀数即纯收益。 */
+  function updateTrial(dt) {
+    if (G.trialSettled) return;          /* 结算面板期间不倒计时、不刷怪 */
+    G.trialT -= dt;
+    if (G.trialT <= 0) { G.trialT = 0; settleTrial(); }
+  }
+  /* 离线补偿档位: 纪录越高加成越大; 48h 有效, 刷新纪录即续期升档 */
+  function trialBoostFor(k) { return k >= 45 ? .20 : k >= 35 ? .15 : k >= 20 ? .10 : k >= 10 ? .05 : 0; }
+  function settleTrial() {
+    G.trialSettled = true;
+    const kills = G.trialKills;
+    /* 清场: 轮次结束, 场上怪与投射特效退去(掉落保留让玩家收完) */
+    for (const e of G.enemies) { e.alive = false; e.dying = 0; }
+    G.enemies.length = 0;
+    G.bossActive = false; G.smallKillsSinceBoss = 0;
+    /* 纪录 + 离线加成(写进 state, 随云存档同步) */
+    let best = 0, boost = 0, isNew = false;
+    try {
+      const st = state;
+      if (st) {
+        best = st.trialBest || 0;
+        if (kills > best) {
+          best = kills; isNew = true;
+          st.trialBest = best;
+          try { window.addJournal && window.addJournal({ key: 'trial-' + Date.now(), big: realmName(), kind: '试炼', title: '妖潮试炼', text: `妖潮退去, 此番斩妖 ${kills} 只, 刷新试炼纪录。` }); } catch (err) {}
+        }
+        boost = trialBoostFor(best);
+        if (boost > 0) {
+          st.trialBoost = Math.max(st.trialBoost || 0, boost);
+          st.trialBoostUntil = Math.max(st.trialBoostUntil || 0, Date.now() + 48*3600*1000);
+        }
+      }
+    } catch (err) { console.warn('[battle] 试炼结算写档失败', err); }
+    /* 结算面板 */
+    try {
+      const el = document.getElementById('trialModal');
+      if (el) {
+        document.getElementById('trialKillsN').textContent = kills;
+        document.getElementById('trialTierN').textContent = (BC.tier[G.trialTier] || BC.tier[1]).name;
+        document.getElementById('trialBestN').textContent = best + (isNew ? '（新纪录！）' : '');
+        const bEl = document.getElementById('trialBoostN');
+        bEl.textContent = boost > 0 ? `离线游历所得 +${Math.round(boost*100)}%（48 时辰内有效）` : '再接再厉，10 只起有加成';
+        el.classList.add('show');
+      }
+    } catch (err) {}
+    updateHUD();
+  }
+  function trialRestart() {
+    document.getElementById('trialModal') && document.getElementById('trialModal').classList.remove('show');
+    G.trialT = BC.trialSecs; G.trialKills = 0; G.tierKills = 0; G.trialTier = 1;
+    G.trialSettled = false; G.trialRound++; G.trialBossDone = false;
+    G.paused = false;
+    updateHUD();
+  }
+  function realmName() { try { return (typeof window.realm === 'function' && window.realm().big) || ''; } catch (err) { return ''; } }
   function update(dt) {
     if (G.speedMultTimer > 0) {
       G.speedMultTimer -= dt;
@@ -995,11 +1094,14 @@ import { SND } from './10-base.js';
     }
     const sdt = dt * G.speedMult;
     G.t += sdt;
+    /* v3.9 试炼倒计时: 原始 dt —— 计时器与倍速分离, 倍速只加战斗节奏不加轮时 */
+    updateTrial(dt);
     const aliveEnemies = G.enemies.filter(e => e.alive && e.dying<=0);
     const newState = aliveEnemies.length > 0 ? 'fight' : 'walk';
     if (newState !== G.state) { G.state = newState; updateHUD(); }
     G.spawnT -= sdt;
-    if (G.spawnT <= 0) { spawnWave(); G.spawnT = BC.spawnInterval; }
+    if (G.trialSettled) { G.spawnT = BC.spawnInterval; }   /* 结算面板期间停刷怪 */
+    else if (G.spawnT <= 0) { spawnWave(); G.spawnT = BC.spawnInterval; }
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
     _pushT -= dt;
     if (_pushT <= 0) { _pushT = 5; if (typeof window.pushBattleStats === 'function') window.pushBattleStats(); }
@@ -1767,6 +1869,7 @@ import { SND } from './10-base.js';
     const speedEl = document.getElementById('battleSpeed');
     const stateEl = document.getElementById('battleState');
     const spEl = document.getElementById('battleSpirit');
+    const trEl = document.getElementById('battleTrial');
     if (killsEl) killsEl.textContent = G.kills;
     if (spEl) spEl.textContent = fmtNum(G.spirit);
     if (speedEl) {
@@ -1774,6 +1877,16 @@ import { SND } from './10-base.js';
       else speedEl.style.display = 'none';
     }
     if (stateEl) stateEl.textContent = G.state === 'fight' ? '战斗中' : '推进中';
+    /* v3.9 试炼 HUD: 倒计时+档位; 有离线加成时点亮 */
+    if (trEl) {
+      const td = BC.tier[G.trialTier] || BC.tier[1];
+      const m = Math.floor(G.trialT / 60), s = Math.floor(G.trialT % 60);
+      trEl.textContent = `妖潮·${td.name} ${m}:${s < 10 ? '0' : ''}${s}`;
+      try {
+        if (state && state.trialBoost > 0 && (state.trialBoostUntil || 0) > Date.now()) trEl.classList.add('boosted');
+        else trEl.classList.remove('boosted');
+      } catch (err) {}
+    }
   }
 
   /* v2.6 PERF: ① 30fps 限帧(素材24fps, 高刷屏不再全速空转省电) ② 暂停放泵 —— G.paused 时不再空转 rAF, 由 BattleAPI.resume 重启

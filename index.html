@@ -125,6 +125,9 @@
   .battle-hud{position:absolute;left:0;right:0;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:3px 10px;font-size:10px;color:#c8d4e8;pointer-events:none !important;text-shadow:0 1px 3px rgba(0,0,0,.8)}
   .battle-hud .kills{color:#e8c56b;font-weight:700}
   .battle-hud .speed{color:#ff8a4a;font-weight:700}
+  /* v3.9 妖潮试炼 HUD: 倒计时+波次档位; boosted=离线加成生效中(金光) */
+  .battle-hud .trial{color:#9fd0ff;font-weight:700}
+  .battle-hud .trial.boosted{color:#ffd76b;text-shadow:0 0 6px rgba(255,215,107,.55)}
 
   /* 战斗区UI图标层：大图标(地板右下) + 小图标(右上角) */
   .battle-ui{position:fixed;left:0;right:0;top:92px;bottom:calc(44vh + 84px);z-index:4;pointer-events:none}
@@ -314,6 +317,11 @@
   #skillModal #skillBody{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
   .story-card h3{margin-bottom:3px}
   .story-tip{font-size:10.5px;color:var(--dim);margin-bottom:4px;line-height:1.6}
+  /* v3.9 妖潮试炼结算卡: 自适应高度 + 战报行 */
+  #trialModal .story-card{height:auto;min-height:0;max-height:min(88vh,780px)}
+  .trial-rows{margin:10px 0 6px}
+  .trial-rows .off-row b{margin-left:auto}
+  .trial-tip{font-size:10.5px;color:var(--dim);line-height:1.7;margin-bottom:6px}
   .chips-row{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
   .chips-row::-webkit-scrollbar{display:none}
   .chip{flex:none;font-size:10.5px;padding:4px 10px;border-radius:999px;border:1px solid rgba(232,197,107,.28);
@@ -544,6 +552,7 @@
   <div class="battle-hud">
     <span class="kills">击杀 <b id="battleKills">0</b></span>
     <span class="kills">灵石 <b id="battleSpirit">0</b></span>
+    <span class="trial" id="battleTrial">妖潮·妖群 2:00</span>
     <span class="speed" id="battleSpeed" style="display:none">×2 倍速</span>
     <span id="battleState">推进中</span>
   </div>
@@ -601,6 +610,21 @@
 </div>
 
 <div class="realm-up" id="realmUp"><div class="t" id="realmUpT">筑基</div><div class="s">天人感应 · 修为暴涨</div></div>
+
+<!-- v3.9 妖潮试炼结算: 120秒一轮, 击杀数→纪录→离线游历收益加成 -->
+<div class="modal" id="trialModal">
+  <div class="card story-card">
+    <div class="mhead"><h3>妖潮退去<i>TRIAL SETTLED</i></h3><button class="xbtn" onclick="BattleAPI && BattleAPI.trialRestart()">✕</button></div>
+    <div class="trial-rows">
+      <div class="off-row"><span class="ol">本轮斩妖</span><b class="ov" id="trialKillsN">0</b></div>
+      <div class="off-row"><span class="ol">战至波次</span><b class="ov" id="trialTierN">妖群</b></div>
+      <div class="off-row"><span class="ol">试炼纪录</span><b class="ov jade" id="trialBestN">0</b></div>
+      <div class="off-row"><span class="ol">离线补偿</span><b class="ov" id="trialBoostN">—</b></div>
+    </div>
+    <div class="trial-tip">纪录越高，化身离线游历所得越丰。身法倍速不缩轮时 —— 运气好，刷得多。</div>
+    <div class="cta"><button onclick="BattleAPI && BattleAPI.trialRestart()">再战一轮</button></div>
+  </div>
+</div>
 
 <div class="modal" id="offlineModal">
   <div class="card story-card">

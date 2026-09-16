@@ -125,6 +125,10 @@ function adopt(s) {
   if (!s.pills || typeof s.pills !== "object") s.pills = {};
   if (!Array.isArray(s.buffs)) s.buffs = [];
   s.offlineBoostUntil = Math.max(0, fin(s.offlineBoostUntil, 0));
+  /* v3.9 妖潮试炼: 纪录 + 离线收益加成(120s 击杀纪录 → 补偿档位) */
+  s.trialBest = Math.max(0, Math.floor(fin(s.trialBest, 0)));
+  s.trialBoost = Math.min(.5, Math.max(0, fin(s.trialBoost, 0)));
+  s.trialBoostUntil = Math.max(0, fin(s.trialBoostUntil, 0));
   if (!s.travel || typeof s.travel !== "object") s.travel = null;
   /* v1.8.5 化身行囊: 信匣满后由服务端 stayTravel 攒进 travel.bag。
    * adopt 是白名单式的"规整"而非深拷贝原样保留 —— 显式归一 bag/bagPages,
