@@ -388,10 +388,10 @@
     "assets/ui_icons/icon_story.webp": "92ff84146f80a3d7f9a6479c477113caf2e4017ffe10767dd866be4ea378c003",
     "assets/ui_icons/icon_treasure.webp": "fe0b83d8ece23ab09b23a013e18299de7335ba1917666a7970726e00b7eb7e17",
     "bg.js": "bc746c574ededb93cd6cee342c05924b0d4ccb3911bb32fe24895bdfb0f4e4e9",
-    "dt-theme.css": "a1d592fb83e13d9fa65c219a3c0ce861e1461f48f0b31b86c176525990f639a7",
+    "dt-theme.css": "9bfd9aa7924cdb5483f295a3ec92828b152a3f2572ffed68579614e8cb7749f1",
     "fx2d.js": "f1da1174d9b8d1c399b4be6257f68aae36d7d8d56986481b015ad60ec73c5de0",
     "game.js": "9754940a93231e14afc252557041836597a525a0c9c458498fbf564343e4e717",
-    "index.html": "a17a47d136a1715a35e12daab71c9f8261110afb40285bc158c0226ba646d3a9",
+    "index.html": "c8dfcee8065fe494b28eb0a5b8fb655e184e30e9f034a018aa91a4894dce415b",
     "src/00-pure.js": "f5cb4acb0ebcc74eee7cd3024fe08d777290ffc943f994587348a9c57983ecbe",
     "src/10-base.js": "947eb2de509fc7eb6dba8fe5740021314ccfca7347f41d968717770a3644eed3",
     "src/20-core.js": "801d09ca8fe1680044620e85c03f5cb757a6569178f96022e28c92629f8eccba",
@@ -401,6 +401,6 @@
     "src/60-stage.js": "58e1ee5df0b972d4271ca676e65622fee3544b9ab6f226ef3f8ffaa16205ae47",
     "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
   },
-  "rev": "4ef9e4bd2097aa67",
+  "rev": "5f7ed3784ce4c1fd",
   "version": "3.5"
 }
