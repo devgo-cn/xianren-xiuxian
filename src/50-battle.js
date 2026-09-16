@@ -744,8 +744,14 @@ import { SND } from './10-base.js';
       const targetX = near.x - p.atkRange*0.85;
       p.x += Math.sign(targetX-p.x)*Math.min(Math.abs(targetX-p.x), BC.playerSpeed*1.5*dt);
     } else {
-      /* 无怪，向前推进 */
+      /* v3.8.1 无怪(攻击视野内)时向前推进 —— 防穿越: 玩家若从站位怪身上走过,
+       * 怪会留在玩家左侧(面朝左)永远"对着空气咬"。推进不许越过本道任何活怪。 */
       p.moving = 1; p.walkT += dt*8; p.x += BC.playerSpeed*dt;
+      let nearest = Infinity;
+      for (const e of G.enemies) {
+        if (e.alive && e.dying <= 0 && e.lane === p.lane && e.x > p.x - 1 && e.x < nearest) nearest = e.x;
+      }
+      if (nearest < Infinity) p.x = Math.min(p.x, nearest - p.atkRange*0.5);
     }
   }
   function updatePets(dt) {
@@ -888,6 +894,12 @@ import { SND } from './10-base.js';
         prevX = Math.max(e.x, stopX);
       }
     }
+    /* v3.8.1 防交错兜底: 排队目标 stopX 恒在玩家右侧, 发现怪被留在 stopX 左侧
+     * (玩家推进/移动曾可穿过站位怪)直接拉回站位 —— 杜绝"跑到玩家后面咬空气"。 */
+    for (const e of G.enemies) {
+      if (!e.alive || e.dying > 0 || e.stopX == null) continue;
+      if (e.x < e.stopX - 4) e.x = e.stopX;
+    }
     for (const e of G.enemies) {
       if (e.dying>0) { e.dying-=dt; if (e.armature) advanceRatty(e, dt, true); continue; }
       if (!e.alive) continue;
@@ -1001,9 +1013,9 @@ import { SND } from './10-base.js';
   const LANES = 3;
   function laneGap() { return CH * 0.09; }
   function laneOff(lane) { return -(LANES - 1 - lane) * laneGap(); }
-  /* 纵深缩放: 越远的道越小一档(0.88/0.94/1.0), 强化三车道空间感 */
-  /* v3.8 纵深差加大: 0.88/0.94/1.0 肉眼难辨, 改 0.80/0.90/1.0 —— 远道明显更小更远 */
-  function laneScale(lane) { return 1 - (LANES - 1 - lane) * 0.10; }
+  /* 纵深缩放: 越远的道越小一档, 强化三车道空间感 */
+  /* v3.8.1 层次感回调: 0.10 差距过大(0.80/0.90/1.0 模型大小悬殊), 收敛到 0.86/0.93/1.0 */
+  function laneScale(lane) { return 1 - (LANES - 1 - lane) * 0.07; }
   /* v3.7.1 素材实化: 部分序列帧素材的像素 alpha 不满(实测玩家表均值仅 ~219),
    * 黑底时代看不出来, 换亮背景后角色透出背景纹理。加载时一次性处理:
    * alpha≥200 拉满 255, 30~200 线性拉伸保留软边防锯齿, <30 不动(淡出边缘)。
@@ -1451,7 +1463,7 @@ import { SND } from './10-base.js';
          * 落地对齐用当前姿态 AABB 底边中心 —— 任何动画下脚底都踩地板。素材面朝左, 与其它怪一致不翻转。
          * v3.6.1 调参: 基准高 76→56(Ratty 无帧留白, 同基准下视觉比史莱姆大半档); 素材色彩
          * 偏亮偏饱和, 整体 saturate(0.85)+brightness(0.93) 轻压融入夜色(0.72/0.85 灰暗感像半透, 已回调), 受击白闪保留。 */
-        const drawH = Math.min(CH * 0.5, 56) * (e.elite ? 1.28 : 1) * laneScale(e.lane);
+        const drawH = Math.min(CH * 0.5, 48) * (e.elite ? 1.28 : 1) * laneScale(e.lane);   /* v3.8.1 鼠妖再缩: 56→48 */
         const s = drawH / Math.max(1, RATTY.baseH || 100);
         const bb = window.CanvasDragonBones.armatureAABB(e.armature);
         ctx.save();
