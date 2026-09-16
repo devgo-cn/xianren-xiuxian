@@ -21,14 +21,26 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     spawnInterval: 2.6, enemySpawnOffset: 40, maxAlive: 9, queueGap: 34,   /* v3.8.2 刷怪降密: 1.0s/只→2.6s/只, 同屏 14→9 —— 站桩硬撸改推进节奏 */
     enemies: {
       /* hpK/atkK/defK: 按玩家境界(lv)线性成长 —— 怪只随境界长, 玩家随境界+装备长, 换装即提速。
-       * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。 */
+       * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。
+       * v3.9 骨骼怪批量接入: bone=BONES slug, drawH=游戏内显示高(px, 素材分辨率无关)。 */
+      /* ---- T1 妖群 ---- */
       slime: { name:'妖卒', role:'melee', w:60, atkRange:30, speed:120, hpK:1.0, atkK:0.55, defK:0.35, color:'#6fe0a8', tier:1 },
+      jiangshi: { name:'僵尸', role:'melee', w:40, atkRange:32, speed:95, hpK:1.15, atkK:0.6, defK:0.4, color:'#b9d0a8', bone:'jiangshi', drawH:50, hpBarW:30, tier:1 },
+      slime_flynn: { name:'弗林', role:'melee', w:35, atkRange:28, speed:110, hpK:0.85, atkK:0.5, defK:0.25, color:'#8fe8c0', bone:'slime_flynn', drawH:38, hpBarW:26, tier:1 },
+      /* ---- T2 妖锐 ---- */
+      rat:   { name:'鼠妖', role:'melee', w:35, atkRange:32, speed:150, hpK:0.8, atkK:0.5, defK:0.25, color:'#c9b28f', bone:'ratty', drawH:42, tier:2 },
+      fox:   { name:'妖狐', role:'melee', w:32, atkRange:30, speed:165, hpK:0.85, atkK:0.62, defK:0.28, color:'#e8a86b', bone:'fox', drawH:44, hpBarW:28, tier:2 },
+      bee:   { name:'蜂妖', role:'melee', w:28, atkRange:26, speed:175, hpK:0.55, atkK:0.55, defK:0.15, color:'#e8d06b', bone:'bee', drawH:30, hpBarW:24, tier:2 },
+      /* ---- T3 妖将 ---- */
       water: { name:'水灵', role:'melee', w:40, atkRange:35, speed:80,  hpK:1.6, atkK:0.75, defK:0.60, color:'#6fd0e8', tier:3 },
-      /* v3.6 骨骼怪: 鼠妖 —— DragonBones 骨骼动画(assets/db/)经 Canvas2D 桥实时渲染,
-       * 与序列帧怪并存。bone 字段 = 骨架名(Ratty 包内 armature 名), 有 bone 字段即走骨骼管线。 */
-      rat:   { name:'鼠妖', role:'melee', w:35, atkRange:32, speed:150, hpK:0.8, atkK:0.5, defK:0.25, color:'#c9b28f', bone:'Ratty', tier:2 },
-      /* v2.6 调参: hpK 80→52(实测过厚约-35%), atkRange 70→45(玩家攻距75, 贴身才能互殴, 修复"剑够不到") */
-      boss:  { name:'史莱姆王', role:'ranged', w:5,  atkRange:45, speed:40, hpK:52, atkK:3.0, defK:3.0, color:'#a0ff80', isBoss:true, floatHeight:10, sizeMult:2.0, tier:5 },
+      wolf:  { name:'狼妖', role:'melee', w:36, atkRange:34, speed:150, hpK:1.35, atkK:0.85, defK:0.5, color:'#9aa8c0', bone:'wolf', drawH:46, hpBarW:30, tier:3 },
+      cultist_mage: { name:'邪修', role:'melee', w:34, atkRange:38, speed:90, hpK:1.5, atkK:0.95, defK:0.5, color:'#b08ae0', bone:'cultist_mage', drawH:50, hpBarW:30, tier:3 },
+      /* ---- T4 妖王 ---- */
+      hellhound_garm: { name:'狱犬', role:'melee', w:40, atkRange:36, speed:175, hpK:2.1, atkK:1.1, defK:0.75, color:'#c06a5a', bone:'hellhound_garm', drawH:54, hpBarW:34, tier:4 },
+      black_ant_queen: { name:'蚁后', role:'melee', w:42, atkRange:36, speed:85, hpK:2.8, atkK:1.0, defK:1.0, color:'#7a6ae0', bone:'black_ant_queen', drawH:58, hpBarW:36, tier:4 },
+      /* v2.6 调参: hpK 80→52(实测过厚约-35%), atkRange 70→45(玩家攻距75, 贴身才能互殴, 修复"剑够不到")
+       * v3.9 BOSS 换九尾狐王: giant_kitsune(S 品质, 10 种攻击动作), 骨骼渲染 drawH 110 */
+      boss:  { name:'九尾狐王', role:'ranged', w:5,  atkRange:45, speed:40, hpK:52, atkK:3.0, defK:3.0, color:'#e8b06b', isBoss:true, floatHeight:10, sizeMult:2.0, tier:5, bone:'giant_kitsune', drawH:110, hpBarW:60 },
     },
     /* v3.9 怪物三维系统: 怪包统一池(每个境界都会刷到全怪种), 三维 = 境界基准 × 怪种K × 波次tier倍率。
      * 波次内从 T1 最弱一路递进到 T5 —— tier 决定刷怪池权重与三维倍率。 */
@@ -106,34 +118,66 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   hengsaoImg.src = 'assets/skill_hengsao_sheet.webp';
 
   /* ---------- 骨骼怪(DragonBones → Canvas2D 桥) ----------
-   * Ratty 骨骼包(_ske.json + _tex.json + _tex.png)预构建一个工厂,
-   * 每只鼠妖 makeEnemy 时 buildArmature 出独立骨架实例(动画互不干扰)。
-   * 桥/UMD 由 index.html 以经典脚本先于模块加载 —— 失败则鼠妖自动走兜底占位渲染。 */
-  const RATTY = { ready:false, factory:null, anims:{}, baseH:0, armName:'Ratty' };
-  (function loadRatty() {
-    if (!window.CanvasDragonBones) { console.warn('[battle] CanvasDragonBones 未加载, 鼠妖走兜底渲染'); return; }
-    const img = new Image();
-    let ske = null, tex = null;
-    const tryBuild = () => {
-      if (!ske || !tex || !img.naturalWidth || RATTY.ready) return;
-      try {
-        RATTY.factory = window.CanvasDragonBones.buildFactory(ske, tex, img);
-        /* 探针骨架: 确认动画齐备 + 记录 idle 姿态的基准高度(渲染缩放用, 避免动画间呼吸式缩放) */
-        const probe = RATTY.factory.buildArmature(RATTY.armName);
-        const A = probe.animation;
-        for (const n of ['idle','dead','attack','hurt','walk']) RATTY.anims[n] = A.hasAnimation(n);
-        const bb = window.CanvasDragonBones.armatureAABB(probe);
-        RATTY.baseH = Math.max(1, bb.maxY - bb.minY);
-        probe.dispose();
-        RATTY.ready = true;
-        console.log('[battle] 鼠妖骨骼工厂就绪 baseH=' + RATTY.baseH.toFixed(1) + ' anims=' + JSON.stringify(RATTY.anims));
-      } catch (err) { console.error('[battle] Ratty 骨骼工厂构建失败', err); }
+   * v3.9 BONES 注册表: 按 assets/db/monsters/index.json 按需加载怪工厂 ——
+   * 每怪 {ske.json, tex.json, tex.webp} 预构建一个 factory, makeEnemy 时 buildArmature
+   * 出独立骨架实例(动画互不干扰)。ratty 是老素材路径特例(assets/db/ratty_*),
+   * 新怪全部走 monsters/<slug>/。桥/UMD 由 index.html 以经典脚本先于模块加载,
+   * 失败则骨骼怪自动走兜底占位渲染。
+   * animMap: index.json 动画名(Attack A/Damage/Idle...) → 状态机五态(idle/hurt/attack/walk/dead),
+   * 缺态自动回退(idle→attack, dead→damage, walk→idle), 保证 fadeIn 永远有动画可切。 */
+  const BONES = {};   /* slug -> {ready, factory, anims:{idle,hurt,attack,walk,dead}, baseH, arm} */
+  function boneAnimMap(list) {
+    const low = (list || []).map(a => String(a).toLowerCase());
+    const pick = (cands) => {
+      for (const c of cands) { const i = low.findIndex(a => a.includes(c)); if (i >= 0) return list[i]; }
+      return null;
     };
-    fetch('assets/db/ratty_ske.json').then(r => r.json()).then(j => { ske = j; tryBuild(); }).catch(err => console.error('[battle] ratty_ske 加载失败', err));
-    fetch('assets/db/ratty_tex.json').then(r => r.json()).then(j => { tex = j; tryBuild(); }).catch(err => console.error('[battle] ratty_tex 加载失败', err));
+    const idle = pick(['idle']);
+    const hurt = pick(['damage', 'hurt']) || idle;
+    const attack = pick(['attack']) || idle;
+    const walk = pick(['walk']) || idle;
+    const dead = pick(['dead', 'die']) || hurt;
+    const skill = pick(['skill']) || attack;
+    return { idle, hurt, attack, walk, dead, skill };
+  }
+  function loadBone(slug, urls, armName, animList, onReady) {
+    if (!window.CanvasDragonBones || BONES[slug]) return;
+    const B = BONES[slug] = { ready:false, factory:null, anims:boneAnimMap(animList), baseH:0, arm:armName };
+    let ske = null, tex = null;
+    const img = new Image();
+    const tryBuild = () => {
+      if (!ske || !tex || !img.naturalWidth || B.ready) return;
+      try {
+        B.factory = window.CanvasDragonBones.buildFactory(ske, tex, img);
+        const probe = B.factory.buildArmature(armName);
+        const bb = window.CanvasDragonBones.armatureAABB(probe);
+        B.baseH = Math.max(1, bb.maxY - bb.minY);
+        probe.dispose();
+        B.ready = true;
+        console.log('[battle] 骨骼怪就绪 ' + slug + ' baseH=' + B.baseH.toFixed(1));
+        if (onReady) onReady();
+      } catch (err) { console.error('[battle] ' + slug + ' 骨骼工厂构建失败', err); }
+    };
+    fetch(urls.ske).then(r => r.json()).then(j => { ske = j; tryBuild(); }).catch(err => console.error('[battle] ' + slug + ' ske 加载失败', err));
+    fetch(urls.tex).then(r => r.json()).then(j => { tex = j; tryBuild(); }).catch(err => console.error('[battle] ' + slug + ' tex 加载失败', err));
     img.onload = tryBuild;
-    img.src = 'assets/db/ratty_tex.png';
+    img.src = urls.img;
+  }
+  /* 按需加载清单: BC.enemies 中带 bone 字段的怪(ratty 老路径特例) */
+  (function loadBones() {
+    if (!window.CanvasDragonBones) { console.warn('[battle] CanvasDragonBones 未加载, 骨骼怪走兜底渲染'); return; }
+    loadBone('ratty', { ske:'assets/db/ratty_ske.json', tex:'assets/db/ratty_tex.json', img:'assets/db/ratty_tex.png' }, 'Ratty',
+      ['idle','dead','attack','hurt','walk']);
+    fetch('assets/db/monsters/index.json').then(r => r.json()).then(idx => {
+      const need = Object.values(BC.enemies).map(d => d.bone).filter(b => b && b !== 'ratty');
+      for (const slug of need) {
+        const cfg = idx[slug];
+        if (!cfg) { console.warn('[battle] index.json 缺怪:', slug); continue; }
+        loadBone(slug, { ske:`assets/db/monsters/${slug}/ske.json`, tex:`assets/db/monsters/${slug}/tex.json`, img:`assets/db/monsters/${slug}/tex.webp` }, cfg.armature, cfg.anims);
+      }
+    }).catch(err => console.error('[battle] monsters/index.json 加载失败', err));
   })();
+
 
   /* 音效加载 */
   const sfx = {
@@ -327,9 +371,14 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       tier:tierOverride||def.tier||1,
       atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2)*(elite?0.85:1), color:def.color,
       atkT:Math.random()*0.6, anim:0,hurtT:0,stun:0, alive:true,dying:0,reach:1, animFrame:0, animTimer:0, moving:false };
-    /* 骨骼怪: 工厂就绪时建一只独立骨架实例(每只怪动画独立推进) */
-    if (def.bone && RATTY.ready && def.bone === RATTY.armName) {
-      try { r.armature = RATTY.factory.buildArmature(def.bone); r.boneAnim = 'walk'; } catch (err) { console.error('[battle] buildArmature 失败', err); }
+    /* 骨骼怪: 工厂就绪时建一只独立骨架实例(每只怪动画独立推进)
+     * v3.9 BONES 注册表: def.bone = slug, cfg.arm = 包内骨架名 */
+    if (def.bone) {
+      const B = BONES[def.bone];
+      if (B && B.ready) {
+        try { r.armature = B.factory.buildArmature(B.arm); r.boneSlug = def.bone; r.boneAnim = 'walk'; }
+        catch (err) { console.error('[battle] buildArmature 失败', def.bone, err); }
+      }
     }
     return r;
   }
@@ -908,17 +957,21 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       if (p.atkBuffTimer <= 0) { p.atkBuff = 0; p.atkBuffTimer = 0; }
     }
   }
-  /* 骨骼怪动画状态机: 游戏状态(hurt/anim/moving/dying) → Ratty 动作, fadeIn 平滑过渡。
-   * playTimes=-1 走动画数据自带循环设置(循环动作无限循环, attack/hurt/dead 播一次定格)。 */
+  /* 骨骼怪动画状态机: 游戏状态(hurt/anim/moving/dying) → 动作, fadeIn 平滑过渡。
+   * playTimes=-1 走动画数据自带循环设置(循环动作无限循环, attack/hurt/dead 播一次定格)。
+   * v3.9 通用化: 动画名从 BONES[e.boneSlug].anims 查(加载时已归一化+回退), 永远有效。 */
   function advanceRatty(e, dt, dead) {
+    const B = BONES[e.boneSlug];
+    if (!B || !B.ready) return;
     const A = e.armature.animation;
-    let want = 'walk';
-    if (dead && RATTY.anims.dead) want = 'dead';
-    else if (e.hurtT > 0 && RATTY.anims.hurt) want = 'hurt';
-    else if (e.anim > 0 && RATTY.anims.attack) want = 'attack';
-    else if (!e.moving && RATTY.anims.idle) want = 'idle';
-    if (!A.hasAnimation(want)) want = 'walk';
-    if (e.boneAnim !== want) { e.boneAnim = want; A.fadeIn(want, 0.12, -1); }
+    const an = B.anims;
+    let want = an.walk;
+    if (dead) want = an.dead;
+    else if (e.hurtT > 0) want = an.hurt;
+    else if (e.anim > 0) want = an.attack;
+    else if (!e.moving) want = an.idle;
+    if (!want || !A.hasAnimation(want)) want = an.idle || an.walk;
+    if (want && e.boneAnim !== want) { e.boneAnim = want; A.fadeIn(want, 0.12, -1); }
     e.armature.advanceTime(dt);
   }
   function updateEnemies(dt) {
@@ -1462,6 +1515,27 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       if (laneFilter && !laneFilter(e)) continue;
       if (!e.alive && e.dying <= 0) continue;
       const sx = worldToScreen(e.x); const sy = floorY() + e.y;   /* v3.7: 怪站自己的车道 */
+      /* v3.9 通用骨骼怪分支(链最前): 所有带 armature 的怪 —— 鼠妖/僵尸/妖狐/…/骨骼BOSS 统一走这。
+       * 体型缩放用 idle 基准高(BONES.baseH 建厂时测定, 避免动画间呼吸式缩放);
+       * 落地对齐用当前姿态 AABB 底边中心; drawH/血条宽 per-怪配置(素材分辨率无关)。 */
+      if (e.armature && e.boneSlug && BONES[e.boneSlug] && BONES[e.boneSlug].ready) {
+        const B = BONES[e.boneSlug];
+        const def = BC.enemies[e.type] || {};
+        const cap = def.isBoss ? CH * 0.7 : CH * 0.5;
+        const drawH = Math.min(cap, def.drawH || 42) * (def.isBoss ? 1 : (e.elite ? 1.28 : 1)) * laneScale(e.lane);
+        const s = drawH / Math.max(1, B.baseH || 100);
+        const bb = window.CanvasDragonBones.armatureAABB(e.armature);
+        ctx.save();
+        ctx.translate(sx, sy);
+        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
+        ctx.filter = e.hurtT > 0 ? 'saturate(0.85) brightness(1.8)' : 'saturate(0.85) brightness(0.93)';
+        ctx.scale(s, s);
+        ctx.translate(-(bb.minX + bb.maxX) / 2, -bb.maxY);
+        window.CanvasDragonBones.drawArmature(ctx, e.armature);
+        ctx.restore();
+        if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
+        if (e.alive) drawHpBar(sx, sy - drawH - 4, def.hpBarW || 28, e.hp, e.maxHp, true);
+      }
       /* 史莱姆真实 sprite 渲染 */
       if (G.slimeReady && G.slimeSprite && e.type === 'slime') {
         /* 根据状态选择帧 */
@@ -1570,27 +1644,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         ctx.restore();
         /* BOSS血条在头顶, 右移对齐头部 */
         if (e.alive) drawHpBar(sx + drawW*0.2, sy - floatY - drawH - 8, 50, e.hp, e.maxHp, true);
-      } else if (e.type === 'rat' && e.armature && window.CanvasDragonBones) {
-        /* v3.6 骨骼怪(鼠妖): DragonBones→Canvas2D 桥实时渲染, 非序列帧。
-         * 体型缩放用 idle 基准高度(RATTY.baseH, 建工厂时测定) —— 避免不同姿态 AABB 高度变化导致呼吸式缩放;
-         * 落地对齐用当前姿态 AABB 底边中心 —— 任何动画下脚底都踩地板。素材面朝左, 与其它怪一致不翻转。
-         * v3.6.1 调参: 基准高 76→56(Ratty 无帧留白, 同基准下视觉比史莱姆大半档); 素材色彩
-         * 偏亮偏饱和, 整体 saturate(0.85)+brightness(0.93) 轻压融入夜色(0.72/0.85 灰暗感像半透, 已回调), 受击白闪保留。 */
-        const drawH = Math.min(CH * 0.5, 42) * (e.elite ? 1.28 : 1) * laneScale(e.lane);   /* v3.8.2 鼠妖整体再缩: 48→42(ctx.scale等比, 宽高一起小) */
-        const s = drawH / Math.max(1, RATTY.baseH || 100);
-        const bb = window.CanvasDragonBones.armatureAABB(e.armature);
-        ctx.save();
-        ctx.translate(sx, sy);
-        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
-        ctx.filter = e.hurtT > 0 ? 'saturate(0.85) brightness(1.8)' : 'saturate(0.85) brightness(0.93)';
-        ctx.scale(s, s);
-        ctx.translate(-(bb.minX + bb.maxX) / 2, -bb.maxY);
-        window.CanvasDragonBones.drawArmature(ctx, e.armature);
-        ctx.restore();
-        if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
-        if (e.alive) drawHpBar(sx, sy - drawH - 4, 28, e.hp, e.maxHp, true);
-      } else {
-        /* 素材未就绪时的兜底占位(正常不会走到这里) */
+      } else if (!(e.armature && e.boneSlug && BONES[e.boneSlug] && BONES[e.boneSlug].ready)) {
+        /* 素材未就绪时的兜底占位(骨骼怪工厂未就绪/序列帧怪素材缺失) —— 已由通用骨骼分支画过的不再进这里 */
         ctx.save(); ctx.translate(sx, sy);
         if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
         if (e.hurtT > 0) { ctx.globalAlpha *= 0.6; ctx.filter = 'brightness(2)'; }
