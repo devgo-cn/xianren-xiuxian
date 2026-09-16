@@ -497,7 +497,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const px = Math.round((CW || 1200) * 0.25);
     const e = G && G.enemies && LAB ? G.enemies.find(x => x.boneSlug === LAB.slug && x.alive) : null;
     const r = e ? Number(e.atkRange) || 100 : 100;
-    return { px, ex: px + r, floor: floorY() + laneOff(1) };
+    return { px, ex: px + r, floor: floorY() + laneOff(MID_LANE) };
   }
   function labClearEnemies() {
     /* 标定台必须真空清场 —— 只置 alive=false 是不够的：labActive 时
@@ -517,7 +517,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     labClearEnemies();
     const e = makeBoneEnemy(wantSlug, LAB.opts.tier || 1);
     e.elite = false;
-    e.lane = 1; e.y = laneOff(1);
+    e.lane = MID_LANE; e.y = laneOff(MID_LANE);
     G.enemies.push(e);
     return e;
   }
@@ -551,7 +551,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     G.player.x = Math.round((CW || 1200) * 0.25);   /* 玩家钉在左 1/4 */
     /* 全部同一条道 —— 敌人开火条件是 e.lane === p.lane（见 updateEnemies），
      * 分道摆放会导致 3 道里只有 1 只够得着玩家，其余压根不开火。 */
-    G.player.lane = 1; G.player.y = laneOff(1);
+    G.player.lane = MID_LANE; G.player.y = laneOff(MID_LANE);
     G.player.hp = G.player.maxHp = 9e6;
     G.player.atk = 0;                      /* 玩家不还手，怪不会被打死 */
     /* 玩家也必须冻住：正常逻辑里玩家会被推着走、怪追着走，
@@ -570,10 +570,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       e.elite = false;
       /* 玩家同道 —— 敌人开火条件是 e.lane === p.lane（见 updateEnemies），
        * 分道摆放会导致 3 道里只有 1 只够得着玩家，其余压根不开火。 */
-      e.lane = 1;
+      e.lane = MID_LANE;
       /* y 上按序号错开：全部同道会叠成一个人形粽。错开量刻意压在半个身位内，
        * 视觉上仍是"站在玩家正前方一排"，但每只都能看清轮廓。 */
-      e.y = laneOff(1) + (i - (list.length - 1) / 2) * (laneGap() * 0.42);
+      e.y = laneOff(MID_LANE) + (i - (list.length - 1) / 2) * (laneGap() * 0.42);
       /* x 必须严格落在各自的 atkRange 上 —— 开火门限是 |e.x - p.x| <= atkRange + 5，
        * 多推 6px 就会让后面几只永远够不着（首版验收台踩到的坑，表现为
        * 只有第 0 只开火、其余 atkT 一路负下去）。 */
@@ -615,7 +615,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     window.RANGE_LAB = true;
     G.paused = false;                 /* 仿真要跑逻辑，暂停只在 stage 层拦 */
     if (!G.player) { G.player = makePlayer(); }
-    G.player.lane = 1; G.player.y = laneOff(1);
+    G.player.lane = MID_LANE; G.player.y = laneOff(MID_LANE);
     G.player.hp = G.player.maxHp = 99999;
     G.player.atk = 0;                 /* 玩家不还手，怪不会被秒 */
     G.player.atkRange = Number(opts.playerAtkRange) || 75;
@@ -643,7 +643,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const wScreen = s * (bb.maxX - bb.minX);
     const hScreen = s * (bb.maxY - bb.minY);
     const leftEdge = L.ex - wScreen / 2;
-    const pHalf = Math.min(CH * 0.5, 72) * laneScale(1) * (SPRITE.fw / SPRITE.fh) / 2;
+    const pHalf = Math.min(CH * 0.5, 72) * laneScale(MID_LANE) * (SPRITE.fw / SPRITE.fh) / 2;
     const playerLeft = L.px - pHalf;
     const playerRight = L.px + pHalf;
     return {
@@ -657,7 +657,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       playerLeft: Math.round(playerLeft), playerRight: Math.round(playerRight),
       /* 躯干左缘 相对 玩家右缘 的余量：>0 = 没压到玩家 */
       clear: Math.round(leftEdge - playerRight),
-      collide: !!(e.lane === G.player.lane && Math.abs(L.ex - L.px) <= e.atkRange + 5),
+      collide: !!(Math.abs(laneAt(e.y) - laneAt(G.player.y)) <= 1 && Math.abs(L.ex - L.px) <= e.atkRange + 5),
       anims: Object.keys(B.anims).filter(k => B.anims[k]),
       rawAnims: B.rawAnims || [],
       curAnim: LAB.anim,
@@ -681,7 +681,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     return { drawH, s: drawH / Math.max(1, B.baseH || 100) };
   }
   function labPlayerHalf() {
-    return Math.min(CH * 0.5, 72) * laneScale(1) * (SPRITE.fw / SPRITE.fh) / 2;
+    return Math.min(CH * 0.5, 72) * laneScale(MID_LANE) * (SPRITE.fw / SPRITE.fh) / 2;
   }
   /* 摆到指定动画的指定时刻。
    * 关键：必须用 fadeIn 而不是 play —— DragonBones 里 play() 只重置动画对象，
@@ -932,7 +932,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   };
 
   function makePlayer() {
-    return { x:0,y:laneOff(1), lane:1, hp:PST.hp,maxHp:PST.hp, atk:PST.atk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0,stun:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false, attackTarget:null, hit1:false, hit2:false, hit3:false, sanlianTriggered:false, atkBuff:0, atkBuffTimer:0, skillAnim:false, skillFrame:0, skillTimer:0, skillHit:false, skillCooldown:0, skillTarget:null };
+    return { x:0,y:laneOff(MID_LANE), lane:MID_LANE, hp:PST.hp,maxHp:PST.hp, atk:PST.atk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0,stun:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false, attackTarget:null, hit1:false, hit2:false, hit3:false, sanlianTriggered:false, atkBuff:0, atkBuffTimer:0, skillAnim:false, skillFrame:0, skillTimer:0, skillHit:false, skillCooldown:0, skillTarget:null };
   }
   /* 怪物成长系统: 三围随玩家境界 lv 线性成长(怪只吃境界, 不吃装备 → 换装备=变快)。
    * v3.9 三维系统: 三围 = 境界基准 × 怪种hpK/atkK/defK × 波次tier倍率 ——
@@ -948,7 +948,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     let atk = Math.round((8 + 5*lv)   * def.atkK * mul);
     const dfn = Math.round((2 + 2*lv)   * def.defK * mul);
     if (elite) { hp = Math.round(hp*DROP.eliteHp); atk = Math.round(atk*1.2); }
-    const lane = (Math.random() * LANES) | 0;   /* v3.7: 三车道随机刷怪 */
+    const lane = Math.random();   /* v5.0: 纵深比例 0~1 连续随机(无道) */
     /* v4.6 全局减速旋钮: window.__enemySpeedMul(默认 1) 统一作用于所有怪的移速 ——
      * 走这条构造路径的怪(手配 + 骨骼池)全都会吃到, 调试时改一个数即可。 */
     const spdMul = (typeof window !== 'undefined' && window.__enemySpeedMul) || 1;
@@ -1112,7 +1112,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       const e = makeEnemy('boss');
       e.x = G.camX + stageW() + BC.enemySpawnOffset;
       e.elite = true;  /* BOSS标记为精英 */
-      e.lane = 1; e.y = laneOff(1);   /* BOSS 固定中道, 突出存在感 */
+      e.lane = MID_LANE; e.y = laneOff(MID_LANE);   /* BOSS 固定中道, 突出存在感 */
       G.enemies.push(e);
       G.bossActive = true;
       G.smallKillsSinceBoss = 0;
@@ -1456,8 +1456,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       for (const o of G.enemies) {
         if (hit >= n) break;
         if (o === target || !o.alive || o.dying > 0) continue;
-        /* v3.7.2 三车道: 剑气只扫玩家本道, 扫程与特效一致(起手前20px~扫末230px); 原按全场x距离跨道波及 */
-        if (o.lane !== p.lane) continue;
+        /* v5.0 剑气横扫改二维: 纵向允许半格(约一个身位)以内的怪被波及,
+         * 越界的仍不扫 —— 保留"横扫是横向范围技"的定位, 但不再是同道硬限制。 */
+        if (Math.abs(laneAt(o.y) - laneAt(p.y)) > 1.2) continue;
         if (o.x < p.x - 20 || o.x > p.x + 230) continue;
         dealDamage(o, calcDmg(PST.atk, base*(hs.dmg||0)/100, o.def, pen), '#ffc98a', false);
         hit++;
@@ -1477,6 +1478,26 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   function findNearestEnemy(lane, fromX, maxDist) {
     let best=null, bestD=maxDist||Infinity;
     for (const e of G.enemies) { if (!e.alive||e.dying>0||e.lane!==lane) continue; const d=Math.abs(e.x-fromX); if (d<bestD){bestD=d;best=e;} }
+    return best;
+  }
+  /* v5.0 二维地面距离: 纵向按"道"折合成像素(y 本身就是像素偏移, 直接相减即可)。
+   * 这是 MMO 式的地面判定 —— 用平面距离而非"是否同道"。 */
+  function groundDist(a, b) {
+    const dx = a.x - b.x, dy = (a.y || 0) - (b.y || 0);
+    return Math.hypot(dx, dy);
+  }
+  /* 目标是否在攻击范围内(二维) */
+  function inRange(a, b, range) {
+    return groundDist(a, b) <= range + 5;
+  }
+  /* 按二维距离找最近的可攻击目标 —— 取代原来的"同道最近"。 */
+  function findNearestEnemy2D(from, maxDist) {
+    let best=null, bestD=maxDist||Infinity;
+    for (const e of G.enemies) {
+      if (!e.alive || e.dying > 0) continue;
+      const d = groundDist(from, e);
+      if (d < bestD) { bestD = d; best = e; }
+    }
     return best;
   }
   /* v4.9 贴身判定距离: 玩家攻距固定 BC.playerAtkRange(75), 够不着就走到怪身边。
@@ -1516,11 +1537,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         const atkMult = (1 + (p.atkBuff || 0)) * SKILL.damageMult;
         const dmg = calcDmg(p.atk, atkMult * (0.9 + Math.random()*0.2) * r.mult, p.skillTarget.def, PST.pen || 0);
         dealDamage(p.skillTarget, dmg, '#bfe8ff', r.crit);
-        /* 剑气斩范围伤害: 波及本道周围敌人(剑气只在玩家所在车道, 原按全场x距离跨道波及) */
+        /* v5.0 剑气斩范围伤害: 按二维地面距离波及周边敌人 */
         for (const o of G.enemies) {
           if (o === p.skillTarget || !o.alive || o.dying > 0) continue;
-          if (o.lane !== p.lane) continue;
-          if (Math.abs(o.x - p.x) <= p.atkRange + 80) {
+          if (groundDist(o, p) <= p.atkRange + 80) {
             const dmg2 = calcDmg(p.atk, atkMult * 0.5 * (0.9 + Math.random()*0.2), o.def, PST.pen || 0);
             dealDamage(o, dmg2, '#bfe8ff', false);
           }
@@ -1595,34 +1615,25 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         if (p.animFrame === 18 && p.moving) playSfx('footstep', 0.5);
       }
     }
-    /* v3.7 三车道寻道: 攻击/技能动画不打断; 本道还有活怪就就地清, 清空了才换到
-     * "最近有怪"的车道; 三道全清回中道(中间起步位, 视觉均衡)。
-     * 换道只改 p.lane, 纵向位移由下面的 y 平滑过渡完成 —— 走位感而不是瞬移。 */
+    /* v5.0 无目标时回到中间纵深(视觉均衡)。有目标时由下方的二维追击分支
+     * 负责纵向跟进(直接向怪的 y 插值), 不存在"换道"这个动作。 */
     if (!p.attackAnim && !p.skillAnim) {
-      const sameLaneAlive = G.enemies.some(e => e.alive && e.dying <= 0 && e.lane === p.lane);
-      if (!sameLaneAlive) {
-        let best = -1, bestD = Infinity;
-        for (let L = 0; L < LANES; L++) {
-          if (L === p.lane) continue;
-          const e = findNearestEnemy(L, p.x, Infinity);
-          if (e) { const d = Math.abs(e.x - p.x); if (d < bestD) { bestD = d; best = L; } }
-        }
-        p.lane = best >= 0 ? best : 1;
-      }
+      const anyAlive = G.enemies.some(e => e.alive && e.dying <= 0);
+      if (!anyAlive) p.lane = MID_LANE;
     }
-    /* 车道 y 平滑过渡(带轻微跳跃弧线: 换道时先快后慢) */
+    /* 纵深 y 向目标深度平滑过渡 */
     p.y += (laneOff(p.lane) - p.y) * Math.min(1, dt * 7);
 
     if (labActive()) return;   /* 标定台: 玩家不追击不出手 —— 位置锁在 labLayout().px */
     if (window.__skillFreeze) { p.moving = 0; return; }   /* v4.8 弹道验收台: 玩家定桩 */
 
-    /* v4.9: 玩家攻距恒为 BC.playerAtkRange(75), 不随怪变化。
-     * 够不着就由下面的分支走到怪身边(贴身 PLAYER_HIT_GAP 处)再出手。 */
-    const near = findNearestEnemy(p.lane, p.x, p.atkRange+200);
+    /* v5.0 二维地面寻敌: 不再限制"同道", 按地面距离取最近目标。
+     * 玩家攻距恒为 BC.playerAtkRange(75), 够不着就走到怪身边再出手。 */
+    const near = findNearestEnemy2D(p, p.atkRange+200);
     /* 攻击动画播放期间不中断，保持攻击状态 */
     if (p.attackAnim) {
       p.moving = 0;
-    } else if (near && Math.abs(near.x-p.x) <= p.atkRange+5) {
+    } else if (near && inRange(p, near, p.atkRange)) {
       /* 进入攻击范围，开始攻击（触发时不立即造成伤害，伤害在动画帧中触发） */
       p.moving = 0;
       if (p.atkT <= 0) {
@@ -1637,19 +1648,23 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         }
       }
     } else if (near) {
-      /* 有怪但不在攻击范围，向怪移动 —— 直接走到怪的身边(贴身位)再打,
-       * 不能提前刹车: 技能怪站位远(弹道攻距 108~210), 若按玩家攻距留距离,
-       * 玩家会在够不着的地方停住, 表现为"顶着怪不出手"。 */
+      /* v5.0 二维追击: X 走到怪贴身位, Y 连续向怪纵深靠拢(无换道动作)。 */
       p.moving = 1; p.walkT += dt*8;
       const targetX = near.x - PLAYER_HIT_GAP;
-      p.x += Math.sign(targetX-p.x)*Math.min(Math.abs(targetX-p.x), BC.playerSpeed*1.5*dt);
+      const spd = BC.playerSpeed*1.5*dt;
+      p.x += Math.sign(targetX-p.x) * Math.min(Math.abs(targetX-p.x), spd);
+      /* 纵向直接向目标怪的纵深靠拢 —— 连续插值, 无换道跳变 */
+      const targetDepth = yToDepth(near.y);
+      const dD = targetDepth - (p.lane || 0);
+      if (Math.abs(dD) > 0.002) {
+        p.lane = (p.lane || 0) + Math.sign(dD) * Math.min(Math.abs(dD), 1.2 * dt);
+      }
     } else {
-      /* v3.8.1 无怪(攻击视野内)时向前推进 —— 防穿越: 玩家若从站位怪身上走过,
-       * 怪会留在玩家左侧(面朝左)永远"对着空气咬"。推进不许越过本道任何活怪。 */
+      /* v5.0 无怪时向前推进 —— 防穿越仍生效, 但按二维距离挑最近的挡路怪。 */
       p.moving = 1; p.walkT += dt*8; p.x += BC.playerSpeed*dt;
       let nearest = Infinity;
       for (const e of G.enemies) {
-        if (e.alive && e.dying <= 0 && e.lane === p.lane && e.x > p.x - 1 && e.x < nearest) nearest = e.x;
+        if (e.alive && e.dying <= 0 && e.x > p.x - 1 && e.x < nearest) nearest = e.x;
       }
       if (nearest < Infinity) p.x = Math.min(p.x, nearest - PLAYER_HIT_GAP);
     }
@@ -1800,10 +1815,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   /* 标定台专用：把玩家/怪钉在固定屏幕位，怪只播动画不移动 —— 攻距 = 锚点水平间距。 */
   function labTick(dt) {
     const p = G.player, L = labLayout();
-    p.x = G.camX + L.px; p.lane = 1; p.y = laneOff(1);
+    p.x = G.camX + L.px; p.lane = MID_LANE; p.y = laneOff(MID_LANE);
     const e = G.enemies.find(x => x.boneSlug === LAB.slug && x.alive);
     if (!e) return;
-    e.x = G.camX + L.ex; e.lane = 1; e.y = laneOff(1);
+    e.x = G.camX + L.ex; e.lane = MID_LANE; e.y = laneOff(MID_LANE);
     e.hp = e.maxHp; e.atk = 0; e.moving = false;
     if (e.armature) {
       /* 指定动画循环播放；进度由 LAB.t 驱动（受 fps 控制，可冻结）。
@@ -1830,15 +1845,23 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   function updateEnemies(dt) {
     const p = G.player;
     if (labActive()) { labTick(dt); return; }   /* 标定台: 不走常规排队/推进 */
-    /* v3.7 排队按车道分组: 每条车道独立排队 —— 近的先站位, 后面的依次后挪一个身位。
-     * 不同车道互不影响(各道都有一列纵队向玩家逼近)。 */
-    for (let L = 0; L < LANES; L++) {
-      const queue = G.enemies.filter(e => e.alive && e.dying <= 0 && e.lane === L).sort((a, b) => a.x - b.x);
+    /* v5.0 排队改为按"纵深邻域"聚类: 地面是连续坐标没有道可分组, 于是用
+     * 纵深相近(半身位内)且横向投影重叠的怪视为一列, 近的先站位, 后面的后挪。
+     * 纵深相差大的怪互不排队 —— 与原来"各道独立"效果一致, 但不依赖离散道。 */
+    const groups = [];
+    for (const e of G.enemies) {
+      if (!e.alive || e.dying > 0) continue;
+      let g = null;
+      for (const cand of groups) {
+        if (Math.abs(yToDepth(cand.y) - yToDepth(e.y)) * depthPx() < laneGap() * 0.5) { g = cand; break; }
+      }
+      if (g) g.list.push(e); else groups.push({ y: e.y, list: [e] });
+    }
+    for (const g of groups) {
+      const queue = g.list.sort((a, b) => a.x - b.x);
       let prevX = -1e9;
       for (const e of queue) {
-        /* v4.8 弹道验收台: 被 __skillHold 标记的怪不进队列, 原地定桩开火 ——
-         * 否则 5 只同道会被排队逻辑挤成一列(prevX + queueGap), 互相遮挡,
-         * 目视检查"单条弹道长什么样"就无从谈起。 */
+        /* 验收台定桩怪不进队列, 原地开火 */
         if (e.__skillHold) { e.stopX = e.x; prevX = Math.max(prevX, e.x); continue; }
         const stopX = Math.max(p.x + e.atkRange, prevX + BC.queueGap);
         e.stopX = stopX;
@@ -1856,14 +1879,12 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       if (e.dying>0) { e.dying-=dt; if (e.armature) advanceRatty(e, dt, true); continue; }
       if (!e.alive) continue;
       if (e.armature) advanceRatty(e, dt, false);   /* 骨骼怪: 推进动画(吃倍速 dt, 与移动节奏一致) */
-      /* v3.9.1 怪寻玩家: 玩家不在本道累计计时, 超 2.5s 换道追击。
-       * BOSS 旧版(史莱姆王, 远程漂浮)曾固定中道 —— 现换九尾狐王地面怪, 同样追击, 不再豁免。 */
-      if (e.lane !== p.lane) {
-        e.chaseT = (e.chaseT || 0) + dt;
-        if (e.chaseT >= 2.5) { e.chaseT = 0; e.lane = p.lane; }
-      } else if (e.chaseT) e.chaseT = 0;
-      /* 车道 y 平滑过渡(与玩家同参), 换道是走位感而非瞬移 */
-      if (!e.__skillHold) e.y += (laneOff(e.lane) - e.y) * Math.min(1, dt * 7);
+      /* v5.0 怪二维寻玩家: 纵深直接向玩家的 y 连续插值 —— 没有"道"可换,
+       * 也就没有跳变; 横向由 stopX 控制, 纵向由这条插值控制, 两轴都丝滑。 */
+      if (!e.__skillHold) {
+        e.y += (p.y - e.y) * Math.min(1, dt * 1.2);
+        e.lane = yToDepth(e.y);   /* 兼容字段: 记录当前纵深比例 */
+      }
       e.atkT -= dt; e.anim = Math.max(0, e.anim-dt*1.5);
       const wasHurt = e.hurtT > 0;
       e.hurtT = Math.max(0, e.hurtT-dt);
@@ -1892,8 +1913,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       e.moving = e.x > stopX+2;
       if (e.x > stopX+2) e.x = Math.max(stopX, e.x-e.speed*dt);
       const wasAttacking = e.anim > 0;
-      /* v3.7 攻击判定加同道条件: 不同车道的怪贴得再近也打不到玩家(各道独立交战) */
-      if (e.lane === p.lane && Math.abs(e.x-p.x) <= e.atkRange+5 && e.atkT <= 0) {
+      /* v5.0 攻击判定改二维地面距离: 范围内的怪都能打到玩家, 不再要求同道。 */
+      if (inRange(e, p, e.atkRange) && e.atkT <= 0) {
         e.anim = 1; e.atkT = 1/(0.8+Math.random()*0.5); e.animFrame = 0;
         /* 攻击音效: 攻击开始时 */
         if (!wasAttacking) {
@@ -2047,12 +2068,25 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
    * 0.74/0.83/0.92 铺进去 —— 间隔用 CH 比例而非固定像素, 任何横带高度都不越界。
    * 实体的 y 字段 = 车道偏移(负值) —— 特效/伤害数字/宠物/掉落全部从实体 y 推导,
    * 因此只要实体带 y, 整条表现链自动跟道, 无需逐处改坐标。 */
-  const LANES = 3;
-  function laneGap() { return CH * 0.09; }
-  function laneOff(lane) { return -(LANES - 1 - lane) * laneGap(); }
-  /* 纵深缩放: 越远的道越小一档, 强化三车道空间感 */
-  /* v3.8.1 层次感回调: 0.10 差距过大(0.80/0.90/1.0 模型大小悬殊), 收敛到 0.86/0.93/1.0 */
-  function laneScale(lane) { return 1 - (LANES - 1 - lane) * 0.07; }
+  /* v5.0 取消"车道", 地面纵深改为连续坐标(原 3 道 0.74/0.83/0.92 CH)。
+   * 原来 lane 是 3 个离散索引, 换道必然跳变; 现在实体的 y 直接是地面纵深像素
+   * (0 = 最近/屏幕下方, 负值向上), 位置连续可插值, 移动自然丝滑。
+   * 保留 lane 字段仅作兼容(值为由 y 反推的浮点数), 判定一律走二维像素距离。
+   *
+   * 地面带: 沿用原三车道覆盖的区间 —— 屏幕 y ∈ [0.74CH, 0.92CH], 即偏移
+   * y ∈ [-(0.18)CH, 0]。深度用 DEPTH 表示(0 最近, 1 最远), y = -DEPTH * DEPTH_PX。 */
+  function laneGap() { return CH * 0.09; }          /* 兼容旧调用: 一个身位的纵深尺度 */
+  function depthPx() { return CH * 0.18; }          /* 地面带总深 ≈ 55px(CH=306 时) */
+  function depthToY(d) { return -Math.max(0, Math.min(1, d || 0)) * depthPx(); }
+  function yToDepth(y) { return Math.max(0, Math.min(1, -(y || 0) / depthPx())); }
+  /* 兼容层: laneOff(lane) 把 0~1 的纵深比例映射成 y */
+  function laneOff(lane) { return depthToY(typeof lane === 'number' && lane > 1 ? lane / (LANES - 1) : lane); }
+  function laneAt(y) { return yToDepth(y); }
+  function lanePos(lane) { return Math.max(0, Math.min(1, typeof lane === 'number' && lane > 1 ? lane / (LANES - 1) : (lane || 0))); }
+  /* 纵深缩放: 最近 1.0 → 最远 0.86(与原三车道端点一致), 连续插值不再分档 */
+  function laneScale(lane) { return 1 - lanePos(lane) * 0.14; }
+  const LANES = 2;          /* 兼容占位: 旧的"道数"概念已废弃, 仅防越界引用 */
+  const MID_LANE = 0.42;    /* 起始纵深比例(约原中道位置) */
   /* v3.7.1 素材实化: 部分序列帧素材的像素 alpha 不满(实测玩家表均值仅 ~219),
    * 黑底时代看不出来, 换亮背景后角色透出背景纹理。加载时一次性处理:
    * alpha≥200 拉满 255, 30~200 线性拉伸保留软边防锯齿, <30 不动(淡出边缘)。
@@ -3160,7 +3194,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     g.lineStyle(2, 0x66d9ff, 0.95);
     for (let y = baseY - 190; y < baseY; y += DASH * 2) g.moveTo(L.px, y).lineTo(L.px, Math.min(baseY, y + DASH));
     /* 玩家左右缘 */
-    const pH = Math.min(CH * 0.5, 72) * laneScale(1);
+    const pH = Math.min(CH * 0.5, 72) * laneScale(MID_LANE);
     const pW = pH * (SPRITE.fw / SPRITE.fh);
     g.lineStyle(1, 0x2f88b8, 0.8);
     g.moveTo(L.px - pW / 2, baseY - pH); g.lineTo(L.px - pW / 2, baseY);
