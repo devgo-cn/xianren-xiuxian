@@ -122,10 +122,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
    * 运行时也可在控制台随时改这些值, 即时生效。 */
   if (typeof window !== 'undefined') {
     if (window.__enemySpeedMul === undefined) window.__enemySpeedMul = 0.35;
-    if (window.__spawnSlowMul   === undefined) window.__spawnSlowMul   = 2.5;
-    if (window.__poolAll        === undefined) window.__poolAll        = true;
-    if (window.__maxAlive       === undefined) window.__maxAlive       = 3;
-    if (window.__trialFreeze    === undefined) window.__trialFreeze    = true;  /* 冻结妖潮倒计时, 免得到点清场 */
+    /* v5.0 调试开关恢复默认值(之前调试时设的非默认值会影响正式游戏) */
+    if (window.__spawnSlowMul   === undefined) window.__spawnSlowMul   = 1;
+    if (window.__poolAll        === undefined) window.__poolAll        = false;
+    if (window.__maxAlive       === undefined) window.__maxAlive       = 20;
+    if (window.__trialFreeze    === undefined) window.__trialFreeze    = false;  /* 妖潮倒计时正常走 */
     /* v4.7 攻距手感旋钮: 0.30~0.70 之间调 —— 调大怪站更远(更不挡人但更不近战),
      * 调小怪贴更近(更近战但大怪可能少量遮住玩家)。改完刷下一只怪即生效。 */
     if (window.__torsoFrac      === undefined) window.__torsoFrac      = 0.45;
@@ -2200,7 +2201,14 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
           p.hp -= dmg; p.hurtT = 0.25; p.stun = 0.5;
           G.dmg.push({ x:p.x,y:p.y-40, val:dmg, crit:false, color:'#ff8a7a', t:0 });
           G.fx.push({ kind:'hitSpark', x:p.x,y:p.y-20, color:'#ff8a7a', t:0,dur:0.3 });
-          if (p.hp <= 0) p.hp = p.maxHp;              // 收草节奏: 主角不死, 倒下即刻重整旗鼓
+          if (p.hp <= 0) {
+            /* v5.0 死亡判定: 玩家倒下后妖潮从头开始(清场+重置怪池+回满血) */
+            p.hp = p.maxHp;
+            for (const e of G.enemies) { e.alive = false; e.dying = 0; despawnEnemy(e); }
+            G.enemies.length = 0;
+            G.bossActive = false;
+            trialRestart();
+          }
         }
       }
     }
