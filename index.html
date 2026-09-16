@@ -305,9 +305,13 @@
     font-size:9.5px;font-family:ui-monospace,SFMono-Regular,monospace;letter-spacing:.02em;
     color:rgba(232,197,107,.66);pointer-events:none;z-index:3;text-shadow:0 1px 2px rgba(0,0,0,.6)}
   .btn.primary .pnum{color:rgba(255,200,180,.70)}
-  .btn{pointer-events:auto;border:0;background:transparent;color:var(--gold);border-radius:0;display:flex;align-items:center;justify-content:flex-end;padding:0;aspect-ratio:3/1;flex:1;max-width:108px;min-width:88px;box-sizing:border-box;
-    font-size:12px;font-weight:600;letter-spacing:.02em;cursor:pointer;transition:transform .12s;
-    box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;-webkit-appearance:none;appearance:none;outline:none}   /* v4.4: 3:1比例; 12px字体; label绝对定位右侧; padding:0 */
+  .btn{pointer-events:auto;border:0;background:transparent;color:var(--gold);border-radius:0;padding:13px 24px;
+    font-size:14px;font-weight:600;letter-spacing:.06em;cursor:pointer;transition:transform .12s;
+    box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;-webkit-appearance:none;appearance:none;outline:none}
+  /* v4.4: 底部三按钮专用样式(不污染全局 .btn) —— 3:1比例锁尺寸, 12px字体, padding:0 */
+  #btnArray, #btnBreak, #btnTravel{display:flex;align-items:center;justify-content:flex-end;padding:0;aspect-ratio:3/1;flex:1;max-width:108px;min-width:88px;box-sizing:border-box;font-size:12px;letter-spacing:.02em}
+  /* v4.4: 底部按钮label绝对定位到右侧空白区, 不换行 */
+  #btnArray .label, #btnBreak .label, #btnTravel .label{position:absolute;right:8px;top:50%;transform:translateY(-50%);z-index:2;white-space:nowrap;line-height:1;pointer-events:none}
   .btn:active{transform:scale(.94)}
   .btn.primary{background:transparent;color:inherit}
   .btn:disabled{opacity:.62}   /* v1.7.46: 进度已移入按钮, 禁用态保留可读性 */
