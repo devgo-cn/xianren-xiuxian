@@ -634,7 +634,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const bb = window.BattleGL.armatureAABB(e.armature);
     const def = BC.enemies[e.type] || {};
     const cap = def.isBoss ? CH * 0.7 : CH * 0.5;
-    const drawH = Math.min(cap, e.drawH || def.drawH || 84) * laneScale(e.lane);
+    const drawH = Math.min(cap, e.drawH || def.drawH || 84) * laneScale(yToDepth(e.y));
     const s = drawH / Math.max(1, B.baseH || 100);
     const L = labLayout();
     /* 标定台：CW/CH 取横带逻辑尺寸 —— 与舞台模式（60-stage 传 W/bandH）同一套语义 */
@@ -677,7 +677,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   function labScaleOf(e, B) {
     const def = BC.enemies[e.type] || {};
     const cap = def.isBoss ? CH * 0.7 : CH * 0.5;
-    const drawH = Math.min(cap, e.drawH || def.drawH || 84) * laneScale(e.lane);
+    const drawH = Math.min(cap, e.drawH || def.drawH || 84) * laneScale(yToDepth(e.y));
     return { drawH, s: drawH / Math.max(1, B.baseH || 100) };
   }
   function labPlayerHalf() {
@@ -2388,9 +2388,17 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   function drawEnemies(laneFilter, batch) {
     const batchC = window.BattleGL.layers[batch === 'near' ? 'near' : 'far'];
     const uiLayer = batch === 'near' ? 'nearUI' : 'farUI';
+    /* v5.0 同层内按纵深排序绘制(近盖远): 原按数组顺序画, 同层怪互相重叠时
+     * 遮挡关系取决于入队顺序而非前后位置。地面已是连续纵深, 直接按 y 降序
+     * (y 大 = 靠屏幕下方 = 更近 = 后画) 即为正确的画家顺序。 */
+    const list = [];
     for (const e of G.enemies) {
       if (laneFilter && !laneFilter(e)) continue;
       if (!e.alive && e.dying <= 0) continue;
+      list.push(e);
+    }
+    list.sort((a, b) => (a.y || 0) - (b.y || 0));
+    for (const e of list) {
       const sx = worldToScreen(e.x); const sy = floorY() + e.y;   /* v3.7: 怪站自己的车道 */
       /* v3.9 通用骨骼怪分支(链最前): 所有带 armature 的怪 —— 鼠妖/僵尸/妖狐/…/骨骼BOSS 统一走这。
        * 体型缩放用 idle 基准高(BONES.baseH 建厂时测定, 避免动画间呼吸式缩放);
@@ -2399,7 +2407,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         const B = BONES[e.boneSlug];
         const def = BC.enemies[e.type] || {};
         const cap = def.isBoss ? CH * 0.7 : CH * 0.5;
-        const drawH = Math.min(cap, e.drawH || def.drawH || 84) * (def.isBoss ? 1 : (e.elite ? 1.28 : 1)) * laneScale(e.lane);
+        const drawH = Math.min(cap, e.drawH || def.drawH || 84) * (def.isBoss ? 1 : (e.elite ? 1.28 : 1)) * laneScale(yToDepth(e.y));
         const s = drawH / Math.max(1, B.baseH || 100);
         const bb = window.BattleGL.armatureAABB(e.armature);
         /* v4.0 WebGL: 2D 的 translate(sx,sy)·scale(s)·translate(-cx,-maxY) 在
@@ -2432,7 +2440,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
           frameIdx = SLIME_SPRITE.walkStart + (Math.floor(G.t * SLIME_SPRITE.fps) % SLIME_SPRITE.walkCount);
         }
         /* 渲染尺寸: 到玩家肩膀高度(精英怪体型 ×1.28) */
-        const drawH = Math.min(CH * 0.5, 72) * (e.elite ? 1.28 : 1) * laneScale(e.lane);
+        const drawH = Math.min(CH * 0.5, 72) * (e.elite ? 1.28 : 1) * laneScale(yToDepth(e.y));
         const drawW = drawH * (SLIME_SPRITE.fw / SLIME_SPRITE.fh);
         /* 脚底在帧中的y=120(距底部8px), 用这个偏移让脚底踩在地板上 */
         const footOffset = 120 * (drawH / SLIME_SPRITE.fh);
@@ -2461,7 +2469,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         const row = Math.floor(frameIdx / WATER_SPRITE.cols);
         void col; void row;   /* v4.0: 切帧由 frameTex 完成, 保留帧选择逻辑不变 */
         /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放) */
-        const drawH = Math.min(CH * 0.5, 70) * (e.elite ? 1.28 : 1) * laneScale(e.lane);
+        const drawH = Math.min(CH * 0.5, 70) * (e.elite ? 1.28 : 1) * laneScale(yToDepth(e.y));
         const drawW = drawH * (WATER_SPRITE.fw / WATER_SPRITE.fh);
         /* 脚底在帧中的y=118(距底部10px) */
         const footOffset = 118 * (drawH / WATER_SPRITE.fh);
@@ -2490,7 +2498,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         const row = Math.floor(frameIdx / BOSS_SPRITE.cols);
         void col; void row;
         /* BOSS 2倍大, 漂浮不踩地板 */
-        const drawH = Math.min(CH * 0.7, 140) * laneScale(e.lane);
+        const drawH = Math.min(CH * 0.7, 140) * laneScale(yToDepth(e.y));
         const drawW = drawH * (BOSS_SPRITE.fw / BOSS_SPRITE.fh);
         const floatY = BOSS_SPRITE.floatHeight + Math.sin(G.t * 1.5) * 8;  /* 漂浮上下浮动 */
         const spr = enemySpriteGL(e, batchC);
@@ -2786,7 +2794,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (p.skillAnim && G.skillReady && G.skillSprite) {
       const frameIdx = Math.min(p.skillFrame, SKILL.count - 1);
       /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放) */
-      const drawH = Math.min(CH * 0.55, 80) * laneScale(p.lane);
+      const drawH = Math.min(CH * 0.55, 80) * laneScale(yToDepth(p.y));
       const drawW = drawH * (SKILL.fw / SKILL.fh);
       /* 技能帧中角色脚底在 y=250(帧高256), 偏移对齐地板 */
       const footOffset = (SKILL.fh - 250) / SKILL.fh * drawH;
@@ -2827,7 +2835,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (p.attackAnim) frameIdx = SPRITE.attackStart + ATTACK_MAP[Math.min(p.animFrame, ATTACK_MAP.length - 1)];
     else frameIdx = SPRITE.walkStart + (p.animFrame % SPRITE.walkCount);
     /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放; v3.8: 80→72; v4.4: 72→80 恢复高清素材细节) */
-    const drawH = Math.min(CH * 0.5, 80) * laneScale(p.lane);
+    const drawH = Math.min(CH * 0.5, 80) * laneScale(yToDepth(p.y));
     const drawW = drawH * (SPRITE.fw / SPRITE.fh);
     /* 疾风步/缩地成寸残影: 加速期间玩家身后显示3个半透明残影, 倍速越高残影越多 */
     if (G.speedMult > 1 && !p.attackAnim) {
@@ -3157,9 +3165,12 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     drawBg();
     /* v3.8.2 遮挡分层: 远道怪 → 玩家 → 宠物 → 近道怪(近盖远, 画家算法)
      * v4.2: 前景遮挡条带压住全部实体(脚踝在草后) → 掉落物画在前景之上 */
-    drawEnemies(e => e.y < G.player.y, 'far');
+    /* v5.0 分层切换点加半身位迟滞: 怪与玩家纵深几乎相同(同一水平线)时判为远景,
+     * 避免怪恰好站在玩家所在线上时把玩家整个盖住 —— 玩家永远可见。 */
+    const splitY = G.player.y + laneGap() * 0.5;
+    drawEnemies(e => e.y < splitY, 'far');
     drawPlayerSprite(); drawPets();
-    drawEnemies(e => e.y >= G.player.y, 'near');
+    drawEnemies(e => e.y >= splitY, 'near');
     drawForeground(); drawDrops();
     drawFx(); drawDmg(); drawSkillCall();
     if (labActive()) drawLabOverlay();
@@ -3182,7 +3193,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const bb = GL.armatureAABB(e.armature);
     const def = BC.enemies[e.type] || {};
     const cap = def.isBoss ? CH * 0.7 : CH * 0.5;
-    const drawH = Math.min(cap, e.drawH || def.drawH || 84) * laneScale(e.lane);
+    const drawH = Math.min(cap, e.drawH || def.drawH || 84) * laneScale(yToDepth(e.y));
     const s = drawH / Math.max(1, B.baseH || 100);
     const wS = s * (bb.maxX - bb.minX);
     const baseY = L.floor;
