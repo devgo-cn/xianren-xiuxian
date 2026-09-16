@@ -2819,24 +2819,23 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
    *        现在按 玩家身高 的比例给下限, 保证"看得见"这个底线先满足。 */
   const PLAYER_H = 92;                     /* 玩家基准身高(与 SPRITE 尺寸同量级) */
   const SKILL_KIND = {
-    /* 1 暗影弹: 直线单发, 暗紫, 最基础 */
-    1: { tex: 'spike', blend: 'ADD', rgb: '#a06ae8', len: 46, thick: 16, minLen: 0.46, dur: 0.42,
-         speedK: 1.0, alpha: 0.88, spread: 0, count: 1, trail: 0.55, alt: 0.62 },
-    /* 2 神光柱: 上空落柱, 金白, 不飞 */
-    2: { tex: 'column', blend: 'ADD', rgb: '#ffd98a', len: 78, thick: 22, minLen: 0.80, dur: 0.38,
-         speedK: 0.0, alpha: 0.82, spread: 0, count: 1, trail: 0.0, alt: 1.20, drop: true },
-    /* 3 自然藤蔓: 贴地延伸, 青绿, 前摇可躲 */
-    3: { tex: 'column', blend: 'NORMAL', rgb: '#6ad89a', len: 58, thick: 13, minLen: 0.60, dur: 0.44,
-         speedK: 0.0, alpha: 0.82, spread: 0, count: 1, trail: 0.0, alt: 0.0, ground: true },
-    /* 4 弹幕扫射: 3 连发小子弹, 橙黄, 单发低 */
+    /* v4.9 全部统一为 3 连发飞行弹机制(原 2/3 类原地光柱/藤蔓用户不满意),
+     * 各类靠颜色+形态+尺寸区分, 不再有"不飞"的技能。 */
+    /* 1 暗影弹: 3连发, 暗紫尖锥 */
+    1: { tex: 'spike', blend: 'ADD', rgb: '#a06ae8', len: 40, thick: 14, minLen: 0.40, dur: 0.46,
+         speedK: 1.0, alpha: 0.88, spread: 0.08, count: 3, trail: 0.45, gap: 0.07, alt: 0.62 },
+    /* 2 神光弹: 3连发, 金白光球, 更大更亮 */
+    2: { tex: 'shard', blend: 'ADD', rgb: '#ffd98a', len: 26, thick: 26, minLen: 0.26, dur: 0.46,
+         speedK: 1.05, alpha: 0.90, spread: 0.08, count: 3, trail: 0.30, gap: 0.07, alt: 0.65 },
+    /* 3 藤蔓弹: 3连发, 青绿光球 */
+    3: { tex: 'shard', blend: 'ADD', rgb: '#6ad89a', len: 22, thick: 22, minLen: 0.22, dur: 0.46,
+         speedK: 1.1, alpha: 0.85, spread: 0.10, count: 3, trail: 0.35, gap: 0.075, alt: 0.58 },
+    /* 4 弹幕扫射: 3连发, 橙黄小子弹(用户满意, 保持不变) */
     4: { tex: 'shard', blend: 'ADD', rgb: '#ffb45c', len: 22, thick: 22, minLen: 0.22, dur: 0.46,
          speedK: 1.15, alpha: 0.85, spread: 0.10, count: 3, trail: 0.35, gap: 0.075, alt: 0.58 },
-    /* 5 巨型吐息: 锥形, 青蓝, 判定最宽。
-     * 注意 trail 必须小 —— 首版给了 0.85, 弹体随生命周期拉长近 2 倍,
-     * 尖锥被拉成一条又长又方的条带(实测横跨大半屏、边缘直角, 像 UI 故障),
-     * 这是典型的"抢画面"。现在改成"一开始就够长, 越到后面越细"的锥形收束。 */
-    5: { tex: 'spike', blend: 'ADD', rgb: '#5cd0ff', len: 104, thick: 30, minLen: 1.00, dur: 0.55,
-         speedK: 0.85, alpha: 0.72, spread: 0.05, count: 1, trail: 0.18, alt: 0.70, cone: true },
+    /* 5 吐息弹: 3连发, 青蓝尖锥, 更大 */
+    5: { tex: 'spike', blend: 'ADD', rgb: '#5cd0ff', len: 52, thick: 18, minLen: 0.52, dur: 0.48,
+         speedK: 0.95, alpha: 0.82, spread: 0.06, count: 3, trail: 0.40, gap: 0.08, alt: 0.68 },
   };
 
   /* 弹道存活表 —— 同屏节流, 保证画面干净 */
@@ -2897,12 +2896,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       t: -delay, dur: k.dur + delay,
       a0: k.alpha, trail: k.trail, spread: k.spread,
     });
-    if (kind === 4) {
-      /* 弹幕: 3 发错开时间 + 轻微纵向散, 做出"连点"感 */
-      for (let i = 0; i < k.count; i++) SK_LIVE.push(G.fx[G.fx.push(shot(i * (k.gap || 0.08), (i - 1) * 5)) - 1]);
-    } else {
-      SK_LIVE.push(G.fx[G.fx.push(shot(0, 0)) - 1]);
-    }
+    /* v4.9 所有技能均为 3 连发: 错开时间 + 轻微纵向散, 做出"连点"感 */
+    for (let i = 0; i < k.count; i++) SK_LIVE.push(G.fx[G.fx.push(shot(i * (k.gap || 0.08), (i - 1) * 5)) - 1]);
   }
   /* 回收: 弹道走完从存活表移除 */
   function reapSkillFx() {
