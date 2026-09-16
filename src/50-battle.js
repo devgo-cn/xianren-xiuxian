@@ -2066,8 +2066,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   }
   function drawPlayerSprite() {
     const p = G.player;
-    const sx = worldToScreen(p.x);
-    const sy = floorY() + p.y;   /* v3.7: 玩家随车道(y 为车道偏移, 平滑过渡) */
+    const sx = Math.round(worldToScreen(p.x));   /* v4.4: 取整消除亚像素采样导致的边缘软化 */
+    const sy = Math.round(floorY() + p.y);   /* v3.7: 玩家随车道(y 为车道偏移, 平滑过渡); v4.4: 取整 */
     const S = playerGL();
     S.main.visible = S.glow.visible = S.place.visible = false;
     for (const t of S.trails) t.visible = false;
@@ -2117,8 +2117,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     let frameIdx;
     if (p.attackAnim) frameIdx = SPRITE.attackStart + ATTACK_MAP[Math.min(p.animFrame, ATTACK_MAP.length - 1)];
     else frameIdx = SPRITE.walkStart + (p.animFrame % SPRITE.walkCount);
-    /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放; v3.8: 80→72) */
-    const drawH = Math.min(CH * 0.5, 72) * laneScale(p.lane);
+    /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放; v3.8: 80→72; v4.4: 72→80 恢复高清素材细节) */
+    const drawH = Math.min(CH * 0.5, 80) * laneScale(p.lane);
     const drawW = drawH * (SPRITE.fw / SPRITE.fh);
     /* 疾风步/缩地成寸残影: 加速期间玩家身后显示3个半透明残影, 倍速越高残影越多 */
     if (G.speedMult > 1 && !p.attackAnim) {

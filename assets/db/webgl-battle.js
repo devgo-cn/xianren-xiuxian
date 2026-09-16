@@ -89,7 +89,7 @@
 
     function resize() {
         if (!app) return;
-        dpr = Math.min(global.devicePixelRatio || 1, 1.5);   // v2.9 同款封顶
+        dpr = Math.min(global.devicePixelRatio || 1, 2.0);   // v4.4: 1.5→2.0, 高DPR屏canvas不再被浏览器2倍上采样, 战斗层整体锐度提升
         W = global.innerWidth; H = global.innerHeight;
         app.renderer.resolution = dpr;
         app.renderer.resize(W, H);
