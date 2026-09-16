@@ -374,7 +374,12 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* v2.9: 暂停时清掉限帧 sleep 句柄 —— 否则那枚 setTimeout 醒来时 G.paused 已为 true,
      * 会直接 return 且把 _rafOn 留成 true, 导致 resume 认为"泵还在跑"而不重启(死锁)。 */
     pause: () => { G.paused = true; if (_sleepT) { clearTimeout(_sleepT); _sleepT = 0; } _rafOn = false; },
-    resume: () => { G.paused = false; lastT = performance.now(); _lastPaint = 0; if (_sleepT) { clearTimeout(_sleepT); _sleepT = 0; } if (!_rafOn) { _rafOn = true; requestAnimationFrame(loop); } },
+    /* v4.0.1: _managed guard —— 舞台模式下 resume 只解 paused, 绝不重启独立泵。
+     * 否则黑屏挂机(enterDim/exitDim)走一次 pause/resume 后, 独立 loop 与 60-stage
+     * 双泵并存: 独立泵 frame(0, innerHeight) 把内容画到屏幕顶部, 60-stage 又画回
+     * 横带 —— 战斗画面在顶部与横带间抖动(真机实测), 且 update 双跑=逻辑双倍速。
+     * 2D 时代独立泵画的是 display:none 的 #battleCanvas, 该 bug 一直潜伏不可见。 */
+    resume: () => { G.paused = false; lastT = performance.now(); _lastPaint = 0; if (_sleepT) { clearTimeout(_sleepT); _sleepT = 0; } if (!_managed && !_rafOn) { _rafOn = true; requestAnimationFrame(loop); } },
     getState: () => ({ kills:G.kills, spirit:G.spirit, speedMult:G.speedMult, state:G.state, playerHp:G.player?G.player.hp:0, pets:G.pets.length, enemies:G.enemies.filter(e=>e.alive).length }),
     /* v3.2 验收探针：战斗世界的内部时钟。
      * G.t 由 `G.t += dt * G.speedMult` 推进 —— 它是"倍速确实生效"的最直接证据，
