@@ -458,6 +458,45 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   const ATTACK_MAP = [0, 2, 4, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 8, 9, 10, 11, 13, 19, 20, 21, 21, 21, 24];
   /* 技能: 剑气斩 (24帧, 1秒, 6列x4行, 480x256每帧) */
   const SKILL = { name:'剑气斩', cols:6, fw:480, fh:256, count:24, fps:24, hitFrame:12, damageMult:2.5, cooldown:4.0, triggerChance:0.3 };
+  /* ══════ v6.1 体型归一: 走路 / 普攻 / 剑气斩 三套帧统一「角色高度 + 脚底贴地」 ══════
+   * 症状: 一放技能人就缩小一圈, 而且脚离地。
+   * 上一轮「增高」只把渲染基准 drawH 提到 80, 但三套帧一直是【按画布边界】等比缩放的,
+   * 于是画出来多大完全取决于素材里角色占画布的比例:
+   *   普攻表 cultivator_sheet        408x252  角色内容高 ≈242/252 = 0.960
+   *   技能表 cultivator_skill_sheet  480x256  起手段 f0~f8 只有 ≈172/256 = 0.672
+   * 同一个 drawH=80 缩下去, 普攻人高 76.8px, 技能起手只剩 53.4px —— 直接小 30%,
+   * 看到的就是「一按键人缩了」; 技能表这几帧脚底还画在 y≈219/256(离帧底 37px),
+   * 等比渲染后脚悬空 12~19px。f10 起月牙铺满画布(占比 0.92~1.0)视觉才恢复,
+   * 所以只有前段突兀 —— 不是走路改了、技能没改, 是两素材的内容占比本来就不同。
+   *
+   * 修法: 不再按画布缩放, 统一按【内容包围盒】缩放 —— 每帧把角色实际高度归一到同一个
+   * BODY_REF_H, 并用内容底边贴地板。走路 / 普攻 / 技能三套同值同源, 一次同时到位,
+   * 顺便消掉逐帧内容高抖动带来的「呼吸」感。脚下的悬空比例三套素材是同一套算法,
+   * 归一后底边一律贴 sy, 不再各自留出不同高度的空白。
+   * 数值由脚本离线逐帧量 AABB(alpha>16)得到, 写死在这里, 运行时零开销。
+   * 注: 技能表 f9 是脏点帧(全帧只剩零星像素), 直接用会把缩放算飞, 取 f8/f10 插值。 */
+  const BODY_REF_H = 242;                     /* 参考内容高: 普攻表走路帧均值, 帧坐标 */
+  const BODY_RATIO = BODY_REF_H / SPRITE.fh;  /* 0.960 —— 画布 252 里角色实际占多少 */
+  /* cultivator_sheet 72 帧(走路 0~31 + 普攻 32~71)逐帧内容包围盒: [高, 底边] */
+  const SPRITE_BOX_H = [
+    240,239,239,240,239,240,241,241,241,242,242,242,
+    242,240,239,240,240,240,241,243,245,247,247,245,
+    246,246,245,245,244,245,243,241,243,239,236,232,
+    232,232,231,232,232,237,237,237,237,238,238,238,
+    238,238,238,238,238,238,238,238,238,238,238,238,
+    238,238,238,248,248,248,248,246,243,247,247,246
+  ];
+  const SPRITE_BOX_B = [
+    247,247,247,248,247,248,248,247,247,247,247,247,
+    248,247,247,247,247,247,247,247,247,248,248,248,
+    248,248,247,248,247,248,247,248,248,248,248,248,
+    248,248,248,248,248,248,248,248,248,248,248,248,
+    248,248,248,248,248,248,248,248,248,248,248,248,
+    248,248,248,248,248,248,248,246,245,248,248,246
+  ];
+  /* cultivator_skill_sheet 24 帧(剑气斩) */
+  const SKILL_BOX_H = [172,171,178,180,181,182,182,183,181,208,235,239,243,244,248,253,256,253,228,241,225,219,225,226];
+  const SKILL_BOX_B = [219,218,223,225,226,229,233,234,234,241,248,248,248,250,251,254,256,256,247,255,228,227,239,236];
   /* 横扫千军特效配置: 7列7行, 49帧, 左右渐现渐隐 */
   const HENGSAO_SPRITE = { cols:7, fw:320, fh:160, count:49, fps:12 };
   /* 史莱姆帧配置: 12列8行, walk32+attack51+hurt11 */
@@ -1574,11 +1613,16 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (e.__skillRange) return Math.max(0, (e.atkRange || 0) - playerHalfW());
     return Math.max(0, e.atkRange || 0);
   }
+  /* v6.1 FIX: 目标半宽必须按【目标自己】的算法取。原先不管打谁都走 enemyHalfW()，
+   * 打到玩家时玩家没有 armature/__spriteRatio，直接掉进 30px 兜底 ——
+   * 技能怪判定就短了 58.3-27≈31px，必须比站位再近一寸才判命中，
+   * 表现正是「远程怪傻站着不放技能，贴脸才出手」。 */
+  function halfOf(ent) { return (ent && ent === G.player) ? playerHalfW() : enemyHalfW(ent); }
   /* 命中判定: 边缘到边缘。range 传"攻击方前伸量"，target 的半宽补齐另一半。
    * 这样双方各自只关心自己伸多远，重叠即命中 —— 与 Capcom/SoR 一致。 */
   function canHit(attacker, target, reach) {
     if (!target) return false;
-    return groundDist(attacker, target) <= reach + enemyHalfW(target) + 5;
+    return groundDist(attacker, target) <= reach + halfOf(target) + 5;
   }
   /* 兼容旧签名(有些地方只想知道"在不在某个距离内", 不涉及体型) */
   function inRange(a, b, range) {
@@ -2897,28 +2941,35 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     S.main.visible = S.glow.visible = S.place.visible = false;
     for (const t of S.trails) t.visible = false;
     const hurtOn = p.hurtT > 0;
+    /* v6.1 三套帧共用的「角色目标视觉高」: 旧渲染里 drawH 是画布高, 真正的人物高度
+     * = drawH × 内容占比(普攻 0.960 / 技能起手仅 0.672), 两套素材不一样才导致换动作
+     * 就变形。这里先算出统一的人高, 再由每帧内容高反推该帧应该画多大的画布。 */
+    const ls = laneScale(yToDepth(p.y));
+    const bodyH = Math.min(CH * 0.5, 80) * BODY_RATIO * ls;
 
     /* 技能动画渲染 (剑气斩) */
     if (p.skillAnim && G.skillReady && G.skillSprite) {
       const frameIdx = Math.min(p.skillFrame, SKILL.count - 1);
-      /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放) */
-      const drawH = Math.min(CH * 0.55, 80) * laneScale(yToDepth(p.y));
-      const drawW = drawH * (SKILL.fw / SKILL.fh);
-      /* 技能帧中角色脚底在 y=250(帧高256), 偏移对齐地板 */
-      const footOffset = (SKILL.fh - 250) / SKILL.fh * drawH;
+      const boxH = SKILL_BOX_H[frameIdx] || 240;
+      const boxB = SKILL_BOX_B[frameIdx] || 248;
+      const sk = bodyH / boxH;                  /* 帧像素 → 游戏像素 */
+      const skW = SKILL.fw * sk;
       S.main.visible = true;
       S.main.texture = frameTex(G.skillSprite, SKILL.cols, SKILL.fw, SKILL.fh, frameIdx);
-      S.main.position.set(sx - drawW*0.42, sy - drawH + footOffset);
-      S.main.scale.set(drawW / SKILL.fw, drawH / SKILL.fh);
+      /* 纵向用内容底边贴地板(sy - boxB*sk + boxB*sk === sy), 取代画布底边贴地。
+       * 横向沿用 0.42 锚点比例, 随缩放等比推移, 相对关系不变。 */
+      S.main.position.set(sx - skW*0.42, sy - boxB * sk);
+      S.main.scale.set(sk, sk);
       S.main.alpha = 1; S.main.filters = null;
       if (hurtOn) { S.main.alpha = 0.5+0.5*Math.sin(p.hurtT*40); S.main.filters = [window.BattleGL.Filters.playerHurt]; }
-      /* 技能发光效果(原 shadowBlur 青蓝光) → ADD 柔光垫底 */
+      /* 技能发光效果(原 shadowBlur 青蓝光) → ADD 柔光垫底
+       * v6.1: 光晕/血条统一挂在「人高」上, 与普攻完全同口径, 不再跟着画布高抖。 */
       S.glow.visible = true;
       S.glow.texture = window.BattleGL.tex(GLOW.skill);
-      S.glow.position.set(sx, sy - drawH * 0.5);
-      S.glow.width = S.glow.height = drawH * 1.6;
+      S.glow.position.set(sx, sy - bodyH * 0.5);
+      S.glow.width = S.glow.height = bodyH * 1.6;
       S.glow.alpha = 0.45;
-      drawHpBar('playerUI', sx, sy-drawH*0.7-10, 36, p.hp, p.maxHp);
+      drawHpBar('playerUI', sx, sy - bodyH - 10, 36, p.hp, p.maxHp);
       return;
     }
 
@@ -2942,9 +2993,12 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     let frameIdx;
     if (p.attackAnim) frameIdx = SPRITE.attackStart + ATTACK_MAP[Math.min(p.animFrame, ATTACK_MAP.length - 1)];
     else frameIdx = SPRITE.walkStart + (p.animFrame % SPRITE.walkCount);
-    /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放; v3.8: 80→72; v4.4: 72→80 恢复高清素材细节) */
-    const drawH = Math.min(CH * 0.5, 80) * laneScale(yToDepth(p.y));
-    const drawW = drawH * (SPRITE.fw / SPRITE.fh);
+    /* v6.1 同样按内容包围盒渲染: 人高锁定 bodyH, 画布高由该帧内容高反推,
+     * 底边贴 sy。基准仍是 min(CH*0.5,80)(v4.4 高清素材), 数值与旧渲染只差 1~2%。 */
+    const boxH = SPRITE_BOX_H[frameIdx] || BODY_REF_H;
+    const boxB = SPRITE_BOX_B[frameIdx] || SPRITE.fh;
+    const bs = bodyH / boxH;
+    const drawW = SPRITE.fw * bs;
     /* 疾风步/缩地成寸残影: 加速期间玩家身后显示3个半透明残影, 倍速越高残影越多 */
     if (G.speedMult > 1 && !p.attackAnim) {
       const trailCount = G.speedMult >= 3 ? 4 : 3;
@@ -2955,13 +3009,14 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         t.texture = ftex;
         t.alpha = 0.12 * (trailCount + 1 - i) / trailCount;
         t.position.set(sx - i * 10, sy);
-        t.scale.set((drawW / SPRITE.fw) * (1 + i * 0.03), drawH / SPRITE.fh);
+        t.scale.set(bs * (1 + i * 0.03), bs);
       }
     }
     S.main.visible = true;
     S.main.texture = frameTex(G.sprite, SPRITE.cols, SPRITE.fw, SPRITE.fh, frameIdx);
-    S.main.position.set(sx - drawW*0.35, sy - drawH);
-    S.main.scale.set(drawW / SPRITE.fw, drawH / SPRITE.fh);
+    /* 用内容底边贴地板(旧版是画布底边贴地, 素材里脚下方留白不同就一高一低) */
+    S.main.position.set(sx - drawW*0.35, sy - boxB * bs);
+    S.main.scale.set(bs, bs);
     S.main.alpha = 1; S.main.filters = null;
     if (hurtOn) { S.main.alpha = 0.5+0.5*Math.sin(p.hurtT*40); S.main.filters = [window.BattleGL.Filters.playerHurt]; }
     /* 攻击buff/加速光晕(原 shadowBlur) → ADD 柔光垫底 */
@@ -2977,12 +3032,12 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (glowTex) {
       S.glow.visible = true;
       S.glow.texture = window.BattleGL.tex(glowTex);
-      S.glow.position.set(sx - drawW*0.35 + drawW/2, sy - drawH/2);
-      S.glow.width = S.glow.height = drawH * 1.5;
+      S.glow.position.set(sx - drawW*0.35 + drawW/2, sy - bodyH/2);
+      S.glow.width = S.glow.height = bodyH * 1.5;
       S.glow.alpha = glowA;
     }
-    /* 血条 */
-    drawHpBar('playerUI', sx, sy - drawH - 8, 36, p.hp, p.maxHp);
+    /* 血条: 挂人头顶, 与技能态同口径 */
+    drawHpBar('playerUI', sx, sy - bodyH - 10, 36, p.hp, p.maxHp);
   }
 
   function drawFx() {
