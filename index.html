@@ -227,7 +227,7 @@
   .actions{position:fixed;left:0;right:0;bottom:24px;z-index:10;display:flex;justify-content:center;gap:10px;padding:0 14px}  /* v1.7.52: 上移 6px 给按钮下方数字进度留位 */
   /* v1.7.46 按钮内进度: SVG clipPath 复用墨形, 填充宽度即进度(聚灵阵=灵石/升级价, 突破=修为/所需) */
   .btn .skin{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none;z-index:0}
-  .btn .label{position:relative;z-index:2;background:rgba(8,10,16,.55);padding:2px 12px;border-radius:8px;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);text-shadow:0 1px 3px rgba(0,0,0,.85);font-size:13px}
+  .btn .label{position:relative;z-index:2}
   .btn .prog{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;
     mix-blend-mode:multiply;isolation:isolate}   /* v1.7.49: 与按钮底色相乘 → 恒为"本色加深", 任何状态(金/红/禁用灰调)都不割裂 */
   /* v2.6.1: 皮肤已换 webp 图片 → 进度填充改用图片 alpha 作 mask 裁形, 与新皮肤天然贴合
@@ -305,9 +305,9 @@
     font-size:9.5px;font-family:ui-monospace,SFMono-Regular,monospace;letter-spacing:.02em;
     color:rgba(232,197,107,.66);pointer-events:none;z-index:3;text-shadow:0 1px 2px rgba(0,0,0,.6)}
   .btn.primary .pnum{color:rgba(255,200,180,.70)}
-  .btn{pointer-events:auto;border:0;background:transparent;color:var(--gold);border-radius:0;padding:13px 24px;
-    font-size:14px;font-weight:600;letter-spacing:.06em;cursor:pointer;transition:transform .12s;
-    box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;-webkit-appearance:none;appearance:none;outline:none}
+  .btn{pointer-events:auto;border:0;background:transparent;color:var(--gold);border-radius:0;padding:13px 18px 13px 24px;text-align:right;
+    font-size:14px;font-weight:600;letter-spacing:.02em;cursor:pointer;transition:transform .12s;
+    box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;-webkit-appearance:none;appearance:none;outline:none}   /* v4.4: 文字右移到按钮背景图右侧空白区(避开左侧主题图案), 字间距 .06→.02em */
   .btn:active{transform:scale(.94)}
   .btn.primary{background:transparent;color:inherit}
   .btn:disabled{opacity:.62}   /* v1.7.46: 进度已移入按钮, 禁用态保留可读性 */
