@@ -589,6 +589,33 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   };
   /* v4.8 弹道验收台的自检快照：G 是模块私有变量，外部看不到，
    * 冒烟测试只能靠这个口子确认"怪到底开火没有"。 */
+  /* v6.0 战斗距离自检: 一眼看清"谁够得着谁、差多少"。
+   * 判据(response.pairs):
+   *   stop    怪站位(锚点距离)      = 玩家半宽 + 怪前伸量  → 不重叠的极限贴合
+   *   reachP  玩家前伸量(剑尖)      = BC.playerAtkRange
+   *   halfE   怪半宽(实时体型)
+   *   pCanHit dist <= reachP + halfE ?  → 玩家够得着怪
+   *   eCanHit dist <= enemyReach + 玩家半宽 ? → 怪够得着玩家
+   * 两边都是 true 才算这套距离逻辑健康。 */
+  window.__rangeProbe = () => {
+    const p = G.player;
+    const pw = playerHalfW();
+    return {
+      player: { x: Math.round(p.x), y: Math.round(p.y),
+                reach: p.atkRange, half: +pw.toFixed(1), atkAnim: !!p.attackAnim, moving: p.moving },
+      pairs: G.enemies.filter(e => e.alive && e.dying <= 0).map(e => {
+        const d = groundDist(p, e), he = enemyHalfW(e), er = enemyReach(e);
+        return {
+          t: e.type, skill: e.skill || 0,
+          dist: Math.round(d), stop: e.stopX != null ? Math.round(e.stopX - p.x) : null,
+          reachP: p.atkRange, halfE: +he.toFixed(1), reachE: +er.toFixed(1),
+          pCanHit: canHit(p, e, p.atkRange),
+          eCanHit: canHit(e, p, er),
+        };
+      }),
+      kills: G.kills,
+    };
+  };
   window.__skillProbe = () => {
     const kinds = {};
     for (const f of G.fx) kinds[f.kind] = (kinds[f.kind] || 0) + 1;
@@ -982,8 +1009,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* v4.7 体型感知攻距: 骨架已建好, 现在能拿到真实 AABB 了 —— 按体型重算 atkRange,
      * 让大怪自动站远(不穿模挡玩家), 小怪保持贴身。详见 bodyRange 的说明。
      * 非骨骼怪(纯序列帧)没有 armature, 用自己 sprite 帧的宽高比按同一公式算。
-     * v4.8 技能怪优先: 29 只技能怪的攻距改为实测值(见 SK_RANGE), 只用体感兜底不覆盖。 */
+     * v4.8 技能怪优先: 29 只技能怪的攻距改为实测值(见 SK_RANGE), 只用体感兜底不覆盖。
+     * v6.0 同时缓存体型(半宽), 供 canHit()/enemyHalfW() 做"边缘到边缘"判定 ——
+     * 之前只存了 atkRange(混合口径), 判定时拿不到"怪身体多宽", 才会互相够不着。 */
     const sk = SK_OF[r.type];
+    const dh0 = r.drawH || def.drawH || 84;
     if (sk && SK_RANGE[r.type]) {
       r.atkRange = SK_RANGE[r.type];
       r.skill = sk;
@@ -991,7 +1021,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     } else if (def.bone && r.armature) {
       const bb = armAABB(r.armature);
       if (bb) {
-        r.atkRange = bodyRange(bb, r.drawH || def.drawH || 84, def.role === 'ranged');
+        r.atkRange = bodyRange(bb, dh0, def.role === 'ranged');
         r.__bodyRange = true;
       }
     } else if (!def.bone) {
@@ -1003,6 +1033,15 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         r.__bodyRange = true;
       }
     }
+    /* v6.0 缓存体型, 供边缘判定用。骨骼怪取 AABB 宽高比, 序列帧怪取精灵宽高比。 */
+    if (r.armature) {
+      const bb2 = armAABB(r.armature);
+      if (bb2 && bb2.height > 0) r.__spriteRatio = bb2.width / bb2.height;
+    } else {
+      const sp2 = (key === 'boss') ? BOSS_SPRITE : (key === 'slime') ? SLIME_SPRITE : (key === 'water') ? WATER_SPRITE : null;
+      if (sp2 && sp2.fh > 0) r.__spriteRatio = sp2.fw / sp2.fh;
+    }
+    r.__halfW = 0;    /* 置 0 让 enemyHalfW() 首次调用时惰性算出真实值 */
     return r;
   }
   function makeEnemy(type, tierOverride) {
@@ -1036,12 +1075,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
    *   取 0.45: 允许四肢/武器/尾巴与玩家有视觉交叠(这本来就有打击感),
    *   只保证"身体主干不糊在玩家脸上"。经算, 79 只怪躯干左缘均不越过玩家右缘。
    *   (公式: 攻距 = 玩家半宽 + aabb宽×0.45/2, 躯干左缘 = 攻距 - 躯干半宽 = 玩家右缘, 恒等) */
-  /* 玩家渲染半宽(和 drawPlayerSprite 同一套算法, CH 取当前横带高; 未就绪时用兜底值) */
-  function playerHalfW() {
-    /* v4.7 与 drawPlayerSprite 对齐：drawH = min(CH*0.5, 72) */
-    const h = Math.min((CH || 306) * 0.5, 72);
-    return h * (SPRITE.fw / SPRITE.fh) / 2;
-  }
+  /* v6.0 playerHalfW() 统一定义在下方"战斗距离"区(原此处副本已删)。
+   * 取 72 而非渲染实际用的 80，是为了让 stopPx/SK_RANGE 两张权威表继续对得上。 */
   /* 怪按体型算攻距: 传入骨架 AABB 与本次实际渲染高 */
   function torsoFrac() {
     const v = (typeof window !== 'undefined' && window.__torsoFrac);
@@ -1480,13 +1515,72 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     for (const e of G.enemies) { if (!e.alive||e.dying>0||e.lane!==lane) continue; const d=Math.abs(e.x-fromX); if (d<bestD){bestD=d;best=e;} }
     return best;
   }
-  /* v5.0 二维地面距离: 纵向按"道"折合成像素(y 本身就是像素偏移, 直接相减即可)。
-   * 这是 MMO 式的地面判定 —— 用平面距离而非"是否同道"。 */
+  /* ═══════════════ v6.0 战斗距离: 统一为"边缘到边缘" ═══════════════
+   *
+   * 【为什么要统一】之前玩家和怪各用一套口径，互相打架：
+   *   玩家: atkRange = 75，量的精灵是【锚点 -> 剑尖】(实测剑尖前伸 68.6px)
+   *   技能怪: stopPx = 58.3 + reachPx，其中
+   *           58.3   = 玩家半宽(玩家锚点 -> 玩家身体边缘)
+   *           reachPx = 怪锚点 -> 怪前缘
+   *   于是 stopPx 是【锚点 -> 怪前缘】的距离，而玩家 75 是【锚点 -> 剑尖】。
+   *   两者差一个玩家半宽(58.3)：怪站在 105~210 处，玩家只有 75 的手臂，
+   *   永远够不着 —— 这就是"顶着怪就是不出手"的真凶。
+   *
+   * 【业界标准做法】判定不用"锚点距离 <= 单方攻距"，而是【各自的判定框相交】：
+   *   Capcom 格斗: hitbox 与 hurtbox 重叠即命中；
+   *   SoR 引擎:    dist <= 攻击半径 + 目标半径(半径之和)；
+   *   通用 2D:     分离时用 pushbox 保证不重叠，命中用 hitbox 相交。
+   *   即: A 能打到 B  <=>  dist(anchorA, anchorB) <= reachA + halfB
+   *
+   * 本作照此实现：每方只存【自己的前伸量 + 自己的半宽】，命中判定用两者之和。
+   *   玩家: reach = 75(剑尖)          half = 58.3
+   *   怪:   reach = atkRange - 58.3    half 由渲染体型实时算
+   * 这样谁都不需要知道对方的数值，也不存在"口径不一致"这种事。
+   *
+   * 【站位由"不重叠"单独决定，不看攻距】
+   *   怪停在【自己前缘刚好贴到玩家边缘】处，即 dist = 玩家半宽 + 怪前伸量。
+   *   近战怪前伸小 -> 自然贴身；远程怪前伸大 -> 自然站远。
+   *   这正是技能包 stopPx 的公式，保留不动 —— 它是"零重叠极限贴合"，
+   *   既不会穿模(那是玩家最烦的)，也不会互相够不着。 */
   function groundDist(a, b) {
     const dx = a.x - b.x, dy = (a.y || 0) - (b.y || 0);
     return Math.hypot(dx, dy);
   }
-  /* 目标是否在攻击范围内(二维) */
+  /* 玩家渲染半宽。与 drawPlayerSprite 同一套算法(drawH = min(CH*0.5, 80))。
+   * 技能包算 58.3 时用的是旧基准 min(CH*0.5, 72)，保留 58.3 以保证
+   * stopPx / SK_RANGE 两张权威表继续对得上，不再二次改动。 */
+  function playerHalfW() {
+    const h = Math.min((CH || 306) * 0.5, 72);
+    return h * (SPRITE.fw / SPRITE.fh) / 2;
+  }
+  /* 怪渲染半宽: 骨头怪用骨架 AABB，序列帧怪用精灵帧宽高比，都没有就退回 30。
+   * 这是"怪身体占多宽"的实时值，只跟体型有关，跟攻距无关。 */
+  function enemyHalfW(e) {
+    if (e && e.__halfW > 0) return e.__halfW;
+    let w = 0;
+    if (e && e.armature) {
+      const bb = armAABB(e.armature);
+      if (bb && bb.height > 0) w = (e.drawH || 84) * (bb.width / bb.height) * torsoFrac();
+    }
+    if (!w && e && e.__spriteRatio > 0) w = (e.drawH || 84) * e.__spriteRatio * torsoFrac();
+    if (!w) w = 60 * torsoFrac();            /* 兜底: 约等于玩家体宽 */
+    if (e) e.__halfW = w / 2;
+    return w / 2;
+  }
+  /* 怪的前伸量(= 怪锚点 -> 怪前缘)。技能怪的 atkRange 含玩家半宽，减掉即得。
+   * 非技能怪 atkRange 是旧版的"保守判定半径"，按其语义直接当锚点->边缘用于站位。 */
+  function enemyReach(e) {
+    if (!e) return 0;
+    if (e.__skillRange) return Math.max(0, (e.atkRange || 0) - playerHalfW());
+    return Math.max(0, e.atkRange || 0);
+  }
+  /* 命中判定: 边缘到边缘。range 传"攻击方前伸量"，target 的半宽补齐另一半。
+   * 这样双方各自只关心自己伸多远，重叠即命中 —— 与 Capcom/SoR 一致。 */
+  function canHit(attacker, target, reach) {
+    if (!target) return false;
+    return groundDist(attacker, target) <= reach + enemyHalfW(target) + 5;
+  }
+  /* 兼容旧签名(有些地方只想知道"在不在某个距离内", 不涉及体型) */
   function inRange(a, b, range) {
     return groundDist(a, b) <= range + 5;
   }
@@ -1500,9 +1594,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     }
     return best;
   }
-  /* v4.9 贴身判定距离: 玩家攻距固定 BC.playerAtkRange(75), 够不着就走到怪身边。
-   * 技能怪弹道攻距(108~210)只决定"怪站在哪", 不改变玩家攻距。 */
-  const PLAYER_HIT_GAP = 40;
+  /* 玩家站位: 走到"剑尖够到怪身体边缘"的位置, 再往前就纯浪费。
+   * 与怪的站位(前缘贴玩家边缘)配对 => 互相贴住、零重叠。 */
+  const PLAYER_HIT_GAP = 40;   /* 兼容旧引用 */
   function dealDamage(target, amount, color, crit) {
     target.hp -= amount; target.hurtT = 0.25;
     G.dmg.push({ x:target.x,y:target.y-40, val:Math.round(amount), crit:crit||false, color:color||'#e8f2fa', t:0, vx:(Math.random()-0.5)*18 });
@@ -1572,7 +1666,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         /* 普攻主段: 第一剑刺出, 帧 12 判定一次(全额) */
         if (p.animFrame === 12 && !p.hit1 && p.attackTarget && p.attackTarget.alive) {
           p.hit1 = true;
-          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
+          if (canHit(p, p.attackTarget, p.atkRange)) {
             playerStrike(p, p.attackTarget, 1);
             /* 三连斩: 主段命中即 roll 补刀(第二剑 + 第三刀) */
             const sl = skVal('sanlian');
@@ -1593,7 +1687,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         /* 三连斩第二剑: 帧 18, 追加一段(走 seg=2, 非全额基数, 只是补刀的第二下) */
         if (p.animFrame === 18 && p.sanlianTriggered && !p.hit2 && p.attackTarget && p.attackTarget.alive) {
           p.hit2 = true;
-          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
+          if (canHit(p, p.attackTarget, p.atkRange)) {
             playSfx('attack2', 0.8);
             playerStrike(p, p.attackTarget, 2);
           }
@@ -1601,7 +1695,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         /* 三连斩补刀(第三刀): 帧 22, 必会心(至少×1.5) */
         if (p.animFrame === 22 && p.sanlianTriggered && !p.hit3 && p.attackTarget && p.attackTarget.alive) {
           p.hit3 = true;
-          if (Math.abs(p.attackTarget.x - p.x) <= p.atkRange + 15) {
+          if (canHit(p, p.attackTarget, p.atkRange)) {
             playerStrike(p, p.attackTarget, 3);
           }
         }
@@ -1627,13 +1721,14 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (labActive()) return;   /* 标定台: 玩家不追击不出手 —— 位置锁在 labLayout().px */
     if (window.__skillFreeze) { p.moving = 0; return; }   /* v4.8 弹道验收台: 玩家定桩 */
 
-    /* v5.0 二维地面寻敌: 不再限制"同道", 按地面距离取最近目标。
-     * 玩家攻距恒为 BC.playerAtkRange(75), 够不着就走到怪身边再出手。 */
+    /* v6.0 二维地面寻敌 + 边缘到边缘判定。
+     * 玩家攻距恒为 BC.playerAtkRange(75, 剑尖), 够不着就走过去 —— 不因怪种变。
+     * 命中与否交给 canHit(): dist <= 剑尖 + 怪半宽, 见上方"战斗距离"区。 */
     const near = findNearestEnemy2D(p, p.atkRange+200);
     /* 攻击动画播放期间不中断，保持攻击状态 */
     if (p.attackAnim) {
       p.moving = 0;
-    } else if (near && inRange(p, near, p.atkRange)) {
+    } else if (near && canHit(p, near, p.atkRange)) {
       /* 进入攻击范围，开始攻击（触发时不立即造成伤害，伤害在动画帧中触发） */
       p.moving = 0;
       if (p.atkT <= 0) {
@@ -1648,11 +1743,12 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         }
       }
     } else if (near) {
-      /* v5.0 二维追击: X 走到怪贴身位, Y 连续向怪纵深靠拢(无换道动作)。 */
+      /* v6.0 追击: 走到"剑尖刚好够到怪身体边缘"处，再往前是纯浪费。
+       * 与怪的站位(dist = 玩家半宽 + 怪前伸量)配对 => 双方互相贴住、零重叠。 */
       p.moving = 1; p.walkT += dt*8;
-      const targetX = near.x - PLAYER_HIT_GAP;
+      const standAt = near.x - (p.atkRange + enemyHalfW(near));
       const spd = BC.playerSpeed*1.5*dt;
-      p.x += Math.sign(targetX-p.x) * Math.min(Math.abs(targetX-p.x), spd);
+      p.x += Math.sign(standAt-p.x) * Math.min(Math.abs(standAt-p.x), spd);
       /* 纵向直接向目标怪的纵深靠拢 —— 连续插值, 无换道跳变 */
       const targetDepth = yToDepth(near.y);
       const dD = targetDepth - (p.lane || 0);
@@ -1660,7 +1756,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         p.lane = (p.lane || 0) + Math.sign(dD) * Math.min(Math.abs(dD), 1.2 * dt);
       }
     } else {
-      /* v5.0 无怪时向前推进 —— 防穿越仍生效, 但按二维距离挑最近的挡路怪。 */
+      /* v6.0 无怪时向前推进 —— 防穿越按二维地面距离挑最近的挡路怪。 */
       p.moving = 1; p.walkT += dt*8; p.x += BC.playerSpeed*dt;
       let nearest = Infinity;
       for (const e of G.enemies) {
@@ -1863,19 +1959,15 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       for (const e of queue) {
         /* 验收台定桩怪不进队列, 原地开火 */
         if (e.__skillHold) { e.stopX = e.x; prevX = Math.max(prevX, e.x); continue; }
-        /* v5.1 停位公式修正: 原来怪站在"玩家 + 自己的 atkRange"处, 而技能怪
-         * atkRange 是弹道实测值(108~210), 远大于玩家攻距 75 —— 怪站定后玩家
-         * 永远够不着, 追也追不上(停位跟着玩家漂)。现在怪停在"玩家攻距内"的
-         * 身位处: 用玩家攻距与自身弹道攻距的较小者作为站位基准, 保证双方都能
-         * 交手(远程怪仍比近战怪站得远, 保留其"远程"定位)。 */
+        /* v6.0 站位 = "不重叠"的唯一解, 与攻距无关:
+         *   dist(怪, 玩家) = 玩家半宽 + 怪前伸量
+         * 即【怪身体前缘刚好贴到玩家身体边缘】—— 玩家最烦的穿模在这里被杜绝,
+         * 同时又没有多余间隙(再远一寸就是纯浪费)。近战怪前伸小 -> 自然贴身;
+         * 远程怪前伸大 -> 自然站远, "远程"定位自动成立。
+         * 技能怪的 atkRange 来自 04_数据/stop_class5.json 的 stopPx(= 58.3 + reachPx),
+         * 已含玩家半宽, 故这里直接用即可, 不再做 min/区间之类的人为收窄。 */
         if (e.stopX == null || e.x < e.stopX - BC.queueGap) {
-          /* 站位带: 下界=近战贴身(怪攻距), 上界=玩家能打到的极限(玩家攻距×0.95)。
-           * 怪按其弹道攻距在带内取相对远近 —— 远程怪仍比近战怪站得靠后,
-           * 但一定落在玩家攻距内, 保证交手。 */
-          const lo = Math.min(e.atkRange || 0, G.player.atkRange * 0.95);
-          const hi = G.player.atkRange * 0.95;
-          const standoff = Math.max(lo, Math.min(hi, (e.atkRange || 0) * 0.75));
-          const stopX = Math.max(p.x + standoff, prevX + BC.queueGap);
+          const stopX = Math.max(p.x + (e.atkRange || 0), prevX + BC.queueGap);
           e.stopX = stopX;
         }
         prevX = Math.max(e.x, e.stopX);
@@ -1926,8 +2018,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       e.moving = e.x > stopX+2;
       if (e.x > stopX+2) e.x = Math.max(stopX, e.x-e.speed*dt);
       const wasAttacking = e.anim > 0;
-      /* v5.0 攻击判定改二维地面距离: 范围内的怪都能打到玩家, 不再要求同道。 */
-      if (inRange(e, p, e.atkRange) && e.atkT <= 0) {
+      /* v6.0 攻击判定: 边缘到边缘。怪用自己【前伸量】, 玩家半宽补上另一半。
+       * 怪的站位就是"前缘贴玩家边缘", 所以站定即命中 —— 距离即攻击。
+       * 关于玩家半宽: 技能怪 atkRange 已含 58.3(玩家半宽), 减掉才是纯前伸量;
+       * 非技能怪的 atkRange 是旧版保守半径, 其语义已接近"锚点->边缘", 直接用作前伸。 */
+      if (canHit(e, p, enemyReach(e)) && e.atkT <= 0) {
         e.anim = 1; e.atkT = 1/(0.8+Math.random()*0.5); e.animFrame = 0;
         /* 攻击音效: 攻击开始时 */
         if (!wasAttacking) {
