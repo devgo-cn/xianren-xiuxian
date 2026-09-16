@@ -774,10 +774,14 @@
   </div>
 </div>
 
-<!-- ── DragonBones 骨骼渲染(Canvas2D 桥) ──────────────────────────────────
-     经典脚本先于模块加载: dragonBones.js 为官方 UMD(仅用其 core, 不用 Pixi 渲染器),
-     canvas-dragonbones.js 为自写 Canvas2D 渲染桥(全局 CanvasDragonBones)。 -->
+<!-- ── DragonBones 骨骼渲染 ──────────────────────────────────────────────
+     经典脚本先于模块加载: dragonBones.js 为官方 UMD(内置 PixiFactory,
+     依赖 PIXI —— 所以 pixi-legacy 必须排它前面), webgl-battle.js 为 WebGL
+     战斗层(全局 BattleGL, 依赖前两者)。canvas-dragonbones.js 保留: 加载
+     逻辑仍用它做手配怪素材解析兜底。 -->
+<script src="./test_orig/pixi-legacy.min.js"></script>
 <script src="./assets/db/dragonBones.js"></script>
+<script src="./assets/db/webgl-battle.js"></script>
 <script src="./assets/db/canvas-dragonbones.js"></script>
 
 <!-- ── 游戏入口（唯一）────────────────────────────────────────────────────

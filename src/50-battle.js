@@ -149,16 +149,16 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     return { idle, hurt, attack, walk, dead, skill };
   }
   function loadBone(slug, urls, armName, animList, onReady) {
-    if (!window.CanvasDragonBones || BONES[slug]) return;
-    const B = BONES[slug] = { ready:false, factory:null, anims:boneAnimMap(animList), baseH:0, arm:armName };
+    if (!window.BattleGL || BONES[slug]) return;
+    const B = BONES[slug] = { ready:false, factory:null, anims:boneAnimMap(animList), baseH:0, arm:armName, pool:[] };
     let ske = null, tex = null;
     const img = new Image();
     const tryBuild = () => {
       if (!ske || !tex || !img.naturalWidth || B.ready) return;
       try {
-        B.factory = window.CanvasDragonBones.buildFactory(ske, tex, img);
+        B.factory = window.BattleGL.buildFactory(ske, tex, img);
         const probe = B.factory.buildArmature(armName);
-        const bb = window.CanvasDragonBones.armatureAABB(probe);
+        const bb = window.BattleGL.armatureAABB(probe);
         B.baseH = Math.max(1, bb.maxY - bb.minY);
         probe.dispose();
         B.ready = true;
@@ -177,7 +177,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   const BONE_POOL = { 1:[], 2:[], 3:[], 4:[], 5:[] };
   const BONE_IDX = {};   /* slug -> index.json cfg(armature/anims/tier/drawH) —— makeBoneEnemy 取 drawH 用 */
   (function loadBones() {
-    if (!window.CanvasDragonBones) { console.warn('[battle] CanvasDragonBones 未加载, 骨骼怪走兜底渲染'); return; }
+    if (!window.BattleGL) { console.warn('[battle] BattleGL 未加载, 骨骼怪不可用'); return; }
     loadBone('ratty', { ske:'assets/db/ratty_ske.json', tex:'assets/db/ratty_tex.json', img:'assets/db/ratty_tex.png' }, 'Ratty',
       ['idle','dead','attack','hurt','walk']);
     fetch('assets/db/monsters/index.json').then(r => r.json()).then(idx => {
@@ -572,10 +572,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   /* ---------- 掉落物: 灵石/装备落在地板; 灵石飞向顶部统计区; 装备由飞行宠物拾取 ---------- */
   const QUALITY_COLOR = ['#aab2c0', '#6b9df5', '#3fc9a2', '#e0b45a', '#c08af0', '#ff5257'];
   function dropRarityColor(q) { return QUALITY_COLOR[Math.max(0, Math.min(5, q | 0))] || '#aab2c0'; }
-  function drawGem(x, y, r, fill, hi) {
-    ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.72, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r * 0.72, y); ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
-    ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.72, y); ctx.lineTo(x, y); ctx.closePath(); ctx.fillStyle = hi; ctx.fill();
-  }
   function hudTarget() {                          // 顶部统计区"灵石"数字位置(canvas 局部坐标)
     const el = document.getElementById('battleSpirit');
     if (el && cv) { const r = el.getBoundingClientRect(), c = cv.getBoundingClientRect(); return { x: r.left + r.width / 2 - c.left, y: r.top + r.height / 2 - c.top }; }
@@ -631,37 +627,100 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       }
     }
   }
+  /* v4.0 WebGL: '#rrggbb' → 0xRRGGBB（带缓存） */
+  function colorInt(css) {
+    const c = colorInt._c || (colorInt._c = {});
+    let v = c[css];
+    if (v === undefined) {
+      let s = css.replace('#', '');
+      if (s.length === 3) s = s[0] + s[0] + s[1] + s[1] + s[2] + s[2];
+      v = c[css] = parseInt(s, 16) | 0;
+    }
+    return v;
+  }
+  function drawGem(g, x, y, r, fill, hi) {
+    g.beginFill(fill, 1);
+    g.moveTo(x, y - r); g.lineTo(x + r * 0.72, y); g.lineTo(x, y + r); g.lineTo(x - r * 0.72, y); g.closePath();
+    g.endFill();
+    g.beginFill(hi, 1);
+    g.moveTo(x, y - r); g.lineTo(x + r * 0.72, y); g.lineTo(x, y); g.closePath();
+    g.endFill();
+  }
   function drawDrops() {
+    /* v4.0 WebGL: 每个掉落一个池化 Container（跟随 d 生命周期 destroy）。
+     * spirit = Graphics 脉冲重画; equip = 阴影 Graphics + body(描边圈/圆裁图标)。 */
+    const dropsC = window.BattleGL.layers.drops;
+    const pool = drawDrops._pool || (drawDrops._pool = []);
+    for (const o of pool) o.__used = false;
     for (const d of G.drops) {
       if (d.phase === 'done') continue;
-      if (d.kind === 'spirit') {
-        ctx.save(); ctx.translate(d.x, d.y);
-        const pulse = 1 + Math.sin(d.t * 6) * 0.08;
-        ctx.globalAlpha = d.phase === 'fly' ? 0.92 : 1;
-        ctx.fillStyle = 'rgba(103,201,171,0.28)';
-        ctx.beginPath(); ctx.arc(0, 0, 9 * pulse, 0, Math.PI * 2); ctx.fill();
-        drawGem(0, 0, 7 * pulse, '#67c9ab', '#b7ecda');
-        ctx.restore();
-      } else {
-        const sc = d.scale; if (sc <= 0.02) continue;
-        /* 贴地阴影(未起飞时) */
-        if (d.phase === 'wait' || d.phase === 'fetch' || d.phase === 'land') {
-          ctx.save(); ctx.globalAlpha = 0.22; ctx.fillStyle = '#000';
-          ctx.beginPath(); ctx.ellipse(d.x, floorY() + (d.gy || 0) - 4, 10 * sc, 3 * sc, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-        }
-        ctx.save(); ctx.translate(d.x, d.y - 14 * sc); ctx.scale(sc, sc);
-        ctx.globalAlpha = 0.5; ctx.strokeStyle = dropRarityColor(d.eq.q); ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.stroke();
-        ctx.globalAlpha = 1;
-        if (d.img && d.img.complete && d.img.naturalWidth) {
-          ctx.save();                              /* 图标裁成圆形宝珠(素材自带深色方底) */
-          ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.clip();
-          ctx.drawImage(d.img, -12, -12, 24, 24);
-          ctx.restore();
-        }
-        else { ctx.fillStyle = dropRarityColor(d.eq.q); ctx.beginPath(); (ctx.roundRect ? ctx.roundRect(-11, -11, 22, 22, 4) : ctx.rect(-11, -11, 22, 22)); ctx.fill(); }
-        ctx.restore();
+      let o = d.__gl;
+      if (!o) {
+        o = d.__gl = { __used: true, c: new PIXI.Container(), g: new PIXI.Graphics() };
+        o.c.addChild(o.g);
+        dropsC.addChild(o.c);
+        pool.push(o);
       }
+      o.__used = true;
+      o.c.visible = true;
+      o.c.position.set(d.x, d.y);
+      o.c.alpha = 1;
+      o.g.clear();
+      if (d.kind === 'spirit') {
+        const pulse = 1 + Math.sin(d.t * 6) * 0.08;
+        o.c.alpha = d.phase === 'fly' ? 0.92 : 1;
+        o.g.beginFill(0x67c9ab, 0.28);
+        o.g.drawCircle(0, 0, 9 * pulse);
+        o.g.endFill();
+        drawGem(o.g, 0, 0, 7 * pulse, 0x67c9ab, 0xb7ecda);
+      } else {
+        const sc = d.scale;
+        if (sc <= 0.02) { o.c.visible = false; continue; }
+        /* 贴地阴影(未起飞时) —— 画在容器外那层, 阴影不随本体缩放/浮起 */
+        if (d.phase === 'wait' || d.phase === 'fetch' || d.phase === 'land') {
+          o.g.beginFill(0x000000, 0.22);
+          o.g.drawEllipse(0, floorY() + (d.gy || 0) - 4 - d.y, 10 * sc, 3 * sc);
+          o.g.endFill();
+        }
+        if (!o.body) {
+          o.body = new PIXI.Container();
+          o.g2 = new PIXI.Graphics();
+          o.iconMask = new PIXI.Graphics();
+          o.iconMask.beginFill(0xffffff).drawCircle(0, 0, 12).endFill();
+          o.icon = new PIXI.Sprite();
+          o.icon.anchor.set(0.5);
+          o.icon.width = 24; o.icon.height = 24;
+          o.body.addChild(o.g2);
+          o.body.addChild(o.iconMask);
+          o.body.addChild(o.icon);
+          o.icon.mask = o.iconMask;   /* 图标裁成圆形宝珠(素材自带深色方底) */
+          o.c.addChild(o.body);
+        }
+        o.body.visible = true;
+        o.body.y = -14 * sc;
+        o.body.scale.set(sc);
+        const rc = colorInt(dropRarityColor(d.eq.q));
+        o.g2.clear();
+        o.g2.lineStyle(2, rc, 0.5);
+        o.g2.drawCircle(0, 0, 14);
+        o.g2.lineStyle(0);
+        if (d.img && d.img.complete && d.img.naturalWidth) {
+          o.icon.visible = true;
+          o.icon.texture = window.BattleGL.tex(d.img);
+        } else {
+          o.icon.visible = false;
+          o.g2.beginFill(rc, 1);
+          o.g2.drawRoundedRect(-11, -11, 22, 22, 4);
+          o.g2.endFill();
+        }
+      }
+    }
+    /* 对账回收: 掉落已被 splice 的池对象销毁(防 GL 显存泄漏) */
+    for (let i = pool.length - 1; i >= 0; i--) {
+      const o = pool[i];
+      if (o.__used) continue;
+      o.c.destroy({ children: true });
+      pool.splice(i, 1);
     }
   }
   /* ---------- 玩家一次命中(段1/段2)的全部技能判定 ----------
@@ -1110,7 +1169,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         }
       }
     }
-    G.enemies = G.enemies.filter(e => e.alive || e.dying>0);
+    G.enemies = G.enemies.filter(e => { if (!(e.alive || e.dying > 0)) despawnEnemy(e); return e.alive || e.dying > 0; });
   }
   function updateFx(dt) {
     for (const f of G.fx) {
@@ -1153,6 +1212,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const kills = G.trialKills;
     /* 清场: 轮次结束, 场上怪与投射特效退去(掉落保留让玩家收完) */
     for (const e of G.enemies) { e.alive = false; e.dying = 0; }
+    for (const e of G.enemies) despawnEnemy(e);   /* v4.0: GL 资源同步回收 */
     G.enemies.length = 0;
     G.bossActive = false; G.smallKillsSinceBoss = 0;
     /* 纪录 + 离线加成(写进 state, 随云存档同步) */
@@ -1260,6 +1320,12 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     cv = document.getElementById('battleCanvas');
     if (!cv) return false;
     ctx = cv.getContext('2d');
+    /* v4.0 WebGL: GL 战斗层 canvas 挂 body(全屏 z:1), 不依赖 #battleCanvas 尺寸;
+     * 2D 画布仍保留以兼容独立模式与 resize 逻辑。 */
+    if (window.BattleGL) window.BattleGL.init();
+    /* 常态调色移到 CSS 合成层(GPU, 零 canvas 开销) —— ctx.filter 会让每个 drawImage
+     * 走滤镜管线, 在 mesh 逐三角/多怪同屏时是移动端帧率杀手之一 */
+    cv.style.filter = 'saturate(0.85) brightness(0.93)';
     resize();
     window.addEventListener('resize', resize);
     return true;
@@ -1278,19 +1344,21 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   function worldToScreen(wx) { return wx - G.camX; }
 
   function hash01(n) { return ((Math.imul(n | 0, 1103515245) + 12345) >>> 8) % 1000 / 1000; }
-  function drawCloudShape(x, y, s, alpha) {
+  function drawCloudShape(g, x, y, s, alpha) {
     /* 一朵云 = 4 个椭圆拼的云团(同一路径一次填充, 重叠处不会加深) */
-    ctx.save(); ctx.globalAlpha = alpha; ctx.fillStyle = '#d8e4f0';
-    ctx.beginPath();
-    ctx.ellipse(x, y, 70 * s, 13 * s, 0, 0, Math.PI * 2);
-    ctx.ellipse(x - 40 * s, y + 4 * s, 32 * s, 8 * s, 0, 0, Math.PI * 2);
-    ctx.ellipse(x + 42 * s, y + 5 * s, 28 * s, 7 * s, 0, 0, Math.PI * 2);
-    ctx.ellipse(x + 8 * s, y - 9 * s, 34 * s, 9 * s, 0, 0, Math.PI * 2);
-    ctx.fill(); ctx.restore();
+    g.beginFill(0xd8e4f0, alpha);
+    g.drawEllipse(x, y, 70 * s, 13 * s);
+    g.drawEllipse(x - 40 * s, y + 4 * s, 32 * s, 8 * s);
+    g.drawEllipse(x + 42 * s, y + 5 * s, 28 * s, 7 * s);
+    g.drawEllipse(x + 8 * s, y - 9 * s, 34 * s, 9 * s);
+    g.endFill();
   }
   function drawClouds() {
-    /* 三层视差云: 远层慢而淡、近层快而实; 随摄像机视差滚动 + 自身缓慢漂移 + 上下浮动 */
+    /* 三层视差云: 远层慢而淡、近层快而实; 随摄像机视差滚动 + 自身缓慢漂移 + 上下浮动
+     * v4.0 WebGL: 画进 bg 层共享 Graphics（每帧 clear 重画, 仅 bgImg 未就绪时走此路径） */
     const t = G.t;
+    const g = window.BattleGL.layers.bg._clouds;
+    g.clear();
     const layers = [
       { par: 0.12, n: 5, gap: 540, alpha: 0.045, sc: 0.72, yBase: 0.10, spd: 3 },
       { par: 0.28, n: 4, gap: 660, alpha: 0.062, sc: 1.0,  yBase: 0.21, spd: 6 },
@@ -1304,97 +1372,63 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         if (sx > CW + 320) continue;
         const r = hash01(i * 57 + L.n * 13);
         const cy = CH * (L.yBase + r * 0.09) + Math.sin(t * 0.5 + i * 1.7) * 4;
-        drawCloudShape(sx, cy, L.sc * (0.8 + r * 0.45), L.alpha);
+        drawCloudShape(g, sx, cy, L.sc * (0.8 + r * 0.45), L.alpha);
       }
-    }
-  }
-  function drawGround() {
-    /* 地面带 + 1:1 滚动刻度/碎石 —— 推进感的主要参照物 */
-    const fy = floorY();
-    const g = ctx.createLinearGradient(0, fy, 0, fy + 16);
-    g.addColorStop(0, 'rgba(180,170,140,0.10)');
-    g.addColorStop(1, 'rgba(180,170,140,0.02)');
-    ctx.fillStyle = g; ctx.fillRect(0, fy, CW, 16);
-    /* 刻度斜线: 世界坐标每 56px 一条, 随 camX 滚动 */
-    const gap = 56, off = ((G.camX % gap) + gap) % gap;
-    ctx.strokeStyle = 'rgba(180,170,140,0.16)'; ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let x = gap - off; x < CW + gap; x += gap) { ctx.moveTo(x, fy + 3); ctx.lineTo(x - 6, fy + 11); }
-    ctx.stroke();
-    /* 碎石点: 按世界格索引取确定性伪随机, 高低错落 */
-    const gap2 = 23, start = Math.floor(G.camX / gap2) - 1, end = start + Math.ceil(CW / gap2) + 3;
-    ctx.fillStyle = 'rgba(200,190,160,0.13)';
-    for (let i = start; i < end; i++) {
-      const r = hash01(i * 2654435761);
-      ctx.fillRect(i * gap2 - G.camX, fy + 4 + r * 9, 2, 1.5);
     }
   }
   function drawBg() {
     /* v3.7 幽夜森林背景: 随摄像机 0.5 视差滚动, 【镜像交替平铺】实现左右无限无缝拼接。
-     * 手法: 把图按宽度切成份, 全局份序号奇偶交替 —— 偶数份原图、奇数份水平翻转。
-     * 任何图与自身镜像在边缘处像素级对称(数学保证), 相邻份交接处必然无缝,
-     * 不要求素材本身可循环平铺。周期 = 2×drawW(正+反一循环)。 */
-    const fy = floorY();
+     * v4.0 WebGL: Sprite 池交替正/镜像摆位（scale.x=-1 等价原 translate+scale(-1,1)）。 */
     if (G.bgReady && G.bgImg) {
+      window.BattleGL.layers.bg._clouds.clear();   // 平铺生效时清掉云兜底
       const drawH = CH;                           /* 画满整条战斗横带(地板下方延续石板路, 无黑边) */
       const drawW = drawH * (G.bgImg.width / G.bgImg.height);
       const period = drawW * 2;
       const off = ((G.camX * 0.5) % period + period) % period;   // 远景半速视差
       const y0 = CH - drawH;
       const n0 = Math.floor(off / drawW);
-      ctx.save();
-      ctx.beginPath(); ctx.rect(0, 0, CW, CH); ctx.clip();
+      const tiles = window.BattleGL.layers.bg._tiles;
+      const need = Math.min(8, Math.ceil(CW / drawW) + 2);
+      const pool = drawBg._pool || (drawBg._pool = []);
+      while (pool.length < need) { const s = new PIXI.Sprite(); tiles.addChild(s); pool.push(s); }
+      const tex = window.BattleGL.tex(G.bgImg);
+      let k = 0;
       for (let n = n0; ; n++) {
         const x = n * drawW - off;
         if (x > CW) break;
-        if (n % 2 === 0) {
-          ctx.drawImage(G.bgImg, x, y0, drawW, drawH);
-        } else {
-          ctx.save(); ctx.translate(x + drawW, y0); ctx.scale(-1, 1);
-          ctx.drawImage(G.bgImg, 0, 0, drawW, drawH);
-          ctx.restore();
-        }
+        const s = pool[k++];
+        s.visible = true;
+        s.texture = tex;
+        s.y = y0;
+        if (n % 2 === 0) { s.x = x; s.scale.set(drawW / G.bgImg.width, drawH / G.bgImg.height); }
+        else { s.x = x + drawW; s.scale.set(-drawW / G.bgImg.width, drawH / G.bgImg.height); }
       }
-      ctx.restore();
+      for (; k < pool.length; k++) pool[k].visible = false;
     } else {
       drawClouds();   /* 背景图未就绪时保留旧的程序云天 */
     }
   }
 
-  function drawEliteRing(x, y, r) {          // 精英怪: 脚下金色法环
-    ctx.save(); ctx.translate(x, y); ctx.globalAlpha = 0.5;
-    ctx.strokeStyle = '#e8c46b'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.ellipse(0, 0, r, r*0.3, 0, 0, Math.PI*2); ctx.stroke();
-    ctx.restore();
+  /* v4.0 WebGL: 血条/法环 → Pixi Graphics。layerName 指定绘制层(farUI/nearUI/playerUI)，
+   * 该层 Graphics 每帧 render 前清空，重画顺序与原 2D 完全一致。
+   * 原水平渐变按中点取纯色近似(3px 高的渐变肉眼不可辨)。 */
+  const HPBAR_COL = { e: 0xe84038, g: 0x55cc90, y: 0xe4bc54, r: 0xf46050 };
+  function drawEliteRing(layerName, x, y, r) {   // 精英怪: 脚下金色法环
+    const g = window.BattleGL.layers[layerName]._gfx;
+    g.lineStyle(1.5, 0xe8c46b, 0.5);
+    g.drawEllipse(x, y, r, r * 0.3);
   }
-  /* v2.6 PERF: 血条渐变按(宽度,配色桶)缓存 —— 原实现每条血条每帧新建 LinearGradient
-   * (满屏怪 + 玩家 + BOSS 可达十几条/帧)。渐变用相对坐标, 绘制前 translate 到位 */
-  const HPBAR_GRAD = {};
-  function drawHpBar(x, y, w, hp, maxHp, isEnemy) {
+  function drawHpBar(layerName, x, y, w, hp, maxHp, isEnemy) {
     const p = Math.max(0, hp/maxHp); const h = 3;
-    ctx.fillStyle = 'rgba(8,12,20,0.6)';
-    roundRect(x-w/2, y, w, h, 1.5); ctx.fill();
+    const g = window.BattleGL.layers[layerName]._gfx;
+    g.lineStyle(0);
+    g.beginFill(0x080c14, 0.6);
+    g.drawRoundedRect(x - w/2, y, w, h, 1.5);
+    g.endFill();
     const bucket = isEnemy ? 'e' : (p > 0.5 ? 'g' : p > 0.25 ? 'y' : 'r');
-    const key = w + bucket;
-    let grad = HPBAR_GRAD[key];
-    if (!grad) {
-      grad = ctx.createLinearGradient(-w/2, 0, w/2, 0);
-      if (bucket === 'e') { grad.addColorStop(0,'#ff6050'); grad.addColorStop(1,'#d82020'); }
-      else if (bucket === 'g') { grad.addColorStop(0,'#6fe0a8'); grad.addColorStop(1,'#3ab878'); }
-      else if (bucket === 'y') { grad.addColorStop(0,'#f0d070'); grad.addColorStop(1,'#d8a838'); }
-      else { grad.addColorStop(0,'#ff8070'); grad.addColorStop(1,'#e84030'); }
-      HPBAR_GRAD[key] = grad;
-    }
-    ctx.save(); ctx.translate(x, y);
-    ctx.fillStyle = grad;
-    roundRect(-w/2, 0, w*p, h, 1.5); ctx.fill();
-    ctx.restore();
-  }
-  function roundRect(x, y, w, h, r) {
-    r = Math.min(r, w/2, h/2);
-    ctx.beginPath(); ctx.moveTo(x+r, y);
-    ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r);
-    ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath();
+    g.beginFill(HPBAR_COL[bucket], 1);
+    if (w * p > 0.01) g.drawRoundedRect(x - w/2, y, w * p, h, 1.5);
+    g.endFill();
   }
 
   /* v2.6 PERF: BOSS 攻击帧"左侧渐隐"掩码按帧预渲染 —— 原实现攻击期间每帧新建
@@ -1426,147 +1460,98 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     return BOSS_MASK.frames[fi] || null;
   }
 
-  function drawPlayerSprite() {
-    const p = G.player;
-    const sx = worldToScreen(p.x);
-    const sy = floorY() + p.y;   /* v3.7: 玩家随车道(y 为车道偏移, 平滑过渡) */
-
-    /* 技能动画渲染 (剑气斩) */
-    if (p.skillAnim && G.skillReady && G.skillSprite) {
-      const frameIdx = Math.min(p.skillFrame, SKILL.count - 1);
-      const col = frameIdx % SKILL.cols;
-      const row = Math.floor(frameIdx / SKILL.cols);
-      const srcX = col * SKILL.fw;
-      const srcY = row * SKILL.fh;
-      /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放) */
-      const drawH = Math.min(CH * 0.55, 80) * laneScale(p.lane);
-      const drawW = drawH * (SKILL.fw / SKILL.fh);
-      ctx.save();
-      ctx.translate(sx, sy);
-      if (p.hurtT > 0) { ctx.globalAlpha = 0.5+0.5*Math.sin(p.hurtT*40); ctx.filter = 'brightness(2.2) saturate(0.3)'; }
-      /* 技能发光效果 */
-      ctx.shadowColor = 'rgba(150,220,255,0.6)';
-      ctx.shadowBlur = 12;
-      /* 技能帧中角色脚底在 y=250(帧高256), 偏移对齐地板 */
-      const footOffset = (SKILL.fh - 250) / SKILL.fh * drawH;
-      /* 角色中心在帧中 x≈200/480≈0.42, 水平对齐 */
-      ctx.drawImage(G.skillSprite, srcX, srcY, SKILL.fw, SKILL.fh, -drawW*0.42, -drawH + footOffset, drawW, drawH);
-      ctx.restore();
-      drawHpBar(sx, sy-drawH*0.7-10, 36, p.hp, p.maxHp);
-      return;
-    }
-
-    if (!G.spriteReady || !G.sprite) {
-      /* 素材未加载时用占位图形 */
-      ctx.save(); ctx.translate(sx, sy);
-      if (p.hurtT > 0) { ctx.globalAlpha = 0.5+0.5*Math.sin(p.hurtT*40); ctx.filter = 'brightness(2.2) saturate(0.3)'; }
-      const bodyH = Math.min(40, CH*0.3);
-      ctx.fillStyle = '#e8eef5';
-      ctx.beginPath(); ctx.moveTo(-10,-bodyH); ctx.lineTo(10,-bodyH); ctx.lineTo(13,-4); ctx.lineTo(-13,-4); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#f0d8c0'; ctx.beginPath(); ctx.arc(0,-bodyH-6,7,0,Math.PI*2); ctx.fill();
-      ctx.restore();
-      drawHpBar(sx, sy-bodyH-20, 32, p.hp, p.maxHp);
-      return;
-    }
-    /* 真实 sprite 渲染 */
-    /* 计算帧索引和位置 */
-    let frameIdx;
-    if (p.attackAnim) frameIdx = SPRITE.attackStart + ATTACK_MAP[Math.min(p.animFrame, ATTACK_MAP.length - 1)];
-    else frameIdx = SPRITE.walkStart + (p.animFrame % SPRITE.walkCount);
-    const col = frameIdx % SPRITE.cols;
-    const row = Math.floor(frameIdx / SPRITE.cols);
-    const srcX = col * SPRITE.fw;
-    const srcY = row * SPRITE.fh;
-    /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放; v3.8: 80→72, 新素材角色满帧高,
-     * 同基准下视觉会大 13%, 回调保持体型延续) */
-    const drawH = Math.min(CH * 0.5, 72) * laneScale(p.lane);
-    const drawW = drawH * (SPRITE.fw / SPRITE.fh);
-    /* 疾风步/缩地成寸残影: 加速期间玩家身后显示3个半透明残影, 倍速越高残影越多 */
-    if (G.speedMult > 1 && !p.attackAnim) {
-      const trailCount = G.speedMult >= 3 ? 4 : 3;
-      for (let i = trailCount; i >= 1; i--) {
-        ctx.save();
-        ctx.translate(sx - i * 10, sy);  /* 向后偏移, 距离递增 */
-        ctx.globalAlpha = 0.12 * (trailCount + 1 - i) / trailCount;  /* 透明度递减 */
-        /* 残影轻微水平拉伸, 增强速度感 */
-        ctx.scale(1 + i * 0.03, 1);
-        ctx.drawImage(G.sprite, srcX, srcY, SPRITE.fw, SPRITE.fh, -drawW*0.35, -drawH, drawW, drawH);
-        ctx.restore();
-      }
-    }
-    ctx.save();
-    ctx.translate(sx, sy);
-    if (p.hurtT > 0) { ctx.globalAlpha = 0.5+0.5*Math.sin(p.hurtT*40); ctx.filter = 'brightness(2.2) saturate(0.3)'; }
-    /* 攻击buff视觉: 橙色光晕 */
-    if (p.atkBuff > 0) {
-      const pulse = 0.5 + 0.5 * Math.sin(G.t * 6);
-      ctx.shadowColor = `rgba(255,170,85,${0.5 + pulse*0.3})`;
-      ctx.shadowBlur = 10 + pulse*6;
-    }
-    /* 加速期间玩家发光: 疾风步青绿, 缩地成寸蓝紫 */
-    if (G.speedMult > 1) {
-      const glowColor = G.speedMult >= 3 ? 'rgba(160,180,255,0.8)' : 'rgba(128,255,192,0.7)';
-      ctx.shadowColor = glowColor;
-      ctx.shadowBlur = G.speedMult >= 3 ? 16 : 12;
-    }
-    ctx.drawImage(G.sprite, srcX, srcY, SPRITE.fw, SPRITE.fh, -drawW*0.35, -drawH, drawW, drawH);
-    ctx.restore();
-    /* 血条 */
-    drawHpBar(sx, sy - drawH - 8, 36, p.hp, p.maxHp);
-  }
-
   function drawPets() {
+    const C = window.BattleGL.layers.pets;
+    const ensure = (pet) => {
+      if (pet.__gl) return pet.__gl;
+      const o = { main: new PIXI.Sprite(), glow: new PIXI.Sprite(), place: new PIXI.Graphics() };
+      o.main.anchor.set(0.5, 1);   /* 原版 translate 后 drawImage(-w/2,-h) → anchor(0.5,1) 等价 */
+      o.glow.anchor.set(0.5);
+      o.glow.blendMode = PIXI.BLEND_MODES.ADD;
+      C.addChild(o.glow); C.addChild(o.place); C.addChild(o.main);
+      return pet.__gl = o;
+    };
     for (const pet of G.pets) {
       if (!pet.alive) continue;
       const sx = worldToScreen(pet.x);
       const sy = pet.y;  /* 宠物y坐标已包含offsetY和上下浮动 */
+      const S = ensure(pet);
+      S.main.visible = S.glow.visible = S.place.visible = false;
       /* 灵狐真实 sprite 渲染 */
       if (G.petFoxReady && G.petFoxSprite && pet.type === 'fox') {
         const PET_SPRITE = { cols:8, fw:96, fh:80 };
         const frameIdx = pet.flyFrame % 32;
-        const col = frameIdx % PET_SPRITE.cols;
-        const row = Math.floor(frameIdx / PET_SPRITE.cols);
-        const srcX = col * PET_SPRITE.fw;
-        const srcY = row * PET_SPRITE.fh;
         /* 渲染尺寸: 宠物较小, 约玩家的60% */
         const drawH = Math.min(CH * 0.35, 52);
         const drawW = drawH * (PET_SPRITE.fw / PET_SPRITE.fh);
-        ctx.save();
-        ctx.translate(sx, sy);
-        if (pet.face === -1) ctx.scale(-1, 1);   /* 向左飞: 水平镜像(素材默认朝右) */
-        /* v2.6.2 施法特效: lighter 柔光垫底(呼吸幅度收小), 替代大光圈脉冲 + 浓 shadowBlur 投影(整只狐糊一圈彩光, 又脏又糊) */
+        S.main.visible = true;
+        S.main.texture = frameTex(G.petFoxSprite, PET_SPRITE.cols, PET_SPRITE.fw, PET_SPRITE.fh, frameIdx);
+        /* 向左飞: 水平镜像(素材默认朝右) —— scale.x 取负 */
+        S.main.scale.set((drawW / PET_SPRITE.fw) * (pet.face === -1 ? -1 : 1), drawH / PET_SPRITE.fh);
+        S.main.position.set(sx, sy);
+        /* 施法特效: lighter 柔光垫底(呼吸幅度收小) */
         if (pet.casting) {
           const pulse = 0.5 + 0.5 * Math.sin(pet.castAnim * Math.PI * 3);
           const img = pet.castType === 'heal' ? GLOW.heal : GLOW.atk;
           const glowR = drawH * (0.68 + pulse * 0.14);
-          ctx.save();
-          ctx.globalCompositeOperation = 'lighter';
-          ctx.globalAlpha = 0.3 + pulse * 0.18;
-          ctx.drawImage(img, -glowR, -drawH*0.55 - glowR, glowR*2, glowR*2);
-          ctx.restore();
+          S.glow.visible = true;
+          S.glow.texture = window.BattleGL.tex(img);
+          S.glow.position.set(sx, sy - drawH * 0.55);
+          S.glow.width = S.glow.height = glowR * 2;
+          S.glow.alpha = 0.3 + pulse * 0.18;
         }
-        /* v3.4: 删掉了"待机微光"常亮垫底。
-         * 用户反馈"没放技能的时候也在发光" —— 真凶就是这里的 else 分支：
-         * 每帧都拿 GLOW.heal(青绿) 以 lighter 叠 0.16 alpha，×2/×3 倍速下
-         * 每帧叠加次数翻倍，整只狐就常年泛着一层绿光，看着像一直在施法。
-         * 现在灵狐本体只在 casting 期间发光，待机即干净贴图。 */
-        ctx.drawImage(G.petFoxSprite, srcX, srcY, PET_SPRITE.fw, PET_SPRITE.fh, -drawW*0.5, -drawH, drawW, drawH);
-        ctx.restore();
       } else {
         /* 其他宠物占位 */
-        ctx.save(); ctx.translate(sx, sy);
-        if (pet.hurtT > 0) { ctx.globalAlpha = 0.6; ctx.filter = 'brightness(2)'; }
+        S.place.visible = true;
+        S.place.clear();
+        S.place.position.set(sx, sy);
+        S.place.alpha = pet.hurtT > 0 ? 0.6 : 1;
         const r = Math.min(8, CH*0.07);
-        ctx.fillStyle = pet.color || '#ffd76b'; ctx.beginPath(); ctx.arc(0,-r,r,0,Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#1a1a2a'; ctx.beginPath(); ctx.arc(-2.5,-r-1,1.2,0,Math.PI*2); ctx.arc(2.5,-r-1,1.2,0,Math.PI*2); ctx.fill();
-        ctx.restore();
+        S.place.beginFill(colorInt(pet.color || '#ffd76b'), 1);
+        S.place.drawCircle(0, -r, r);
+        S.place.endFill();
+        S.place.beginFill(0x1a1a2a, 1);
+        S.place.drawCircle(-2.5, -r-1, 1.2);
+        S.place.drawCircle(2.5, -r-1, 1.2);
+        S.place.endFill();
       }
     }
   }
 
   /* v3.8.2 遮挡分层: 接收 lane 过滤器 —— render 拆两批调用, 远于玩家的怪先画
-   * (被玩家盖), 近于玩家的怪最后画(盖玩家), 三车道遮挡关系明确(画家算法)。 */
-  function drawEnemies(laneFilter) {
+   * (被玩家盖), 近于玩家的怪最后画(盖玩家), 三车道遮挡关系明确(画家算法)。
+   * v4.0 WebGL: uiLayer('far'/'near') 指定批次 —— 怪挂 far/near 容器, 血条/法环
+   * 挂 farUI/nearUI 的共享 Graphics。容器内 addChild 置顶保持批次内遍历序=遮挡序。 */
+  /* v4.0 WebGL: 怪离场回收 —— 骨骼 display 是持久 addChild(非每帧重建),
+   * 怪被 G.enemies 移除后若不同步出列, far/near 容器里就留下永生幽灵怪。
+   * 在两个移除点(死亡 filter / 试炼清场)调用; 骨架回池复用(build 不便宜)。 */
+  function despawnEnemy(e) {
+    const GL = window.BattleGL;
+    if (!GL || !GL.ready) return;
+    if (e.armature && e.boneSlug && BONES[e.boneSlug]) {
+      GL.releaseArmature(BONES[e.boneSlug], e.armature);
+      e.armature = null;
+    }
+    if (e.__spr) { e.__spr.destroy(); e.__spr = null; }
+    if (e.__placeG) { e.__placeG.destroy(); e.__placeG = null; }
+  }
+
+  /* v4.0 WebGL: 序列帧怪的共享 Sprite（per-enemy 懒建），挂本批容器并置顶 */
+  function enemySpriteGL(e, layer) {
+    let s = e.__spr;
+    if (!s) { s = e.__spr = new PIXI.Sprite(); layer.addChild(s); }
+    layer.addChild(s);
+    s.visible = true;
+    return s;
+  }
+  /* 序列帧怪受击/死亡的公共 alpha+filter */
+  function enemyFxGL(spr, e) {
+    spr.alpha = (e.dying > 0 ? Math.max(0, e.dying / 0.4) : 1) * (e.hurtT > 0 ? 0.7 : 1);
+    spr.filters = e.hurtT > 0 ? [window.BattleGL.Filters.hurt] : null;
+  }
+  function drawEnemies(laneFilter, batch) {
+    const batchC = window.BattleGL.layers[batch === 'near' ? 'near' : 'far'];
+    const uiLayer = batch === 'near' ? 'nearUI' : 'farUI';
     for (const e of G.enemies) {
       if (laneFilter && !laneFilter(e)) continue;
       if (!e.alive && e.dying <= 0) continue;
@@ -1580,17 +1565,19 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         const cap = def.isBoss ? CH * 0.7 : CH * 0.5;
         const drawH = Math.min(cap, e.drawH || def.drawH || 84) * (def.isBoss ? 1 : (e.elite ? 1.28 : 1)) * laneScale(e.lane);
         const s = drawH / Math.max(1, B.baseH || 100);
-        const bb = window.CanvasDragonBones.armatureAABB(e.armature);
-        ctx.save();
-        ctx.translate(sx, sy);
-        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
-        ctx.filter = e.hurtT > 0 ? 'saturate(0.85) brightness(1.8)' : 'saturate(0.85) brightness(0.93)';
-        ctx.scale(s, s);
-        ctx.translate(-(bb.minX + bb.maxX) / 2, -bb.maxY);
-        window.CanvasDragonBones.drawArmature(ctx, e.armature);
-        ctx.restore();
-        if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
-        if (e.alive) drawHpBar(sx, sy - drawH - 4, def.hpBarW || 28, e.hp, e.maxHp, true);
+        const bb = window.BattleGL.armatureAABB(e.armature);
+        /* v4.0 WebGL: 2D 的 translate(sx,sy)·scale(s)·translate(-cx,-maxY) 在
+         * display 上等价于 pos=(sx-s·cx, sy-s·maxY)+scale(s)。蒙皮顶点在
+         * armature.display 的骨架局部空间, 与 2D drawArmature 同一坐标系。 */
+        const d = e.armature.display;
+        batchC.addChild(d);   // reparent 到本批容器 + 置顶(遍历序=遮挡序)
+        d.visible = true;
+        d.position.set(sx - s * (bb.minX + bb.maxX) / 2, sy - s * bb.maxY);
+        d.scale.set(s);
+        d.alpha = e.dying > 0 ? Math.max(0, e.dying/0.4) : 1;
+        d.filters = e.hurtT > 0 ? [window.BattleGL.Filters.hurt] : null;
+        if (e.elite && e.alive) drawEliteRing(uiLayer, sx, sy, 16);
+        if (e.alive) drawHpBar(uiLayer, sx, sy - drawH - 4, def.hpBarW || 28, e.hp, e.maxHp, true);
       }
       /* 史莱姆真实 sprite 渲染 */
       if (G.slimeReady && G.slimeSprite && e.type === 'slime') {
@@ -1608,29 +1595,20 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
           /* 走路/待机循环: 用时间驱动 */
           frameIdx = SLIME_SPRITE.walkStart + (Math.floor(G.t * SLIME_SPRITE.fps) % SLIME_SPRITE.walkCount);
         }
-        const col = frameIdx % SLIME_SPRITE.cols;
-        const row = Math.floor(frameIdx / SLIME_SPRITE.cols);
-        const srcX = col * SLIME_SPRITE.fw;
-        const srcY = row * SLIME_SPRITE.fh;
         /* 渲染尺寸: 到玩家肩膀高度(精英怪体型 ×1.28) */
         const drawH = Math.min(CH * 0.5, 72) * (e.elite ? 1.28 : 1) * laneScale(e.lane);
         const drawW = drawH * (SLIME_SPRITE.fw / SLIME_SPRITE.fh);
         /* 脚底在帧中的y=120(距底部8px), 用这个偏移让脚底踩在地板上 */
         const footOffset = 120 * (drawH / SLIME_SPRITE.fh);
-        ctx.save();
-        ctx.translate(sx, sy);
-        /* 变形纠正: 轻微垂直压缩(scaleY=0.92)让底部变平贴合地板, 同时补偿高度 */
-        const scaleY = 0.92;
-        const compensatedH = drawH / scaleY;
-        ctx.translate(0, -footOffset * (1 - scaleY));
-        ctx.scale(1, scaleY);
-        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
-        if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
+        const spr = enemySpriteGL(e, batchC);
+        spr.texture = frameTex(G.slimeSprite, SLIME_SPRITE.cols, SLIME_SPRITE.fw, SLIME_SPRITE.fh, frameIdx);
+        /* 原变换链(压缩0.92+高度补偿)线性合成后 == 直接贴 (sx-dw/2, sy-fo, dw, drawH) */
+        spr.position.set(sx - drawW / 2, sy - footOffset);
+        spr.scale.set(drawW / SLIME_SPRITE.fw, drawH / SLIME_SPRITE.fh);
+        enemyFxGL(spr, e);
         /* 史莱姆面朝左, 素材本身就是面朝左, 不需要翻转 */
-        ctx.drawImage(G.slimeSprite, srcX, srcY, SLIME_SPRITE.fw, SLIME_SPRITE.fh, -drawW*0.5, -footOffset, drawW, compensatedH);
-        ctx.restore();
-        if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
-        if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp, true);
+        if (e.elite && e.alive) drawEliteRing(uiLayer, sx, sy, 16);
+        if (e.alive) drawHpBar(uiLayer, sx, sy - footOffset - 4, 28, e.hp, e.maxHp, true);
       } else if (G.waterReady && G.waterSprite && e.type === 'water') {
         /* 水精灵真实 sprite 渲染 */
         let frameIdx;
@@ -1645,28 +1623,24 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         }
         const col = frameIdx % WATER_SPRITE.cols;
         const row = Math.floor(frameIdx / WATER_SPRITE.cols);
-        const srcX = col * WATER_SPRITE.fw;
-        const srcY = row * WATER_SPRITE.fh;
+        void col; void row;   /* v4.0: 切帧由 frameTex 完成, 保留帧选择逻辑不变 */
+        /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放) */
         const drawH = Math.min(CH * 0.5, 70) * (e.elite ? 1.28 : 1) * laneScale(e.lane);
         const drawW = drawH * (WATER_SPRITE.fw / WATER_SPRITE.fh);
         /* 脚底在帧中的y=118(距底部10px) */
         const footOffset = 118 * (drawH / WATER_SPRITE.fh);
-        ctx.save();
-        ctx.translate(sx, sy);
-        /* 变形纠正: 轻微垂直压缩(scaleY=0.92)让底部变平贴合地板 + 轻微倾斜校正 */
-        const scaleY = 0.92;
-        const compensatedH = drawH / scaleY;
-        ctx.translate(0, -footOffset * (1 - scaleY));
-        /* 水精灵身体微微向右倾斜, 用skew校正(-0.03弧度约-1.7度) */
-        ctx.transform(1, 0, -0.03, 1, 0, 0);
-        ctx.scale(1, scaleY);
-        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
-        if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
+        const spr = enemySpriteGL(e, batchC);
+        spr.texture = frameTex(G.waterSprite, WATER_SPRITE.cols, WATER_SPRITE.fw, WATER_SPRITE.fh, frameIdx);
+        /* 原变换链(压缩0.92 + skewX(-0.03) 校正)线性合成 —— canvas 矩阵语义
+         * x'=(dw/fw)x - 0.03·(drawH/fh)y + sx - dw/2 + 0.03·0.92·fo ; y'=(drawH/fh)y + sy - fo */
+        spr.transform.setFromMatrix(new PIXI.Matrix(
+          drawW / WATER_SPRITE.fw, 0,
+          -0.03 * drawH / WATER_SPRITE.fh, drawH / WATER_SPRITE.fh,
+          sx - drawW / 2 + 0.03 * 0.92 * footOffset, sy - footOffset));
+        enemyFxGL(spr, e);
         /* 水精灵面朝左, 素材本身就是面朝左, 不需要翻转 */
-        ctx.drawImage(G.waterSprite, srcX, srcY, WATER_SPRITE.fw, WATER_SPRITE.fh, -drawW*0.5, -footOffset, drawW, compensatedH);
-        ctx.restore();
-        if (e.elite && e.alive) drawEliteRing(sx, sy, 16);
-        if (e.alive) drawHpBar(sx, sy - footOffset - 4, 28, e.hp, e.maxHp, true);
+        if (e.elite && e.alive) drawEliteRing(uiLayer, sx, sy, 16);
+        if (e.alive) drawHpBar(uiLayer, sx, sy - footOffset - 4, 28, e.hp, e.maxHp, true);
       } else if (G.bossReady && G.bossSprite && e.type === 'boss') {
         /* BOSS史莱姆王: 飘着的, 2倍大, 攻击/漂浮分帧 */
         let frameIdx;
@@ -1678,37 +1652,45 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         }
         const col = frameIdx % BOSS_SPRITE.cols;
         const row = Math.floor(frameIdx / BOSS_SPRITE.cols);
-        const srcX = col * BOSS_SPRITE.fw;
-        const srcY = row * BOSS_SPRITE.fh;
+        void col; void row;
         /* BOSS 2倍大, 漂浮不踩地板 */
         const drawH = Math.min(CH * 0.7, 140) * laneScale(e.lane);
         const drawW = drawH * (BOSS_SPRITE.fw / BOSS_SPRITE.fh);
         const floatY = BOSS_SPRITE.floatHeight + Math.sin(G.t * 1.5) * 8;  /* 漂浮上下浮动 */
-        ctx.save();
-        ctx.translate(sx, sy - floatY);  /* 漂浮在地板上方 */
-        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
-        if (e.hurtT > 0) { ctx.globalAlpha *= 0.7; ctx.filter = 'brightness(1.8)'; }
+        const spr = enemySpriteGL(e, batchC);
+        enemyFxGL(spr, e);
         /* 攻击帧左侧特效渐隐: 预渲染掩码帧直接贴图(原每帧离屏重建, 见 bossMaskedFrame) */
         if (e.anim > 0) {
           const fi = Math.min(frameIdx - BOSS_SPRITE.attackStart, BOSS_SPRITE.attackCount - 1);
           const off = bossMaskedFrame(fi, drawW, drawH);
-          if (off) ctx.drawImage(off, -drawW*0.5, -drawH, drawW, drawH);
+          if (off) {
+            spr.texture = window.BattleGL.tex(off);
+            spr.position.set(sx - drawW * 0.5, sy - floatY - drawH);
+            spr.scale.set(1);
+          }
         } else {
           /* 漂浮帧直接绘制 */
-          ctx.drawImage(G.bossSprite, srcX, srcY, BOSS_SPRITE.fw, BOSS_SPRITE.fh, -drawW*0.5, -drawH, drawW, drawH);
+          spr.texture = frameTex(G.bossSprite, BOSS_SPRITE.cols, BOSS_SPRITE.fw, BOSS_SPRITE.fh, frameIdx);
+          spr.position.set(sx - drawW * 0.5, sy - floatY - drawH);
+          spr.scale.set(drawW / BOSS_SPRITE.fw, drawH / BOSS_SPRITE.fh);
         }
-        ctx.restore();
         /* BOSS血条在头顶, 右移对齐头部 */
-        if (e.alive) drawHpBar(sx + drawW*0.2, sy - floatY - drawH - 8, 50, e.hp, e.maxHp, true);
+        if (e.alive) drawHpBar(uiLayer, sx + drawW*0.2, sy - floatY - drawH - 8, 50, e.hp, e.maxHp, true);
       } else if (!(e.armature && e.boneSlug && BONES[e.boneSlug] && BONES[e.boneSlug].ready)) {
         /* 素材未就绪时的兜底占位(骨骼怪工厂未就绪/序列帧怪素材缺失) —— 已由通用骨骼分支画过的不再进这里 */
-        ctx.save(); ctx.translate(sx, sy);
-        if (e.dying > 0) ctx.globalAlpha = e.dying/0.4;
-        if (e.hurtT > 0) { ctx.globalAlpha *= 0.6; ctx.filter = 'brightness(2)'; }
+        let pg = e.__placeG;
+        if (!pg) { pg = e.__placeG = new PIXI.Graphics(); }
+        batchC.addChild(pg);
+        pg.visible = true;
+        pg.clear();
+        pg.position.set(sx, sy);
+        pg.alpha = (e.dying > 0 ? Math.max(0, e.dying / 0.4) : 1) * (e.hurtT > 0 ? 0.6 : 1);
+        pg.filters = e.hurtT > 0 ? [window.BattleGL.Filters.hurt] : null;
         const bodyH = Math.min(25, CH*0.2);
-        ctx.fillStyle = e.color; ctx.beginPath(); ctx.ellipse(0,-bodyH/2,10,bodyH/2,0,0,Math.PI*2); ctx.fill();
-        ctx.restore();
-        if (e.alive) drawHpBar(sx, sy-35, 24, e.hp, e.maxHp, true);
+        pg.beginFill(colorInt(e.color || '#888899'), 1);
+        pg.drawEllipse(0, -bodyH/2, 10, bodyH/2);
+        pg.endFill();
+        if (e.alive) drawHpBar(uiLayer, sx, sy-35, 24, e.hp, e.maxHp, true);
       }
     }
   }
@@ -1725,79 +1707,205 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     g.fillStyle = gr; g.fillRect(0, 0, S, S);
     return c;
   }
-  const GLOW = { heal: makeGlow('120,255,175'), atk: makeGlow('255,175,95') };
+  const GLOW = { heal: makeGlow('120,255,175'), atk: makeGlow('255,175,95'),
+                 speed1: makeGlow('128,255,192'), speed3: makeGlow('160,180,255'), skill: makeGlow('150,220,255') };
+
+  /* v4.0 WebGL: 精灵表切帧纹理缓存（frame → PIXI.Texture frame 引用同 baseTexture） */
+  const _frameCache = new Map();
+  function frameTex(img, cols, fw, fh, fi) {
+    let per = _frameCache.get(img);
+    if (!per) { per = { map: [], cols, fw, fh }; _frameCache.set(img, per); }
+    let t = per.map[fi];
+    if (!t) {
+      const base = window.BattleGL.tex(img);
+      t = per.map[fi] = new PIXI.Texture(base,
+        new PIXI.Rectangle((fi % cols) * fw, Math.floor(fi / cols) * fh, fw, fh));
+    }
+    return t;
+  }
+  /* 玩家渲染对象组: 主 Sprite + 4 残影 + ADD 柔光 + 占位 Graphics（懒建单例） */
+  function playerGL() {
+    const S = drawPlayerSprite._st;
+    if (S) return S;
+    const C = window.BattleGL.layers.player;
+    const st = { main: new PIXI.Sprite(), trails: [], glow: new PIXI.Sprite(), place: new PIXI.Graphics() };
+    st.glow.anchor.set(0.5);
+    st.glow.blendMode = PIXI.BLEND_MODES.ADD;
+    C.addChild(st.glow);
+    C.addChild(st.place);
+    C.addChild(st.main);
+    for (let i = 0; i < 4; i++) { const t = new PIXI.Sprite(); t.visible = false; C.addChild(t); st.trails.push(t); }
+    return drawPlayerSprite._st = st;
+  }
+  function drawPlayerSprite() {
+    const p = G.player;
+    const sx = worldToScreen(p.x);
+    const sy = floorY() + p.y;   /* v3.7: 玩家随车道(y 为车道偏移, 平滑过渡) */
+    const S = playerGL();
+    S.main.visible = S.glow.visible = S.place.visible = false;
+    for (const t of S.trails) t.visible = false;
+    const hurtOn = p.hurtT > 0;
+
+    /* 技能动画渲染 (剑气斩) */
+    if (p.skillAnim && G.skillReady && G.skillSprite) {
+      const frameIdx = Math.min(p.skillFrame, SKILL.count - 1);
+      /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放) */
+      const drawH = Math.min(CH * 0.55, 80) * laneScale(p.lane);
+      const drawW = drawH * (SKILL.fw / SKILL.fh);
+      /* 技能帧中角色脚底在 y=250(帧高256), 偏移对齐地板 */
+      const footOffset = (SKILL.fh - 250) / SKILL.fh * drawH;
+      S.main.visible = true;
+      S.main.texture = frameTex(G.skillSprite, SKILL.cols, SKILL.fw, SKILL.fh, frameIdx);
+      S.main.position.set(sx - drawW*0.42, sy - drawH + footOffset);
+      S.main.scale.set(drawW / SKILL.fw, drawH / SKILL.fh);
+      S.main.alpha = 1; S.main.filters = null;
+      if (hurtOn) { S.main.alpha = 0.5+0.5*Math.sin(p.hurtT*40); S.main.filters = [window.BattleGL.Filters.playerHurt]; }
+      /* 技能发光效果(原 shadowBlur 青蓝光) → ADD 柔光垫底 */
+      S.glow.visible = true;
+      S.glow.texture = window.BattleGL.tex(GLOW.skill);
+      S.glow.position.set(sx, sy - drawH * 0.5);
+      S.glow.width = S.glow.height = drawH * 1.6;
+      S.glow.alpha = 0.45;
+      drawHpBar('playerUI', sx, sy-drawH*0.7-10, 36, p.hp, p.maxHp);
+      return;
+    }
+
+    if (!G.spriteReady || !G.sprite) {
+      /* 素材未加载时用占位图形 */
+      S.place.visible = true;
+      S.place.clear();
+      S.place.position.set(sx, sy);
+      S.place.alpha = hurtOn ? 0.5+0.5*Math.sin(p.hurtT*40) : 1;
+      const bodyH = Math.min(40, CH*0.3);
+      S.place.beginFill(0xe8eef5, 1);
+      S.place.moveTo(-10,-bodyH); S.place.lineTo(10,-bodyH); S.place.lineTo(13,-4); S.place.lineTo(-13,-4); S.place.closePath();
+      S.place.endFill();
+      S.place.beginFill(0xf0d8c0, 1);
+      S.place.drawCircle(0, -bodyH-6, 7);
+      S.place.endFill();
+      drawHpBar('playerUI', sx, sy-bodyH-20, 32, p.hp, p.maxHp);
+      return;
+    }
+    /* 真实 sprite 渲染 */
+    let frameIdx;
+    if (p.attackAnim) frameIdx = SPRITE.attackStart + ATTACK_MAP[Math.min(p.animFrame, ATTACK_MAP.length - 1)];
+    else frameIdx = SPRITE.walkStart + (p.animFrame % SPRITE.walkCount);
+    /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放; v3.8: 80→72) */
+    const drawH = Math.min(CH * 0.5, 72) * laneScale(p.lane);
+    const drawW = drawH * (SPRITE.fw / SPRITE.fh);
+    /* 疾风步/缩地成寸残影: 加速期间玩家身后显示3个半透明残影, 倍速越高残影越多 */
+    if (G.speedMult > 1 && !p.attackAnim) {
+      const trailCount = G.speedMult >= 3 ? 4 : 3;
+      const ftex = frameTex(G.sprite, SPRITE.cols, SPRITE.fw, SPRITE.fh, frameIdx);
+      for (let i = trailCount; i >= 1; i--) {
+        const t = S.trails[i - 1];
+        t.visible = true;
+        t.texture = ftex;
+        t.alpha = 0.12 * (trailCount + 1 - i) / trailCount;
+        t.position.set(sx - i * 10, sy);
+        t.scale.set((drawW / SPRITE.fw) * (1 + i * 0.03), drawH / SPRITE.fh);
+      }
+    }
+    S.main.visible = true;
+    S.main.texture = frameTex(G.sprite, SPRITE.cols, SPRITE.fw, SPRITE.fh, frameIdx);
+    S.main.position.set(sx - drawW*0.35, sy - drawH);
+    S.main.scale.set(drawW / SPRITE.fw, drawH / SPRITE.fh);
+    S.main.alpha = 1; S.main.filters = null;
+    if (hurtOn) { S.main.alpha = 0.5+0.5*Math.sin(p.hurtT*40); S.main.filters = [window.BattleGL.Filters.playerHurt]; }
+    /* 攻击buff/加速光晕(原 shadowBlur) → ADD 柔光垫底 */
+    let glowTex = null, glowA = 0;
+    if (p.atkBuff > 0) {
+      const pulse = 0.5 + 0.5 * Math.sin(G.t * 6);
+      glowTex = GLOW.atk; glowA = 0.35 + pulse*0.25;
+    }
+    if (G.speedMult > 1) {
+      glowTex = GLOW.speed3 ? (G.speedMult >= 3 ? GLOW.speed3 : GLOW.speed1) : GLOW.speed1;
+      glowA = Math.max(glowA, G.speedMult >= 3 ? 0.4 : 0.3);
+    }
+    if (glowTex) {
+      S.glow.visible = true;
+      S.glow.texture = window.BattleGL.tex(glowTex);
+      S.glow.position.set(sx - drawW*0.35 + drawW/2, sy - drawH/2);
+      S.glow.width = S.glow.height = drawH * 1.5;
+      S.glow.alpha = glowA;
+    }
+    /* 血条 */
+    drawHpBar('playerUI', sx, sy - drawH - 8, 36, p.hp, p.maxHp);
+  }
 
   function drawFx() {
+    /* v4.0 WebGL: 矢量特效(每 f 一个池化 Graphics 每帧重画) + Sprite 特效(掩码帧/柔光)。
+     * 速度线: fx 层共享 Graphics。shadowBlur(发灰且费性能)一律由 ADD 柔光或直接略去。 */
+    const fxC = window.BattleGL.layers.fx;
+    const pool = drawFx._pool || (drawFx._pool = []);
+    for (const o of pool) o.__used = false;
     /* 加速期间屏幕速度线: 横向线条从右向左流动, 增强速度感 */
+    const lines = drawFx._lines || (drawFx._lines = (() => { const g = new PIXI.Graphics(); fxC.addChild(g); return g; })());
+    lines.clear();
     if (G.speedMult > 1) {
-      ctx.save();
-      ctx.globalAlpha = 0.15 + (G.speedMult - 1) * 0.1;
-      ctx.strokeStyle = G.speedMult >= 3 ? 'rgba(160,180,255,0.5)' : 'rgba(128,255,192,0.5)';
-      ctx.lineWidth = 1;
+      lines.lineStyle(1, G.speedMult >= 3 ? 0xa0b4ff : 0x80ffc0, 0.15 + (G.speedMult - 1) * 0.1);
       const lineCount = G.speedMult >= 3 ? 12 : 8;
       for (let i = 0; i < lineCount; i++) {
         const y = (i / lineCount) * CH + (G.t * 200 * G.speedMult + i * 37) % CH;
         const x = (G.t * 300 * G.speedMult + i * 53) % CW;
         const len = 30 + Math.random() * 50;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x - len, y);
-        ctx.stroke();
+        lines.moveTo(x, y);
+        lines.lineTo(x - len, y);
       }
-      ctx.restore();
     }
     for (const f of G.fx) {
-      /* v2.6 FIX: f.y 是相对地板线的偏移(敌人/玩家 y=0), 屏幕坐标须加 floorY(); 原直接当屏幕 y 画到了画布顶外, 特效从未显示 */
+      /* v2.6 FIX: f.y 是相对地板线的偏移(敌人/玩家 y=0), 屏幕坐标须加 floorY() */
       const k = f.t/f.dur; const sx = worldToScreen(f.x); const fy = floorY() + f.y;
+      let o = f.__gl;
+      if (!o) {
+        o = f.__gl = { __used: true, g: new PIXI.Graphics(), spr: null };
+        fxC.addChild(o.g);
+        pool.push(o);
+      }
+      o.__used = true;
+      o.g.visible = true;
+      if (o.spr) o.spr.visible = false;
+      const g = o.g;
+      g.clear();
+      g.position.set(sx, fy);
+      g.alpha = 1; g.filters = null;
       if (f.kind === 'hitSpark') {
         /* 受击火花: 不旋转, 4条向外扩散的短线 */
-        ctx.save(); ctx.translate(sx, fy);
-        ctx.strokeStyle = f.color; ctx.globalAlpha = 1-k; ctx.lineWidth = 1.2;
+        g.lineStyle(1.2, colorInt(f.color), 1-k);
         for (let i=0; i<4; i++) {
           const ang = i * Math.PI/2 + Math.PI/4;
           const r1 = 2 + k*4, r2 = 6 + k*8;
-          ctx.beginPath(); ctx.moveTo(Math.cos(ang)*r1, Math.sin(ang)*r1); ctx.lineTo(Math.cos(ang)*r2, Math.sin(ang)*r2); ctx.stroke();
+          g.moveTo(Math.cos(ang)*r1, Math.sin(ang)*r1);
+          g.lineTo(Math.cos(ang)*r2, Math.sin(ang)*r2);
         }
-        ctx.restore();
       } else if (f.kind === 'slash') {                    // 剑气斩: 一道横掠的剑气
-        ctx.save(); ctx.translate(sx, fy); ctx.globalAlpha = 1-k;
-        ctx.strokeStyle = f.color; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        g.lineStyle(2, colorInt(f.color), 1-k);
         const w = 26 + k*34;
-        ctx.beginPath(); ctx.moveTo(-w*0.5, 6+k*4); ctx.lineTo(w*0.5, -2-k*6); ctx.stroke();
-        ctx.restore();
-      } else if (f.kind === 'hengsao') {                    // 横扫千军: sprite特效, 从左向右扫, 快速淡出
+        g.moveTo(-w*0.5, 6+k*4);
+        g.lineTo(w*0.5, -2-k*6);
+      } else if (f.kind === 'hengsao') {                  // 横扫千军: sprite特效, 从左向右扫, 快速淡出
         if (G.hengsaoReady && G.hengsaoSprite) {
           const frameIdx = Math.min(f.frame, HENGSAO_SPRITE.count - 1);
-          const col = frameIdx % HENGSAO_SPRITE.cols;
-          const row = Math.floor(frameIdx / HENGSAO_SPRITE.cols);
-          const srcX = col * HENGSAO_SPRITE.fw;
-          const srcY = row * HENGSAO_SPRITE.fh;
-          /* v3.8: 剑气贴合本道高度 —— 原 drawW=280(drawH≈140) 在横带里横跨约两条道,
-           * 素材内容又偏帧下部, 视觉重心砸在最下道: 换道释放也像一直在最下道放。
-           * 缩到≈玩家身高(drawH=100), 配合 y 已带车道偏移, 剑气完整落在玩家本道。 */
+          /* v3.8: 剑气贴合本道高度, 缩到≈玩家身高, 配合 y 已带车道偏移 */
           const drawW = 200;
           const drawH = drawW * (HENGSAO_SPRITE.fh / HENGSAO_SPRITE.fw);
           /* 特效从左向右移动: startX到endX插值 */
           const moveX = (f.startX || f.x) + ((f.endX || f.x+120) - (f.startX || f.x)) * k;
           const moveSx = worldToScreen(moveX);
-          ctx.save();
-          ctx.translate(moveSx, fy);
           /* 透明度曲线: 前15%快速渐入, 中间保持最亮, 后40%快速淡出 */
           let alpha;
           if (k < 0.15) alpha = k / 0.15;
           else if (k < 0.6) alpha = 1.0;
           else alpha = (1 - k) / 0.4;
-          ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-          /* v2.9 PERF: 左右渐现渐隐的离屏合成原为**每帧重建**(createElement+渐变+destination-in),
-           * 横扫 0.38s≈12帧就重建 12 次, 是纯浪费。改为按帧号缓存(同 BOSS_MASK 模式),
-           * 首次播放时建一次, 后续直接复用 —— 视觉完全一致。 */
+          /* v2.9 PERF: 左右渐现渐隐掩码帧按帧号缓存(同 BOSS_MASK 模式) */
           if (!HENGSAO_MASK.frames) HENGSAO_MASK.frames = [];
           let off = HENGSAO_MASK.frames[frameIdx];
           if (!off) {
             off = document.createElement('canvas');
             off.width = drawW; off.height = drawH;
             const octx = off.getContext('2d');
-            octx.drawImage(G.hengsaoSprite, srcX, srcY, HENGSAO_SPRITE.fw, HENGSAO_SPRITE.fh, 0, 0, drawW, drawH);
+            octx.drawImage(G.hengsaoSprite, (frameIdx % HENGSAO_SPRITE.cols) * HENGSAO_SPRITE.fw,
+              Math.floor(frameIdx / HENGSAO_SPRITE.cols) * HENGSAO_SPRITE.fh, HENGSAO_SPRITE.fw, HENGSAO_SPRITE.fh, 0, 0, drawW, drawH);
             octx.globalCompositeOperation = 'destination-in';
             /* 左侧20%渐现, 右侧20%渐隐, 中间保持不透明 */
             const grad = octx.createLinearGradient(0, 0, drawW, 0);
@@ -1809,94 +1917,128 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
             octx.fillRect(0, 0, drawW, drawH);
             HENGSAO_MASK.frames[frameIdx] = off;
           }
-          ctx.drawImage(off, -drawW*0.5, -drawH*0.5);
-          ctx.restore();
+          if (!o.spr) { o.spr = new PIXI.Sprite(); o.spr.anchor.set(0.5); fxC.addChild(o.spr); }
+          o.g.visible = false;
+          o.spr.visible = true;
+          o.spr.texture = window.BattleGL.tex(off);
+          o.spr.position.set(moveSx, fy);
+          o.spr.alpha = Math.max(0, Math.min(1, alpha));
         }
       } else if (f.kind === 'sweep') {                    // 横扫千军: 一道贴地弧光(兜底)
-        ctx.save(); ctx.translate(sx, fy); ctx.globalAlpha = (1-k)*0.9;
-        ctx.strokeStyle = f.color; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.arc(0, 0, 18 + k*46, -Math.PI*0.15, Math.PI*0.42); ctx.stroke();
-        ctx.restore();
+        g.lineStyle(2.5, colorInt(f.color), (1-k)*0.9);
+        g.arc(0, 0, 18 + k*46, -Math.PI*0.15, Math.PI*0.42);
       } else if (f.kind === 'death') {
-        ctx.save(); ctx.translate(sx, fy);
+        g.beginFill(colorInt(f.color), (1-k)*0.9);
         for (let i=0; i<8; i++) {
           const ang = i/8*6.28, r = k*15;
-          ctx.fillStyle = f.color; ctx.globalAlpha = (1-k)*0.9;
-          ctx.beginPath(); ctx.arc(Math.cos(ang)*r, Math.sin(ang)*r, 1.8*(1-k)+0.5, 0, 6.28); ctx.fill();
+          g.drawCircle(Math.cos(ang)*r, Math.sin(ang)*r, 1.8*(1-k)+0.5);
         }
-        ctx.restore();
+        g.endFill();
       } else if (f.kind === 'speedBurst') {
-        /* 身法触发: 速度爆发 —— 冲击波圆环 + 向后气流线 + 粒子飞溅 */
-        ctx.save(); ctx.translate(sx, fy - 25);
+        /* 身法触发: 速度爆发 —— 冲击波圆环 + 向后气流线 + 粒子飞溅(原 shadowBlur 略去) */
+        g.position.set(sx, fy - 25);
         /* 冲击波圆环: 从中心向外扩散 */
-        ctx.globalAlpha = (1-k) * 0.6;
-        ctx.strokeStyle = f.color; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(0, 0, 5 + k*35, 0, Math.PI*2); ctx.stroke();
+        g.lineStyle(2, colorInt(f.color), (1-k) * 0.6);
+        g.drawCircle(0, 0, 5 + k*35);
         /* 向后气流线: 8条, 从中心向后扩散 */
-        ctx.globalAlpha = (1-k) * 0.9;
-        ctx.lineWidth = 1.8; ctx.lineCap = 'round';
-        ctx.shadowColor = f.color; ctx.shadowBlur = 6;
+        g.lineStyle(1.8, colorInt(f.color), (1-k) * 0.9);
         for (let i=0; i<8; i++) {
           const ang = Math.PI + (i/7 - 0.5) * 1.2;  /* 向后扇形扩散 */
           const r1 = 3 + k*8, r2 = 12 + k*40;
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(ang)*r1, Math.sin(ang)*r1);
-          ctx.lineTo(Math.cos(ang)*r2, Math.sin(ang)*r2);
-          ctx.stroke();
+          g.moveTo(Math.cos(ang)*r1, Math.sin(ang)*r1);
+          g.lineTo(Math.cos(ang)*r2, Math.sin(ang)*r2);
         }
         /* 粒子飞溅: 6个小光点向后飞 */
-        ctx.shadowBlur = 0;
+        g.lineStyle(0);
+        g.beginFill(colorInt(f.color), (1-k) * 0.7);
         for (let i=0; i<6; i++) {
           const ang = Math.PI + (Math.random()-0.5)*1.5;
           const r = 8 + k*45;
-          ctx.globalAlpha = (1-k) * 0.7;
-          ctx.fillStyle = f.color;
-          ctx.beginPath(); ctx.arc(Math.cos(ang)*r, Math.sin(ang)*r, 1.5*(1-k)+0.5, 0, Math.PI*2); ctx.fill();
+          g.drawCircle(Math.cos(ang)*r, Math.sin(ang)*r, 1.5*(1-k)+0.5);
         }
-        ctx.restore();
+        g.endFill();
       } else if (f.kind === 'healParticle' || f.kind === 'atkParticle') {
-        /* v2.6.2: 柔光粒子(lighter 加法发光) —— 压在角色身上是"透亮"而非"盖色", 去掉发灰的 shadowBlur */
+        /* v2.6.2: 柔光粒子(ADD 加法发光) —— 压在角色身上是"透亮"而非"盖色" */
         const img = f.kind === 'healParticle' ? GLOW.heal : GLOW.atk;
         const r = (2.2 + (1-k)*2.6) * 2.4;
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = (1-k) * 0.7;
-        ctx.drawImage(img, sx - r, fy - r, r*2, r*2);
-        ctx.restore();
+        if (!o.spr) { o.spr = new PIXI.Sprite(); o.spr.anchor.set(0.5); o.spr.blendMode = PIXI.BLEND_MODES.ADD; fxC.addChild(o.spr); }
+        o.g.visible = false;
+        o.spr.visible = true;
+        o.spr.texture = window.BattleGL.tex(img);
+        o.spr.position.set(sx, fy);
+        o.spr.width = o.spr.height = r * 2;
+        o.spr.alpha = (1-k) * 0.7;
       } else if (f.kind === 'healBurst' || f.kind === 'atkBurst') {
-        /* v2.6.2: 施法完成 → 一团柔光从角色胸口绽开(lighter), 替代硬描边圆环 */
+        /* v2.6.2: 施法完成 → 一团柔光从角色胸口绽开(ADD) */
         const img = f.kind === 'healBurst' ? GLOW.heal : GLOW.atk;
         const r = 14 + k * 40;
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = (1-k) * 0.75;
-        ctx.drawImage(img, sx - r, fy - r, r*2, r*2);
-        ctx.restore();
+        if (!o.spr) { o.spr = new PIXI.Sprite(); o.spr.anchor.set(0.5); o.spr.blendMode = PIXI.BLEND_MODES.ADD; fxC.addChild(o.spr); }
+        o.g.visible = false;
+        o.spr.visible = true;
+        o.spr.texture = window.BattleGL.tex(img);
+        o.spr.position.set(sx, fy);
+        o.spr.width = o.spr.height = r * 2;
+        o.spr.alpha = (1-k) * 0.75;
       }
+    }
+    /* 对账回收: fx 已被 splice 的池对象销毁 */
+    for (let i = pool.length - 1; i >= 0; i--) {
+      const o = pool[i];
+      if (o.__used) continue;
+      o.g.destroy();
+      if (o.spr) o.spr.destroy();
+      pool.splice(i, 1);
     }
   }
 
-  /* 现代游戏伤害飘字: 暴击放大+金光描边, 快速浮现→上浮→渐隐, 横向随机漂移避免堆叠 */
+  /* 现代游戏伤害飘字: 暴击放大+金光描边, 快速浮现→上浮→渐隐, 横向随机漂移避免堆叠
+   * v4.0 WebGL: 每条飘字一个 PIXI.Text(跟随 d 生命周期创建/销毁, 同屏量小)。 */
   function drawDmg() {
+    const textC = window.BattleGL.layers.text;
+    const pool = drawDmg._pool || (drawDmg._pool = []);
+    for (const o of pool) o.__used = false;
     for (const d of G.dmg) {
       const k = Math.min(1, d.t / 0.95);
-      const a = k < 0.12 ? k/0.12 : 1 - (k-0.12)/0.88;     // 起手快现, 之后渐隐
+      const a = Math.max(0, Math.min(1, k < 0.12 ? k/0.12 : 1 - (k-0.12)/0.88));  // 起手快现, 之后渐隐
       const sx = worldToScreen(d.x) + (d.vx || 0) * k;
-      const sy = floorY() + d.y - 40 * k;                     // v2.6 FIX: d.y 相对地板线(原直接当屏幕y, 飘字画在画布顶外从未显示)
+      const sy = floorY() + d.y - 40 * k;
       const pop = d.crit ? 1 + 0.6*Math.max(0, 1-k*2.2) : 1 + 0.35*Math.max(0, 1-k*3);
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, Math.min(1, a));
-      ctx.translate(sx, sy); ctx.scale(pop, pop);
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.lineJoin = 'round';
-      ctx.font = `bold ${d.crit ? 19 : 12}px ui-monospace, "SF Mono", Menlo, monospace`;
-      ctx.lineWidth = d.crit ? 4 : 3;
-      ctx.strokeStyle = 'rgba(6,10,18,0.95)';
-      ctx.strokeText(d.val, 0, 0);
-      if (d.crit) { ctx.shadowColor = 'rgba(255,196,80,0.9)'; ctx.shadowBlur = 10; }
-      ctx.fillStyle = d.color || '#eaf2fb';
-      ctx.fillText(d.val, 0, 0);
-      ctx.restore();
+      let o = d.__gl;
+      if (!o) {
+        const style = new PIXI.TextStyle({
+          fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+          fontSize: d.crit ? 19 : 12,
+          fontWeight: 'bold',
+          fill: d.color || '#eaf2fb',
+          stroke: 'rgba(6,10,18,0.95)',
+          strokeThickness: d.crit ? 4 : 3,
+          lineJoin: 'round'
+        });
+        if (d.crit) {
+          style.dropShadow = true;
+          style.dropShadowColor = 'rgba(255,196,80,0.9)';
+          style.dropShadowBlur = 10;
+          style.dropShadowDistance = 0;
+          style.dropShadowAlpha = 0.9;
+        }
+        const t = new PIXI.Text(String(d.val), style);
+        t.anchor.set(0.5);   // textAlign center + textBaseline middle
+        o = d.__gl = { __used: true, t: t };
+        textC.addChild(t);
+        pool.push(o);
+      }
+      o.__used = true;
+      o.t.visible = true;
+      o.t.alpha = a;
+      o.t.position.set(sx, sy);
+      o.t.scale.set(pop);
+    }
+    /* 对账回收: 飘字已被 splice 的 Text 销毁(Text 位图纹理必须显式释放) */
+    for (let i = pool.length - 1; i >= 0; i--) {
+      const o = pool[i];
+      if (o.__used) continue;
+      o.t.destroy();
+      pool.splice(i, 1);
     }
   }
 
@@ -1912,25 +2054,23 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
    *   改成在【横带自己的坐标系里】铺一层不透明底色：视觉上与"擦出一个干净条带"
    *   完全等价（横带内所有像素回到夜空底色），但裁剪区域外的像素一个都不动。
    *   save/restore 保证底色只作用于横带内部，也不会污染 worldToScreen 平移。 */
+  /* v4.0 WebGL: 全部内容画进 BattleGL 的 Pixi 容器（横带本地坐标）——
+   * 2D 清屏/底色渐变由 bgGradSprite 接管（GL canvas 是透明层，每帧全量重建，
+   * 无 clearRect 概念）；ctx 参数仅保留签名兼容，绘制链路零 2D 调用。 */
   function render(clear) {
-    /* v3.6: 每帧强制归位 —— 上帧任何残留 alpha/混合模式都不许带进来 */
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
-    if (clear) {
-      ctx.clearRect(0, 0, CW, CH);
-    } else {
-      const g = ctx.createLinearGradient(0, 0, 0, CH);
-      g.addColorStop(0, '#070b16');
-      g.addColorStop(0.72, '#060912');
-      g.addColorStop(1, '#050810');
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, CW, CH);
+    /* UI 层共享 Graphics 每帧 clear 重画(2D 时代靠清屏自然清, GL 必须显式清,
+     * 否则血条/法环矩形逐帧累积成满屏红条 —— 首轮冒烟实锤) */
+    const GL = window.BattleGL;
+    if (GL && GL.ready) {
+      GL.layers.farUI._gfx.clear();
+      GL.layers.playerUI._gfx.clear();
+      GL.layers.nearUI._gfx.clear();
     }
     drawBg();
     /* v3.8.2 遮挡分层: 远道怪 → 掉落 → 玩家 → 宠物 → 近道怪(近盖远, 画家算法) */
-    drawEnemies(e => e.y < G.player.y);
+    drawEnemies(e => e.y < G.player.y, 'far');
     drawDrops(); drawPlayerSprite(); drawPets();
-    drawEnemies(e => e.y >= G.player.y);
+    drawEnemies(e => e.y >= G.player.y, 'near');
     drawFx(); drawDmg(); drawSkillCall();
   }
 
@@ -1946,9 +2086,26 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
 
   /* ---------- 技能名播报绘制: 书法字金渐变+深描边, 弹入→稳住→末段快淡出上飘(瞬间隐藏) ----------
    * v2.9: 字号放大到战斗动画区可读(原 12.5px 太小, 看不出在播报什么);
-   *       淡出窗口收到末 18% —— 前半段"看得清", 后半段"秒没", 不拖泥带水。 */
+   *       淡出窗口收到末 18% —— 前半段"看得清", 后半段"秒没", 不拖泥带水。
+   * v4.0 WebGL: 单例 PIXI.Text 挂 text 层 —— fill 数组即竖向线性渐变
+   *       (TextStyle 原生支持, 等价 canvas createLinearGradient 两档 stop)。 */
   function drawSkillCall() {
-    const c = G.skillCall; if (!c) return;
+    const textC = window.BattleGL.layers.text;
+    if (!drawSkillCall._t) {
+      drawSkillCall._t = new PIXI.Text('', {
+        fontFamily: '"Kaiti SC","STKaiti","KaiTi","DFKai-SB","BiauKai",serif',
+        fontWeight: '600',
+        fill: ['#ffe9b0', '#f0b95a'],
+        stroke: 'rgba(18,12,4,.9)',
+        strokeThickness: 4,
+        lineJoin: 'round'
+      });
+      drawSkillCall._t.anchor.set(0.5);
+      textC.addChild(drawSkillCall._t);
+    }
+    const t = drawSkillCall._t;
+    const c = G.skillCall;
+    if (!c) { t.visible = false; return; }
     const k = c.t / c.dur;
     let scale;
     if (k < 0.16) scale = 0.46 + (k / 0.16) * 0.66;          // 0.46 → 1.12 弹入
@@ -1958,21 +2115,14 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const rise = k < 0.82 ? 0 : (k - 0.82) * 46;
     /* 字号: 屏宽 3.4% 起, 夹在 15~24px —— 手机上既醒目又不糊成一团 */
     const size = Math.round(Math.max(15, Math.min(CW * 0.034, 24)));
-    ctx.save();
-    ctx.globalAlpha = fade;
-    ctx.translate(CW / 2, CH * 0.30 - rise);
-    ctx.scale(scale, scale);
-    ctx.font = '600 ' + size + 'px "Kaiti SC","STKaiti","KaiTi","DFKai-SB","BiauKai",serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = Math.max(2.2, size * 0.15);
-    ctx.strokeStyle = 'rgba(18,12,4,.9)';
-    ctx.strokeText(c.name, 0, 0);
-    const grad = ctx.createLinearGradient(0, -size * 0.6, 0, size * 0.6);
-    grad.addColorStop(0, '#ffe9b0'); grad.addColorStop(1, '#f0b95a');
-    ctx.fillStyle = grad;
-    ctx.fillText(c.name, 0, 0);
-    ctx.restore();
+    if (t.text !== c.name) t.text = c.name;
+    if (t.style.fontSize !== size) t.style.fontSize = size;
+    const st = Math.max(2.2, size * 0.15);
+    if (t.style.strokeThickness !== st) t.style.strokeThickness = st;
+    t.visible = true;
+    t.alpha = fade;
+    t.position.set(CW / 2, CH * 0.30 - rise);
+    t.scale.set(scale);
   }
 
   function updateHUD() {
@@ -2026,9 +2176,14 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     _lastPaint = t;
     const dt = Math.min(0.05, (t-lastT)/1000); lastT = t;
     update(dt); render(true);   /* 独立模式：自己就是画布主人，清屏透出底下 #bg */
+    /* v4.0 WebGL: 独立模式横带=全屏（band 语义与 stage 一致） */
+    { const GL = window.BattleGL; if (GL && GL.ready) GL.frame(0, window.innerHeight); }
   }
 
-  /* v3.2: 交给 60-stage 的层对象，绘制顺序排在 bg 之后、aura 之前 */
+  /* v3.2: 交给 60-stage 的层对象，绘制顺序排在 bg 之后、aura 之前
+   * v4.0 WebGL: 本层不再往 2D ctx 画任何东西 —— render 全量走 BattleGL，
+   *   末尾 frame(band.top, band.height) 同步横带平移+遮罩+渲染。
+   *   ctx 仅在暂停/未就绪分支之外做形参接住（签名兼容），2D 画布零触摸。 */
   function battleLayer() {
     return {
       name: 'battle',
@@ -2041,28 +2196,14 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         const band = (typeof window !== 'undefined' && window.__stageBand)
           ? window.__stageBand()
           : { top: 92, height: Math.max(1, 0.56 * H - 176) };
-        const savedCtx = ctx, savedCW = CW, savedCH = CH;
-        CW = W; CH = band.height; ctx = targetCtx;
-        /* v3.6 纵深防御：舞台画布由 bg/aura/burst 共享，任何一层泄漏
-         * globalAlpha / GCO / filter 都会让战斗层全体"半透明"（bg 层
-         * lighter 泄漏正是真机全员半透明的根因）。进入前强制归位。 */
-        targetCtx.globalAlpha = 1;
-        targetCtx.globalCompositeOperation = 'source-over';
-        try { targetCtx.filter = 'none'; } catch (err) {}
-        /* 逻辑坐标系仍是"整屏宽 × 横带高"，与原来独立画布完全一致；
-         * 只是绘制被 clip 到横带、并平移到横带顶端。 */
-        targetCtx.save();
+        const savedCW = CW, savedCH = CH;
+        CW = W; CH = band.height;
         try {
-          targetCtx.beginPath();
-          targetCtx.rect(0, band.top, W, band.height);
-          targetCtx.clip();
-          targetCtx.translate(0, band.top);
-          render(false);   /* 舞台模式：只铺自己那条横带，绝不清共享画布 */
+          render(false);   /* 画进 GL 横带本地坐标 */
+          const GL = window.BattleGL;
+          if (GL && GL.ready) GL.frame(band.top, band.height);   /* root.y 平移 + 遮罩 + app.render() */
         } finally {
-          /* try/finally：render 内若抛异常，restore 也必须执行 ——
-           * 否则 clip/translate 残留会把后续帧的绘制区域越裁越小。 */
-          targetCtx.restore();
-          ctx = savedCtx; CW = savedCW; CH = savedCH;
+          CW = savedCW; CH = savedCH;
         }
       },
     };

@@ -143,6 +143,8 @@
       '<div class="row"><button class="rst">还原</button><input type="range" min="40" max="400" step="1"><span class="val"></span></div>';
     const stage = card.querySelector('.stage');
     const cv = card.querySelector('canvas');
+    /* 调色用 CSS 合成层(GPU), 不用 ctx.filter —— 后者让每个 drawImage 走滤镜管线, 移动端极慢 */
+    cv.style.filter = 'saturate(0.85)';
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.width = stage.clientWidth * dpr; cv.height = stage.clientHeight * dpr;
     const slider = card.querySelector('input');
@@ -190,7 +192,6 @@
     const s = it.drawH / it.B.baseH * dpr;
     const footY = (H - FLOOR * dpr);
     ctx.save();
-    ctx.filter = 'saturate(0.85)';
     ctx.translate(W / 2, footY);
     ctx.scale(s, s);
     ctx.translate(-it.B.anchor.cx, -it.B.anchor.bottom);

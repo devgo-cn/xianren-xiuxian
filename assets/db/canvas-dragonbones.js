@@ -232,24 +232,46 @@
         ctx.restore();
     }
 
+    // 最小二乘仿射拟合：把源局部像素坐标 (sx,sy) 映到骨架空间顶点 (dx,dy)。
+    // 返回 null 表示奇异（顶点共线等）。正常方程 3x3 直接解。
+    function fitAffine(srcX, srcY, verts, n, out) {
+        let sxx = 0, sxy = 0, sx = 0, syy = 0, sy = 0;
+        let bxa = 0, bxb = 0, bya = 0, byb = 0, bxe = 0, byf = 0;
+        for (let i = 0; i < n; i++) {
+            const x = srcX[i], y = srcY[i];
+            const dx = verts[i * 2], dy = verts[i * 2 + 1];
+            sxx += x * x; sxy += x * y; sx += x; syy += y * y; sy += y;
+            bxa += x * dx; bxb += y * dx; bxe += dx;
+            bya += x * dy; byb += y * dy; byf += dy;
+        }
+        const N = n;
+        // 3x3 伴随求逆
+        const m00 = sxx, m01 = sxy, m02 = sx, m10 = sxy, m11 = syy, m12 = sy, m20 = sx, m21 = sy, m22 = N;
+        const det = m00 * (m11 * m22 - m12 * m21) - m01 * (m10 * m22 - m12 * m20) + m02 * (m10 * m21 - m11 * m20);
+        if (!isFinite(det) || Math.abs(det) < 1e-6) return false;
+        const i00 = (m11 * m22 - m12 * m21) / det, i01 = (m02 * m21 - m01 * m22) / det, i02 = (m01 * m12 - m02 * m11) / det;
+        const i10 = (m12 * m20 - m10 * m22) / det, i11 = (m00 * m22 - m02 * m20) / det, i12 = (m02 * m10 - m00 * m12) / det;
+        const i20 = (m10 * m21 - m11 * m20) / det, i21 = (m01 * m20 - m00 * m21) / det, i22 = (m00 * m11 - m01 * m10) / det;
+        // 输出为 canvas transform(a,b,c,d,e,f) 顺序：dx=a*x+c*y+e, dy=b*x+d*y+f，
+        // 调用方可直接 ctx.transform(out) 且误差公式与 canvas 语义一致。
+        out[0] = i00 * bxa + i01 * bxb + i02 * bxe; // a = ∂dx/∂x
+        out[1] = i00 * bya + i01 * byb + i02 * byf; // b = ∂dy/∂x
+        out[2] = i10 * bxa + i11 * bxb + i12 * bxe; // c = ∂dx/∂y
+        out[3] = i10 * bya + i11 * byb + i12 * byf; // d = ∂dy/∂y
+        out[4] = i20 * bxa + i21 * bxb + i22 * bxe; // e = dx 偏移
+        out[5] = i20 * bya + i21 * byb + i22 * byf; // f = dy 偏移
+        return true;
+    }
+
     // 绘制一个 mesh slot（调用方已检查 visible/alpha/贴图可用）。
-    function drawMeshSlot(ctx, slot, td, alpha) {
+    // opts.affineTol：仿射退化的最大顶点偏差（骨架空间 px，默认 0.5）。蒙皮变形小于该值时
+    // 用 1 次 drawImage 代替逐三角 clip——移动端 clip 是头号性能杀手（158 三角 → 1 调用）。
+    function drawMeshSlot(ctx, slot, td, alpha, opts) {
         const geo = computeMeshGeometry(slot);
         if (!geo) return;
         const region = td.region;
         const src = td.parent.renderTexture;
-        if (td.rotated) {
-            // 本素材包无 rotated 网格；遇到时先按普通矩形兜底（后续包再验证）
-            const M = slot.globalTransformMatrix, ts = slot._textureScale;
-            const x = M.tx - (M.a * slot._pivotX + M.c * slot._pivotY);
-            const y = M.ty - (M.b * slot._pivotX + M.d * slot._pivotY);
-            ctx.save();
-            ctx.globalAlpha = Math.max(0.0, Math.min(1.0, alpha));
-            ctx.transform(M.a * ts, M.b * ts, M.c * ts, M.d * ts, x, y);
-            ctx.drawImage(src, region.x, region.y, region.height, region.width, 0, 0, region.width, region.height);
-            ctx.restore();
-            return;
-        }
+        const tol = (opts && opts.affineTol !== undefined) ? opts.affineTol : 0.5;
 
         const verts = geo.verts;
         const intArray = geo.intArray;
@@ -260,32 +282,65 @@
         const indexBase = geo.gd.offset + 4;
         const rw = region.width, rh = region.height, rx = region.x, ry = region.y;
 
+        // 源图像素坐标（每顶点一次）
+        const srcX = new Float32Array(geo.vertexCount);
+        const srcY = new Float32Array(geo.vertexCount);
+        for (let i = 0; i < geo.vertexCount; ++i) {
+            srcX[i] = floatArray[uvOffset + i * 2] * rw;
+            srcY[i] = floatArray[uvOffset + i * 2 + 1] * rh;
+        }
+
         ctx.save();
         ctx.globalAlpha = Math.max(0.0, Math.min(1.0, alpha));
+
         if (!geo.skinned) {
             const M = slot.globalTransformMatrix, ts = slot._textureScale;
             const x = M.tx - (M.a * slot._pivotX + M.c * slot._pivotY);
             const y = M.ty - (M.b * slot._pivotX + M.d * slot._pivotY);
             ctx.transform(M.a * ts, M.b * ts, M.c * ts, M.d * ts, x, y);
         }
-        // 预换算 UV → 源图像素（每顶点一次）
-        const srcX = new Float32Array(geo.vertexCount);
-        const srcY = new Float32Array(geo.vertexCount);
-        for (let i = 0; i < geo.vertexCount; ++i) {
-            const u = floatArray[uvOffset + i * 2];
-            const v = floatArray[uvOffset + i * 2 + 1];
-            srcX[i] = rx + u * rw;
-            srcY[i] = ry + v * rh;
+
+        // 仿射退化检测：拟合误差（骨架空间）< tol → 单次 drawImage。
+        // 非蒙皮 mesh 顶点在 slot 局部空间，误差 ×ts 折算到骨架空间。
+        const errScale = geo.skinned ? 1.0 : slot._textureScale;
+        const m = [0, 0, 0, 0, 0, 0];
+        let affineOk = tol > 0 && fitAffine(srcX, srcY, verts, geo.vertexCount, m);
+        if (affineOk) {
+            let maxErr = 0;
+            for (let i = 0; i < geo.vertexCount; i++) {
+                const ex = Math.abs(m[0] * srcX[i] + m[2] * srcY[i] + m[4] - verts[i * 2]);
+                const ey = Math.abs(m[1] * srcX[i] + m[3] * srcY[i] + m[5] - verts[i * 2 + 1]);
+                if (ex > maxErr) maxErr = ex;
+                if (ey > maxErr) maxErr = ey;
+            }
+            if (maxErr * errScale > tol) affineOk = false;
         }
-        for (let t = 0; t < geo.triangleCount; ++t) {
-            const i0 = intArray[indexBase + t * 3];
-            const i1 = intArray[indexBase + t * 3 + 1];
-            const i2 = intArray[indexBase + t * 3 + 2];
-            drawTexturedTriangle(ctx, src,
-                verts[i0 * 2], verts[i0 * 2 + 1],
-                verts[i1 * 2], verts[i1 * 2 + 1],
-                verts[i2 * 2], verts[i2 * 2 + 1],
-                srcX[i0], srcY[i0], srcX[i1], srcY[i1], srcX[i2], srcY[i2]);
+
+        if (affineOk) {
+            if (global.CanvasDragonBones && global.CanvasDragonBones._stats) {
+                global.CanvasDragonBones._stats.affine++;
+            }
+            ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
+            ctx.drawImage(src, rx, ry, rw, rh, 0, 0, rw, rh);
+        }
+        else if (td.rotated) {
+            // 本素材包无 rotated 网格；遇到时先按普通矩形兜底（后续包再验证）
+            ctx.drawImage(src, rx, ry, rh, rw, 0, 0, rw, rh);
+        }
+        else {
+            if (global.CanvasDragonBones && global.CanvasDragonBones._stats) {
+                global.CanvasDragonBones._stats.tri++;
+            }
+            for (let t = 0; t < geo.triangleCount; ++t) {
+                const i0 = intArray[indexBase + t * 3];
+                const i1 = intArray[indexBase + t * 3 + 1];
+                const i2 = intArray[indexBase + t * 3 + 2];
+                drawTexturedTriangle(ctx, src,
+                    verts[i0 * 2], verts[i0 * 2 + 1],
+                    verts[i1 * 2], verts[i1 * 2 + 1],
+                    verts[i2 * 2], verts[i2 * 2 + 1],
+                    rx + srcX[i0], ry + srcY[i0], rx + srcX[i1], ry + srcY[i1], rx + srcX[i2], ry + srcY[i2]);
+            }
         }
         ctx.restore();
     }
@@ -318,10 +373,10 @@
                 (slot._globalAlpha === undefined || slot._globalAlpha === null ? 1.0 : slot._globalAlpha);
             if (alpha0 <= 0.001) continue;
 
-            // 网格变形贴片：走 mesh 专用路径（蒙皮顶点公式 + 逐三角仿射贴图）
+            // 网格变形贴片：走 mesh 专用路径（蒙皮顶点公式 + 仿射退化/逐三角仿射贴图）
             if (slot._geometryData) {
                 slot.updateGlobalTransform();
-                drawMeshSlot(ctx, slot, td, alpha0);
+                drawMeshSlot(ctx, slot, td, alpha0, opts);
                 continue;
             }
 
@@ -435,6 +490,8 @@
         CanvasArmatureProxy,
         drawArmature,
         armatureAABB,
+        _stats: { affine: 0, tri: 0 }, // 调试: 仿射退化/逐三角路径命中计数
+        _debug: { computeMeshGeometry, fitAffine, drawMeshSlot }, // 调试句柄
 
         /**
          * 构建一个可复用工厂（一次解析，多次 buildArmature 出独立骨架实例）。
