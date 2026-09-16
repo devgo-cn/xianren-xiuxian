@@ -472,7 +472,7 @@
     "game.js": "9754940a93231e14afc252557041836597a525a0c9c458498fbf564343e4e717",
     "index.html": "c8dfcee8065fe494b28eb0a5b8fb655e184e30e9f034a018aa91a4894dce415b",
     "src/00-pure.js": "f5cb4acb0ebcc74eee7cd3024fe08d777290ffc943f994587348a9c57983ecbe",
-    "src/10-base.js": "947eb2de509fc7eb6dba8fe5740021314ccfca7347f41d968717770a3644eed3",
+    "src/10-base.js": "f0c99dc28e9aead2a50f5e45ccbba4d3eb8e578445b1ffd42512126800999367",
     "src/20-core.js": "801d09ca8fe1680044620e85c03f5cb757a6569178f96022e28c92629f8eccba",
     "src/30-systems.js": "8e8c6eaa0828eb56611db6b0882540af64afb3c9142599584559e55f75ad9cec",
     "src/40-app.js": "0a5ce4e9f696a5c8d707ac04d774323752558c1c1c56823f465ef9187161c82d",
@@ -480,6 +480,6 @@
     "src/60-stage.js": "58e1ee5df0b972d4271ca676e65622fee3544b9ab6f226ef3f8ffaa16205ae47",
     "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
   },
-  "rev": "4ee840375ff5f073",
+  "rev": "3a5d031be447ff7a",
   "version": "3.5"
 }
