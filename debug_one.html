@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>单怪渲染对照</title>
+<style>
+  body { background:#151820; color:#d8dee9; font:13px/1.5 -apple-system,"PingFang SC",sans-serif; margin:0; padding:10px; }
+  .bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  input, button { background:#2a3348; color:#d8dee9; border:1px solid #3a4358; border-radius:6px; padding:6px 10px; font-size:13px; }
+  button { cursor:pointer; }
+  input[type=text] { width:200px; }
+  .wrap { display:flex; gap:10px; flex-wrap:wrap; }
+  .pane { flex:1; min-width:380px; }
+  .pane h3 { margin:4px 0; font-size:13px; color:#8b93a3; }
+  canvas { background:#10131a; border:1px solid #2a3040; border-radius:8px; width:100%; }
+  #info { color:#8b93a3; font-size:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <input type="text" id="slug" value="dagger_goblin">
+  <button id="btnLoad">加载</button>
+  <label>速度 <input type="range" id="speed" min="0" max="2" step="0.1" value="0.3" style="width:100px"></label>
+  <label>drawH <input type="range" id="dh" min="100" max="800" step="10" value="420" style="width:120px"></label>
+  <span id="stat"></span>
+</div>
+<div class="wrap">
+  <div class="pane"><h3>游戏桥渲染（实装同款）</h3><canvas id="cvBridge" width="760" height="560"></canvas></div>
+  <div class="pane"><h3>官方 Pixi 渲染（对照）</h3><div id="pixiBox"></div></div>
+</div>
+<pre id="info"></pre>
+
+<script src="./test_orig/pixi-legacy.min.js"></script>
+<script src="./assets/db/dragonBones.js"></script>
+<script src="./assets/db/canvas-dragonbones.js"></script>
+<script>
+(function () {
+  const qs = new URLSearchParams(location.search);
+  const slug0 = qs.get('slug') || 'dagger_goblin';
+  document.getElementById('slug').value = slug0;
+
+  const cv = document.getElementById('cvBridge');
+  const ctx = cv.getContext('2d');
+  const info = document.getElementById('info');
+  let arm = null, baseH = 0, anims = { idle: null };
+  let pixiApp = null, pixiArm = null;
+
+  function boneAnimMap(list) {
+    const low = (list || []).map(a => String(a).toLowerCase());
+    const pick = cands => { for (const c of cands) { const i = low.findIndex(a => a.includes(c)); if (i >= 0) return list[i]; } return null; };
+    const idle = pick(['idle']);
+    return { idle: idle || (list && list[0]) || null };
+  }
+
+  function load(slug) {
+    arm = null; pixiArm = null; pixiApp = null;
+    document.getElementById('pixiBox').innerHTML = '';
+    let ske = null, tex = null;
+    const img = new Image();
+    const finish = () => {
+      if (!ske || !tex || !img.naturalWidth || arm) return;
+      /* —— 游戏同款: buildFactory → buildArmature → fadeIn —— */
+      const factory = window.CanvasDragonBones.buildFactory(ske, tex, img, qs.get('ts') !== null ? parseFloat(qs.get('ts')) : undefined);
+      const armName = ske.armature[0].name;
+      arm = factory.buildArmature(armName);
+      window.__arm = arm;
+      const animNames = (ske.armature[0].animation || []).map(a => a.name);
+      anims = boneAnimMap(animNames);
+      if (anims.idle) arm.animation.fadeIn(anims.idle, 0.12, 0);
+      const probe = window.CanvasDragonBones.buildArmature;
+      const bb = window.CanvasDragonBones.armatureAABB(arm);
+      baseH = Math.max(1, bb.maxY - bb.minY);
+      /* —— Pixi 对照 —— */
+      const ptex = PIXI.Texture.from('assets/db/monsters/' + slug + '/tex.webp');
+      ptex.baseTexture.once('loaded', () => {
+        const pf = new dragonBones.PixiFactory();
+        pf.parseDragonBonesData(ske);
+        pf.parseTextureAtlasData(tex, ptex, null, tex.width / (ptex.baseTexture.realWidth || tex.width));
+        pixiArm = pf.buildArmature(armName);
+        window.__pixiArm = pixiArm;
+        pixiArm.animation.fadeIn(anims.idle, 0, 0);
+        pixiApp = new PIXI.Application({ width: 760, height: 560, backgroundColor: 0x10131a, forceCanvas: false });
+        document.getElementById('pixiBox').appendChild(pixiApp.view);
+        pixiArm.display.x = 380; pixiArm.display.y = 480;
+        pixiApp.stage.addChild(pixiArm.display);
+        let last = Date.now();
+        pixiApp.ticker.add(() => {
+          const now = Date.now(); const dt = (now - last) / 1000; last = now;
+          const sp = parseFloat(document.getElementById('speed').value);
+          pixiArm.advanceTime(sp * (dt > 0.2 ? 0.2 : dt));
+        });
+      });
+      document.getElementById('stat').textContent = '';
+    };
+    const cfgUrl = 'assets/db/monsters/' + slug + '/ske.json';
+    fetch(cfgUrl).then(r => r.json()).then(j => { ske = j; finish(); }).catch(e => document.getElementById('stat').textContent = 'ske 失败');
+    fetch('assets/db/monsters/' + slug + '/tex.json').then(r => r.json()).then(j => { tex = j; window.__cfg = j; finish(); }).catch(e => document.getElementById('stat').textContent = 'tex 失败');
+    img.onload = finish;
+    img.src = 'assets/db/monsters/' + slug + '/tex.webp';
+    window.__slug = slug;
+    window.__cfg = null;
+    fetch('assets/db/monsters/index.json').then(r => r.json()).then(idx => { window.__cfg = idx[slug]; });
+  }
+
+  /* —— 游戏桥渲染循环(公式与 50-battle.js drawEnemies 骨骼分支一致) —— */
+  let last = Date.now();
+  function loop() {
+    const now = Date.now(); const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const sp = parseFloat(document.getElementById('speed').value);
+    const drawH = parseInt(document.getElementById('dh').value, 10);
+    const W = cv.width, H = cv.height, floorY = H - 60;
+    ctx.clearRect(0, 0, W, H);
+    /* 参照网格 */
+    ctx.strokeStyle = '#1c2230'; ctx.lineWidth = 1;
+    for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(111,224,168,.5)'; ctx.beginPath(); ctx.moveTo(0, floorY); ctx.lineTo(W, floorY); ctx.stroke();
+    ctx.strokeStyle = 'rgba(232,176,107,.35)'; ctx.beginPath(); ctx.moveTo(W/2, floorY - drawH); ctx.lineTo(W/2, floorY); ctx.stroke();
+
+    if (arm) {
+      arm.advanceTime(sp * dt);
+      const B = { baseH };
+      const bb = window.CanvasDragonBones.armatureAABB(arm);
+      const s = drawH / baseH;
+      const sx = W / 2, sy = floorY;
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.scale(s, s);
+      ctx.translate(-(bb.minX + bb.maxX) / 2, -bb.maxY);
+      window.CanvasDragonBones.drawArmature(ctx, arm);
+      ctx.restore();
+      /* AABB 框可视化 */
+      ctx.strokeStyle = 'rgba(255,80,80,.6)'; ctx.setLineDash([5, 4]);
+      ctx.strokeRect(sx - (bb.maxX - bb.minX) / 2 * s, floorY - (bb.maxY - bb.minY) * s, (bb.maxX - bb.minX) * s, (bb.maxY - bb.minY) * s);
+      ctx.setLineDash([]);
+      info.textContent = 'slug=' + (window.__slug) + ' baseH=' + baseH.toFixed(1) + ' AABB=[' +
+        [bb.minX, bb.minY, bb.maxX, bb.maxY].map(v => v.toFixed(0)).join(', ') + '] 高=' + (bb.maxY - bb.minY).toFixed(0);
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  document.getElementById('btnLoad').onclick = () => { location.search = '?slug=' + document.getElementById('slug').value.trim(); };
+  load(slug0);
+})();
+</script>
+</body>
+</html>
