@@ -1303,26 +1303,29 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* v5.0 小怪tier按已刷序号决定, 不再按击杀数升档 */
     G.trialTier = (typeof window !== 'undefined' && window.__poolAll) ? 10 : tierForSpawn(G.trialSpawned + 1);
     /* v3.9 怪包统一池 = 手配怪(BC.enemies, 自带 w 权重) + 骨骼池怪(BONE_POOL, 全量 79 只按文档档位)。
-     * 池 = tier<=当前档的全部怪; 当前档怪权重 ×3(主流), 低档怪保底出现(越打怪越杂越强)。
-     * 骨骼池怪统一 w=10 —— 池子大, 单只出现频率低但种类多, 全量怪都能刷到。
-     * v4.6 调试开关: window.__poolAll = true 时忽略档位限制, 79 只怪全部立刻进池 ——
-     * 素材逐只过目用(不必先打到 T5 才能看后面的怪)。 */
+     * v5.0 境界怪物包: 怪种tier上限按玩家境界解锁 —— 炼气期只刷T1弱怪, 大乘期+解锁全怪种。
+     *   maxMobTier = min(5, ceil(lv/2)): lv2(炼气)→1, lv3-4(筑基/结丹)→2, lv5-6(元婴/化神)→3,
+     *   lv7-8(炼虚/合体)→4, lv9+(大乘+)→5。避免小号刷到高级怪种被虐。
+     * 池 = 怪种tier<=maxMobTier的全部怪; 当前档怪权重×3(主流), 低档怪保底出现。
+     * 骨骼池怪统一 w=10 —— 池子大, 单只出现频率低但种类多。
+     * v4.6 调试开关: window.__poolAll = true 时忽略档位限制, 79 只怪全部立刻进池。 */
     const cur = (typeof window !== 'undefined' && window.__poolAll) ? 10 : (G.trialTier || 1);
+    const maxMobTier = (typeof window !== 'undefined' && window.__poolAll) ? 5 : Math.min(5, Math.ceil(Math.max(1, PST.lv || 1) / 2));
+    const weightTier = Math.min(cur, maxMobTier);   /* 权重×3给当前能刷到的最高怪种档 */
     const entries = [];
     for (const [t, d] of Object.entries(BC.enemies)) {
-      if (t === 'boss' || !d || (d.tier || 1) > cur) continue;
+      if (t === 'boss' || !d || (d.tier || 1) > maxMobTier) continue;
       /* v4.6 FIX 占位图: 手配骨骼怪只在工厂就绪后才入池 —— 否则开局刷出的怪
        * 因工厂没建好, 会走兜底分支画成灰色椭圆(就是看到的"占位图")。 */
       if (d.bone && !(BONES[d.bone] && BONES[d.bone].ready)) continue;
       /* v4.6 FIX 同上: 纯序列帧怪(slime/water 这类没 bone 的)素材就绪前同样出占位图 */
       if (!d.bone && !spriteReadyFor(t)) continue;
-      entries.push({ kind:'hand', key:t, w:(d.w || 1) * ((d.tier || 1) === cur ? 3 : 1) });
+      entries.push({ kind:'hand', key:t, w:(d.w || 1) * ((d.tier || 1) === weightTier ? 3 : 1) });
     }
-    for (let t = 1; t <= cur; t++) {
-      const mul = (t === cur) ? 3 : 1;
-      /* v5.0 FIX: BONE_POOL只有T1-T5档(怪种按文档分5档), T6-T10复用T5怪池, 否则遍历undefined报错卡死 */
-      const poolT = Math.min(t, 5);
-      for (const slug of BONE_POOL[poolT]) {
+    for (let t = 1; t <= maxMobTier; t++) {
+      const mul = (t === weightTier) ? 3 : 1;
+      /* v5.0 FIX: BONE_POOL只有T1-T5档(怪种按文档分5档), 这里t<=maxMobTier<=5, 安全 */
+      for (const slug of BONE_POOL[t]) {
         /* v4.6 FIX 同上: 骨骼池怪工厂未就绪就不进池 —— 懒加载是 1.5s/3 只,
          * 79 只要约 40s 才建完; 不等就绪就刷, 开局必然一片灰椭圆。 */
         if (!(BONES[slug] && BONES[slug].ready)) continue;
