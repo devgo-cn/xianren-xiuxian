@@ -54,6 +54,14 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     tierNeedBase: 7,      /* 首档升档击杀数: T2@7, T3@9, T4@12, T5@15(累计43) —— 120s 产能约46只, 顶尖玩家压哨进 T5 */
     tierNeedStep: 1.3,    /* 每档所需击杀数递增系数 */
     trialSecs: 120,       /* 试炼轮时长: 120 秒结算, 击杀数计入纪录 → 离线补偿 */
+    /* v3.9.2 骨骼池怪数值模板(按档位) —— 全量 79 只不再逐怪手配, 个体差异靠波次倍率+精英 roll */
+    boneTpl: {
+      1: { hpK:0.95, atkK:0.55, defK:0.30, speed:110 },
+      2: { hpK:0.85, atkK:0.62, defK:0.28, speed:155 },
+      3: { hpK:1.45, atkK:0.85, defK:0.50, speed:120 },
+      4: { hpK:2.20, atkK:1.05, defK:0.80, speed:150 },
+      5: { hpK:2.80, atkK:1.20, defK:1.00, speed:110 },
+    },
   };
   /* 升档所需击杀数: base × step^(t-1) */
   function tierNeed(t) { return Math.round(BC.tierNeedBase * Math.pow(BC.tierNeedStep, (t||1) - 1)); }
@@ -163,18 +171,43 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     img.onload = tryBuild;
     img.src = urls.img;
   }
-  /* 按需加载清单: BC.enemies 中带 bone 字段的怪(ratty 老路径特例) */
+  /* 按需加载清单: BC.enemies 中带 bone 字段的怪(ratty 老路径特例) + v3.9.2 全量池:
+   * index.json 全部 slug 进懒加载队列(1.5s/3只错峰, 工厂就绪一只就能刷一只)。
+   * BC.bonePool = {tier:[slug...]} —— spawnWave 按当前档从池里挑(排除手配怪与BOSS)。 */
+  const BONE_POOL = { 1:[], 2:[], 3:[], 4:[], 5:[] };
+  const BONE_IDX = {};   /* slug -> index.json cfg(armature/anims/tier/drawH) —— makeBoneEnemy 取 drawH 用 */
   (function loadBones() {
     if (!window.CanvasDragonBones) { console.warn('[battle] CanvasDragonBones 未加载, 骨骼怪走兜底渲染'); return; }
     loadBone('ratty', { ske:'assets/db/ratty_ske.json', tex:'assets/db/ratty_tex.json', img:'assets/db/ratty_tex.png' }, 'Ratty',
       ['idle','dead','attack','hurt','walk']);
     fetch('assets/db/monsters/index.json').then(r => r.json()).then(idx => {
-      const need = Object.values(BC.enemies).map(d => d.bone).filter(b => b && b !== 'ratty');
+      const handMade = new Set(Object.values(BC.enemies).map(d => d.bone).filter(Boolean));
+      for (const [slug, cfg] of Object.entries(idx)) BONE_IDX[slug] = cfg;
+      /* 优先加载手配怪(BC.enemies 里的 bone) */
+      const need = [...handMade].filter(b => b && b !== 'ratty');
       for (const slug of need) {
         const cfg = idx[slug];
         if (!cfg) { console.warn('[battle] index.json 缺怪:', slug); continue; }
         loadBone(slug, { ske:`assets/db/monsters/${slug}/ske.json`, tex:`assets/db/monsters/${slug}/tex.json`, img:`assets/db/monsters/${slug}/tex.webp` }, cfg.armature, cfg.anims);
       }
+      /* 全量池: 排除手配/BOSS/老路径, 按文档 tier 分组 */
+      const queue = [];
+      for (const [slug, cfg] of Object.entries(idx)) {
+        if (handMade.has(slug) || slug === 'ratty') continue;
+        const t = Math.min(5, Math.max(1, parseInt(String(cfg.tier || 'T1').slice(1)) || 1));
+        BONE_POOL[t].push(slug);
+        queue.push(slug);
+      }
+      /* 懒加载队列: 错峰构建工厂(每 1.5s 3 只), 就绪一只入池一只 */
+      let i = 0;
+      const pump = setInterval(() => {
+        const batch = queue.slice(i, i + 3); i += 3;
+        for (const slug of batch) {
+          const cfg = idx[slug];
+          loadBone(slug, { ske:`assets/db/monsters/${slug}/ske.json`, tex:`assets/db/monsters/${slug}/tex.json`, img:`assets/db/monsters/${slug}/tex.webp` }, cfg.armature, cfg.anims);
+        }
+        if (i >= queue.length) clearInterval(pump);
+      }, 1500);
     }).catch(err => console.error('[battle] monsters/index.json 加载失败', err));
   })();
 
@@ -357,8 +390,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
    * v3.9 三维系统: 三围 = 境界基准 × 怪种hpK/atkK/defK × 波次tier倍率 ——
    * 怪包统一池, 每个境界都会刷到全怪种; 同一只怪随境界+波次档位三维缩放。 */
   function tierMul(t) { const d = BC.tier[t || G.trialTier || 1]; return d ? d.mul : 1; }
-  function makeEnemy(type, tierOverride) {
-    const def = BC.enemies[type] || BC.enemies.slime;
+  /* v3.9.2 全量接入: makeEnemy 拆两层 —— makeEnemyFrom(合成def) 为实, BC.enemies 手配怪与
+   * index.json 骨骼池怪(档位模板数值)共用同一条构造路径。 */
+  function makeEnemyFrom(def, tierOverride, key) {
     const lv = Math.max(1, PST.lv || 1);
     const elite = Math.random() < DROP.eliteChance;
     const mul = tierMul(tierOverride);
@@ -367,12 +401,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const dfn = Math.round((2 + 2*lv)   * def.defK * mul);
     if (elite) { hp = Math.round(hp*DROP.eliteHp); atk = Math.round(atk*1.2); }
     const lane = (Math.random() * LANES) | 0;   /* v3.7: 三车道随机刷怪 */
-    const r = { type,name:def.name,role:def.role, elite, lane, y:laneOff(lane), x:0, hp,maxHp:hp, atk, def:dfn,
-      tier:tierOverride||def.tier||1,
+    const r = { type:key||def.bone||'bone',name:def.name,role:def.role, elite, lane, y:laneOff(lane), x:0, hp,maxHp:hp, atk, def:dfn,
+      tier:tierOverride||def.tier||1, drawH:def.drawH||0, hpBarW:def.hpBarW||0,
       atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2)*(elite?0.85:1), color:def.color,
       atkT:Math.random()*0.6, anim:0,hurtT:0,stun:0, alive:true,dying:0,reach:1, animFrame:0, animTimer:0, moving:false };
-    /* 骨骼怪: 工厂就绪时建一只独立骨架实例(每只怪动画独立推进)
-     * v3.9 BONES 注册表: def.bone = slug, cfg.arm = 包内骨架名 */
+    /* 骨骼怪: 工厂就绪时建一只独立骨架实例(每只怪动画独立推进) */
     if (def.bone) {
       const B = BONES[def.bone];
       if (B && B.ready) {
@@ -381,6 +414,20 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       }
     }
     return r;
+  }
+  function makeEnemy(type, tierOverride) {
+    return makeEnemyFrom(BC.enemies[type] || BC.enemies.slime, tierOverride, type);
+  }
+  /* v3.9.2 骨骼池怪: 数值按档位模板(同档同模板, 个体差异靠波次倍率), 名字暂用 slug 标题化(后续汉化) */
+  function makeBoneEnemy(slug, tierOverride) {
+    const t = tierOverride || 1;
+    const tpl = BC.boneTpl[t] || BC.boneTpl[1];
+    const cfg = BONE_IDX[slug] || {};
+    const dh = cfg.drawH || 42;
+    const def = { name: slug.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()),
+      role:'melee', atkRange:34, speed:tpl.speed, hpK:tpl.hpK, atkK:tpl.atkK, defK:tpl.defK,
+      color:'#9aa8b8', bone:slug, tier:t, drawH:dh, hpBarW:Math.max(24, Math.round(dh*0.55)) };
+    return makeEnemyFrom(def, tierOverride);
   }
   function spawnWave() {
     /* BOSS活跃时不刷新小怪 */
@@ -399,15 +446,24 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       G.trialBossDone = true;
       return e;
     }
-    /* v3.9 怪包统一池: 怪种带 tier, 刷怪池 = tier<=当前档的全部怪;
-     * 当前档怪权重 ×3(主流), 低档怪保底出现(质感: 越打怪越杂越强)。 */
+    /* v3.9 怪包统一池 = 手配怪(BC.enemies, 自带 w 权重) + 骨骼池怪(BONE_POOL, 全量 79 只按文档档位)。
+     * 池 = tier<=当前档的全部怪; 当前档怪权重 ×3(主流), 低档怪保底出现(越打怪越杂越强)。
+     * 骨骼池怪统一 w=10 —— 池子大, 单只出现频率低但种类多, 全量怪都能刷到。 */
     const cur = G.trialTier || 1;
-    const types = Object.keys(BC.enemies).filter(t => t !== 'boss' && (BC.enemies[t].tier || 1) <= cur);
-    const tw = types.reduce((s,t) => s + (BC.enemies[t].w || 1) * ((BC.enemies[t].tier||1) === cur ? 3 : 1), 0);
-    let r = Math.random()*tw, type = types[0];
-    for (const t of types) { r -= (BC.enemies[t].w || 1) * ((BC.enemies[t].tier||1) === cur ? 3 : 1); if (r <= 0) { type = t; break; } }
+    const entries = [];
+    for (const [t, d] of Object.entries(BC.enemies)) {
+      if (t === 'boss' || !d || (d.tier || 1) > cur) continue;
+      entries.push({ kind:'hand', key:t, w:(d.w || 1) * ((d.tier || 1) === cur ? 3 : 1) });
+    }
+    for (let t = 1; t <= cur; t++) {
+      const mul = (t === cur) ? 3 : 1;
+      for (const slug of BONE_POOL[t]) entries.push({ kind:'bone', key:slug, w:10 * mul });
+    }
+    const twAll = entries.reduce((s,e2) => s + e2.w, 0);
+    let rr = Math.random() * twAll, pick2 = entries[0];
+    for (const e2 of entries) { rr -= e2.w; if (rr <= 0) { pick2 = e2; break; } }
     if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= BC.maxAlive) return null;
-    const e = makeEnemy(type, G.trialTier);   /* v3.9 三维系统: 小怪三维按当前波次档位缩放 */
+    const e = pick2.kind === 'bone' ? makeBoneEnemy(pick2.key, G.trialTier) : makeEnemy(pick2.key, G.trialTier);   /* v3.9 三维: 小怪按当前档位缩放 */
     e.x = G.camX + stageW() + BC.enemySpawnOffset;
     G.enemies.push(e);
     return e;
@@ -997,9 +1053,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       if (e.dying>0) { e.dying-=dt; if (e.armature) advanceRatty(e, dt, true); continue; }
       if (!e.alive) continue;
       if (e.armature) advanceRatty(e, dt, false);   /* 骨骼怪: 推进动画(吃倍速 dt, 与移动节奏一致) */
-      /* v3.8.2 怪寻玩家: 玩家不在本道累计计时, 超 2.5s 换道追击(BOSS 固定中道除外)。
-       * 此前怪死守出生车道, 玩家换道后旧道怪原地滞留 —— 表现为"跑到玩家后面咬空气"。 */
-      if (e.lane !== p.lane && e.type !== 'boss') {
+      /* v3.9.1 怪寻玩家: 玩家不在本道累计计时, 超 2.5s 换道追击。
+       * BOSS 旧版(史莱姆王, 远程漂浮)曾固定中道 —— 现换九尾狐王地面怪, 同样追击, 不再豁免。 */
+      if (e.lane !== p.lane) {
         e.chaseT = (e.chaseT || 0) + dt;
         if (e.chaseT >= 2.5) { e.chaseT = 0; e.lane = p.lane; }
       } else if (e.chaseT) e.chaseT = 0;
@@ -1522,7 +1578,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         const B = BONES[e.boneSlug];
         const def = BC.enemies[e.type] || {};
         const cap = def.isBoss ? CH * 0.7 : CH * 0.5;
-        const drawH = Math.min(cap, def.drawH || 42) * (def.isBoss ? 1 : (e.elite ? 1.28 : 1)) * laneScale(e.lane);
+        const drawH = Math.min(cap, e.drawH || def.drawH || 42) * (def.isBoss ? 1 : (e.elite ? 1.28 : 1)) * laneScale(e.lane);
         const s = drawH / Math.max(1, B.baseH || 100);
         const bb = window.CanvasDragonBones.armatureAABB(e.armature);
         ctx.save();

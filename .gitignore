@@ -7,3 +7,4 @@ tools/refactor/package-lock.json
 *.swp
 *~
 node_modules/
+.playwright-cli/

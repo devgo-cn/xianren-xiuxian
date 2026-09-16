@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>怪物体型校准 · 闲人修仙</title>
+<style>
+  :root { --bg:#12141a; --card:#1c2029; --line:#2a3040; --txt:#d8dee9; --dim:#8b93a3; --acc:#6fe0a8; --warn:#e8b06b; }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { background:var(--bg); color:var(--txt); font:14px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif; padding-bottom:80px; }
+  header { position:sticky; top:0; z-index:10; background:rgba(18,20,26,.96); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); padding:10px 14px; }
+  h1 { font-size:16px; margin-bottom:6px; }
+  h1 small { color:var(--dim); font-weight:normal; font-size:11px; margin-left:8px; }
+  .bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .bar .stat { color:var(--dim); font-size:12px; margin-right:auto; }
+  .bar .stat b { color:var(--acc); }
+  button { background:#2a3348; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer; }
+  button:active { background:#3a4a68; }
+  button.primary { background:var(--acc); color:#0a2015; border-color:var(--acc); font-weight:600; }
+  .chips { display:flex; gap:6px; padding:8px 14px; overflow-x:auto; position:sticky; top:76px; z-index:9; background:rgba(18,20,26,.96); }
+  .chips button { padding:5px 12px; font-size:12px; border-radius:14px; white-space:nowrap; }
+  .chips button.on { background:var(--acc); color:#0a2015; border-color:var(--acc); }
+  .chips button.on2 { background:var(--warn); color:#241505; border-color:var(--warn); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:10px; padding:10px 14px; max-width:860px; margin:0 auto; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px; }
+  .card.modified { border-color:var(--warn); }
+  .head { display:flex; align-items:baseline; gap:8px; margin-bottom:6px; }
+  .head .nm { font-weight:600; font-size:14px; }
+  .head .slug { color:var(--dim); font-size:10px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .badge { font-size:10px; padding:1px 7px; border-radius:9px; background:#2a3348; color:var(--dim); }
+  .badge.t1{background:#24483a;color:#6fe0a8}.badge.t2{background:#3d4a24;color:#b8e06f}.badge.t3{background:#4a3d24;color:#e0c46f}.badge.t4{background:#4a2e24;color:#e09a6f}.badge.t5{background:#4a2438;color:#e06fb8}
+  .stage { position:relative; height:190px; background:#141720; border-radius:8px; overflow:hidden; }
+  .stage canvas { position:absolute; left:0; top:0; width:100%; height:100%; }
+  .refline { position:absolute; left:0; right:0; bottom:22px; border-top:1px dashed rgba(111,224,168,.45); }
+  .refline span { position:absolute; right:4px; top:-16px; font-size:10px; color:rgba(111,224,168,.7); }
+  .floor { position:absolute; left:0; right:0; bottom:22px; height:22px; background:linear-gradient(#1a1f2b,#141720); }
+  .row { display:flex; align-items:center; gap:10px; margin-top:8px; }
+  input[type=range] { flex:1; height:30px; accent-color:var(--acc); }
+  .val { font-variant-numeric:tabular-nums; font-weight:600; min-width:52px; text-align:right; }
+  .val.changed { color:var(--warn); }
+  .rst { padding:4px 10px; font-size:11px; border-radius:6px; }
+  #toast { position:fixed; left:50%; bottom:90px; transform:translateX(-50%); background:#2a3348; border:1px solid var(--acc); color:var(--acc); padding:10px 18px; border-radius:10px; font-size:13px; opacity:0; transition:opacity .25s; pointer-events:none; z-index:20; }
+  #toast.show { opacity:1; }
+  #loading { text-align:center; color:var(--dim); padding:40px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>怪物体型校准<small>虚线 = 玩家身高 72px · 拖滑杆调大小</small></h1>
+  <div class="bar">
+    <span class="stat">已改 <b id="cnt">0</b> / 79</span>
+    <button id="btnExport" class="primary">导出 JSON</button>
+    <button id="btnReset">全部重置</button>
+  </div>
+</header>
+<div class="chips" id="chips"></div>
+<div class="grid" id="grid"><div id="loading">加载素材中…</div></div>
+<div id="toast"></div>
+
+<script src="./assets/db/dragonBones.js"></script>
+<script src="./assets/db/canvas-dragonbones.js"></script>
+<script>
+(function () {
+  'use strict';
+  const PLAYER_H = 72;            /* 游戏内玩家显示高(min(CH*0.5,72)) —— 参照线 */
+  const LS_KEY = 'db_calibrate_v1';
+  const FLOOR = 22;               /* 卡片舞台地板高(css px) */
+  const saved = (() => { try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch (e) { return {}; } })();
+  const list = [];                /* {slug,cfg,drawH,base0,B,arm,canvas,ctx,card,visible,dirty} */
+  let filter = 0;                 /* 0=全部 1..5=T档 9=只看已改 */
+  let readyCnt = 0;
+
+  const $ = id => document.getElementById(id);
+  const toast = (msg) => { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1800); };
+
+  /* ---------- 档位过滤 chips ---------- */
+  const chipsEl = $('chips');
+  const chips = [['全部', 0], ['T1', 1], ['T2', 2], ['T3', 3], ['T4', 4], ['T5', 5], ['已改', 9]];
+  chips.forEach(([label, v], i) => {
+    const b = document.createElement('button');
+    b.textContent = label; if (i === 0) b.classList.add('on');
+    b.onclick = () => {
+      filter = v;
+      [...chipsEl.children].forEach(x => x.classList.remove('on', 'on2'));
+      b.classList.add(v === 9 ? 'on2' : 'on');
+      applyFilter();
+    };
+    chipsEl.appendChild(b);
+  });
+  function applyFilter() {
+    for (const it of list) {
+      const show = filter === 0 ? true
+        : filter === 9 ? (it.drawH !== it.base0)
+        : (parseInt(String(it.cfg.tier || 'T1').slice(1)) || 1) === filter;
+      it.card.style.display = show ? '' : 'none';
+    }
+  }
+
+  /* ---------- 动画名归一(与游戏 50-battle.js 同逻辑) ---------- */
+  function boneAnimMap(list) {
+    const low = (list || []).map(a => String(a).toLowerCase());
+    const pick = cands => { for (const c of cands) { const i = low.findIndex(a => a.includes(c)); if (i >= 0) return list[i]; } return null; };
+    const idle = pick(['idle']);
+    return { idle: idle || (list && list[0]) || null };
+  }
+
+  /* ---------- 建一只怪 ---------- */
+  function buildOne(it) {
+    const cfg = it.cfg;
+    const img = new Image();
+    let ske = null, tex = null;
+    const finish = () => {
+      if (!ske || !tex || !img.naturalWidth || it.B) return;
+      try {
+        const factory = window.CanvasDragonBones.buildFactory(ske, tex, img);
+        const arm = factory.buildArmature(cfg.armature);
+        const bb0 = window.CanvasDragonBones.armatureAABB(arm);   /* idle 姿态 AABB —— 锚点用它, 稳定不跳 */
+        const baseH = Math.max(1, bb0.maxY - bb0.minY);
+        const anims = boneAnimMap(cfg.anims);
+        if (anims.idle) { arm.animation.fadeIn(anims.idle, 0.12, -1); arm.animation.play(anims.idle); }
+        it.B = { factory, arm, baseH, anims, anchor: { cx: (bb0.minX + bb0.maxX) / 2, bottom: bb0.maxY } };
+        it.baseH = baseH;
+        readyCnt++;
+      } catch (err) { console.error('build fail', it.slug, err); }
+    };
+    fetch('assets/db/monsters/' + it.slug + '/ske.json').then(r => r.json()).then(j => { ske = j; finish(); });
+    fetch('assets/db/monsters/' + it.slug + '/tex.json').then(r => r.json()).then(j => { tex = j; finish(); });
+    img.onload = finish;
+    img.src = 'assets/db/monsters/' + it.slug + '/tex.webp';
+  }
+
+  /* ---------- UI 卡片 ---------- */
+  function makeCard(it) {
+    const tier = parseInt(String(it.cfg.tier || 'T1').slice(1)) || 1;
+    const card = document.createElement('div');
+    card.className = 'card' + (it.drawH !== it.base0 ? ' modified' : '');
+    card.innerHTML =
+      '<div class="head"><span class="nm">' + it.slug.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) + '</span>' +
+      '<span class="badge t' + tier + '">T' + tier + (it.cfg.qual ? ' · ' + it.cfg.qual : '') + '</span>' +
+      '<span class="slug">' + it.slug + '</span></div>' +
+      '<div class="stage"><canvas></canvas><div class="refline"><span>玩家 72px</span></div><div class="floor"></div></div>' +
+      '<div class="row"><button class="rst">还原</button><input type="range" min="20" max="200" step="1"><span class="val"></span></div>';
+    const stage = card.querySelector('.stage');
+    const cv = card.querySelector('canvas');
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = stage.clientWidth * dpr; cv.height = stage.clientHeight * dpr;
+    const slider = card.querySelector('input');
+    const valEl = card.querySelector('.val');
+    slider.value = it.drawH; valEl.textContent = it.drawH + ' px';
+    if (it.drawH !== it.base0) { valEl.classList.add('changed'); card.classList.add('modified'); }
+    slider.oninput = () => {
+      it.drawH = parseInt(slider.value, 10);
+      valEl.textContent = it.drawH + ' px';
+      const changed = it.drawH !== it.base0;
+      valEl.classList.toggle('changed', changed);
+      card.classList.toggle('modified', changed);
+      saved[it.slug] = it.drawH;
+      localStorage.setItem(LS_KEY, JSON.stringify(saved));
+      updateCnt();
+    };
+    card.querySelector('.rst').onclick = () => { slider.value = it.base0; slider.dispatchEvent(new Event('input')); };
+    it.canvas = cv; it.ctx = cv.getContext('2d'); it.card = card; it.dpr = dpr; it.stage = stage;
+    return card;
+  }
+  /* canvas 像素尺寸必须在卡片进 DOM 后设置(否则 clientWidth=0 画布空白) */
+  function sizeCanvas(it) {
+    const w = it.stage.clientWidth, h = it.stage.clientHeight;
+    it.canvas.width = Math.max(1, Math.round(w * it.dpr));
+    it.canvas.height = Math.max(1, Math.round(h * it.dpr));
+  }
+  window.addEventListener('resize', () => { for (const it of list) sizeCanvas(it); });
+  function updateCnt() {
+    $('cnt').textContent = list.filter(x => x.drawH !== x.base0).length;
+  }
+
+  /* ---------- 渲染循环: 只推进视口内的 ---------- */
+  const io = new IntersectionObserver(es => {
+    for (const en of es) { const it = list.find(x => x.card === en.target); if (it) it.visible = en.isIntersecting; }
+  }, { rootMargin: '120px' });
+
+  function draw(it, t) {
+    const { ctx, canvas, dpr } = it;
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    if (!it.B || !it.B.arm) return;
+    const arm = it.B.arm;
+    arm.advanceTime(1 / 60);
+    /* 游戏同款缩放: drawH/baseH(idle基准高), 底边中心用 idle 姿态锚点(稳定) */
+    const s = it.drawH / it.B.baseH * dpr;
+    const footY = (H - FLOOR * dpr);
+    ctx.save();
+    ctx.filter = 'saturate(0.85)';
+    ctx.translate(W / 2, footY);
+    ctx.scale(s, s);
+    ctx.translate(-it.B.anchor.cx, -it.B.anchor.bottom);
+    window.CanvasDragonBones.drawArmature(ctx, arm);
+    ctx.restore();
+  }
+
+  let last = 0;
+  function loop(t) {
+    if (t - last >= 33) {           /* ~30fps 足够校准 */
+      last = t;
+      for (const it of list) if (it.visible && it.B) draw(it, t);
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  /* ---------- 导出 ---------- */
+  $('btnExport').onclick = async () => {
+    const out = {};
+    for (const it of list) out[it.slug] = it.drawH;
+    const json = JSON.stringify(out);
+    try { await navigator.clipboard.writeText(json); toast('已复制 79 只怪的 JSON，直接粘贴发我'); }
+    catch (e) { toast('复制失败，改用下载'); }
+    const blob = new Blob([json], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'drawH_calibrate.json'; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  };
+  $('btnReset').onclick = () => {
+    if (!confirm('清空全部修改？')) return;
+    localStorage.removeItem(LS_KEY);
+    for (const it of list) {
+      it.drawH = it.base0;
+      const slider = it.card.querySelector('input');
+      slider.value = it.base0;
+      slider.dispatchEvent(new Event('input'));
+    }
+    toast('已全部还原');
+  };
+
+  /* ---------- 启动 ---------- */
+  window.__CAL = list;   /* 调试钩子 */
+  fetch('assets/db/monsters/index.json').then(r => r.json()).then(idx => {
+    const grid = $('grid'); grid.innerHTML = '';
+    const order = { T1: 1, T2: 2, T3: 3, T4: 4, T5: 5 };
+    const slugs = Object.keys(idx).sort((a, b) =>
+      (order[idx[a].tier] || 9) - (order[idx[b].tier] || 9) || a.localeCompare(b));
+    for (const slug of slugs) {
+      const cfg = idx[slug];
+      const it = {
+        slug, cfg,
+        base0: saved[slug] || cfg.drawH || 42,
+        drawH: saved[slug] || cfg.drawH || 42,
+        B: null, baseH: 0, visible: false,
+      };
+      list.push(it);
+      const card = makeCard(it);
+      grid.appendChild(card);
+      sizeCanvas(it);
+      io.observe(card);
+    }
+    applyFilter(); updateCnt();
+    /* 错峰建工厂: 每 350ms 一只, 建好即渲染 */
+    let i = 0;
+    const pump = setInterval(() => {
+      if (i >= list.length) return clearInterval(pump);
+      buildOne(list[i++]);
+    }, 350);
+  }).catch(err => { $('loading').textContent = 'index.json 加载失败: ' + err; });
+})();
+</script>
+</body>
+</html>
