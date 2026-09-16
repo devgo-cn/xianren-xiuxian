@@ -305,9 +305,9 @@
     font-size:9.5px;font-family:ui-monospace,SFMono-Regular,monospace;letter-spacing:.02em;
     color:rgba(232,197,107,.66);pointer-events:none;z-index:3;text-shadow:0 1px 2px rgba(0,0,0,.6)}
   .btn.primary .pnum{color:rgba(255,200,180,.70)}
-  .btn{pointer-events:auto;border:0;background:transparent;color:var(--gold);border-radius:0;padding:13px 18px 13px 24px;text-align:right;
+  .btn{pointer-events:auto;border:0;background:transparent;color:var(--gold);border-radius:0;padding:13px 18px 13px 24px;text-align:right;flex:1;max-width:120px;min-width:96px;
     font-size:14px;font-weight:600;letter-spacing:.02em;cursor:pointer;transition:transform .12s;
-    box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;-webkit-appearance:none;appearance:none;outline:none}   /* v4.4: 文字右移到按钮背景图右侧空白区(避开左侧主题图案), 字间距 .06→.02em */
+    box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;-webkit-appearance:none;appearance:none;outline:none}   /* v4.4: 文字右移到空白区+字间距收紧; flex:1 三按钮等宽(避免文字变短后按钮缩窄图标变小) */
   .btn:active{transform:scale(.94)}
   .btn.primary{background:transparent;color:inherit}
   .btn:disabled{opacity:.62}   /* v1.7.46: 进度已移入按钮, 禁用态保留可读性 */
