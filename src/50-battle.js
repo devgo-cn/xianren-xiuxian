@@ -99,11 +99,19 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (window.__spawnSlowMul   === undefined) window.__spawnSlowMul   = 2.5;
     if (window.__poolAll        === undefined) window.__poolAll        = true;
     if (window.__maxAlive       === undefined) window.__maxAlive       = 3;
+    if (window.__trialFreeze    === undefined) window.__trialFreeze    = true;  /* 冻结妖潮倒计时, 免得到点清场 */
   }
   /* 同屏怪上限: 过目模式下由 window.__maxAlive 覆盖, 否则用线上值 */
   function capAlive() {
     const v = (typeof window !== 'undefined' && window.__maxAlive);
     return (typeof v === 'number' && v > 0) ? v : BC.maxAlive;
+  }
+  /* v4.6: 纯序列帧手配怪的素材就绪判定(slime/water 这类没走骨骼的) ——
+   * 素材没好就不刷, 免得开局画成兜底占位椭圆。没列到的类型一律视为就绪。 */
+  function spriteReadyFor(t) {
+    if (t === 'slime') return !!(G.slimeReady && G.slimeSprite);
+    if (t === 'water') return !!(G.waterReady && G.waterSprite);
+    return true;
   }
 
   const G = {    t:0, kills:0, spirit:0, speedMult:1, speedMultTimer:0, state:'walk', camX:0, paused:false,
@@ -708,12 +716,23 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const entries = [];
     for (const [t, d] of Object.entries(BC.enemies)) {
       if (t === 'boss' || !d || (d.tier || 1) > cur) continue;
+      /* v4.6 FIX 占位图: 手配骨骼怪只在工厂就绪后才入池 —— 否则开局刷出的怪
+       * 因工厂没建好, 会走兜底分支画成灰色椭圆(就是看到的"占位图")。 */
+      if (d.bone && !(BONES[d.bone] && BONES[d.bone].ready)) continue;
+      /* v4.6 FIX 同上: 纯序列帧怪(slime/water 这类没 bone 的)素材就绪前同样出占位图 */
+      if (!d.bone && !spriteReadyFor(t)) continue;
       entries.push({ kind:'hand', key:t, w:(d.w || 1) * ((d.tier || 1) === cur ? 3 : 1) });
     }
     for (let t = 1; t <= cur; t++) {
       const mul = (t === cur) ? 3 : 1;
-      for (const slug of BONE_POOL[t]) entries.push({ kind:'bone', key:slug, w:10 * mul });
+      for (const slug of BONE_POOL[t]) {
+        /* v4.6 FIX 同上: 骨骼池怪工厂未就绪就不进池 —— 懒加载是 1.5s/3 只,
+         * 79 只要约 40s 才建完; 不等就绪就刷, 开局必然一片灰椭圆。 */
+        if (!(BONES[slug] && BONES[slug].ready)) continue;
+        entries.push({ kind:'bone', key:slug, w:10 * mul });
+      }
     }
+    if (!entries.length) return null;   /* 工厂全部未就绪时这一拍不刷, 避免出占位图 */
     const twAll = entries.reduce((s,e2) => s + e2.w, 0);
     let rr = Math.random() * twAll, pick2 = entries[0];
     for (const e2 of entries) { rr -= e2.w; if (rr <= 0) { pick2 = e2; break; } }
@@ -1469,6 +1488,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
    *   运气好触发倍速多, 同样 120 秒里刷的怪就更多, 击杀数即纯收益。 */
   function updateTrial(dt) {
     if (G.trialSettled) return;          /* 结算面板期间不倒计时、不刷怪 */
+    /* v4.6 素材过目: window.__trialFreeze = true 冻结倒计时 —— 120s 看不完 79 只怪,
+     * 冻结后不会到点结算清场, 可以慢慢逐只过目。置回 false 即恢复。 */
+    if (typeof window !== 'undefined' && window.__trialFreeze) return;
     G.trialT -= dt;
     if (G.trialT <= 0) { G.trialT = 0; settleTrial(); }
   }
@@ -2449,7 +2471,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (trEl) {
       const td = BC.tier[G.trialTier] || BC.tier[1];
       const m = Math.floor(G.trialT / 60), s = Math.floor(G.trialT % 60);
-      trEl.textContent = `妖潮·${td.name} ${m}:${s < 10 ? '0' : ''}${s}`;
+      /* v4.6 过目模式: 倒计时冻结时加 ⏸ 标记, 免得看着像卡住了 */
+      const frozen = (typeof window !== 'undefined' && window.__trialFreeze) ? '⏸ ' : '';
+      trEl.textContent = `${frozen}妖潮·${td.name} ${m}:${s < 10 ? '0' : ''}${s}`;
       try {
         if (state && state.trialBoost > 0 && (state.trialBoostUntil || 0) > Date.now()) trEl.classList.add('boosted');
         else trEl.classList.remove('boosted');
