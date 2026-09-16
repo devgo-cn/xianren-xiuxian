@@ -17,7 +17,7 @@
     background:#070b16;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
     user-select:none;-webkit-user-select:none;
   }
-  #stage{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+  /* v4.1: #stage 2D 舞台画布已删除（渲染栈统一 WebGL），原 z:0 垫底位由 .bg-img 承担 */
   .bg-img{position:fixed;inset:0;background:center/cover no-repeat url(assets/main-bg.jpg);opacity:.14;z-index:1;filter:saturate(1.1);pointer-events:none}
   .vignette{position:fixed;inset:0;z-index:2;pointer-events:none;
     background:
@@ -512,7 +512,7 @@
 <linearGradient id="progGreen" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4a3a22" stop-opacity=".24"/><stop offset=".55" stop-color="#3e2f1a" stop-opacity=".27"/><stop offset="1" stop-color="#332614" stop-opacity=".30"/></linearGradient>
 <linearGradient id="progJade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#463024" stop-opacity=".24"/><stop offset="1" stop-color="#33231a" stop-opacity=".30"/></linearGradient>
 </defs></svg>
-<canvas id="stage"></canvas> <!-- v3.2 统一舞台：bg+battle+aura+burst 合成到这一张 -->
+<!-- v4.1: #stage 2D 舞台画布已删除 —— 渲染栈统一 WebGL(#battleGL)，此处仅剩 .bg-img 静态底图 -->
 <div class="bg-img"></div>
 <!-- v3.2: 灵气层已并入 #stage -->
 <div class="vignette"></div>

@@ -77,11 +77,13 @@ function resize() {
   _W = Math.max(1, window.innerWidth || 1);
   _H = Math.max(1, window.innerHeight || 1);
   _dpr = pickDPR();
-  const bw = Math.round(_W * _dpr), bh = Math.round(_H * _dpr);
-  if (_cv.width !== bw) _cv.width = bw;
-  if (_cv.height !== bh) _cv.height = bh;
-  /* 统一变换：逻辑坐标 = CSS 像素，绘制时无需再关心 DPR */
-  _ctx.setTransform(_dpr, 0, 0, _dpr, 0, 0);
+  if (_cv && _ctx) {
+    const bw = Math.round(_W * _dpr), bh = Math.round(_H * _dpr);
+    if (_cv.width !== bw) _cv.width = bw;
+    if (_cv.height !== bh) _cv.height = bh;
+    /* 统一变换：逻辑坐标 = CSS 像素，绘制时无需再关心 DPR */
+    _ctx.setTransform(_dpr, 0, 0, _dpr, 0, 0);
+  }
   for (const L of _layers) { try { L.resize && L.resize(_W, _H); } catch (e) {} }
 }
 
@@ -105,28 +107,43 @@ function tick(now) {
   const dt = Math.min(0.05, (now - _last) / 1000);
   _last = now;
 
-  _ctx.clearRect(0, 0, _W, _H);
-  for (const L of _layers) {
-    /* 诊断钩子：逐层记录它收到的 dt。验收「倍速不泄漏」时靠它取证 ——
-     * 舞台把【同一个原始 dt】给每一层，任何一层拿到的 dt 都不含 G.speedMult。 */
-    if (_diag) _diag(L.name, dt);
-    /* v3.6 状态隔离：clearRect 只清像素、不清画笔状态，globalAlpha /
-     * globalCompositeOperation / filter 会跨层、跨帧残留。任何一层泄漏
-     * 都会污染后续所有层（曾致 battle 层全体半透明）。每层进入前强制归位。 */
-    _ctx.globalAlpha = 1;
-    _ctx.globalCompositeOperation = "source-over";
-    try { _ctx.filter = "none"; } catch (e) {}
-    try { L.draw(_ctx, _W, _H, dt, now); }
-    catch (e) {
-      /* 单层异常不应拖垮整条渲染链：报一次，之后跳过该层 */
-      if (!L._err) { L._err = 1; console.error('[stage] 层绘制失败:', L.name, e); }
+  /* v4.1: _ctx 为 null（纯 ticker 模式）时跳过 2D 清屏与状态归位 ——
+   * 层各自的绘制面（GL canvas / overlay canvas）自己负责自己的像素。 */
+  if (_ctx) {
+    _ctx.clearRect(0, 0, _W, _H);
+    for (const L of _layers) {
+      /* 诊断钩子：逐层记录它收到的 dt。验收「倍速不泄漏」时靠它取证 ——
+       * 舞台把【同一个原始 dt】给每一层，任何一层拿到的 dt 都不含 G.speedMult。 */
+      if (_diag) _diag(L.name, dt);
+      /* v3.6 状态隔离：clearRect 只清像素、不清画笔状态，globalAlpha /
+       * globalCompositeOperation / filter 会跨层、跨帧残留。任何一层泄漏
+       * 都会污染后续所有层（曾致 battle 层全体半透明）。每层进入前强制归位。 */
+      _ctx.globalAlpha = 1;
+      _ctx.globalCompositeOperation = "source-over";
+      try { _ctx.filter = "none"; } catch (e) {}
+      try { L.draw(_ctx, _W, _H, dt, now); }
+      catch (e) {
+        /* 单层异常不应拖垮整条渲染链：报一次，之后跳过该层 */
+        if (!L._err) { L._err = 1; console.error('[stage] 层绘制失败:', L.name, e); }
+      }
+    }
+  } else {
+    for (const L of _layers) {
+      if (_diag) _diag(L.name, dt);
+      try { L.draw(null, _W, _H, dt, now); }
+      catch (e) {
+        if (!L._err) { L._err = 1; console.error('[stage] 层绘制失败:', L.name, e); }
+      }
     }
   }
 }
 
 export function initStage(canvas, layers) {
-  _cv = canvas;
-  _ctx = _cv.getContext('2d', { alpha: false });
+  /* v4.1: canvas 可为 null —— 渲染栈统一 WebGL 后，#stage 2D 画布退役，
+   * 本模块降级为纯 ticker（限帧调度 + dt 分发 + 可见性管理），
+   * 层 draw 的 ctx 首参恒 null（层各自决定画到哪：battle→BattleGL，dantian→overlay）。 */
+  _cv = canvas || null;
+  _ctx = _cv ? _cv.getContext('2d', { alpha: false }) : null;
   _layers = layers.filter(Boolean);
   resize();
   _running = true;

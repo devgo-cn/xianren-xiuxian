@@ -303,7 +303,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* v3.2: 统一舞台接入点 ---- 返回 60-stage 契约层对象 { name, draw(ctx,W,H,dt) }。
      * 调用后本层不再自持 rAF，逻辑与绘制都由舞台按统一 30fps 驱动。
      * ⚠️ 舞台传进来的 dt 必须是原始 dt —— 倍速乘法留在 update() 内部。 */
-    createStageLayer: () => battleLayer(),
+    /* v4.1.2: 舞台接管时必须显式置 _managed —— 此前 initManaged 无人调用,
+     * _managed 恒 false, 模块加载自启的独立泵从未停过(双泵: update 双跑=逻辑
+     * 双倍速潜伏至今; GL 迁移后独立泵 frame(0,innerH) 可见 = 画面上下抖动)。 */
+    createStageLayer: () => { _managed = true; _rafOn = false; return battleLayer(); },
     getKills: () => G.kills,
     resetKills: () => { G.kills = 0; },
     /* v3.4: 统一走 applySpeedBuff 的叠加规则（取 max 倍率 + 重置时长），
@@ -318,6 +321,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       return hit ? { name: hit, mult: G.speedMult, duration: G.speedMultTimer } : null;
     },
     getSpeedMult: () => G.speedMult,
+    /* v4.1.1 诊断口: 抖动取证 —— managed=true 且 pumpRuns 增长 = 双泵实锤 */
+    __glDiag: () => ({ managed: _managed, rafOn: _rafOn, pumpRuns: _pumpRuns, paused: G.paused, gl: window.BattleGL ? window.BattleGL.diag : null }),
     /* v3.2 验收用：直接设定倍速（跳过技能随机 proc），让 A/B 对照可复现。
      * 传 1 即清除加速。 */
     __setSpeedMultForTest: (m, dur) => {
@@ -2166,9 +2171,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   let _sleepT = 0;              /* v2.9: 限帧 setTimeout 句柄 —— 暂停/恢复时必须清掉, 否则双链跑帧 */
   const BATTLE_FRAME_MS = 33;   // ≈30fps
   let _managed = false;         // v3.2: true = 由 60-stage 驱动
+  let _pumpRuns = 0;            // v4.1.1: 独立泵实际执行帧数(诊断口)
   function loop(t) {
-    if (G.paused) { _rafOn = false; lastT = t; return; }   // 停泵: 下一帧不再续 rAF, resume 负责重启
-    _rafOn = true;
+    if (_managed || G.paused) { _rafOn = false; lastT = t; return; }   // v4.1.2: 舞台接管/暂停 → 停泵
+    _rafOn = true; _pumpRuns++;
     const wait = BATTLE_FRAME_MS - (t - _lastPaint);
     if (wait > 4) {
       /* v2.9 PERF: 限帧期间真正让出主线程 —— 原先无条件续 rAF, 高刷屏上按屏幕刷新率
@@ -2182,7 +2188,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const dt = Math.min(0.05, (t-lastT)/1000); lastT = t;
     update(dt); render(true);   /* 独立模式：自己就是画布主人，清屏透出底下 #bg */
     /* v4.0 WebGL: 独立模式横带=全屏（band 语义与 stage 一致） */
-    { const GL = window.BattleGL; if (GL && GL.ready) GL.frame(0, window.innerHeight); }
+    { const GL = window.BattleGL; if (GL && GL.ready) GL.frame(0, window.innerHeight, 'standalone-loop'); }
   }
 
   /* v3.2: 交给 60-stage 的层对象，绘制顺序排在 bg 之后、aura 之前
@@ -2206,7 +2212,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         try {
           render(false);   /* 画进 GL 横带本地坐标 */
           const GL = window.BattleGL;
-          if (GL && GL.ready) GL.frame(band.top, band.height);   /* root.y 平移 + 遮罩 + app.render() */
+          if (GL && GL.ready) GL.frame(band.top, band.height, '60-stage');   /* root.y 平移 + 遮罩 + app.render() */
         } finally {
           CW = savedCW; CH = savedCH;
         }
@@ -2235,7 +2241,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     updateHUD();
     if (typeof window.pushBattleStats === 'function') window.pushBattleStats();
     /* v3.2: 舞台模式下由 60-stage 驱动，自己不启 rAF */
-    if (!_managed) requestAnimationFrame(loop);
+    /* v4.1.2: 不自动启泵 —— 主游戏必走 60-stage(createStageLayer 已置 _managed);
+     * 独立调试页显式调 BattleAPI.resume() 启泵(其 guard 放行 !_managed)。
+     * 自动启泵 + 接管时序竞争 = 双泵抖动根因, 见 createStageLayer 注释。 */
   }
 
   /* v3.2: 初始化但不启动自持循环（舞台模式） */

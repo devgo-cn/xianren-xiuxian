@@ -461,12 +461,8 @@ const bctx = bcv ? bcv.getContext("2d") : null;
 function sizeBurst() { if (bcv) { bcv.width = innerWidth; bcv.height = innerHeight; } }
 
 function burstBoom() {
-  const cx = innerWidth / 2, cy = innerHeight * 0.46;
-  for (let i = 0; i < 120; i++) {
-    const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 8;
-    parts.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 2.4,
-      life: 1, size: 1.5 + Math.random() * 2.8, color: Math.random() < .75 ? "232,197,107" : "255,240,200" });
-  }
+  /* v4.1: canvas 粒子已退役（渲染栈统一 WebGL）—— 破境特效由 flash 白闪 +
+   * realmUp 弹字（DOM 动画）承担，保留导出签名兼容调用点。 */
 }
 
 /* 爆发粒子层。

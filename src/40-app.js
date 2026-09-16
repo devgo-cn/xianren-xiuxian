@@ -682,32 +682,21 @@ function bindBattleHooks() {                    // 战斗 IIFE 是内联脚本, 
 const _stageLayers = { bg: null, battle: null, dantian: null };
 function mountStage() {
   if (window.__stage) return;                       // 幂等
-  const canvas = document.getElementById("stage");
-  if (!canvas) { console.warn("[stage] 找不到 #stage，回退到分层渲染"); initAura(); initBg(); initFxLayer(); return; }
+  /* v4.1 渲染栈统一 WebGL：#stage 2D 画布已删除。
+   *   · 战斗层 → BattleGL(Pixi)（v4.0 已迁）
+   *   · 深空/灵气/爆发粒子 → 退役（灵气 36 光点、burst 粒子零贡献，
+   *     深空透出 .bg-img 静态图即可，bg.js 保留文件待后续清理）
+   * 60-stage 降级为纯 ticker：只负责限帧调度 + dt 分发 + 可见性管理，
+   * 2D ctx 为 null，层 draw 的首参恒 null。 */
+  const canvas = null;
 
-  /* 统一舞台持有 canvas 与 ctx。灵气层与爆发层直接画到它上面，
-   * 不再各自 clearRect（那会抹掉别的层）。 */
-  const ctx = canvas.getContext("2d", { alpha: false });
-
-  /* 层壳子：真正的绘制函数在创建后回填，保证插入顺序在装配时就固定。 */
-  const auraLayer = {
-    name: "aura",
-    draw(c, W, H, dt) { if (!DIMSTAT.on) tickAura(dt, { ctx: c, W, H }); },
-  };
-  const burstLayer = {
-    name: "burst",
-    draw(c, W, H, dt) { if (!DIMSTAT.on) tickBurst(dt, { ctx: c, W, H }); },
-  };
-  /* v3.3 丹田层壳子：fx2d.js 是动态 import（模块可能还没就绪），
+  /* v4.1 丹田层壳子：fx2d.js 是动态 import（模块可能还没就绪），
    * 先用空壳占住位置，等模块到了再把真身回填进去 —— 这样层顺序不依赖加载时序。
    *
-   * ⚠️ 这一层最终【不会画在 #stage 上】。
-   *   #stage 是 z-index:0，而角色本体（.stage/#cult）是 z-index:5 ——
-   *   画在 #stage 上的丹田会被角色贴图整个盖住（实测中心只有 (94,109,126)，
-   *   那是袍子本身的颜色，不是丹田的光）。
-   *   丹田必须"长在人物身上"，所以它得在角色之上。做法见 dantianOverlay()：
+   * ⚠️ 这一层最终【不会画在已删除的 #stage 上】。
+   *   丹田是"人物身上发光的一点"，必须长在人物之上 —— 做法见 dantianOverlay()：
    *   给角色容器加一张同尺寸的 overlay canvas，z-index 高于贴图。
-   *   这里仍保留一个层对象，用于【非 overlay 场景】的兜底与几何兜底。 */
+   *   （overlay canvas 是丹田的专用绘制面，不属于舞台渲染栈，后续随 fx2d 一并迁移） */
   const dantianLayer = {
     name: "dantian",
     _real: null,
@@ -715,18 +704,10 @@ function mountStage() {
     draw(c, W, H, dt) { if (!DIMSTAT.on && this._real) this._real.draw(c, W, H, dt); },
   };
 
-  /* 先建 stage（bg 层要拿到它给的真实尺寸），再按顺序挂层。 */
+  /* 纯 ticker 模式：ctx=null，60-stage 只调度不绘制。 */
   import("./60-stage.js").then(mod => {
     const stage = mod.initStage(canvas, []);
     window.__stage = stage;
-    /* 灵气层的 ctx 需要注入（它内部用自己的 _auraCtx 判断是否就绪）。
-     * 单独 try —— 任何一层初始化失败都不应让整条舞台装配中断。 */
-    try { initAura(ctx); } catch (e) { console.error("[stage] aura 层初始化失败:", e); }
-    try { stage.addLayer(auraLayer); } catch (e) { console.error("[stage] aura 层挂载失败:", e); }
-    try { stage.addLayer(burstLayer); } catch (e) { console.error("[stage] burst 层挂载失败:", e); }
-    /* v3.8: 去掉 bg 星空层 —— 上半屏战斗横带自绘夜色+森林图、下半屏打坐区改纯黑,
-     * 星空已无处安放, 且它画整屏大柔光图, 对战斗层的清晰度有肉眼可见的拖累(用户实测)。
-     * 保留 bg.js 文件与其独立模式(initBg, 找不到 #stage 的兜底分支仍可用)。 */
     pollBattleLayer(stage);
     /* 丹田：动态 import fx2d，回来后挂到角色之上的 overlay */
     import('../fx2d.js?v=' + CACHE_VER).then(m => {

@@ -92,10 +92,16 @@
         app.renderer.resize(W, H);
     }
 
-    /* 每帧末调用：同步横带几何并渲染。bandTop/bandH 来自 window.__stageBand() */
+    /* 每帧末调用：同步横带几何并渲染。bandTop/bandH 来自 window.__stageBand()
+     * v4.1.1: 环形记录最近调用 —— 排查"战斗画面跳顶部"抖动：
+     * bandTop 只可能是 92(stage 驱动)或 0(独立泵 frame(0,innerH))，
+     * 若 diag 里 top=0 出现即证明第二渲染泵存在，src 字段指认调用方。 */
     let _bandTop = NaN, _bandH = NaN, _maskW = 0, _maskH = 0;
-    function frame(bandTop, bandH) {
+    const _frameLog = [];
+    function frame(bandTop, bandH, src) {
         if (!app) return;
+        _frameLog.push({ top: bandTop, h: bandH, src: src || '?', at: (performance.now() | 0) });
+        if (_frameLog.length > 60) _frameLog.shift();
         root.y = bandTop;
         if (bandTop !== _bandTop || bandH !== _bandH || W !== _maskW || H !== _maskH) {
             _bandTop = bandTop; _bandH = bandH; _maskW = W; _maskH = H;
@@ -269,6 +275,8 @@
         computeMeshGeometry, armatureAABB,
         get renderer() { return app ? app.renderer : null; },
         get ready() { return !!app; },
-        get size() { return { W, H, dpr }; }
+        get size() { return { W, H, dpr }; },
+        /* 诊断：最近 60 次 frame 调用(top/h/src/at) —— 抖动取证 */
+        get diag() { return { frames: _frameLog.slice(), rootY: root ? root.y : null, W, H, dpr }; }
     };
 })(window);
