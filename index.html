@@ -148,26 +148,63 @@
   .small-icons .icon-btn img{width:100%;height:100%;display:block;pointer-events:none}
   .small-icons #cloudChip{display:block;width:28px;height:28px;max-width:none;padding:0;overflow:hidden}
   .small-icons .icon-btn:active{transform:scale(.9)}
-  .small-icons .icon-btn .mail-dot{position:absolute;top:-1px;right:-1px;width:7px;height:7px;background:#ff4a4a;border-radius:50%;border:1px solid #fff;display:none;z-index:2}
-  .small-icons .icon-btn.has-mail .mail-dot{display:block;animation:dotBlink 1.2s ease-in-out infinite}
-  .small-icons .icon-btn.has-mail{box-shadow:0 0 8px rgba(232,197,107,.8);border-color:#e8c56b}
+  .small-icons .icon-btn .mail-dot{position:absolute;top:-3px;right:-3px;width:9px;height:9px;background:radial-gradient(circle at 35% 35%,#ff8080,#e82828);border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 8px rgba(255,74,74,.9);display:none;z-index:3;animation:dotPulse 1.2s ease-in-out infinite}
+  .small-icons .icon-btn.has-mail .mail-dot{display:block}
+  .small-icons .icon-btn.has-mail{
+    box-shadow:0 0 10px rgba(232,197,107,.9),0 0 22px rgba(232,197,107,.5),inset 0 0 8px rgba(232,197,107,.25);
+    border-color:#e8c56b;animation:iconPulseGold 1.5s ease-in-out infinite;overflow:visible}
+  .small-icons .icon-btn.has-mail img{border-radius:3px;animation:iconBrightGold 1.5s ease-in-out infinite}
   .battle-ui .icon-btn{position:relative;width:42px;height:42px;border-radius:5px;overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .3s;border:1px solid rgba(232,197,107,.25);background:transparent;flex:none}   /* v2.6.1: 图标黑底已抠空, 垫黑改透明 */
   .battle-ui .icon-btn img{width:100%;height:100%;display:block;pointer-events:none}
   .battle-ui .icon-btn.small{width:28px;height:28px;border-radius:3px}
   .battle-ui #cloudChip{display:block;width:28px;height:28px;max-width:none;padding:0;overflow:hidden}
   .battle-ui .icon-btn:active{transform:scale(.9)}
   .battle-ui .icon-btn .lg{display:none}
+  /* v4.4 激活态全面增强：图标透明度调高后原 box-shadow 脉冲不明显。
+     三重叠加 —— ①外发光+内发光 box-shadow 脉冲(范围×1.5、不透明度拉满)
+     ②图标 img 自身 brightness/saturate 呼吸(半透明图标也能明显亮暗交替)
+     ③右上角实心圆点(::after, 带白边+光晕, 独立脉冲)。
+     overflow:visible 让圆点露出角外；img 补 border-radius 保持圆角不溢出。 */
   /* 激活态：丹房可炼丹(橙光) */
-  .battle-ui .icon-btn.glow-ember{box-shadow:0 0 10px rgba(255,138,74,.9),0 0 20px rgba(255,138,74,.5);border-color:#ff8a4a;animation:iconPulseEmber 1.8s ease-in-out infinite}
-  @keyframes iconPulseEmber{0%,100%{box-shadow:0 0 6px rgba(255,138,74,.6)}50%{box-shadow:0 0 14px rgba(255,138,74,1),0 0 28px rgba(255,138,74,.5)}}
+  .battle-ui .icon-btn.glow-ember{
+    box-shadow:0 0 12px rgba(255,138,74,.95),0 0 28px rgba(255,138,74,.55),inset 0 0 10px rgba(255,138,74,.3);
+    border-color:#ff8a4a;animation:iconPulseEmber 1.5s ease-in-out infinite;overflow:visible}
+  .battle-ui .icon-btn.glow-ember img{border-radius:5px;animation:iconBrightEmber 1.5s ease-in-out infinite}
+  .battle-ui .icon-btn.glow-ember::after{
+    content:"";position:absolute;top:-3px;right:-3px;width:9px;height:9px;
+    background:radial-gradient(circle at 35% 35%,#ffc090,#ff6a30);
+    border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 8px rgba(255,138,74,.9);
+    animation:dotPulse 1.2s ease-in-out infinite;z-index:3}
+  @keyframes iconPulseEmber{
+    0%,100%{box-shadow:0 0 6px rgba(255,138,74,.5),inset 0 0 4px rgba(255,138,74,.15)}
+    50%{box-shadow:0 0 20px rgba(255,138,74,1),0 0 40px rgba(255,138,74,.65),inset 0 0 14px rgba(255,138,74,.35)}}
+  @keyframes iconBrightEmber{
+    0%,100%{filter:brightness(1) saturate(1)}
+    50%{filter:brightness(1.45) saturate(1.25) drop-shadow(0 0 5px rgba(255,138,74,.7))}}
   /* 激活态：有邮件(红点+金光) */
-  .battle-ui .icon-btn.has-mail{box-shadow:0 0 8px rgba(232,197,107,.8);border-color:#e8c56b}
-  .battle-ui .icon-btn .mail-dot{position:absolute;top:-1px;right:-1px;width:7px;height:7px;background:#ff4a4a;border-radius:50%;border:1px solid #fff;display:none;z-index:2}
-  .battle-ui .icon-btn.has-mail .mail-dot{display:block;animation:dotBlink 1.2s ease-in-out infinite}
-  @keyframes dotBlink{0%,100%{opacity:1}50%{opacity:.4}}
+  .battle-ui .icon-btn.has-mail{
+    box-shadow:0 0 12px rgba(232,197,107,.9),0 0 26px rgba(232,197,107,.5),inset 0 0 8px rgba(232,197,107,.25);
+    border-color:#e8c56b;animation:iconPulseGold 1.5s ease-in-out infinite;overflow:visible}
+  .battle-ui .icon-btn.has-mail img{border-radius:5px}
+  .battle-ui .icon-btn .mail-dot{position:absolute;top:-3px;right:-3px;width:9px;height:9px;background:radial-gradient(circle at 35% 35%,#ff8080,#e82828);border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 8px rgba(255,74,74,.9);display:none;z-index:3;animation:dotPulse 1.2s ease-in-out infinite}
+  .battle-ui .icon-btn.has-mail .mail-dot{display:block}
+  @keyframes dotPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.35);opacity:.85}}
   /* 激活态：金光(通用) */
-  .battle-ui .icon-btn.glow-gold{box-shadow:0 0 10px rgba(232,197,107,.9),0 0 20px rgba(232,197,107,.4);border-color:#e8c56b;animation:iconPulseGold 1.8s ease-in-out infinite}
-  @keyframes iconPulseGold{0%,100%{box-shadow:0 0 6px rgba(232,197,107,.6)}50%{box-shadow:0 0 14px rgba(232,197,107,1),0 0 28px rgba(232,197,107,.5)}}
+  .battle-ui .icon-btn.glow-gold{
+    box-shadow:0 0 12px rgba(232,197,107,.95),0 0 28px rgba(232,197,107,.55),inset 0 0 10px rgba(232,197,107,.3);
+    border-color:#e8c56b;animation:iconPulseGold 1.5s ease-in-out infinite;overflow:visible}
+  .battle-ui .icon-btn.glow-gold img{border-radius:5px;animation:iconBrightGold 1.5s ease-in-out infinite}
+  .battle-ui .icon-btn.glow-gold::after{
+    content:"";position:absolute;top:-3px;right:-3px;width:9px;height:9px;
+    background:radial-gradient(circle at 35% 35%,#fff0c0,#e8b830);
+    border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 8px rgba(232,197,107,.9);
+    animation:dotPulse 1.2s ease-in-out infinite;z-index:3}
+  @keyframes iconPulseGold{
+    0%,100%{box-shadow:0 0 6px rgba(232,197,107,.5),inset 0 0 4px rgba(232,197,107,.15)}
+    50%{box-shadow:0 0 20px rgba(232,197,107,1),0 0 40px rgba(232,197,107,.65),inset 0 0 14px rgba(232,197,107,.35)}}
+  @keyframes iconBrightGold{
+    0%,100%{filter:brightness(1) saturate(1)}
+    50%{filter:brightness(1.45) saturate(1.2) drop-shadow(0 0 5px rgba(232,197,107,.7))}}
 
   /* 主角（略微缩小以腾出战斗区空间） */
   .stage{position:fixed;inset:0;z-index:5;display:flex;align-items:flex-end;justify-content:center;pointer-events:none}
@@ -426,7 +463,9 @@
   .hint-gold{animation:hintGoldPulse .95s ease-in-out infinite}
   .hint-ember{animation:hintEmberPulse .8s ease-in-out infinite}
   /* v1.7.35: 光晕改 drop-shadow 跟随墨形/圆钮自身轮廓(不再出现直角矩形光) */
-  @keyframes glowGoldInk{0%,100%{filter:drop-shadow(0 0 1.5px rgba(232,197,107,.28))}50%{filter:drop-shadow(0 0 7px rgba(255,215,130,.95)) drop-shadow(0 0 16px rgba(255,200,110,.5))}}
+  /* v4.4 增强:  drop-shadow 范围×1.6、不透明度拉满，暗态也保留可见底光，
+     避免图标透明度调高后脉冲高低对比不足。 */
+  @keyframes glowGoldInk{0%,100%{filter:drop-shadow(0 0 3px rgba(232,197,107,.5))}50%{filter:drop-shadow(0 0 10px rgba(255,220,140,1)) drop-shadow(0 0 22px rgba(255,200,110,.75)) drop-shadow(0 0 6px rgba(255,215,130,.4))}}
   .glow-gold .ink{animation:glowGoldInk .9s ease-in-out infinite}
   /* v1.7.41 装备品质辉光(呼吸) */
   @keyframes eqBoxGlow{0%,100%{box-shadow:0 0 2px var(--qcglow),0 0 7px var(--qcglow)}50%{box-shadow:0 0 7px var(--qcglow),0 0 19px var(--qcglow)}}
@@ -440,7 +479,7 @@
   /* v1.7.36 境界大字呼吸光 */
   @keyframes bigBreath{0%,100%{filter:drop-shadow(0 0 1px rgba(232,197,107,.35))}50%{filter:drop-shadow(0 0 5px rgba(255,222,150,.95)) drop-shadow(0 0 13px rgba(255,205,120,.55)) drop-shadow(0 0 22px rgba(232,197,107,.3))}}
   .realm-badge .big{animation:bigBreath 2.8s ease-in-out infinite}
-  @keyframes glowEmberInk{0%,100%{filter:drop-shadow(0 0 1px rgba(255,150,110,.2))}50%{filter:drop-shadow(0 0 6px rgba(255,150,110,.95)) drop-shadow(0 0 13px rgba(255,120,80,.5))}}
+  @keyframes glowEmberInk{0%,100%{filter:drop-shadow(0 0 2px rgba(255,150,110,.4))}50%{filter:drop-shadow(0 0 9px rgba(255,160,120,1)) drop-shadow(0 0 18px rgba(255,120,80,.75)) drop-shadow(0 0 5px rgba(255,140,100,.4))}}
   .glow-ember{animation:glowEmberInk .75s ease-in-out infinite}
   /* ==================== v1.8.0 设置面板 + 黑屏挂机 ==================== */
   .set-list{display:flex;flex-direction:column;gap:9px;margin:15px 0 10px}
