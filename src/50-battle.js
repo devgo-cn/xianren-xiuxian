@@ -153,6 +153,153 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const skill = pick(['skill']) || attack;
     return { idle, hurt, attack, walk, dead, skill };
   }
+  /* ══════════ v4.4 程序化行走（无 walk 素材的骨骼怪自动摆腿）══════════
+   * 背景: monsters/index.json 的 79 只怪里只有 ratty 自带 walk/run 动画, 其余
+   * 全部只有 Idle/Attack/Damage 三态 —— boneAnimMap 把 walk 回退成 idle, 于是
+   * "怪物有脚却不会走"。实测骨架是有绑腿的(每侧一条 hip→knee→paw 骨链),
+   * 所以这里在运行时按正弦驱动腿部骨骼, 现场合成走路循环, 不依赖美术补素材。
+   *
+   * 关键实现细节(踩过的坑, 勿改):
+   *  1) DragonBones 的 bone.offset 是"相对绑定姿势的增量"(offsetMode=Additive,
+   *     global = origin + offset + animationPose), 所以每帧必须先还原到绑定姿势
+   *     再叠加我们的增量, 否则 offset 会逐帧累积。
+   *  2) 只写 offset 不会生效: 必须先置 _localDirty/_transformDirty/_cachedFrameIndex=-1,
+   *     再调 bone.update(-1) 才会重算 globalTransformMatrix。
+   *  3) 骨骼必须严格【从根到叶】顺序更新 —— 子骨要读父骨刚算好的矩阵。
+   *  4) 光更新骨骼还不够: 插槽(slot)持有的是自己那份矩阵, 必须一并 update。
+   *  5) 本驱动挂在 advanceRatty 里 advanceTime 之后执行, 覆盖掉 idle 对腿的摆位。 */
+
+  /* 从骨架里自动识别"腿"。不依赖骨骼名(这些素材的骨骼名是乱码, 如
+   * "32324343"/"dsdsvccvnbbmnmn", 无法按名字匹配), 改用拓扑+几何特征:
+   *   · 骨架根下会挂很多长度为 0 的装饰骨, 先过滤掉 */
+  const dbgWalk = (...a) => { if (window.__walkDebug) console.log('[walk]', ...a); };
+
+  /* 腿链识别 —— 两级策略(实测 79 只怪归纳):
+   *
+   * ① 优先按【骨骼名】匹配(最可靠)。79 只里 36 只的骨架带可读的腿骨名, 命名很统一:
+   *    "Left Leg"/"right leg"/"IKLegL"/"IK_Lleg"/"Back leg Left"/"front leg R"/
+   *    "LLEG1"/"LegRIK"/"IKFootL" ... 共同特征是名字里含 leg / foot。
+   *    命中后取这些骨为"腿根", 各自往下延伸到叶子的那一段就是一条腿链。
+   *    这一步能把人形怪的"手臂"和"腿"精确分开 —— 光靠几何分不开(僵尸的
+   *    左右胳膊和左右腿下垂量几乎一样), 但名字分得开。
+   *
+   * ② 名字不可用时(43 只乱码名怪, 如森林狼 "32324343")退回【几何判据】:
+   *    叶子 + 长度>0 + 链长≥2 + 下垂量 drop>40。实测四足兽的腿 drop 在 +95~100,
+   *    而尾巴/鬃毛/头饰(横向伸展)drop 在 -32~0, 分得很干净。
+   *    注意这条对两足人形不可靠(胳膊同样下垂), 所以只作退路, 且此时宁缺毋滥 ——
+   *    宁可不动腿, 也不要把胳膊当腿甩。
+   */
+  const LEG_NAME_RE = /(^|[^a-z])(leg|foot|feet|thigh|shin)([^a-z]|$)/i;
+  const isLegName = (n) => LEG_NAME_RE.test(String(n || ''));
+
+  function detectLegs(arm) {
+    const bones = arm.getBones();
+    const byName = {}; bones.forEach(b => byName[b.name] = b);
+    const kids = {};
+    bones.forEach(b => {
+      const p = b._parent ? b._parent.name : null;
+      if (p) (kids[p] || (kids[p] = [])).push(b.name);
+    });
+    /* 从某个"腿根"沿真实父子链向下走到叶子, 构成一条腿链(只收长度>0 的节) */
+    const chainFrom = (rootName) => {
+      const names = [];
+      let cur = byName[rootName];
+      while (cur && cur._boneData && cur._boneData.length > 0) {
+        names.push(cur.name);
+        const k = kids[cur.name] || [];
+        if (!k.length) break;
+        /* 若某节分叉出多条子链, 取最长的那个分支(踢掉挂饰/特效骨) */
+        let best = null, bestLen = -1;
+        for (const c of k) {
+          let n = 0, p = byName[c];
+          while (p) { n++; const kk = kids[p.name] || []; if (!kk.length) break; p = byName[kk[0]]; }
+          if (n > bestLen) { bestLen = n; best = c; }
+        }
+        cur = byName[best];
+      }
+      return names;
+    };
+
+    /* ---- ① 按名字匹配 ----
+     * 注意两个坑(实测):
+     *  · 很多怪的 "IKLegL"/"LLEG1"/"RLEG2IK" 是 IK 目标骨, length=0, 不参与形变,
+     *    必须靠 length>0 排除(否则会拿 IK 骨当腿, 完全不动)。
+     *  · 有单节腿(小怪骨架很简, "Leg Left" 直接就是叶子), 所以链长 >= 1 即可,
+     *    不要求 >= 2。 */
+    const roots = bones.filter(b => isLegName(b.name) && b._boneData && b._boneData.length > 0);
+    if (roots.length) {
+      const seen = new Set();
+      const out = [];
+      roots.forEach(r => {
+        if (seen.has(r.name)) return;
+        const names = chainFrom(r.name);
+        if (!names.length) return;
+        names.forEach(n => seen.add(n));
+        out.push({ names });
+      });
+      if (out.length) return normalizeLegs(out, byName);
+    }
+
+    /* ---- ② 几何退路 ----
+     * 名字不可用时只能靠几何。实测(森林狼)四条真腿的"链根→末端下垂量 drop"
+     * 都在 +95~100, 而尾巴/鬃毛/头饰这些横向伸展的链 drop 在 -32~0 —— 用一个
+     * drop > 40 的阈值就能把腿和"非腿"干净分开。
+     * 注意: 不要试图用"垂直度/漂移比"进一步筛选 —— 实测奔跑姿态下同一条真腿的
+     *       漂移比能从 0.11 变到 1.91(腿会前后踢), 该指标无区分力, 反而误杀真腿。
+     * 也不限制链长: 四足兽的腿链常见 4~5 节。
+     * 局限: 这条对两足人形不可靠(胳膊同样下垂), 故名字匹配才是首选; 若这里
+     *       选出的链数 > 6(多半是把一堆尾巴/挂饰都算进来了)则整体放弃, 保守起见
+     *       宁可腿不动。 */
+    const chains = [];
+    bones.forEach(b => {
+      if ((kids[b.name] || []).length !== 0) return;       /* 只要叶子 */
+      if (!b._boneData || b._boneData.length <= 0) return; /* 装饰骨排除 */
+      const names = []; let cur = b;
+      while (cur && cur._boneData && cur._boneData.length > 0) { names.unshift(cur.name); cur = cur._parent; }
+      if (names.length < 2) return;
+      const head = byName[names[0]];
+      if (b.global.y - head.global.y <= 40) return;        /* 不下垂 = 尾巴/鬃毛/头饰 */
+      chains.push({ names, tipX: b.global.x });
+    });
+    if (chains.length < 2 || chains.length > 6) return [];
+    chains.sort((a, b) => a.tipX - b.tipX);
+    return normalizeLegs(chains, byName);
+  }
+
+  /* 统一整理: 按左右顺序排 + 分配交替相位(形成对角步态) */
+  function normalizeLegs(legs, byName) {
+    const withX = legs.map(l => {
+      const tip = byName[l.names[l.names.length - 1]];
+      return { names: l.names, tipX: tip ? tip.global.x : 0 };
+    });
+    withX.sort((a, b) => a.tipX - b.tipX);
+    withX.forEach((l, i) => { l.phaseOff = (i % 2) ? 0.5 : 0.0; });
+    return withX;
+  }
+
+  /* 每帧驱动一条腿链。amp 为整体摆幅(0~1), 由怪物移动速度/体型缩放。 */
+  function driveLeg(arm, leg, t, amp, refCache) {
+    const bones = leg.bones;
+    for (let i = 0; i < bones.length; i++) {
+      const b = bones[i];
+      if (i === 0) {
+        const k = i / Math.max(1, bones.length - 1);
+        const swing = Math.sin(t + leg.phaseOff * Math.PI * 2) * (0.42 - 0.18 * k) * amp;
+        b.offset.rotation = b.__baseR + swing;
+      } else {
+        const k = i / Math.max(1, bones.length - 1);
+        const knee = Math.sin(t + leg.phaseOff * Math.PI * 2 + Math.PI * 1.15) * (0.10 + 0.14 * k) * amp;
+        b.offset.rotation = b.__baseR + knee;
+      }
+    }
+    /* 根→叶重算 */
+    for (let i = 0; i < bones.length; i++) {
+      const b = bones[i];
+      b._localDirty = true; b._transformDirty = true; b._cachedFrameIndex = -1;
+      b.update(-1);
+    }
+  }
+
   function loadBone(slug, urls, armName, animList, onReady) {
     if (!window.BattleGL || BONES[slug]) return;
     const B = BONES[slug] = { ready:false, factory:null, anims:boneAnimMap(animList), baseH:0, arm:armName, pool:[] };
@@ -328,6 +475,29 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     getSpeedMult: () => G.speedMult,
     /* v4.1.1 诊断口: 抖动取证 —— managed=true 且 pumpRuns 增长 = 双泵实锤 */
     __glDiag: () => ({ managed: _managed, rafOn: _rafOn, pumpRuns: _pumpRuns, paused: G.paused, gl: window.BattleGL ? window.BattleGL.diag : null }),
+    /* v4.4 诊断口: 程序化行走自检 —— 列出每只骨骼怪的归一化动画名、是否自带真 walk、
+     * 以及检测到的腿链; 以及当前场上每只怪的驱动状态。验收脚本据此断言:
+     * ① 有真 walk 的怪(ratty) isRealWalk=true 且不被程序化驱动;
+     * ② 其余有腿的怪 hasRealWalk=false 且移动时 __walkT 递增。 */
+    __walkDiag: () => {
+      const bones = {};
+      for (const k in BONES) {
+        const it = BONES[k]; if (!it) continue;
+        const an = it.anims || {};
+        bones[k] = { ready: !!it.ready, idle: an.idle || null, walk: an.walk || null,
+                     isRealWalk: !!(an.walk && an.walk !== an.idle) };
+      }
+      const live = (G.enemies || []).filter(e => e.alive && e.armature).map(e => ({
+        slug: e.boneSlug, moving: !!e.moving, legs: (e.__legs || []).length,
+        legNames: (e.__legs || []).map(l => l.names.join('>')),
+        walkT: e.__walkT || 0,
+        driving: !!(e.__legs && e.__legs.length && e.moving && e.hurtT <= 0 && e.anim <= 0
+                    && !(BONES[e.boneSlug] && BONES[e.boneSlug].anims
+                         && BONES[e.boneSlug].anims.walk
+                         && BONES[e.boneSlug].anims.walk !== BONES[e.boneSlug].anims.idle))
+      }));
+      return { bones, live };
+    },
     /* v3.2 验收用：直接设定倍速（跳过技能随机 proc），让 A/B 对照可复现。
      * 传 1 即清除加速。 */
     __setSpeedMultForTest: (m, dur) => {
@@ -424,7 +594,22 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (def.bone) {
       const B = BONES[def.bone];
       if (B && B.ready) {
-        try { r.armature = B.factory.buildArmature(B.arm); r.boneSlug = def.bone; r.boneAnim = 'walk'; }
+        try {
+          r.armature = B.factory.buildArmature(B.arm);
+          r.boneSlug = def.bone; r.boneAnim = 'walk';
+          /* v4.4: 建实例时识别一次腿链, 并缓存各腿骨的绑定姿势 offset ——
+           * 后续每帧 walk 驱动都从这份绑定姿势出发叠加增量。
+           * detectLegs 已按左右排好并分配交替相位(对角步态)。 */
+          const legs = detectLegs(r.armature);
+          r.__legs = legs.map(leg => {
+            const bs = leg.names.map(n => r.armature.getBone(n)).filter(Boolean);
+            bs.forEach(b => { if (b.__baseR === undefined) b.__baseR = b.offset.rotation; });
+            return { names: leg.names, bones: bs, phaseOff: leg.phaseOff || 0,
+                     /* 长链(4~5 节)摆幅收一点, 避免膝盖过弯穿模 */
+                     amp: bs.length >= 4 ? 0.85 : 1.0 };
+          }).filter(l => l.bones.length >= 1);
+          if (r.__legs.length) dbgWalk((def.bone || '') + ' 腿(' + r.__legs.length + '): ' + r.__legs.map(l => l.names.join('>')).join(' | '));
+        }
         catch (err) { console.error('[battle] buildArmature 失败', def.bone, err); }
       }
     }
@@ -1103,6 +1288,18 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (!want || !A.hasAnimation(want)) want = an.idle || an.walk;
     if (want && e.boneAnim !== want) { e.boneAnim = want; A.fadeIn(want, 0.12, (want === 'walk' || want === 'idle') ? 0 : -1); }   /* playTimes=0 强制循环: megapack1 数据自带播1次, -1 会冻结在末帧 */
     e.armature.advanceTime(dt);
+    /* v4.4 程序化行走: 该怪没有 walk 动画(素材缺), 但骨架绑了腿 —— 移动时现场摆腿。
+     * 只在"走路态"(非攻击/非受击/非死亡)且确实在移动时驱动, 避免打架: 攻击时腿该
+     * 保持攻击姿势, 受击/死亡同理。
+     * 关键排除: 若该怪自带真正的 walk 动画(如 ratty), 则动画本身就在摆腿,
+     * 再叠加程序化驱动会双重驱动/相位打架 —— 判定方式与 boneAnimMap 的回退一致:
+     * walk 与 idle 不是同一支动画, 才说明素材真有 walk。 */
+    const hasRealWalk = !!(an.walk && an.walk !== an.idle);
+    if (!dead && !hasRealWalk && e.moving && e.hurtT <= 0 && e.anim <= 0 && e.__legs && e.__legs.length) {
+      e.__walkT = (e.__walkT || 0) + dt * (e.__walkRate || 1.0) * 2.0;
+      const amp = e.__walkAmp != null ? e.__walkAmp : 1.0;
+      for (let i = 0; i < e.__legs.length; i++) driveLeg(e.armature, e.__legs[i], e.__walkT, amp * e.__legs[i].amp, null);
+    }
   }
   function updateEnemies(dt) {
     const p = G.player;
