@@ -227,7 +227,7 @@
   .actions{position:fixed;left:0;right:0;bottom:24px;z-index:10;display:flex;justify-content:center;gap:10px;padding:0 14px}  /* v1.7.52: 上移 6px 给按钮下方数字进度留位 */
   /* v1.7.46 按钮内进度: SVG clipPath 复用墨形, 填充宽度即进度(聚灵阵=灵石/升级价, 突破=修为/所需) */
   .btn .skin{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none;z-index:0}
-  .btn .label{position:relative;z-index:2}
+  /* .btn .label 样式在 dt-theme.css 中定义(绝对定位右侧+不换行) */
   .btn .prog{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;
     mix-blend-mode:multiply;isolation:isolate}   /* v1.7.49: 与按钮底色相乘 → 恒为"本色加深", 任何状态(金/红/禁用灰调)都不割裂 */
   /* v2.6.1: 皮肤已换 webp 图片 → 进度填充改用图片 alpha 作 mask 裁形, 与新皮肤天然贴合
@@ -305,9 +305,9 @@
     font-size:9.5px;font-family:ui-monospace,SFMono-Regular,monospace;letter-spacing:.02em;
     color:rgba(232,197,107,.66);pointer-events:none;z-index:3;text-shadow:0 1px 2px rgba(0,0,0,.6)}
   .btn.primary .pnum{color:rgba(255,200,180,.70)}
-  .btn{pointer-events:auto;border:0;background:transparent;color:var(--gold);border-radius:0;display:flex;align-items:center;justify-content:flex-end;padding:0 14px 0 22px;aspect-ratio:3/1;flex:1;max-width:108px;min-width:88px;
+  .btn{pointer-events:auto;border:0;background:transparent;color:var(--gold);border-radius:0;display:flex;align-items:center;justify-content:flex-end;padding:0;aspect-ratio:3/1;flex:1;max-width:108px;min-width:88px;box-sizing:border-box;
     font-size:12px;font-weight:600;letter-spacing:.02em;cursor:pointer;transition:transform .12s;
-    box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;-webkit-appearance:none;appearance:none;outline:none}   /* v4.4: 3:1比例锁尺寸; 字体14→12px避免聚灵阵文字换行; padding收紧 */
+    box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;-webkit-appearance:none;appearance:none;outline:none}   /* v4.4: 3:1比例; 12px字体; label绝对定位右侧; padding:0 */
   .btn:active{transform:scale(.94)}
   .btn.primary{background:transparent;color:inherit}
   .btn:disabled{opacity:.62}   /* v1.7.46: 进度已移入按钮, 禁用态保留可读性 */
@@ -642,8 +642,8 @@
 <div class="feed feed-avatar" id="avatarFeed"></div>
 <div class="feed feed-main" id="mainFeed"></div>
 <div class="actions">
-  <button class="btn" id="btnArray" onclick="tapArray()"><img class="skin" src="assets/ui_icons/btn_array.webp" alt=""><svg class="prog" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true"><rect id="arrFill" x="0" y="0" width="0" height="60" fill="url(#progGreen)"/></svg><span class="label">聚灵阵 Lv.<span id="arrayLv">1</span></span><i class="pnum" id="arrNum"></i></button>
-  <button class="btn primary" id="btnBreak" onclick="manualBreak()"><img class="skin" src="assets/ui_icons/btn_break.webp" alt=""><svg class="prog" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true"><rect id="brkFill" x="0" y="0" width="0" height="60" fill="url(#progJade)"/></svg><span class="label">突破</span><i class="pnum" id="brkNum"></i></button>
+  <button class="btn" id="btnArray" onclick="tapArray()"><img class="skin" src="assets/ui_icons/btn_array.webp" alt=""><svg class="prog" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true"><rect id="arrFill" x="0" y="0" width="0" height="60" fill="url(#progGreen)"/></svg><span class="label">聚灵阵 <span id="arrayLv">1</span></span><i class="pnum" id="arrNum"></i></button>
+  <button class="btn primary" id="btnBreak" onclick="manualBreak()"><img class="skin" src="assets/ui_icons/btn_break.webp" alt=""><svg class="prog" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true"><rect id="brkFill" x="0" y="0" width="0" height="60" fill="url(#progJade)"/></svg><span class="label">突 破</span><i class="pnum" id="brkNum"></i></button>
   <button class="btn" id="btnTravel" onclick="openTravel()"><img class="skin" src="assets/ui_icons/btn_travel.webp" alt=""><span class="label">云游</span></button>
 </div>
 

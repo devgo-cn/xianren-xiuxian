@@ -57,7 +57,7 @@
   .btn .skin{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
   .btn .ink{fill:url(#gradGold);stroke:rgba(235,205,140,.55);stroke-width:1.3;
     vector-effect:non-scaling-stroke}
-  .btn .label{position:relative;z-index:2;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:20px;white-space:nowrap}
+  .btn .label{position:absolute;right:8px;top:50%;transform:translateY(-50%);z-index:2;white-space:nowrap;line-height:1;pointer-events:none}   /* v4.4: 绝对定位到按钮右侧, 彻底解决换行+文字压图案问题 */
   /* 镜像/倾斜：让每颗按钮轮廓各不同向 */
   /* v4.4: 移除 #btnArray .skin scaleX(-1) 镜像——意义不明, 三按钮图案统一在左侧, 文字统一右移到空白区 */
   #btnBreak{--tilt:-.8deg}
