@@ -28,7 +28,7 @@ INCLUDE_DIRS = ["assets"]
 #       src/50-battle.js 也由 index.html 内联脚本抽取而来 —— 二者都在本目录扫描范围内。
 INCLUDE_JS_DIRS = ["src"]
 # 不参与热更新的目录（素材源文件、参考项目）
-EXCLUDE_PREFIX = ("assets/raw/", "assets/ref/")
+EXCLUDE_PREFIX = ("assets/raw/", "assets/ref/", "assets/cultivator_rework/")
 
 
 def collect():

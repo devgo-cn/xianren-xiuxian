@@ -163,7 +163,12 @@ import { SND } from './10-base.js';
   }
 
   /* Sprite 帧配置: 玩家 */
-  const SPRITE = { cols:9, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:24, fps:24 };
+  /* v3.8 素材重抠接入: 高清版 cultivator_sheet(8列9行, 帧408x252, walk32+attack40,
+   * 帧序与旧素材一致——实测两剑刺出峰 5~6/20~23 完全吻合)。ATTACK_MAP/判定帧不动:
+   * 第二下刺 = 攻击段源帧21 全刺(抽帧后 animFrame 18 起刺判定)。
+   * 质心 x=0.35 与渲染锚点 -drawW*0.35 匹配; 角色满帧高(0.95 vs 旧 0.84),
+   * drawH 基准 80→72 补偿, 视觉体型与旧版持平。 */
+  const SPRITE = { cols:8, fw:408, fh:252, walkStart:0, walkCount:32, attackStart:32, attackCount:24, fps:24 };
   /* v2.8 攻击动画抽帧映射(24 帧): 素材攻击段 0..39(源帧32..71), 冗余在"起手抬剑 8 帧 + 收势长尾 11 帧"。
    * 节奏: 0~3 抬剑 → 4~12 第一剑刺出(帧12 命中判定, 对齐源帧39 剑尖最远) → 13~17 收剑 →
    *       18~21 第二剑(源帧51~53, 向左下扫, 帧18 判定) → 22~23 补刀收势(帧22 判定) */
@@ -1241,8 +1246,9 @@ import { SND } from './10-base.js';
     const row = Math.floor(frameIdx / SPRITE.cols);
     const srcX = col * SPRITE.fw;
     const srcY = row * SPRITE.fh;
-    /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放) */
-    const drawH = Math.min(CH * 0.55, 80) * laneScale(p.lane);
+    /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放; v3.8: 80→72, 新素材角色满帧高,
+     * 同基准下视觉会大 13%, 回调保持体型延续) */
+    const drawH = Math.min(CH * 0.5, 72) * laneScale(p.lane);
     const drawW = drawH * (SPRITE.fw / SPRITE.fh);
     /* 疾风步/缩地成寸残影: 加速期间玩家身后显示3个半透明残影, 倍速越高残影越多 */
     if (G.speedMult > 1 && !p.attackAnim) {

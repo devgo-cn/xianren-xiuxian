@@ -4,10 +4,8 @@
     "assets/cultivator_body.webp": "a72d9d498231d77e7f8d131152f06059ddca1091e83889c38c3224ae26927b94",
     "assets/cultivator_hair.webp": "4e83df9dfe253be84dbbfb0a183b283ef75c9c362c522d24b012e3c2070c639d",
     "assets/cultivator_meta.json": "5ea21a40843b6fa40d875d8f10bc86b5bc9f1172e15f41690fc1bd92b77c1670",
-    "assets/cultivator_rework/cultivator_attack.webp": "05b79f2bde0b29b223f33bbf9c5ffb128a55833f04f631c027f9692a2539cdb7",
-    "assets/cultivator_rework/cultivator_walk.webp": "23f1576e4c689cbffac13077701a88ad24433719a95309d4e540205adbab5f2f",
     "assets/cultivator_robe.webp": "30b6bdf27221803a1a91d901e9c691b884c70287002bb0b5688d9684e34faf59",
-    "assets/cultivator_sheet.webp": "4aa2de22da03f0ca51aca5716bbf36724ca2dce218dc4edbce19e61c6644517d",
+    "assets/cultivator_sheet.webp": "b9b57e6a753d8cb8470f0b8b49055c39d3bb5dd417a9f9fb5be6a1e24eaa2721",
     "assets/cultivator_skill_sheet.webp": "ff960c9f75bc92e27526685c193abac1d3adc735849e719267dd7c9dcceb1125",
     "assets/db/canvas-dragonbones.js": "5bbb3d0ef5676082199f67cc6df01ed5938f043d763e7ceee18fdc744c1802a8",
     "assets/db/dragonBones.js": "70b6876047fafbf805b1fcc24a44262ac376015d8ef5b0136686686cb7f7e59a",
@@ -158,10 +156,10 @@
     "src/20-core.js": "801d09ca8fe1680044620e85c03f5cb757a6569178f96022e28c92629f8eccba",
     "src/30-systems.js": "dd06aa051b79740e9281ccef7b71d810a34e41a3070d9f481764296e8f7063bf",
     "src/40-app.js": "518bbd200b7cb77d2cd8ca8d3b1357babf5974426d0b066fbabf4483d0169207",
-    "src/50-battle.js": "1aa05eb0c65b30c31f772a5684f622c53c44cb19fbb4162d3665e9abbe5de881",
+    "src/50-battle.js": "7a5bd94ba00676777fa51f69582d5c0137a34484748e54c183dc9ddae1adf5ff",
     "src/60-stage.js": "f9d2da3f9cd58804ca2fdcbaf42cded7c43ac05a91f7b10fd22d2ca79275192f",
     "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
   },
-  "rev": "e115448e0d7abc72",
+  "rev": "bb4b4df992f91e7c",
   "version": "3.5"
 }
