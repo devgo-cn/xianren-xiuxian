@@ -129,6 +129,10 @@
      不再显示任何内容（保留 #battleStage 容器是因为战斗 HUD 挂在里面）。 */
   .battle-stage canvas{display:none} 
   .battle-stage{pointer-events:none}
+  /* v4.4: .battle-hud 已从 .battle-stage 移入 .battle-ui(z-index:4)。
+     position:absolute 相对于 .battle-ui(fixed) 定位，top:0 即战斗横带顶部，
+     几何与原位置完全一致；脱离战斗内容层层叠上下文，避免 #battleGL 的 CSS
+     filter 在移动端 WebView 触发合成层排序异常后盖住 HUD。 */
   .battle-hud{position:absolute;left:0;right:0;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:3px 10px;font-size:10px;color:#c8d4e8;pointer-events:none !important;text-shadow:0 1px 3px rgba(0,0,0,.8)}
   .battle-hud .kills{color:#e8c56b;font-weight:700}
   .battle-hud .speed{color:#ff8a4a;font-weight:700}
@@ -554,15 +558,12 @@
 <!-- 战斗区（无尽边界式横向推进战斗） -->
 <div class="battle-stage" id="battleStage">
   <!-- v3.2: 战斗层已并入 #stage（按 battleBand() 裁剪到本容器对应的横带）,
-       此处仅保留 HUD 与一个零尺寸占位 canvas 作为几何基准 -->
+       此处仅保留一个零尺寸占位 canvas 作为几何基准。
+       v4.4 FIX: .battle-hud 从本容器移至 .battle-ui —— #battleGL 带 CSS filter
+       会在移动端 WebView 触发独立合成层提升，战斗内容渲染后合成层排序异常，
+       导致 #battleGL 覆盖 z-index 更高的 .battle-stage，HUD 随之消失。
+       HUD 本质是 UI，挂到 .battle-ui(z-index:4) 即脱离战斗内容层层叠上下文。 -->
   <canvas id="battleCanvas" width="1" height="1" aria-hidden="true"></canvas>
-  <div class="battle-hud">
-    <span class="kills">击杀 <b id="battleKills">0</b></span>
-    <span class="kills">灵石 <b id="battleSpirit">0</b></span>
-    <span class="trial" id="battleTrial">妖潮·妖群 2:00</span>
-    <span class="speed" id="battleSpeed" style="display:none">×2 倍速</span>
-    <span id="battleState">推进中</span>
-  </div>
 </div>
 
 <!-- 右上角小图标(独立层级, 不受battle-ui pointer-events影响) -->
@@ -573,8 +574,15 @@
   <button class="icon-btn small" id="storyBtn" onclick="openStory()" title="剧情纲目"><img src="assets/ui_icons/icon_story.webp" alt="剧情"></button>
 </div>
 
-<!-- 战斗区UI图标层：大图标(地板右下) -->
+<!-- 战斗区UI图标层：大图标(地板右下) + 顶部HUD(击杀/灵石/妖潮/倍速/状态) -->
 <div class="battle-ui" id="battleUI">
+  <div class="battle-hud">
+    <span class="kills">击杀 <b id="battleKills">0</b></span>
+    <span class="kills">灵石 <b id="battleSpirit">0</b></span>
+    <span class="trial" id="battleTrial">妖潮·妖群 2:00</span>
+    <span class="speed" id="battleSpeed" style="display:none">×2 倍速</span>
+    <span id="battleState">推进中</span>
+  </div>
   <div class="big-icons">
     <div class="icon-btn" id="equipChip" onclick="openEquip()" title="法宝·装备"><img src="assets/ui_icons/icon_treasure.webp" alt="宝物"></div>
     <div class="icon-btn" id="alchemyChip" onclick="openAlchemy()" title="丹房·炼丹"><img src="assets/ui_icons/icon_alchemy.webp" alt="丹房"><span class="lg"></span></div>
