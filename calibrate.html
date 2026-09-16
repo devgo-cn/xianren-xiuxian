@@ -49,7 +49,7 @@
   <h1>怪物体型校准<small>虚线 = 玩家身高 72px · 拖滑杆调大小</small></h1>
   <div class="bar">
     <span class="stat">已改 <b id="cnt">0</b> / 79</span>
-    <button id="btnExport" class="primary">导出 JSON</button>
+    <button id="btnExport" class="primary">保存传回</button>
     <button id="btnReset">全部重置</button>
   </div>
 </header>
@@ -117,7 +117,8 @@
         const bb0 = window.CanvasDragonBones.armatureAABB(arm);   /* idle 姿态 AABB —— 锚点用它, 稳定不跳 */
         const baseH = Math.max(1, bb0.maxY - bb0.minY);
         const anims = boneAnimMap(cfg.anims);
-        if (anims.idle) { arm.animation.fadeIn(anims.idle, 0.12, -1); arm.animation.play(anims.idle); }
+        /* playTimes=0 强制无限循环 —— megapack1 包动画数据自带 playTimes=1, 传 -1 会"按数据"播一次就冻结 */
+        if (anims.idle) arm.animation.fadeIn(anims.idle, 0.12, 0);
         it.B = { factory, arm, baseH, anims, anchor: { cx: (bb0.minX + bb0.maxX) / 2, bottom: bb0.maxY } };
         it.baseH = baseH;
         readyCnt++;
@@ -139,7 +140,7 @@
       '<span class="badge t' + tier + '">T' + tier + (it.cfg.qual ? ' · ' + it.cfg.qual : '') + '</span>' +
       '<span class="slug">' + it.slug + '</span></div>' +
       '<div class="stage"><canvas></canvas><div class="refline"><span>玩家 72px</span></div><div class="floor"></div></div>' +
-      '<div class="row"><button class="rst">还原</button><input type="range" min="20" max="200" step="1"><span class="val"></span></div>';
+      '<div class="row"><button class="rst">还原</button><input type="range" min="40" max="400" step="1"><span class="val"></span></div>';
     const stage = card.querySelector('.stage');
     const cv = card.querySelector('canvas');
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -207,17 +208,19 @@
   }
   requestAnimationFrame(loop);
 
-  /* ---------- 导出 ---------- */
+  /* ---------- 保存传回(POST 到服务端落盘) ---------- */
   $('btnExport').onclick = async () => {
     const out = {};
     for (const it of list) out[it.slug] = it.drawH;
-    const json = JSON.stringify(out);
-    try { await navigator.clipboard.writeText(json); toast('已复制 79 只怪的 JSON，直接粘贴发我'); }
-    catch (e) { toast('复制失败，改用下载'); }
-    const blob = new Blob([json], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = 'drawH_calibrate.json'; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+    const n = list.filter(x => x.drawH !== x.base0).length;
+    try {
+      const r = await fetch('/api/calibrate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(out) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json().catch(() => ({}));
+      toast('已保存 ' + (j.count != null ? j.count : 79) + ' 只（含改动 ' + n + '）');
+    } catch (e) {
+      toast('保存失败: ' + e.message);
+    }
   };
   $('btnReset').onclick = () => {
     if (!confirm('清空全部修改？')) return;

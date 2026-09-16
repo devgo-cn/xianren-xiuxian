@@ -24,8 +24,9 @@ def slugify(n):
 
 def tex_scale(t):
     t = dict(t)
-    t["width"] = round(t["width"] * SCALE)
-    t["height"] = round(t["height"] * SCALE)
+    # 画布声明保持原版尺寸(不缩)! core parseTextureAtlasData 默认 scale=1,
+    # 画布声明/实际图宽 的比例由 buildFactory 换算成贴图放大系数。
+    # 若画布也减半, 贴图会被画成骨骼空间的一半 → 全部贴图与骨骼脱节(散架)。
     subs = []
     for s in t.get("SubTexture", []):
         s = dict(s)

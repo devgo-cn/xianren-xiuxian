@@ -14,7 +14,7 @@
   "tier": "T2",
   "qual": "D",
   "has_skill": false,
-  "drawH": 46,
+  "drawH": 92,
   "artH": null
  },
  "bee": {
@@ -32,7 +32,7 @@
   "tier": "T2",
   "qual": "C",
   "has_skill": false,
-  "drawH": 30,
+  "drawH": 60,
   "artH": null
  },
  "dagger_goblin": {
@@ -50,7 +50,7 @@
   "tier": "T1",
   "qual": "D",
   "has_skill": false,
-  "drawH": 44,
+  "drawH": 88,
   "artH": null
  },
  "forest_turtle": {
@@ -68,7 +68,7 @@
   "tier": "T3",
   "qual": "C",
   "has_skill": false,
-  "drawH": 36,
+  "drawH": 72,
   "artH": null
  },
  "fox": {
@@ -86,7 +86,7 @@
   "tier": "T2",
   "qual": "C",
   "has_skill": false,
-  "drawH": 44,
+  "drawH": 88,
   "artH": null
  },
  "ghost": {
@@ -104,7 +104,7 @@
   "tier": "T2",
   "qual": "C",
   "has_skill": false,
-  "drawH": 44,
+  "drawH": 88,
   "artH": null
  },
  "goblin_machine_gun": {
@@ -122,7 +122,7 @@
   "tier": "T4",
   "qual": "C",
   "has_skill": false,
-  "drawH": 44,
+  "drawH": 88,
   "artH": null
  },
  "gun_mimic": {
@@ -140,7 +140,7 @@
   "tier": "T4",
   "qual": "B",
   "has_skill": false,
-  "drawH": 42,
+  "drawH": 84,
   "artH": null
  },
  "living_armor": {
@@ -158,7 +158,7 @@
   "tier": "T4",
   "qual": "B",
   "has_skill": false,
-  "drawH": 50,
+  "drawH": 100,
   "artH": null
  },
  "mageshroom": {
@@ -176,7 +176,7 @@
   "tier": "T3",
   "qual": "C",
   "has_skill": false,
-  "drawH": 40,
+  "drawH": 80,
   "artH": null
  },
  "magical_girl_goblin": {
@@ -194,7 +194,7 @@
   "tier": "T3",
   "qual": "C",
   "has_skill": false,
-  "drawH": 46,
+  "drawH": 92,
   "artH": null
  },
  "mimic": {
@@ -212,7 +212,7 @@
   "tier": "T2",
   "qual": "C",
   "has_skill": false,
-  "drawH": 40,
+  "drawH": 80,
   "artH": null
  },
  "scorpion": {
@@ -230,7 +230,7 @@
   "tier": "T2",
   "qual": "D",
   "has_skill": false,
-  "drawH": 40,
+  "drawH": 80,
   "artH": null
  },
  "sword_goblin": {
@@ -248,7 +248,7 @@
   "tier": "T3",
   "qual": "C",
   "has_skill": false,
-  "drawH": 46,
+  "drawH": 92,
   "artH": null
  },
  "wolf": {
@@ -266,7 +266,7 @@
   "tier": "T3",
   "qual": "C",
   "has_skill": false,
-  "drawH": 46,
+  "drawH": 92,
   "artH": null
  },
  "ancient_automaton": {
@@ -288,7 +288,7 @@
   "tier": "T5",
   "qual": "C",
   "has_skill": true,
-  "drawH": 59,
+  "drawH": 118,
   "artH": 316
  },
  "animated_drill_dwarf": {
@@ -307,7 +307,7 @@
   "tier": "T4",
   "qual": "C",
   "has_skill": false,
-  "drawH": 51,
+  "drawH": 102,
   "artH": 313
  },
  "arcane_golem": {
@@ -330,7 +330,7 @@
   "tier": "T4",
   "qual": "B",
   "has_skill": false,
-  "drawH": 58,
+  "drawH": 116,
   "artH": 565
  },
  "black_ant_queen": {
@@ -352,7 +352,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 63,
+  "drawH": 126,
   "artH": 477
  },
  "bonemask_shadow_creature": {
@@ -371,7 +371,7 @@
   "tier": "T3",
   "qual": "C",
   "has_skill": true,
-  "drawH": 47,
+  "drawH": 94,
   "artH": 305
  },
  "clockwork_king": {
@@ -391,7 +391,7 @@
   "tier": "T5",
   "qual": "C",
   "has_skill": true,
-  "drawH": 62,
+  "drawH": 124,
   "artH": 434
  },
  "clockwork_skull": {
@@ -411,7 +411,7 @@
   "tier": "T4",
   "qual": "C",
   "has_skill": true,
-  "drawH": 50,
+  "drawH": 100,
   "artH": 311
  },
  "colossal_crow": {
@@ -431,7 +431,7 @@
   "tier": "T5",
   "qual": "C",
   "has_skill": true,
-  "drawH": 65,
+  "drawH": 130,
   "artH": 549
  },
  "continental_turtle_rukkha": {
@@ -451,7 +451,7 @@
   "tier": "T5",
   "qual": "C",
   "has_skill": false,
-  "drawH": 63,
+  "drawH": 126,
   "artH": 512
  },
  "crab_king_karkinos": {
@@ -473,7 +473,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 63,
+  "drawH": 126,
   "artH": 490
  },
  "cultist_mage": {
@@ -492,7 +492,7 @@
   "tier": "T3",
   "qual": "C",
   "has_skill": true,
-  "drawH": 48,
+  "drawH": 96,
   "artH": 357
  },
  "daidarabotchi": {
@@ -511,7 +511,7 @@
   "tier": "T4",
   "qual": "C",
   "has_skill": true,
-  "drawH": 52,
+  "drawH": 104,
   "artH": 271
  },
  "dark_queen_shaccadyoggoth": {
@@ -532,7 +532,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 60,
+  "drawH": 120,
   "artH": 347
  },
  "darkness_titan_ilnoct": {
@@ -553,7 +553,7 @@
   "tier": "T5",
   "qual": "A",
   "has_skill": true,
-  "drawH": 66,
+  "drawH": 132,
   "artH": 798
  },
  "dragon_huanglong": {
@@ -576,7 +576,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 65,
+  "drawH": 130,
   "artH": 603
  },
  "dryad_queen_rafflesia": {
@@ -596,7 +596,7 @@
   "tier": "T5",
   "qual": "C",
   "has_skill": true,
-  "drawH": 62,
+  "drawH": 124,
   "artH": 431
  },
  "dryad_yggdrasil": {
@@ -617,7 +617,7 @@
   "tier": "T3",
   "qual": "C",
   "has_skill": false,
-  "drawH": 50,
+  "drawH": 100,
   "artH": 410
  },
  "eldritch_overmind": {
@@ -639,7 +639,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 63,
+  "drawH": 126,
   "artH": 513
  },
  "giant_kitsune": {
@@ -666,7 +666,7 @@
   "tier": "T4",
   "qual": "A",
   "has_skill": false,
-  "drawH": 56,
+  "drawH": 112,
   "artH": 399
  },
  "god_warrior_dagon": {
@@ -686,7 +686,7 @@
   "tier": "T5",
   "qual": "C",
   "has_skill": false,
-  "drawH": 58,
+  "drawH": 116,
   "artH": 161
  },
  "god_warrior_isis": {
@@ -708,7 +708,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": true,
-  "drawH": 63,
+  "drawH": 126,
   "artH": 521
  },
  "god_warrior_osiris": {
@@ -729,7 +729,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 61,
+  "drawH": 122,
   "artH": 383
  },
  "god_warrior_skoll": {
@@ -749,7 +749,7 @@
   "tier": "T5",
   "qual": "C",
   "has_skill": false,
-  "drawH": 59,
+  "drawH": 118,
   "artH": 237
  },
  "goddess_aphrodite": {
@@ -770,7 +770,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 60,
+  "drawH": 120,
   "artH": 348
  },
  "grand_sorceress_duesa": {
@@ -791,7 +791,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 64,
+  "drawH": 128,
   "artH": 544
  },
  "hades": {
@@ -811,7 +811,7 @@
   "tier": "T5",
   "qual": "C",
   "has_skill": true,
-  "drawH": 61,
+  "drawH": 122,
   "artH": 400
  },
  "hellhound_garm": {
@@ -832,7 +832,7 @@
   "tier": "T4",
   "qual": "B",
   "has_skill": false,
-  "drawH": 53,
+  "drawH": 106,
   "artH": 324
  },
  "ice_titan_demeres": {
@@ -854,7 +854,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 64,
+  "drawH": 128,
   "artH": 536
  },
  "insect_queen": {
@@ -873,7 +873,7 @@
   "tier": "T5",
   "qual": "C",
   "has_skill": false,
-  "drawH": 62,
+  "drawH": 124,
   "artH": 424
  },
  "jubokko": {
@@ -895,7 +895,7 @@
   "tier": "T5",
   "qual": "S",
   "has_skill": true,
-  "drawH": 61,
+  "drawH": 122,
   "artH": 423
  },
  "king_archial": {
@@ -914,7 +914,7 @@
   "tier": "T5",
   "qual": "C",
   "has_skill": true,
-  "drawH": 61,
+  "drawH": 122,
   "artH": 379
  },
  "legendary_knight_michael": {
@@ -935,7 +935,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 61,
+  "drawH": 122,
   "artH": 379
  },
  "legendary_knight_regulus": {
@@ -957,7 +957,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": true,
-  "drawH": 59,
+  "drawH": 118,
   "artH": 309
  },
  "legendary_knight_remment": {
@@ -979,7 +979,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 60,
+  "drawH": 120,
   "artH": 341
  },
  "light_titan_alfadriel": {
@@ -1000,7 +1000,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 66,
+  "drawH": 132,
   "artH": 614
  },
  "living_hoard_midas": {
@@ -1020,7 +1020,7 @@
   "tier": "T4",
   "qual": "C",
   "has_skill": false,
-  "drawH": 44,
+  "drawH": 88,
   "artH": 196
  },
  "mecha_rattlesnake": {
@@ -1041,7 +1041,7 @@
   "tier": "T4",
   "qual": "B",
   "has_skill": false,
-  "drawH": 52,
+  "drawH": 104,
   "artH": 318
  },
  "mechascorpion": {
@@ -1063,7 +1063,7 @@
   "tier": "T4",
   "qual": "B",
   "has_skill": false,
-  "drawH": 55,
+  "drawH": 110,
   "artH": 355
  },
  "mermaid_warrior_undeen": {
@@ -1082,7 +1082,7 @@
   "tier": "T3",
   "qual": "C",
   "has_skill": true,
-  "drawH": 44,
+  "drawH": 88,
   "artH": 292
  },
  "mythical_knight_goldnharl": {
@@ -1103,7 +1103,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 58,
+  "drawH": 116,
   "artH": 235
  },
  "parrot_king": {
@@ -1123,7 +1123,7 @@
   "tier": "T5",
   "qual": "C",
   "has_skill": false,
-  "drawH": 65,
+  "drawH": 130,
   "artH": 545
  },
  "poseidon": {
@@ -1143,7 +1143,7 @@
   "tier": "T5",
   "qual": "C",
   "has_skill": true,
-  "drawH": 62,
+  "drawH": 124,
   "artH": 469
  },
  "radulac_the_voidvod": {
@@ -1164,7 +1164,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 62,
+  "drawH": 124,
   "artH": 442
  },
  "runic_stone_golem_goliath": {
@@ -1186,7 +1186,7 @@
   "tier": "T4",
   "qual": "B",
   "has_skill": false,
-  "drawH": 59,
+  "drawH": 118,
   "artH": 607
  },
  "sea_calamity_urmica": {
@@ -1207,7 +1207,7 @@
   "tier": "T5",
   "qual": "A",
   "has_skill": false,
-  "drawH": 66,
+  "drawH": 132,
   "artH": 668
  },
  "sea_dragon_leviathan": {
@@ -1229,7 +1229,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 65,
+  "drawH": 130,
   "artH": 576
  },
  "shaccadyoggoth": {
@@ -1249,7 +1249,7 @@
   "tier": "T4",
   "qual": "C",
   "has_skill": false,
-  "drawH": 57,
+  "drawH": 114,
   "artH": 560
  },
  "slime_flynn": {
@@ -1270,7 +1270,7 @@
   "tier": "T1",
   "qual": "C",
   "has_skill": true,
-  "drawH": 34,
+  "drawH": 68,
   "artH": 272
  },
  "son_of_valhalla": {
@@ -1291,7 +1291,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": true,
-  "drawH": 59,
+  "drawH": 118,
   "artH": 334
  },
  "spirit_fighter": {
@@ -1315,7 +1315,7 @@
   "tier": "T3",
   "qual": "B",
   "has_skill": false,
-  "drawH": 42,
+  "drawH": 84,
   "artH": 291
  },
  "sun_goddess": {
@@ -1336,7 +1336,7 @@
   "tier": "T5",
   "qual": "C",
   "has_skill": false,
-  "drawH": 58,
+  "drawH": 116,
   "artH": 209
  },
  "tantalus": {
@@ -1358,7 +1358,7 @@
   "tier": "T4",
   "qual": "A",
   "has_skill": false,
-  "drawH": 60,
+  "drawH": 120,
   "artH": 627
  },
  "thanatos": {
@@ -1377,7 +1377,7 @@
   "tier": "T5",
   "qual": "C",
   "has_skill": true,
-  "drawH": 65,
+  "drawH": 130,
   "artH": 551
  },
  "the_fallen": {
@@ -1396,7 +1396,7 @@
   "tier": "T5",
   "qual": "C",
   "has_skill": true,
-  "drawH": 59,
+  "drawH": 118,
   "artH": 244
  },
  "the_horde": {
@@ -1417,7 +1417,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": true,
-  "drawH": 60,
+  "drawH": 120,
   "artH": 346
  },
  "thunder_titan_dynamo": {
@@ -1439,7 +1439,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 64,
+  "drawH": 128,
   "artH": 531
  },
  "unicorn": {
@@ -1460,7 +1460,7 @@
   "tier": "T3",
   "qual": "C",
   "has_skill": true,
-  "drawH": 42,
+  "drawH": 84,
   "artH": null
  },
  "zeograth": {
@@ -1484,7 +1484,7 @@
   "tier": "T5",
   "qual": "B",
   "has_skill": false,
-  "drawH": 64,
+  "drawH": 128,
   "artH": 522
  },
  "zodiac_cancer": {
@@ -1505,7 +1505,7 @@
   "tier": "T3",
   "qual": "B",
   "has_skill": false,
-  "drawH": 45,
+  "drawH": 90,
   "artH": 295
  },
  "librarium_animated_legendary_knight_pizarro": {
@@ -1525,7 +1525,7 @@
   "tier": "T5",
   "qual": "A",
   "has_skill": false,
-  "drawH": 39,
+  "drawH": 78,
   "artH": 347
  },
  "librarium_animated_mechadragon_ladon": {
@@ -1545,7 +1545,7 @@
   "tier": "T5",
   "qual": "A",
   "has_skill": false,
-  "drawH": 46,
+  "drawH": 92,
   "artH": 461
  },
  "librarium_animated_skull_knight_xoer": {
@@ -1567,7 +1567,7 @@
   "tier": "T5",
   "qual": "A",
   "has_skill": false,
-  "drawH": 51,
+  "drawH": 102,
   "artH": 549
  },
  "jiangshi": {
@@ -1587,7 +1587,7 @@
   "tier": "T1",
   "qual": "C",
   "has_skill": true,
-  "drawH": 46,
+  "drawH": 92,
   "artH": 210
  },
  "witch_baba": {
@@ -1607,7 +1607,7 @@
   "tier": "T3",
   "qual": "C",
   "has_skill": true,
-  "drawH": 42,
+  "drawH": 84,
   "artH": null
  }
 }

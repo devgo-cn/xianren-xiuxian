@@ -257,7 +257,10 @@
         buildFactory(skeJson, texJson, image) {
             const factory = new CanvasFactory(null);
             factory.parseDragonBonesData(skeJson);
-            factory.parseTextureAtlasData(texJson, image);
+            /* scale = 声明画布 / 实际图宽: 压缩管线把贴图与 region 减半但骨骼空间不变,
+             * core 默认 scale=1 会把贴图画成骨骼空间的一半 → 全部贴图与骨骼脱节(散架)。 */
+            const iw = (image && (image.naturalWidth || image.width)) || texJson.width;
+            factory.parseTextureAtlasData(texJson, image, null, texJson.width / iw);
             return factory;
         },
 

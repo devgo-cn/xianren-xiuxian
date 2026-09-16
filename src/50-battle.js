@@ -25,22 +25,22 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
        * v3.9 骨骼怪批量接入: bone=BONES slug, drawH=游戏内显示高(px, 素材分辨率无关)。 */
       /* ---- T1 妖群 ---- */
       slime: { name:'妖卒', role:'melee', w:60, atkRange:30, speed:120, hpK:1.0, atkK:0.55, defK:0.35, color:'#6fe0a8', tier:1 },
-      jiangshi: { name:'僵尸', role:'melee', w:40, atkRange:32, speed:95, hpK:1.15, atkK:0.6, defK:0.4, color:'#b9d0a8', bone:'jiangshi', drawH:50, hpBarW:30, tier:1 },
-      slime_flynn: { name:'弗林', role:'melee', w:35, atkRange:28, speed:110, hpK:0.85, atkK:0.5, defK:0.25, color:'#8fe8c0', bone:'slime_flynn', drawH:38, hpBarW:26, tier:1 },
+      jiangshi: { name:'僵尸', role:'melee', w:40, atkRange:32, speed:95, hpK:1.15, atkK:0.6, defK:0.4, color:'#b9d0a8', bone:'jiangshi', drawH:100, hpBarW:30, tier:1 },
+      slime_flynn: { name:'弗林', role:'melee', w:35, atkRange:28, speed:110, hpK:0.85, atkK:0.5, defK:0.25, color:'#8fe8c0', bone:'slime_flynn', drawH:76, hpBarW:26, tier:1 },
       /* ---- T2 妖锐 ---- */
-      rat:   { name:'鼠妖', role:'melee', w:35, atkRange:32, speed:150, hpK:0.8, atkK:0.5, defK:0.25, color:'#c9b28f', bone:'ratty', drawH:42, tier:2 },
-      fox:   { name:'妖狐', role:'melee', w:32, atkRange:30, speed:165, hpK:0.85, atkK:0.62, defK:0.28, color:'#e8a86b', bone:'fox', drawH:44, hpBarW:28, tier:2 },
-      bee:   { name:'蜂妖', role:'melee', w:28, atkRange:26, speed:175, hpK:0.55, atkK:0.55, defK:0.15, color:'#e8d06b', bone:'bee', drawH:30, hpBarW:24, tier:2 },
+      rat:   { name:'鼠妖', role:'melee', w:35, atkRange:32, speed:150, hpK:0.8, atkK:0.5, defK:0.25, color:'#c9b28f', bone:'ratty', drawH:84, tier:2 },
+      fox:   { name:'妖狐', role:'melee', w:32, atkRange:30, speed:165, hpK:0.85, atkK:0.62, defK:0.28, color:'#e8a86b', bone:'fox', drawH:88, hpBarW:28, tier:2 },
+      bee:   { name:'蜂妖', role:'melee', w:28, atkRange:26, speed:175, hpK:0.55, atkK:0.55, defK:0.15, color:'#e8d06b', bone:'bee', drawH:60, hpBarW:24, tier:2 },
       /* ---- T3 妖将 ---- */
       water: { name:'水灵', role:'melee', w:40, atkRange:35, speed:80,  hpK:1.6, atkK:0.75, defK:0.60, color:'#6fd0e8', tier:3 },
-      wolf:  { name:'狼妖', role:'melee', w:36, atkRange:34, speed:150, hpK:1.35, atkK:0.85, defK:0.5, color:'#9aa8c0', bone:'wolf', drawH:46, hpBarW:30, tier:3 },
-      cultist_mage: { name:'邪修', role:'melee', w:34, atkRange:38, speed:90, hpK:1.5, atkK:0.95, defK:0.5, color:'#b08ae0', bone:'cultist_mage', drawH:50, hpBarW:30, tier:3 },
+      wolf:  { name:'狼妖', role:'melee', w:36, atkRange:34, speed:150, hpK:1.35, atkK:0.85, defK:0.5, color:'#9aa8c0', bone:'wolf', drawH:92, hpBarW:30, tier:3 },
+      cultist_mage: { name:'邪修', role:'melee', w:34, atkRange:38, speed:90, hpK:1.5, atkK:0.95, defK:0.5, color:'#b08ae0', bone:'cultist_mage', drawH:100, hpBarW:30, tier:3 },
       /* ---- T4 妖王 ---- */
-      hellhound_garm: { name:'狱犬', role:'melee', w:40, atkRange:36, speed:175, hpK:2.1, atkK:1.1, defK:0.75, color:'#c06a5a', bone:'hellhound_garm', drawH:54, hpBarW:34, tier:4 },
-      black_ant_queen: { name:'蚁后', role:'melee', w:42, atkRange:36, speed:85, hpK:2.8, atkK:1.0, defK:1.0, color:'#7a6ae0', bone:'black_ant_queen', drawH:58, hpBarW:36, tier:4 },
+      hellhound_garm: { name:'狱犬', role:'melee', w:40, atkRange:36, speed:175, hpK:2.1, atkK:1.1, defK:0.75, color:'#c06a5a', bone:'hellhound_garm', drawH:108, hpBarW:34, tier:4 },
+      black_ant_queen: { name:'蚁后', role:'melee', w:42, atkRange:36, speed:85, hpK:2.8, atkK:1.0, defK:1.0, color:'#7a6ae0', bone:'black_ant_queen', drawH:116, hpBarW:36, tier:4 },
       /* v2.6 调参: hpK 80→52(实测过厚约-35%), atkRange 70→45(玩家攻距75, 贴身才能互殴, 修复"剑够不到")
        * v3.9 BOSS 换九尾狐王: giant_kitsune(S 品质, 10 种攻击动作), 骨骼渲染 drawH 110 */
-      boss:  { name:'九尾狐王', role:'ranged', w:5,  atkRange:45, speed:40, hpK:52, atkK:3.0, defK:3.0, color:'#e8b06b', isBoss:true, floatHeight:10, sizeMult:2.0, tier:5, bone:'giant_kitsune', drawH:110, hpBarW:60 },
+      boss:  { name:'九尾狐王', role:'ranged', w:5,  atkRange:45, speed:40, hpK:52, atkK:3.0, defK:3.0, color:'#e8b06b', isBoss:true, floatHeight:10, sizeMult:2.0, tier:5, bone:'giant_kitsune', drawH:220, hpBarW:60 },
     },
     /* v3.9 怪物三维系统: 怪包统一池(每个境界都会刷到全怪种), 三维 = 境界基准 × 怪种K × 波次tier倍率。
      * 波次内从 T1 最弱一路递进到 T5 —— tier 决定刷怪池权重与三维倍率。 */
@@ -423,7 +423,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const t = tierOverride || 1;
     const tpl = BC.boneTpl[t] || BC.boneTpl[1];
     const cfg = BONE_IDX[slug] || {};
-    const dh = cfg.drawH || 42;
+    const dh = cfg.drawH || 84;
     const def = { name: slug.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()),
       role:'melee', atkRange:34, speed:tpl.speed, hpK:tpl.hpK, atkK:tpl.atkK, defK:tpl.defK,
       color:'#9aa8b8', bone:slug, tier:t, drawH:dh, hpBarW:Math.max(24, Math.round(dh*0.55)) };
@@ -1027,7 +1027,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     else if (e.anim > 0) want = an.attack;
     else if (!e.moving) want = an.idle;
     if (!want || !A.hasAnimation(want)) want = an.idle || an.walk;
-    if (want && e.boneAnim !== want) { e.boneAnim = want; A.fadeIn(want, 0.12, -1); }
+    if (want && e.boneAnim !== want) { e.boneAnim = want; A.fadeIn(want, 0.12, (want === 'walk' || want === 'idle') ? 0 : -1); }   /* playTimes=0 强制循环: megapack1 数据自带播1次, -1 会冻结在末帧 */
     e.armature.advanceTime(dt);
   }
   function updateEnemies(dt) {
@@ -1578,7 +1578,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         const B = BONES[e.boneSlug];
         const def = BC.enemies[e.type] || {};
         const cap = def.isBoss ? CH * 0.7 : CH * 0.5;
-        const drawH = Math.min(cap, e.drawH || def.drawH || 42) * (def.isBoss ? 1 : (e.elite ? 1.28 : 1)) * laneScale(e.lane);
+        const drawH = Math.min(cap, e.drawH || def.drawH || 84) * (def.isBoss ? 1 : (e.elite ? 1.28 : 1)) * laneScale(e.lane);
         const s = drawH / Math.max(1, B.baseH || 100);
         const bb = window.CanvasDragonBones.armatureAABB(e.armature);
         ctx.save();
