@@ -100,6 +100,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (window.__poolAll        === undefined) window.__poolAll        = true;
     if (window.__maxAlive       === undefined) window.__maxAlive       = 3;
     if (window.__trialFreeze    === undefined) window.__trialFreeze    = true;  /* 冻结妖潮倒计时, 免得到点清场 */
+    /* v4.7 攻距手感旋钮: 0.30~0.70 之间调 —— 调大怪站更远(更不挡人但更不近战),
+     * 调小怪贴更近(更近战但大怪可能少量遮住玩家)。改完刷下一只怪即生效。 */
+    if (window.__torsoFrac      === undefined) window.__torsoFrac      = 0.45;
   }
   /* 同屏怪上限: 过目模式下由 window.__maxAlive 覆盖, 否则用线上值 */
   function capAlive() {
@@ -485,6 +488,318 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   }
   function skExpAll(n){ const api = window.SkillAPI; if (api) api.addExpAll(n); }
 
+  /* ══════════ 标定台专用：静态仿真模式（不影响正式游戏，全部由 window.RANGE_LAB 开关控制）══════════ */
+  let LAB = null;   /* { slug, anim, opts } */
+  function labActive() { return !!(LAB && typeof window !== 'undefined' && window.RANGE_LAB); }
+  /* 玩家固定在屏幕 25% 处；怪摆在「玩家 + 当前攻距」处 ——
+   * 站位与攻距直接挂钩，AI 站位的真实含义就是"两锚点相距 atkRange"。 */
+  function labLayout() {
+    const px = Math.round((CW || 1200) * 0.25);
+    const e = G && G.enemies && LAB ? G.enemies.find(x => x.boneSlug === LAB.slug && x.alive) : null;
+    const r = e ? Number(e.atkRange) || 100 : 100;
+    return { px, ex: px + r, floor: floorY() + laneOff(1) };
+  }
+  function labClearEnemies() {
+    /* 标定台必须真空清场 —— 只置 alive=false 是不够的：labActive 时
+     * updateEnemies 被 labTick 整个接管，永远不会跑 dying 倒计时把尸体剔除，
+     * 于是旧怪一直被 render 画出来（切怪时叠一堆残影）。还要连带清掉
+     * 粒子/掉落/伤害数字，否则上一只的技能特效会留在画面上。 */
+    if (G.enemies) { for (const e of G.enemies) { e.alive = false; e.dying = 0; } G.enemies.length = 0; }
+    if (G.drops) G.drops.length = 0;
+    if (G.fx) G.fx.length = 0;
+    if (G.dmg) G.dmg.length = 0;
+    if (G.pets) G.pets.length = 0;
+  }
+  function labEnsureEnemy() {
+    const wantSlug = LAB.slug;
+    const cur = G.enemies.find(e => e.alive && e.dying <= 0 && e.boneSlug === wantSlug && !!e.armature);
+    if (cur) { cur.atkRange = LAB.opts.atkRange; cur.role = LAB.opts.role; return cur; }
+    labClearEnemies();
+    const e = makeBoneEnemy(wantSlug, LAB.opts.tier || 1);
+    e.elite = false;
+    e.lane = 1; e.y = laneOff(1);
+    G.enemies.push(e);
+    return e;
+  }
+  /* 按给定进度取骨架；返回该姿态的渲染尺寸（用于探针换头等场景） */
+  function labPose(arm, anim, p) {
+    const A = arm.animation;
+    try { A.play(anim, 0); } catch (err) { return null; }
+    const B = BONES[LAB.slug];
+    const durF = (A._animationData && A._animationData.duration) || 30;
+    const fr = (A._animationData && A._animationData.frameRate) || 24;
+    const total = durF / fr;
+    let t = 0; const step = Math.max(1 / 240, total / 240);
+    const target = Math.max(0, Math.min(total - 1e-4, total * p));
+    /* 重播后步进到目标时刻 */
+    arm.advanceTime(-1e6);
+    A.play(anim, 0);
+    while (t < target) { const d = Math.min(step, target - t); arm.advanceTime(d); t += d; }
+    const bb = (window.BattleGL && window.BattleGL.armatureAABB) ? window.BattleGL.armatureAABB(arm) : null;
+    return bb;
+  }
+  /* v4.8 给验收台用: 读取某只怪骨架工厂是否就绪 */
+  window.__boneReady = (slug) => !!(BONES[slug] && BONES[slug].ready);
+    /* v4.8 技能弹道验收台：并排摆多只技能怪，让它们真打（不设 atk=0），
+   * 用于目视检查 5 类弹道的浓度/尺寸/是否抢画面。不影响正式游戏。 */
+  window.__skillTest = (list, opts) => {
+    opts = opts || {};
+    window.RANGE_LAB = false;              /* 走常规 updateEnemies，怪才会真攻击 */
+    LAB = null;
+    if (window.__LAB__) { CW = window.__LAB_GW || 1200; CH = window.__LAB_GH || 300; }
+    if (!G.player) G.player = makePlayer();
+    G.player.x = Math.round((CW || 1200) * 0.25);   /* 玩家钉在左 1/4 */
+    /* 全部同一条道 —— 敌人开火条件是 e.lane === p.lane（见 updateEnemies），
+     * 分道摆放会导致 3 道里只有 1 只够得着玩家，其余压根不开火。 */
+    G.player.lane = 1; G.player.y = laneOff(1);
+    G.player.hp = G.player.maxHp = 9e6;
+    G.player.atk = 0;                      /* 玩家不还手，怪不会被打死 */
+    /* 玩家也必须冻住：正常逻辑里玩家会被推着走、怪追着走，
+     * 打几秒后双方位置全漂移，"站在 atkRange 上开火"的前提就失效了。 */
+    window.__skillFreeze = true;
+    labClearEnemies();
+    /* camX 初值在任何一次 updateCamera 之前是 NaN/undefined —— 而 updateCamera 用的是
+     * G.camX += ... 的累加式，NaN 一旦进入就永远收敛不回来，worldToScreen 全变 NaN，
+     * 整场黑屏（验收台首次接入时踩到）。这里直接按 updateCamera 的目标式给定值。 */
+    G.camX = G.player.x - stageW() * 0.42;
+    const out = [];
+    const n = list.length;
+    for (let i = 0; i < n; i++) {
+      const slug = list[i];
+      const e = makeBoneEnemy(slug, opts.tier || 3);
+      e.elite = false;
+      /* 玩家同道 —— 敌人开火条件是 e.lane === p.lane（见 updateEnemies），
+       * 分道摆放会导致 3 道里只有 1 只够得着玩家，其余压根不开火。 */
+      e.lane = 1;
+      /* y 上按序号错开：全部同道会叠成一个人形粽。错开量刻意压在半个身位内，
+       * 视觉上仍是"站在玩家正前方一排"，但每只都能看清轮廓。 */
+      e.y = laneOff(1) + (i - (list.length - 1) / 2) * (laneGap() * 0.42);
+      /* x 必须严格落在各自的 atkRange 上 —— 开火门限是 |e.x - p.x| <= atkRange + 5，
+       * 多推 6px 就会让后面几只永远够不着（首版验收台踩到的坑，表现为
+       * 只有第 0 只开火、其余 atkT 一路负下去）。 */
+      e.x = G.player.x + (e.atkRange || 120);
+      e.hp = e.maxHp = 9e6;
+      e.atk = Math.round((PST && PST.maxHp ? PST.maxHp : 2000) * 0.004);  /* 打不死的轻伤 */
+      e.atkT = 0;
+      e.__skillHold = true;                /* 让 updateEnemies 别推着它往前挪 */
+      G.enemies.push(e);
+      out.push({ slug, kind: SK_OF[slug] || null, atkRange: e.atkRange });
+    }
+    return out;
+  };
+  /* v4.8 弹道验收台的自检快照：G 是模块私有变量，外部看不到，
+   * 冒烟测试只能靠这个口子确认"怪到底开火没有"。 */
+  window.__skillProbe = () => {
+    const kinds = {};
+    for (const f of G.fx) kinds[f.kind] = (kinds[f.kind] || 0) + 1;
+    return {
+      enemies: G.enemies.map(e => ({ t: e.type, x: Math.round(e.x), r: e.atkRange,
+        lane: e.lane, atkT: +(e.atkT || 0).toFixed(2) })),
+      camX: G.camX, playerX: G.player && Math.round(G.player.x),
+      fxKinds: kinds, fxCount: G.fx.length,
+      live: SK_LIVE.map(f => ({ sk: f.sk, t: +(f.t || 0).toFixed(2), x: Math.round(f.x) })),
+      pumpRuns: window.__pumpRuns || 0,
+    };
+  };
+  /* 标定台：设置当前被标定的怪 + 参数（攻距/角色/档位） */
+  window.__labSet = (slug, opts) => {
+    opts = opts || {};
+    LAB = { slug, anim: opts.anim || 'Idle', opts: {
+      atkRange: Number(opts.atkRange) || 100,
+      role: opts.role || 'melee',
+      tier: opts.tier || 1,
+      fps: Number(opts.fps) || 8,
+      paused: !!opts.paused,
+      loop: opts.loop !== false,
+    } };
+    window.RANGE_LAB = true;
+    G.paused = false;                 /* 仿真要跑逻辑，暂停只在 stage 层拦 */
+    if (!G.player) { G.player = makePlayer(); }
+    G.player.lane = 1; G.player.y = laneOff(1);
+    G.player.hp = G.player.maxHp = 99999;
+    G.player.atk = 0;                 /* 玩家不还手，怪不会被秒 */
+    G.player.atkRange = Number(opts.playerAtkRange) || 75;
+    const e = labEnsureEnemy();
+    e.hp = e.maxHp = 99999;
+    e.atk = 0;                        /* 怪也不掉玩家血，专心看站位 */
+    window.__labT = 0;
+    return { ok: true, slug, enemies: G.enemies.length, hasArm: !!e.armature };
+  };
+  window.__labInfo = () => {
+    if (!LAB) return null;
+    if (window.__LAB__) { CW = window.__LAB_GW || 1200; CH = window.__LAB_GH || 300; }
+    const e = G.enemies.find(x => x.boneSlug === LAB.slug && x.alive);
+    const B = BONES[LAB.slug];
+    if (!e || !e.armature || !B) return { slug: LAB.slug, ready: false };
+    const bb = window.BattleGL.armatureAABB(e.armature);
+    const def = BC.enemies[e.type] || {};
+    const cap = def.isBoss ? CH * 0.7 : CH * 0.5;
+    const drawH = Math.min(cap, e.drawH || def.drawH || 84) * laneScale(e.lane);
+    const s = drawH / Math.max(1, B.baseH || 100);
+    const L = labLayout();
+    /* 标定台：CW/CH 取横带逻辑尺寸 —— 与舞台模式（60-stage 传 W/bandH）同一套语义 */
+    if (window.__LAB__) { CW = window.__LAB_GW || 1200; CH = window.__LAB_GH || 300; }
+    /* 屏幕空间：躯干左缘 = 怪锚点x - s*(w/2) */
+    const wScreen = s * (bb.maxX - bb.minX);
+    const hScreen = s * (bb.maxY - bb.minY);
+    const leftEdge = L.ex - wScreen / 2;
+    const pHalf = Math.min(CH * 0.5, 72) * laneScale(1) * (SPRITE.fw / SPRITE.fh) / 2;
+    const playerLeft = L.px - pHalf;
+    const playerRight = L.px + pHalf;
+    return {
+      slug: LAB.slug, ready: true, anim: LAB.anim,
+      atkRange: e.atkRange, role: e.role,
+      enemyX: Math.round(L.ex), playerX: Math.round(L.px),
+      gap: Math.round(L.ex - L.px),                     /* 锚点间距（= atkRange） */
+      bodyW: Math.round(wScreen), bodyH: Math.round(hScreen), baseH: Math.round(B.baseH),
+      drawH: Math.round(drawH), scale: +s.toFixed(4),
+      bodyLeft: Math.round(leftEdge), bodyRight: Math.round(L.ex + wScreen / 2),
+      playerLeft: Math.round(playerLeft), playerRight: Math.round(playerRight),
+      /* 躯干左缘 相对 玩家右缘 的余量：>0 = 没压到玩家 */
+      clear: Math.round(leftEdge - playerRight),
+      collide: !!(e.lane === G.player.lane && Math.abs(L.ex - L.px) <= e.atkRange + 5),
+      anims: Object.keys(B.anims).filter(k => B.anims[k]),
+      rawAnims: B.rawAnims || [],
+      curAnim: LAB.anim,
+    };
+  };
+  /* 标定台：临时改攻距，立刻生效（看挡不挡人） */
+  window.__labRange = (v) => {
+    const e = G.enemies.find(x => x.boneSlug === LAB.slug && x.alive);
+    if (!e) return null;
+    e.atkRange = Number(v); return e.atkRange;
+  };
+  /* ══════════ 自动测距 ══════════
+   * 只要骨架能摆出来，帧 AABB 就是可测量的 —— 这就是那把「尺子」。
+   * 逐帧扫一个动画，取整段里身体/武器/投射物伸得最远的时刻。
+   * 全部换算与 render 一致（scale = drawH / baseH，bbox 中心对齐锚点），
+   * 所以测出来的 px 和玩家站位、和 e.atkRange 是同一个坐标系里的数。 */
+  function labScaleOf(e, B) {
+    const def = BC.enemies[e.type] || {};
+    const cap = def.isBoss ? CH * 0.7 : CH * 0.5;
+    const drawH = Math.min(cap, e.drawH || def.drawH || 84) * laneScale(e.lane);
+    return { drawH, s: drawH / Math.max(1, B.baseH || 100) };
+  }
+  function labPlayerHalf() {
+    return Math.min(CH * 0.5, 72) * laneScale(1) * (SPRITE.fw / SPRITE.fh) / 2;
+  }
+  /* 摆到指定动画的指定时刻。
+   * 关键：必须用 fadeIn 而不是 play —— DragonBones 里 play() 只重置动画对象，
+   * 真正切换状态并驱动骨骼的是 fadeIn（它挂 _isFadeIn，在 advanceTime 里做混合）。
+   * 之前用 play() 导致四个动画量出同一份姿势（reach 全等）。
+   * 另外 fadeIn 后要先把混合期走完，否则测到的是「上一个动画的残余姿势」。 */
+  function labDrive(arm, anim, target) {
+    const A = arm.animation;
+    if (!A) return false;
+    if (!A.hasAnimation || !A.hasAnimation(anim)) return false;
+    A.fadeIn(anim, 0, -1);                 /* 0 秒混合 + playTimes=-1 循环，直接切 */
+    arm.advanceTime(0);                    /* 让状态机落位 */
+    let t = 0;
+    const step = 1 / 60;                   /* 固定小步长，保证姿势连续 */
+    while (t < target) { const d = Math.min(step, target - t); arm.advanceTime(d); t += d; }
+    return true;
+  }
+  function labMeasure(slug, anim, opts) {
+    opts = opts || {};
+    const e = G.enemies.find(x => x.boneSlug === slug && x.alive && x.armature);
+    if (!e || !e.armature) return null;
+    const B = BONES[slug];
+    if (!B) return null;
+    const A = e.armature.animation;
+    if (!A || (A.hasAnimation && !A.hasAnimation(anim))) return null;
+    /* 动画时长从骨架数据取。注意：animations 挂在 armature.animation.animations
+     * （dragonBones.js: Armature.init 里 this._animation.animations = _armatureData.animations），
+     * 且 AnimationData.duration 单位是**秒**，不是帧数 —— 之前当帧数除以 frameRate，
+     * 把时长算小了 24 倍，导致采样循环退化到只跑第 0 帧、四个动画量出同一姿势。 */
+    const dBag = e.armature.animation && e.armature.animation.animations;
+    const animData = dBag ? dBag[anim] : null;
+    const fr = (animData && animData.frameRate) || 24;
+    const total = (animData && animData.duration > 0) ? animData.duration
+                : ((animData && animData.playTimes && animData.duration) || 1);
+    if (!(total > 0)) return null;
+    const durF = Math.max(1, Math.round(total * fr));
+    const sc = labScaleOf(e, B);
+    const s = sc.s;
+    const px = Math.round((CW || 1200) * 0.25);
+    const ex = px + (Number(e.atkRange) || 100);      /* 怪锚点 = 玩家 + 当前攻距 */
+    const aabb = window.BattleGL.armatureAABB;
+    const step = opts.step || 0.5;                    /* 每 0.5 帧采一次，够密 */
+    const N = Math.max(8, Math.min(400, Math.round(durF / step)));
+    let best = null;
+    for (let i = 0; i < N; i++) {
+      const tgt = (i / N) * total;
+      if (!labDrive(e.armature, anim, tgt)) return null;
+      const bb = aabb ? aabb(e.armature) : null;
+      if (!bb || !isFinite(bb.minX) || !isFinite(bb.maxX)) continue;
+      const wS = s * (bb.maxX - bb.minX);
+      const leftEdge = ex - wS / 2;                   /* 与 render 的中心对齐规则一致 */
+      const reach = Math.round(px - leftEdge);        /* 玩家锚点 → 最左沿 */
+      const depth = Math.round(s * (bb.maxY - bb.minY));
+      if (!best || reach > best.reach) {
+        best = { reach, p: +(i / N).toFixed(3), t: +tgt.toFixed(3),
+                 wScreen: Math.round(wS), depth, leftEdge: Math.round(leftEdge) };
+      }
+    }
+    if (!best) return null;
+    return Object.assign({ slug, anim, durFrames: Math.round(durF), fps: fr,
+                           total: +total.toFixed(3), scale: +s.toFixed(4),
+                           drawH: Math.round(sc.drawH) }, best);
+  }
+  /* 扫一只怪的若干候选动画，给出峰值结论 + 建议攻距 */
+  window.__labMeasure = (slug, anims, opts) => {
+    if (window.__LAB__) { CW = window.__LAB_GW || 1200; CH = window.__LAB_GH || 300; }
+    const list = (anims && anims.length) ? anims : ['Idle'];
+    const out = {};
+    for (const a of list) { const r = labMeasure(slug, a, opts); if (r) out[a] = r; }
+    if (!Object.keys(out).length) return null;
+    let peak = null, peakAnim = null;
+    for (const a in out) if (!peak || out[a].reach > peak.reach) { peak = out[a]; peakAnim = a; }
+    const px = Math.round((CW || 1200) * 0.25);
+    const pHalf = labPlayerHalf();
+    const playerRight = Math.round(px + pHalf);
+    /* 峰值帧：怪锚点 ex 固定在 px+atkRange，与站位无关的量是「左缘相对玩家右缘」。
+     * 建议攻距 = 让玩家右缘恰好抵住峰值左缘 所需的锚点间距
+     *          = (锚点 - 峰值左缘) + 玩家半宽 = peak.reach + pHalf  … 再夹进合法区间。 */
+    const rawSuggest = peak.reach + pHalf;
+    const suggest = Math.round(Math.max(34, Math.min(130, rawSuggest)));
+    const durs = {};
+    for (const a in out) durs[a] = out[a].durFrames;
+    return { slug, peakAnim, peak, all: out, durFrames: peak.durFrames,
+             allDurFrames: durs, playerHalf: Math.round(pHalf),
+             playerRight, rawSuggest: Math.round(rawSuggest), suggest };
+  };
+  /* 标定台：跳到动画进度 p（0~1），暂停下也能定格看某一帧 */
+  window.__labSeek = (p) => {
+    if (!LAB) return;
+    LAB.opts.paused = true; LAB.opts.loop = false;
+    LAB.seek = Math.max(0, Math.min(0.999, Number(p)));
+    LAB.t = LAB.seek * (LAB._total || 1);
+    LAB.opts.loop = false;
+    return LAB.seek;
+  };
+  /* 标定台：恢复播放（拖过进度条后回到循环） */
+  window.__labPlay = () => {
+    if (!LAB) return null;
+    LAB.seek = null; LAB.opts.loop = true; LAB.opts.paused = false;
+    return true;
+  };
+  /* 标定台：切动画 / 进度 */
+  window.__labAnim = (anim, opts) => {
+    if (!LAB) return null;
+    LAB.anim = anim; LAB.t = 0; LAB.seek = null;
+    if (opts && opts.atkRange != null) return window.__labRange(opts.atkRange);
+    return anim;
+  };
+  /* 标定台：测完直接把画面定格在峰值帧 —— 用户一眼看到「就是这一帧打到最远」 */
+  window.__labMeasureAndSeek = (slug, anims) => {
+    const r = window.__labMeasure(slug, anims);
+    if (!r) return null;
+    LAB.anim = r.peakAnim;
+    LAB.opts.paused = true; LAB.opts.loop = false;
+    LAB.seek = r.peak.p; LAB.t = 0;
+    return r;
+  };
+
   window.BattleAPI = {
     /* v3.2: 统一舞台接入点 ---- 返回 60-stage 契约层对象 { name, draw(ctx,W,H,dt) }。
      * 调用后本层不再自持 rAF，逻辑与绘制都由舞台按统一 30fps 驱动。
@@ -664,11 +979,101 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         catch (err) { console.error('[battle] buildArmature 失败', def.bone, err); }
       }
     }
+    /* v4.7 体型感知攻距: 骨架已建好, 现在能拿到真实 AABB 了 —— 按体型重算 atkRange,
+     * 让大怪自动站远(不穿模挡玩家), 小怪保持贴身。详见 bodyRange 的说明。
+     * 非骨骼怪(纯序列帧)没有 armature, 用自己 sprite 帧的宽高比按同一公式算。
+     * v4.8 技能怪优先: 29 只技能怪的攻距改为实测值(见 SK_RANGE), 只用体感兜底不覆盖。 */
+    const sk = SK_OF[r.type];
+    if (sk && SK_RANGE[r.type]) {
+      r.atkRange = SK_RANGE[r.type];
+      r.skill = sk;
+      r.__skillRange = true;
+    } else if (def.bone && r.armature) {
+      const bb = armAABB(r.armature);
+      if (bb) {
+        r.atkRange = bodyRange(bb, r.drawH || def.drawH || 84, def.role === 'ranged');
+        r.__bodyRange = true;
+      }
+    } else if (!def.bone) {
+      /* 序列帧怪: slime(8x200 帧) / water / boss(240x200 帧) —— 各自帧的宽高比即体型比 */
+      const sp = (key === 'boss') ? BOSS_SPRITE : (key === 'slime') ? SLIME_SPRITE : (key === 'water') ? WATER_SPRITE : null;
+      if (sp && sp.fw > 0 && sp.fh > 0) {
+        const dh = Math.min(def.isBoss ? (CH || 306) * 0.7 : (CH || 306) * 0.5, def.drawH || 84);
+        r.atkRange = bodyRangeWH(sp.fw / sp.fh, dh, def.role === 'ranged');
+        r.__bodyRange = true;
+      }
+    }
     return r;
   }
   function makeEnemy(type, tierOverride) {
     return makeEnemyFrom(BC.enemies[type] || BC.enemies.slime, tierOverride, type);
   }
+  /* ══════════ v4.7 体型感知攻击距离（近战怪不再穿模挡住玩家）══════════
+   * 问题: 怪的统一攻距只有 34(近战)/52(远程), 但怪的实际渲染宽度是 130~233px ——
+   *   大怪的 aabb 含武器/尾巴/翅膀的全展开范围, 停在 34px 处时左边缘跑到
+   *   玩家身后 80+px, 整只糊在玩家身上, 玩家被挡得看不见。
+   *
+   * 为什么不能"统一调大攻距": 79 只怪体型跨度极大(宽高比 0.57~2.64), 实测要让
+   *   每只怪的躯干都不越界, 需要的攻距是 78~181px —— 没有任何一个固定值能覆盖,
+   *   填最大则小怪退太远(近战打击感消失), 填中间则大怪照样穿模。
+   *
+   * 方案: 攻距按每只怪的**实际体型**算, 而不是填死一个数 ——
+   *   攻距 = 玩家半宽 + 怪躯干半宽
+   * 其中"躯干"取 aabb 宽度的 TORSO_FRAC ——aabb 是全展开包围盒, 含挥舞的武器/
+   *   尾巴/翅膀, 按 100% 算会把怪推得过远; 取 55% 约等于躯干, 允许四肢和武器与
+   *   玩家部分重叠(这反而是打击感), 但躯干主体不会盖住玩家。
+   *
+   * 小怪体型小 → 攻距自然小 → 照旧贴身互殴; 大怪体型大 → 攻距自动拉开 → 不挡人。
+   */
+  const TORSO_FRAC = 0.45;    /* aabb 宽度中视为"躯干"的比例 —— 见下方"为什么 0.45" */
+  const RANGE_FLOOR = 34;     /* 攻距下限: 再小的怪也不低于原近战攻距 */
+  const RANGE_CEIL  = 130;    /* 攻距上限: 避免夸张体型把怪推到画面外 */
+  /* 为什么 TORSO_FRAC = 0.45(而不是 1.0 或 0.55):
+   *   aabb 是"全展开包围盒"—— 含挥舞的武器、甩开的尾巴、张开的翅膀。
+   *   按 1.0 算, 79 只怪的攻距中位会到 126px, 小怪(如鼠妖, aabb 宽高比 2.67
+   *   全因尾巴)会被推到 126px 外, 明明是近战却像在隔空挥爪, 手感全无。
+   *   按 0.55 算, 仍有相当一批怪站在 110px 开外。
+   *   取 0.45: 允许四肢/武器/尾巴与玩家有视觉交叠(这本来就有打击感),
+   *   只保证"身体主干不糊在玩家脸上"。经算, 79 只怪躯干左缘均不越过玩家右缘。
+   *   (公式: 攻距 = 玩家半宽 + aabb宽×0.45/2, 躯干左缘 = 攻距 - 躯干半宽 = 玩家右缘, 恒等) */
+  /* 玩家渲染半宽(和 drawPlayerSprite 同一套算法, CH 取当前横带高; 未就绪时用兜底值) */
+  function playerHalfW() {
+    /* v4.7 与 drawPlayerSprite 对齐：drawH = min(CH*0.5, 72) */
+    const h = Math.min((CH || 306) * 0.5, 72);
+    return h * (SPRITE.fw / SPRITE.fh) / 2;
+  }
+  /* 怪按体型算攻距: 传入骨架 AABB 与本次实际渲染高 */
+  function torsoFrac() {
+    const v = (typeof window !== 'undefined' && window.__torsoFrac);
+    return (typeof v === 'number' && v > 0 && v <= 1.5) ? v : TORSO_FRAC;
+  }
+  function bodyRange(aabb, drawH, isRanged) {
+    let torsoHalf = 0;
+    if (aabb && aabb.width > 0 && aabb.height > 0) {
+      const w = drawH * (aabb.width / aabb.height) * torsoFrac();
+      torsoHalf = w / 2;
+    }
+    /* 远程怪本来就要站远一点, 在体型结果之上再留一段射程余量 */
+    const extra = isRanged ? 18 : 0;
+    const r = playerHalfW() + torsoHalf + extra;
+    return Math.round(Math.max(RANGE_FLOOR, Math.min(RANGE_CEIL, r)));
+  }
+  /* v4.7 同上, 但直接给像素宽高比 —— 序列帧怪(没骨架)用自己 sprite 帧的 fw/fh 调用 */
+  function bodyRangeWH(ratio, drawH, isRanged) {
+    const w = drawH * ratio * torsoFrac();
+    const extra = isRanged ? 18 : 0;
+    const r = playerHalfW() + w / 2 + extra;
+    return Math.round(Math.max(RANGE_FLOOR, Math.min(RANGE_CEIL, r)));
+  }
+  /* 从已建好的 armature 取 aabb(与渲染同源, 最准); 取不到返回 null */
+  function armAABB(arm) {
+    try {
+      const bb = window.BattleGL.armatureAABB(arm);
+      if (bb && bb.maxX > bb.minX) return { width: bb.maxX - bb.minX, height: bb.maxY - bb.minY };
+    } catch (err) {}
+    return null;
+  }
+
   /* v3.9.2 骨骼池怪: 数值按档位模板(同档同模板, 个体差异靠波次倍率), 名字暂用 slug 标题化(后续汉化) */
   function makeBoneEnemy(slug, tierOverride) {
     const t = tierOverride || 1;
@@ -681,8 +1086,15 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
      * 远程怪的三维差异(只给参数, 不改战斗流程):
      *   - atkRange 拉长(34→52): 隔空输出, 玩家得贴身才够得着;
      *   - speed 收窄(×0.8): 站得远, 压迫感靠射程而非速度。 */
-    const hasSkill = !!cfg.has_skill;
+    /* v4.8 远程/近战分类: 改用 SK_OF 名单(29 只, 见映射表)判定, 不再读素材的 has_skill。
+     * 原因: has_skill 有两处标反 —— goblin_machine_gun / animated_drill_dwarf 手里有枪
+     * 却标 false, unicorn 是独角冲撞却标 true; 而真正的远程判定要看骨架里有没有施法器官。
+     * 名单内 = 远程(站位由 SK_RANGE 实测决定), 名单外 = 近战。 */
+    const skKind = SK_OF[slug];
+    const hasSkill = !!skKind;
     const role = hasSkill ? 'ranged' : 'melee';
+    /* v4.7 atkRange 先给个占位值, 真正的值在骨架建好后按体型修正(见 makeEnemyFrom
+     * 末尾的 bodyRange 调用)——因为体型要从实例的 AABB 量, 构造 def 时还没有实例。 */
     const atkRange = hasSkill ? 52 : 34;
     const speed = Math.round(tpl.speed * (hasSkill ? 0.8 : 1));
     const def = { name: slug.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()),
@@ -1198,6 +1610,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* 车道 y 平滑过渡(带轻微跳跃弧线: 换道时先快后慢) */
     p.y += (laneOff(p.lane) - p.y) * Math.min(1, dt * 7);
 
+    if (labActive()) return;   /* 标定台: 玩家不追击不出手 —— 位置锁在 labLayout().px */
+    if (window.__skillFreeze) { p.moving = 0; return; }   /* v4.8 弹道验收台: 玩家定桩 */
+
     const near = findNearestEnemy(p.lane, p.x, p.atkRange+200);
     /* 攻击动画播放期间不中断，保持攻击状态 */
     if (p.attackAnim) {
@@ -1375,14 +1790,49 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       for (let i = 0; i < e.__legs.length; i++) driveLeg(e.armature, e.__legs[i], e.__walkT, amp * e.__legs[i].amp, null);
     }
   }
+  /* 标定台专用：把玩家/怪钉在固定屏幕位，怪只播动画不移动 —— 攻距 = 锚点水平间距。 */
+  function labTick(dt) {
+    const p = G.player, L = labLayout();
+    p.x = G.camX + L.px; p.lane = 1; p.y = laneOff(1);
+    const e = G.enemies.find(x => x.boneSlug === LAB.slug && x.alive);
+    if (!e) return;
+    e.x = G.camX + L.ex; e.lane = 1; e.y = laneOff(1);
+    e.hp = e.maxHp; e.atk = 0; e.moving = false;
+    if (e.armature) {
+      /* 指定动画循环播放；进度由 LAB.t 驱动（受 fps 控制，可冻结）。
+       * 必须走 labDrive（fadeIn 语义），play() 切不动动画。 */
+      const want = LAB.anim;
+      const prev = LAB._cur;
+      LAB._cur = want;
+      const ad = e.armature.animation && e.armature.animation.animations
+        ? e.armature.animation.animations[want] : null;
+      const fr = (ad && ad.frameRate) || 24;
+      /* AnimationData.duration 单位是秒 */
+      const total = (ad && ad.duration > 0) ? ad.duration : 1;
+      LAB._total = total;
+      if (prev !== want) { LAB.t = 0; }
+      if (LAB.seek != null) {
+        LAB.t = LAB.seek * total;               /* 定格模式：直接定位（拖进度条用） */
+      } else if (!LAB.opts.paused) {
+        LAB.t = (LAB.t || 0) + dt * (LAB.opts.fps / 24);
+      }
+      const ph = LAB.opts.loop === false ? Math.min(total - 1e-4, LAB.t) : (LAB.t % total);
+      labDrive(e.armature, want, ph);
+    }
+  }
   function updateEnemies(dt) {
     const p = G.player;
+    if (labActive()) { labTick(dt); return; }   /* 标定台: 不走常规排队/推进 */
     /* v3.7 排队按车道分组: 每条车道独立排队 —— 近的先站位, 后面的依次后挪一个身位。
      * 不同车道互不影响(各道都有一列纵队向玩家逼近)。 */
     for (let L = 0; L < LANES; L++) {
       const queue = G.enemies.filter(e => e.alive && e.dying <= 0 && e.lane === L).sort((a, b) => a.x - b.x);
       let prevX = -1e9;
       for (const e of queue) {
+        /* v4.8 弹道验收台: 被 __skillHold 标记的怪不进队列, 原地定桩开火 ——
+         * 否则 5 只同道会被排队逻辑挤成一列(prevX + queueGap), 互相遮挡,
+         * 目视检查"单条弹道长什么样"就无从谈起。 */
+        if (e.__skillHold) { e.stopX = e.x; prevX = Math.max(prevX, e.x); continue; }
         const stopX = Math.max(p.x + e.atkRange, prevX + BC.queueGap);
         e.stopX = stopX;
         prevX = Math.max(e.x, stopX);
@@ -1392,6 +1842,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
      * (玩家推进/移动曾可穿过站位怪)直接拉回站位 —— 杜绝"跑到玩家后面咬空气"。 */
     for (const e of G.enemies) {
       if (!e.alive || e.dying > 0 || e.stopX == null) continue;
+      if (e.__skillHold) continue;           /* v4.8 定桩怪不回拉 */
       if (e.x < e.stopX - 4) e.x = e.stopX;
     }
     for (const e of G.enemies) {
@@ -1405,7 +1856,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         if (e.chaseT >= 2.5) { e.chaseT = 0; e.lane = p.lane; }
       } else if (e.chaseT) e.chaseT = 0;
       /* 车道 y 平滑过渡(与玩家同参), 换道是走位感而非瞬移 */
-      e.y += (laneOff(e.lane) - e.y) * Math.min(1, dt * 7);
+      if (!e.__skillHold) e.y += (laneOff(e.lane) - e.y) * Math.min(1, dt * 7);
       e.atkT -= dt; e.anim = Math.max(0, e.anim-dt*1.5);
       const wasHurt = e.hurtT > 0;
       e.hurtT = Math.max(0, e.hurtT-dt);
@@ -1447,6 +1898,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         if (Math.random()*100 < ((PST.dodge || 0) + G.speedDodge)) {
           G.dmg.push({ x:p.x,y:p.y-40, val:'闪', crit:false, color:'#9fd8ff', t:0 });
         } else {
+          /* v4.8 技能怪: 按 skills5.json 映射发一条程序化弹道。
+           * 弹道纯表现层 —— 伤害仍在上面这一帧照常结算, 不参与命中判定,
+           * 所以即使弹道被同屏节流丢掉, 战斗数值也不受影响。 */
+          const sk = SK_OF[e.type];
+          if (sk) spawnSkillFx(e, e, sk, e.x >= p.x ? -1 : 1);
           const dmg = calcDmg(e.atk, 0.85+Math.random()*0.3, PST.def, 0);
           p.hp -= dmg; p.hurtT = 0.25; p.stun = 0.5;
           G.dmg.push({ x:p.x,y:p.y-40, val:dmg, crit:false, color:'#ff8a7a', t:0 });
@@ -1473,6 +1929,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       }
     }
     G.fx = G.fx.filter(f => f.t < f.dur);
+    reapSkillFx();                              /* v4.8 标记弹道结束, 释放同屏配额 */
     for (const d of G.dmg) d.t += dt;
     G.dmg = G.dmg.filter(d => d.t < 0.9);
   }
@@ -1561,6 +2018,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* v4.6 刷怪间隔旋钮: window.__spawnSlowMul(默认 1) —— 调大则刷得更稀, 便于逐只端详。 */
     const spawnGap = BC.spawnInterval * ((typeof window !== 'undefined' && window.__spawnSlowMul) || 1);
     if (G.trialSettled) { G.spawnT = spawnGap; }   /* 结算面板期间停刷怪 */
+    /* v4.8 弹道验收台: 关掉刷怪，否则试炼波次会往验收台里掺进无关怪
+     * （表现为 probe 里冒出 sword_goblin / 第二只同名怪，把画面糊掉）。 */
+    else if (window.__skillFreeze) { G.spawnT = spawnGap; }
     else if (G.spawnT <= 0) { spawnWave(); G.spawnT = spawnGap; }
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
     _pushT -= dt;
@@ -1681,12 +2141,18 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       const tiles = window.BattleGL.layers.bg._tiles;
       const need = Math.min(8, Math.ceil(CW / drawW) + 2);
       const pool = drawBg._pool || (drawBg._pool = []);
-      while (pool.length < need) { const s = new PIXI.Sprite(); tiles.addChild(s); pool.push(s); }
+      /* v4.8 FIX: need 只是估算, 实际循环条件由 x > CW 推出 —— 两者在
+       * drawW 很小(窄图/大 CH)或 off 靠边界时会差 1~2 个, 直接 pool[k++] 会取到
+       * undefined 并在下一行 s.visible 抛错, 整帧渲染中断(画面全黑)。
+       * 改为边用边补, 不再依赖预估。 */
+      while (pool.length < need + 2) { const s = new PIXI.Sprite(); tiles.addChild(s); pool.push(s); }
       const tex = window.BattleGL.tex(G.bgImg);
       let k = 0;
       for (let n = n0; ; n++) {
         const x = n * drawW - off;
         if (x > CW) break;
+        if (k >= 12) break;                                  /* v4.8 硬上限: 再多必然异常 */
+        while (pool.length <= k) { const s = new PIXI.Sprite(); tiles.addChild(s); pool.push(s); }
         const s = pool[k++];
         s.visible = true;
         s.texture = tex;
@@ -1726,6 +2192,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     for (let n = n0; ; n++) {
       const x = n * drawW - off;
       if (x > CW) break;
+      if (k >= 12) break;   /* v4.8 硬上限 */
+      while (pool.length <= k) { const s = new PIXI.Sprite(); fgC.addChild(s); pool.push(s); }
       const s = pool[k++];
       s.visible = true;
       s.texture = tex;
@@ -2037,6 +2505,206 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   const GLOW = { heal: makeGlow('120,255,175'), atk: makeGlow('255,175,95'),
                  speed1: makeGlow('128,255,192'), speed3: makeGlow('160,180,255'), skill: makeGlow('150,220,255') };
 
+  /* ══ v4.8 技能怪弹道系统 ═══════════════════════════════════════════════
+   * 素材包( Aekashics Librarium )是纯角色动画包, 不含任何飞行物特效 ——
+   * 所以 29 只技能怪的弹道全部由本段程序化生成, 零图片资源。
+   *
+   * 【不抢画面的四条硬约束】
+   *  1. 尺寸克制   : 弹体高度一律 <= 14px, 约玩家身高的 1/5, 绝不盖住角色
+   *  2. 不透明度   : 峰值 alpha <= 0.85, 且用 ADD 加法混合 —— 压在角色身上是"透亮"而非"盖色"
+   *  3. 配色同源   : 每类一个签名色(见 SKILL_KIND.rgb), 全场只有 5 种技能色, 不跳色
+   *  4. 寿命极短   : 单体弹 <= 0.55s, 落柱/地刺 <= 0.45s; 同屏同时最多 6 条弹道
+   *
+   * 每类只生成 4 张底图(形状源), 运行时靠缩放/拉伸/帧序做出"花样"
+   * —— 花样是参数化的, 不是画出来的, 这样既省资源又不会视觉过载。
+   *
+   * ⚠️ 首版踩过的三个坑(已修, 别再改回去):
+   *   a. def.color 对 79 只怪池是 undefined(monsters_flat.json 里根本没这个字段),
+   *      于是 skillTint(undefined) 让全部 29 只弹道都变成同一个灰蓝 ——
+   *      现在改为按【技能类】取签名色, 不再读 def.color。
+   *   b. 光柱底图被横向拉伸后, 两端的淡出被压成硬直角, 画面上是一个"灰白方框"。
+   *      现在 column 的横向淡出只占 18%, 且弹体额外叠一层 core 柔光收口。
+   *   c. 弹道 y 用了 e.y - drawH*0.42, 对高个怪直接飘到半空。
+   *      现在按 floorY 与怪身高的实际比例定位, 近地技能贴地、空中技能才上浮。
+   * ──────────────────────────────────────────────────────────────────── */
+
+  /* 通用: 造一张带柔边的离屏贴图。fn(g, W, H) 里画形状, 边缘统一用径向渐变收口 */
+  function makeTex(W, H, fn) {
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    fn(c.getContext('2d'), W, H);
+    return c;
+  }
+  /* 色相派生: 从给定色算出一个"同色系但更亮"的技能色, 保证不跳色。
+   * 注意入参是【技能类签名色】, 不是 def.color —— 见上方坑 a。 */
+  function skillTint(hex, up = 1.0) {
+    const h = (hex || '#8899aa').replace('#', '');
+    const n = parseInt(h.length === 3 ? h.split('').map(x => x + x).join('') : h, 16);
+    const r = Math.min(255, ((n >> 16) & 255) * up + 40);
+    const g = Math.min(255, ((n >> 8) & 255) * up + 40);
+    const b = Math.min(255, (n & 255) * up + 40);
+    return `${r | 0},${g | 0},${b | 0}`;
+  }
+  function tintToInt(rgb) {
+    const [r, g, b] = rgb.split(',').map(Number);
+    return (r << 16) | (g << 8) | b;
+  }
+
+  /* ---- 底图 1/4: 柔光核(所有弹体的通用头/身) ---- */
+  const SK_TEX = {};
+  SK_TEX.core = makeGlow('255,255,255');
+  /* ---- 底图 2/4: 尖锥(暗影弹 / 吐息头部 / 箭矢) ---- */
+  SK_TEX.spike = makeTex(32, 32, (g, W, H) => {
+    const gr = g.createLinearGradient(0, H / 2, W, H / 2);
+    gr.addColorStop(0, 'rgba(255,255,255,0)');
+    gr.addColorStop(0.55, 'rgba(255,255,255,0.75)');
+    gr.addColorStop(1, 'rgba(255,255,255,1)');
+    g.fillStyle = gr;
+    g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, 0); g.lineTo(W, H); g.closePath(); g.fill();
+    /* 中轴高光: 让尖锥有"实心"感而不是一片糊 */
+    const ax = g.createLinearGradient(0, 0, 0, H);
+    ax.addColorStop(0, 'rgba(255,255,255,0)');
+    ax.addColorStop(0.5, 'rgba(255,255,255,0.9)');
+    ax.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = ax; g.fillRect(W * 0.3, 0, W * 0.7, H);
+  });
+  /* ---- 底图 3/4: 光柱(神光柱 / 藤蔓主干) ----
+   * 横向淡出只占两端各 18% —— 留出中间 64% 的实心段, 拉伸后仍像"柱"
+   * 而不是一个两边被切平的方框(首版把淡出摊到全宽, 横拉后就成了灰白矩形)。 */
+  SK_TEX.column = makeTex(32, 64, (g, W, H) => {
+    const gr = g.createLinearGradient(0, 0, W, 0);
+    gr.addColorStop(0.00, 'rgba(255,255,255,0)');
+    gr.addColorStop(0.18, 'rgba(255,255,255,1)');
+    gr.addColorStop(0.82, 'rgba(255,255,255,1)');
+    gr.addColorStop(1.00, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    /* 两端淡出, 避免柱体像个矩形块 */
+    g.globalCompositeOperation = 'destination-in';
+    const vg = g.createLinearGradient(0, 0, 0, H);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(0.18, 'rgba(0,0,0,1)');
+    vg.addColorStop(0.82, 'rgba(0,0,0,1)');
+    vg.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = vg; g.fillRect(0, 0, W, H);
+    /* 中轴亮芯: 让柱体有"能量核心"的层次, 不是一个均匀色块 */
+    g.globalCompositeOperation = 'source-atop';
+    const cg = g.createLinearGradient(0, 0, 0, H);
+    cg.addColorStop(0, 'rgba(255,255,255,0)');
+    cg.addColorStop(0.5, 'rgba(255,255,255,0.85)');
+    cg.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = cg; g.fillRect(W * 0.42, 0, W * 0.16, H);
+  });
+  /* ---- 底图 4/4: 碎屑(弹幕的每颗小子弹 / 落地火星) ---- */
+  SK_TEX.shard = makeTex(16, 16, (g, W, H) => {
+    const gr = g.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W / 2);
+    gr.addColorStop(0, 'rgba(255,255,255,1)');
+    gr.addColorStop(0.45, 'rgba(255,255,255,0.55)');
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(W / 2, H / 2, W / 2, 0, 6.283); g.fill();
+  });
+
+  /* 5 类技能的参数表 —— 改这里就能调手感, 不用碰绘制代码。
+   * rgb  = 该类签名色(全 29 只共用 5 种色, 这是"控制花样"的关键:
+   *        花样靠尺寸/时序/条数变化, 不靠颜色堆砌)
+   * alt  = 近地高度系数(0=贴地, 1=怪身高处), 决定弹道从怪的哪个部位射出
+   * len/thick 是【基准像素】, 且会被参照玩家身高放大到 minLenPx 以上 ——
+   *        首版 len 26/thick 9 在 1200x300 的画面里只有 29x9px, 峰值 alpha 0.78
+   *        也救不回来, 实测肉眼完全看不见("发了但没看见"的第二个原因)。
+   *        现在按 玩家身高 的比例给下限, 保证"看得见"这个底线先满足。 */
+  const PLAYER_H = 92;                     /* 玩家基准身高(与 SPRITE 尺寸同量级) */
+  const SKILL_KIND = {
+    /* 1 暗影弹: 直线单发, 暗紫, 最基础 */
+    1: { tex: 'spike', blend: 'ADD', rgb: '#a06ae8', len: 46, thick: 16, minLen: 0.46, dur: 0.42,
+         speedK: 1.0, alpha: 0.88, spread: 0, count: 1, trail: 0.55, alt: 0.62 },
+    /* 2 神光柱: 上空落柱, 金白, 不飞 */
+    2: { tex: 'column', blend: 'ADD', rgb: '#ffd98a', len: 78, thick: 22, minLen: 0.80, dur: 0.38,
+         speedK: 0.0, alpha: 0.82, spread: 0, count: 1, trail: 0.0, alt: 1.20, drop: true },
+    /* 3 自然藤蔓: 贴地延伸, 青绿, 前摇可躲 */
+    3: { tex: 'column', blend: 'NORMAL', rgb: '#6ad89a', len: 58, thick: 13, minLen: 0.60, dur: 0.44,
+         speedK: 0.0, alpha: 0.82, spread: 0, count: 1, trail: 0.0, alt: 0.0, ground: true },
+    /* 4 弹幕扫射: 3 连发小子弹, 橙黄, 单发低 */
+    4: { tex: 'shard', blend: 'ADD', rgb: '#ffb45c', len: 22, thick: 22, minLen: 0.22, dur: 0.46,
+         speedK: 1.15, alpha: 0.85, spread: 0.10, count: 3, trail: 0.35, gap: 0.075, alt: 0.58 },
+    /* 5 巨型吐息: 锥形, 青蓝, 判定最宽。
+     * 注意 trail 必须小 —— 首版给了 0.85, 弹体随生命周期拉长近 2 倍,
+     * 尖锥被拉成一条又长又方的条带(实测横跨大半屏、边缘直角, 像 UI 故障),
+     * 这是典型的"抢画面"。现在改成"一开始就够长, 越到后面越细"的锥形收束。 */
+    5: { tex: 'spike', blend: 'ADD', rgb: '#5cd0ff', len: 104, thick: 30, minLen: 1.00, dur: 0.55,
+         speedK: 0.85, alpha: 0.72, spread: 0.05, count: 1, trail: 0.18, alt: 0.70, cone: true },
+  };
+
+  /* 弹道存活表 —— 同屏节流, 保证画面干净 */
+  const SK_LIVE = [];
+  const SK_MAX_LIVE = 6;
+
+  /* 怪种 → 技能类(1暗影弹 2神光柱 3自然藤蔓 4弹幕扫射 5巨型吐息)。
+   * 由 /workspace/技能怪映射表.md 生成, 只列 29 只技能怪; 其余怪种走普通近战表现。 */
+  const SK_OF = {
+    ancient_automaton: 2, animated_drill_dwarf: 4, arcane_golem: 2,
+    bonemask_shadow_creature: 1, clockwork_skull: 2, cultist_mage: 1,
+    dragon_huanglong: 5, dryad_queen_rafflesia: 3, eldritch_overmind: 5,
+    goblin_machine_gun: 4, god_warrior_dagon: 2, god_warrior_osiris: 2,
+    goddess_aphrodite: 2, grand_sorceress_duesa: 1, gun_mimic: 4,
+    jiangshi: 3, jubokko: 3, king_archial: 4,
+    librarium_animated_mechadragon_ladon: 5, mageshroom: 3,
+    mecha_rattlesnake: 4, mermaid_warrior_undeen: 4, poseidon: 4,
+    slime_flynn: 1, son_of_valhalla: 5, the_fallen: 1,
+    the_horde: 5, thunder_titan_dynamo: 5, witch_baba: 1,
+  };
+  /* 29 只技能怪的实测攻距(px)。来源: /workspace/技能怪映射表.md
+   * 算法 = 玩家半宽 58.3 + 该怪技能姿态的前伸量(逐帧量骨架, 按身高归一化后乘渲染高)。
+   * 两张手工修正: god_warrior_dagon 357→173(dark star 脱离身体), 
+   *              mecha_rattlesnake 263→147(蜷曲蛇身, 骨链平铺虚长)。 */
+  const SK_RANGE = {
+    ancient_automaton: 174, animated_drill_dwarf: 174, arcane_golem: 170,
+    bonemask_shadow_creature: 146, clockwork_skull: 122, cultist_mage: 112,
+    dragon_huanglong: 144, dryad_queen_rafflesia: 143, eldritch_overmind: 154,
+    goblin_machine_gun: 147, god_warrior_dagon: 173, god_warrior_osiris: 167,
+    goddess_aphrodite: 129, grand_sorceress_duesa: 172, gun_mimic: 137,
+    jiangshi: 105, jubokko: 115, king_archial: 151,
+    librarium_animated_mechadragon_ladon: 112, mageshroom: 124,
+    mecha_rattlesnake: 147, mermaid_warrior_undeen: 147, poseidon: 158,
+    slime_flynn: 108, son_of_valhalla: 191, the_fallen: 210,
+    the_horde: 181, thunder_titan_dynamo: 127, witch_baba: 126,
+  };
+
+  /* 由怪种 + 技能类发一条弹道。dir=1 面向右(怪在玩家左侧), dir=-1 面向左 */
+  function spawnSkillFx(e, def, kind, dir) {
+    if (SK_LIVE.length >= SK_MAX_LIVE) SK_LIVE.shift();   /* 超限丢最老的, 不排队 */
+    const k = SKILL_KIND[kind] || SKILL_KIND[1];
+    const dh = def.drawH || 84;
+    /* 起点: 怪身前一点(不是身内, 否则弹道从怪身上"长"出来) */
+    const ox = e.x + dir * dh * 0.16;
+    /* 纵向: f.y 在 drawFx 里是按【地板线相对量】消费的(fy = floorY() + f.y),
+     * 所以这里只能给"相对地板"的偏移, 绝不能再加一次 floorY() ——
+     * 早先写成 floorY()+e.y-dh*alt, 等于把地板算了两遍, 弹道整体沉到画面下方
+     * 100px 处(300px 高的横带直接看不到), 这是"技能明明发了却看不见"的真凶。
+     * e.y 是车道偏移(负值), 故"怪脚底"在地板相对坐标里就是 e.y。
+     * alt = 怪身高系数: 0 贴地, 1 头顶。 */
+    const oy = e.y - dh * k.alt;
+    const rgb = skillTint(k.rgb, 1.0);
+    const shot = (delay, spreadY) => ({
+      kind: 'skillShot', sk: kind, rgb, tex: k.tex, blend: k.blend,
+      x: ox, y: oy + spreadY, dir, len: Math.max(k.len, (k.minLen || 0) * PLAYER_H), thick: k.thick,
+      travel: (e.atkRange || 120) * k.speedK,      /* 2/3 类原地, 不前进 */
+      ground: !!k.ground, drop: !!k.drop, cone: !!k.cone,
+      t: -delay, dur: k.dur + delay,
+      a0: k.alpha, trail: k.trail, spread: k.spread,
+    });
+    if (kind === 4) {
+      /* 弹幕: 3 发错开时间 + 轻微纵向散, 做出"连点"感 */
+      for (let i = 0; i < k.count; i++) SK_LIVE.push(G.fx[G.fx.push(shot(i * (k.gap || 0.08), (i - 1) * 5)) - 1]);
+    } else {
+      SK_LIVE.push(G.fx[G.fx.push(shot(0, 0)) - 1]);
+    }
+  }
+  /* 回收: 弹道走完从存活表移除 */
+  function reapSkillFx() {
+    for (let i = SK_LIVE.length - 1; i >= 0; i--) if (SK_LIVE[i].t >= SK_LIVE[i].dur) SK_LIVE.splice(i, 1);
+  }
+  /* 验收台重置用：G.fx 被清空后 SK_LIVE 里的记录就成了悬空引用，
+   * 会一直占着同屏配额（最多 6 条）导致新弹道刚发就被 shift 掉。 */
+  window.__clearSkillLive = () => { SK_LIVE.length = 0; };
+
   /* v4.0 WebGL: 精灵表切帧纹理缓存（frame → PIXI.Texture frame 引用同 baseTexture） */
   const _frameCache = new Map();
   function frameTex(img, cols, fw, fh, fi) {
@@ -2251,6 +2919,58 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
           o.spr.position.set(moveSx, fy);
           o.spr.alpha = Math.max(0, Math.min(1, alpha));
         }
+      } else if (f.kind === 'skillShot') {
+        /* v4.8 技能弹道: 全部程序化贴图 + ADD 混合。三条不抢画面的做法:
+         *  - 尺寸 <= 16px, 用 sprite 缩放而不是大图
+         *  - alpha 峰值 <= 0.78, 且前 20% 渐入 / 后 35% 渐出, 不做突兀消失
+         *  - 弹体只有一个 sprite, 直接复用特效池对象, 绝不额外开 Graphics */
+        if (f.t < 0) { g.visible = false; continue; }   /* 连发延迟期: 不画 */
+        const kx = f.t / f.dur;
+
+        if (!o.spr) { o.spr = new PIXI.Sprite(); fxC.addChild(o.spr); }
+        o.g.visible = false;
+        o.spr.visible = true;
+        o.spr.texture = window.BattleGL.tex(SK_TEX[f.tex]);
+
+        const col = f.tex === 'column';
+        o.spr.blendMode = f.blend === 'NORMAL' ? PIXI.BLEND_MODES.NORMAL : PIXI.BLEND_MODES.ADD;
+        o.spr.anchor.set(col ? 0.5 : f.dir < 0 ? 1 : 0, 0.5);
+
+        /* 位置曲线:
+         *  1/4/5 类 —— 沿朝向推进, 2/3 类原地生长(藤蔓自脚下窜出 / 神柱直接落下)
+         *  drop 类(神光柱) 额外做一次纵向坠落, 从怪上方砸到地面 */
+        const adv = f.travel ? f.travel * Math.min(1, kx / 0.8) : 0;
+        const px = sx + f.dir * adv;
+        let py = fy;
+        if (f.drop) {
+          const fall = Math.min(1, kx / 0.45);
+          py = fy - (1 - fall) * (1 - fall) * 46;      /* 缓出下坠 */
+        } else if (f.ground) {
+          /* 藤蔓: 起步贴地, 末段抬到怪胸口 */
+          py = fy + (f.y - fy) * Math.min(1, kx / 0.55);
+        }
+
+        /* 尺寸: 横向类长边= len(含拖尾拉伸), 纵向类(光柱)长边= 成长高度。
+         * cone(吐息) 让粗端留在近处、远端收细 —— 靠 thick 的二次衰减做锥形,
+         * 而不是把三角贴图整体拉长(那样尖端会被拉平成矩形)。 */
+        const breathe = (f.sk === 5 || f.sk === 3) ? 1 + Math.sin(kx * Math.PI) * 0.14 : 1;
+        const grow = col ? Math.min(1, kx / 0.35) : 1;   /* 光柱从 0 拔起, 不凭空出现 */
+        const L = f.len * (1 + (f.trail || 0) * kx) * breathe * grow;
+        const taper = f.cone ? (1 - kx * 0.55) : (1 - kx * 0.22);
+        const W = f.thick * taper * breathe;
+        o.spr.width = col ? W : L;
+        o.spr.height = col ? L : W;
+        o.spr.scale.x = Math.abs(o.spr.scale.x) * (f.dir < 0 ? -1 : 1);
+        /* col 类锚点在中心, 高度从底部往上长 —— 故位置要抬高半个身高 */
+        o.spr.position.set(px, col ? py - L * 0.5 : py);
+
+        const fadeIn = Math.min(1, kx / 0.20), fadeOut = Math.min(1, (1 - kx) / 0.35);
+        o.spr.alpha = f.a0 * Math.min(fadeIn, fadeOut);
+        o.spr.tint = tintToInt(f.rgb);
+        window.__skDrawn = (window.__skDrawn || 0) + 1;
+        window.__skLast = { sk: f.sk, tex: f.tex, x: Math.round(px), y: Math.round(py),
+                            L: Math.round(L), W: Math.round(W), a: +o.spr.alpha.toFixed(2),
+                            parented: !!o.spr.parent, visShared: fxC.visible };
       } else if (f.kind === 'sweep') {                    // 横扫千军: 一道贴地弧光(兜底)
         g.lineStyle(2.5, colorInt(f.color), (1-k)*0.9);
         g.arc(0, 0, 18 + k*46, -Math.PI*0.15, Math.PI*0.42);
@@ -2401,6 +3121,66 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     drawEnemies(e => e.y >= G.player.y, 'near');
     drawForeground(); drawDrops();
     drawFx(); drawDmg(); drawSkillCall();
+    if (labActive()) drawLabOverlay();
+  }
+
+  /* 标定台叠层：锚点竖线 + 玩家缘 / 怪躯干缘标记 + 间距数值 —— 一眼看出"挡没挡住" */
+  function drawLabOverlay() {
+    const GL = window.BattleGL;
+    if (!GL || !GL.ready) return;
+    const C = drawLabOverlay._g || (drawLabOverlay._g = (() => { const g = new PIXI.Graphics(); GL.layers.text.addChild(g); return g; })());
+    const T = drawLabOverlay._t || (drawLabOverlay._t = (() => {
+      const t = new PIXI.Text('', { fontFamily: 'monospace', fontSize: 13, fill: 0x7ef0b0, stroke: 'rgba(0,0,0,.85)', strokeThickness: 3 });
+      t.anchor.set(0.5, 1); GL.layers.text.addChild(t); return t;
+    })());
+    const g = C; g.clear();
+    const L = labLayout();
+    const e = G.enemies.find(x => x.boneSlug === LAB.slug && x.alive);
+    const B = BONES[LAB.slug];
+    if (!e || !e.armature || !B) { T.visible = false; return; }
+    const bb = GL.armatureAABB(e.armature);
+    const def = BC.enemies[e.type] || {};
+    const cap = def.isBoss ? CH * 0.7 : CH * 0.5;
+    const drawH = Math.min(cap, e.drawH || def.drawH || 84) * laneScale(e.lane);
+    const s = drawH / Math.max(1, B.baseH || 100);
+    const wS = s * (bb.maxX - bb.minX);
+    const baseY = L.floor;
+    const DASH = 6;
+    /* 地面基线 */
+    g.lineStyle(1, 0x445566, 0.9);
+    g.moveTo(L.px - 160, baseY); g.lineTo(L.ex + 180, baseY);
+    /* 玩家锚点线 */
+    g.lineStyle(2, 0x66d9ff, 0.95);
+    for (let y = baseY - 190; y < baseY; y += DASH * 2) g.moveTo(L.px, y).lineTo(L.px, Math.min(baseY, y + DASH));
+    /* 玩家左右缘 */
+    const pH = Math.min(CH * 0.5, 72) * laneScale(1);
+    const pW = pH * (SPRITE.fw / SPRITE.fh);
+    g.lineStyle(1, 0x2f88b8, 0.8);
+    g.moveTo(L.px - pW / 2, baseY - pH); g.lineTo(L.px - pW / 2, baseY);
+    g.moveTo(L.px + pW / 2, baseY - pH); g.lineTo(L.px + pW / 2, baseY);
+    /* 怪锚点线与躯干缘（躯干 = aabb 宽 × torsoFrac） */
+    g.lineStyle(2, 0xff8a5c, 0.95);
+    for (let y = baseY - 210; y < baseY; y += DASH * 2) g.moveTo(L.ex, y).lineTo(L.ex, Math.min(baseY, y + DASH));
+    const tf = (typeof window.__torsoFrac === 'number' ? window.__torsoFrac : 0.45);
+    const torsoW = wS * tf;
+    const tL = L.ex - torsoW / 2, tR = L.ex + torsoW / 2;
+    g.lineStyle(2, 0xffe066, 0.95);
+    g.moveTo(tL, baseY - drawH); g.lineTo(tL, baseY);
+    g.moveTo(tR, baseY - drawH); g.lineTo(tR, baseY);
+    /* 全展开包围盒（含武器/尾巴/翅膀） */
+    g.lineStyle(1, 0xffffff, 0.28);
+    g.drawRect(L.ex - wS / 2, baseY - drawH, wS, drawH);
+    /* 间距标注线：怪锚点 ↔ 玩家锚点 */
+    g.lineStyle(2, 0x7ef0b0, 1);
+    g.moveTo(L.px, baseY - 226); g.lineTo(L.ex, baseY - 226);
+    g.moveTo(L.px, baseY - 232); g.lineTo(L.px, baseY - 220);
+    g.moveTo(L.ex, baseY - 232); g.lineTo(L.ex, baseY - 220);
+
+    const info = window.__labInfo();
+    T.visible = true;
+    T.position.set((L.px + L.ex) / 2, baseY - 240);
+    T.text = `攻距 ${info.gap}px　躯干左缘 ${info.bodyLeft} / 玩家右缘 ${info.playerRight} → 余量 ${info.clear}px`;
+    T.style.fill = info.clear >= 0 ? 0x7ef0b0 : 0xff6b6b;
   }
 
   /* v3.2 舞台模式绘制：把战斗画到统一舞台画布的一条横带上。
