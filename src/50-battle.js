@@ -435,14 +435,86 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (!a && pool.length < 3) { a = sfx[name].cloneNode(); pool.push(a); }
     return a;   // 池满且全部在播 → 丢弃本次(可接受, 密集音效本就会叠一起)
   }
-  function playSfx(name, vol) {
+  function playSfx(name, vol, rate) {
     if (!sfx.ready || !sfx[name]) return;
     if (typeof SND !== 'undefined' && !SND.sfxOn) return;   /* 设置页「音效」开关统一管控战斗音效 */
     const a = sfxGet(name);
     if (!a) return;
     a.volume = vol || 0.6;
+    if (rate) { try { a.playbackRate = rate; } catch (e) {} }   /* v6.3: 脚步/同源变调用的变速 */
     try { a.currentTime = 0; } catch (e) {}
     a.play().catch(() => {});
+  }
+
+  /* ── v6.3 骨骼怪专属音效 ──────────────────────────────────────────────
+   * 原素材包(Ækashics Librarium)全系列只发视觉资源(map sprite / 静态立绘 /
+   * DragonBones 工程 / 图标), 从不带音频, 所以重下一百遍也没有音效。
+   * 这里单独补一套 CC0 素材: OpenGameArt「80 CC0 Creature SFX」(rubberduck, CC0 免署名),
+   * 已转单声道 44.1kHz vorbis, 全 77 条合计 ≈700K。
+   * MON_ATK: 79 只骨骼怪每只一条专属攻击音(70 条不重复 / 7 条各复用两次)。
+   * MON_HURT: 受击音固定这 5 条轮播 —— 受击是高频事件, 每怪再备一条不划算。
+   * 不入上面的常驻 sfx 表(那 12 条决定 sfx.ready 开门时间), 走按需懒加载+池化。 */
+  const MON_ATK = {
+    ancient_automaton: 'weird_01', animated_drill_dwarf: 'alien_04', arcane_golem: 'monster_05',
+    axe_goblin: 'cute_07', bee: 'bug_04', black_ant_queen: 'bug_01', bonemask_shadow_creature: 'scream_01',
+    clockwork_king: 'troll_01', clockwork_skull: 'troll_03', colossal_crow: 'roar_03',
+    continental_turtle_rukkha: 'cute_01', crab_king_karkinos: 'burble_01', cultist_mage: 'cute_05',
+    dagger_goblin: 'cough_03', daidarabotchi: 'misc_08', dark_queen_shaccadyoggoth: 'alien_02',
+    darkness_titan_ilnoct: 'roar_02', dragon_huanglong: 'monster_01', dryad_queen_rafflesia: 'burble_02',
+    dryad_yggdrasil: 'monster_03', eldritch_overmind: 'cute_06', forest_turtle: 'cute_02', fox: 'misc_07',
+    ghost: 'cough_01', giant_kitsune: 'barking_01', goblin_machine_gun: 'alien_06',
+    god_warrior_dagon: 'monster_02', god_warrior_isis: 'cute_08', god_warrior_osiris: 'cough_02',
+    god_warrior_skoll: 'roar_02', goddess_aphrodite: 'roar_01', grand_sorceress_duesa: 'monster_07',
+    gun_mimic: 'eat_01', hades: 'eat_03', hellhound_garm: 'barking_02', ice_titan_demeres: 'breath',
+    insect_queen: 'bug_02', jiangshi: 'scream_02', jubokko: 'weird_03', king_archial: 'grunt_02',
+    legendary_knight_michael: 'burp_01', legendary_knight_regulus: 'misc_02', legendary_knight_remment: 'grunt_05',
+    librarium_animated_legendary_knight_pizarro: 'grunt_01', librarium_animated_mechadragon_ladon: 'monster_06',
+    librarium_animated_skull_knight_xoer: 'troll_02', light_titan_alfadriel: 'monster_02',
+    living_armor: 'alien_05', living_hoard_midas: 'misc_03', mageshroom: 'weird_05',
+    magical_girl_goblin: 'cute_09', mecha_rattlesnake: 'weird_04', mechascorpion: 'weird_02',
+    mermaid_warrior_undeen: 'spit_02', mimic: 'eat_02', mythical_knight_goldnharl: 'misc_04',
+    parrot_king: 'misc_01', poseidon: 'cute_10', radulac_the_voidvod: 'alien_01',
+    runic_stone_golem_goliath: 'grunt_04', scorpion: 'bug_03', sea_calamity_urmica: 'roar_01',
+    sea_dragon_leviathan: 'monster_03', shaccadyoggoth: 'alien_03', slime_flynn: 'cute_03',
+    son_of_valhalla: 'roar_03', spirit_fighter: 'eat_04', sun_goddess: 'misc_05', sword_goblin: 'spit_03',
+    tantalus: 'grunt_01', thanatos: 'monster_04', the_fallen: 'monster_01', the_horde: 'grunt_03',
+    thunder_titan_dynamo: 'misc_06', unicorn: 'cute_04', witch_baba: 'burp_02', wolf: 'howl',
+    zeograth: 'misc_09', zodiac_cancer: 'spit_01',
+  };
+  const MON_HURT = ['hurt_01', 'hurt_02', 'hurt_03', 'hurt_04', 'hurt_05'];
+  let monHurtRot = 0;
+  const MON_SRC = Object.create(null), MON_POOL = Object.create(null);
+  function playMonSfx(file, vol, rate) {
+    if (!file) return;
+    if (typeof SND !== 'undefined' && !SND.sfxOn) return;   /* 同样受设置页「音效」开关管控 */
+    const pool = MON_POOL[file] || (MON_POOL[file] = []);
+    let a = null;
+    for (const x of pool) { if (x.paused || x.ended) { a = x; break; } }
+    if (!a) {
+      if (pool.length >= 3) return;                          /* 池满且全在播 → 丢弃本次 */
+      const src = MON_SRC[file]
+        || (MON_SRC[file] = new Audio('assets/sfx/monster/' + file + '.ogg'));
+      a = src.cloneNode(); pool.push(a);
+    }
+    a.volume = vol || 0.5;
+    if (rate) { try { a.playbackRate = rate; } catch (e) {} }
+    try { a.currentTime = 0; } catch (e) {}
+    a.play().catch(() => {});
+  }
+  /* 怪的三类发声: 攻击走专属音, 受击轮播 hurt 组, 脚步复用现有 footstep 变调(存在感低, 不值得每人一条) */
+  function monAttackSfx(e) {
+    if (!e) return;
+    if (e.type === 'slime') return playSfx('slime_attack', 0.5);
+    if (e.type === 'water') return playSfx('water_attack', 0.5);
+    if (e.type === 'boss') return playSfx('boss_attack', 0.8);
+    const f = e.boneSlug && MON_ATK[e.boneSlug];
+    if (f) playMonSfx(f, 0.5);
+  }
+  function monHurtSfx(e) {
+    if (!e) return;
+    if (e.type === 'slime') return playSfx('slime_hurt', 0.5);
+    if (e.type === 'water') return playSfx('water_hurt', 0.5);
+    playMonSfx(MON_HURT[(monHurtRot++) % MON_HURT.length], 0.45);
   }
 
   /* Sprite 帧配置: 玩家 */
@@ -2044,10 +2116,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       const wasHurt = e.hurtT > 0;
       e.hurtT = Math.max(0, e.hurtT-dt);
       /* 受击音效: 受击开始时 */
-      if (!wasHurt && e.hurtT > 0) {
-        if (e.type === 'slime') playSfx('slime_hurt', 0.5);
-        else if (e.type === 'water') playSfx('water_hurt', 0.5);
-      }
+      if (!wasHurt && e.hurtT > 0) monHurtSfx(e);
       /* 动画帧跟踪 */
       e.animTimer += dt;
       const frameDur = 1 / 24;
@@ -2061,6 +2130,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
           if (e.moving) {
             if (e.type === 'slime' && (e.animFrame === 4 || e.animFrame === 20)) playSfx('slime_footstep', 0.4);
             else if (e.type === 'water' && (e.animFrame === 8 || e.animFrame === 24)) playSfx('water_footstep', 0.4);
+            /* v6.3 骨骼怪脚步: 复用主角脚步 + 按体型变速(drawH 60~132 → 1.5~0.73 倍),
+             * 大体型压低音高显得沉重。存在感本来就低, 不值得每只单独一条音。 */
+            else if (e.boneSlug && (e.animFrame === 4 || e.animFrame === 20))
+              playSfx('footstep', 0.2, Math.max(0.6, Math.min(1.5, 96 / (e.drawH || 96))));
           }
         }
       }
@@ -2074,12 +2147,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
        * 非技能怪的 atkRange 是旧版保守半径, 其语义已接近"锚点->边缘", 直接用作前伸。 */
       if (canHit(e, p, enemyReach(e)) && e.atkT <= 0) {
         e.anim = 1; e.atkT = 1/(0.8+Math.random()*0.5); e.animFrame = 0;
-        /* 攻击音效: 攻击开始时 */
-        if (!wasAttacking) {
-          if (e.type === 'slime') playSfx('slime_attack', 0.5);
-          else if (e.type === 'water') playSfx('water_attack', 0.5);
-          else if (e.type === 'boss') playSfx('boss_attack', 0.8);
-        }
+        /* 攻击音效: 攻击开始时 —— 骨骼怪走各自专属音, 见 MON_ATK */
+        if (!wasAttacking) monAttackSfx(e);
         /* 闪避判定(装备词条 + 身法技能时效加成) —— 落空则不进伤害 */
         if (Math.random()*100 < ((PST.dodge || 0) + G.speedDodge)) {
           G.dmg.push({ x:p.x,y:p.y-40, val:'闪', crit:false, color:'#9fd8ff', t:0 });
