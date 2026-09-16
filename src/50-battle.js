@@ -1320,7 +1320,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     }
     for (let t = 1; t <= cur; t++) {
       const mul = (t === cur) ? 3 : 1;
-      for (const slug of BONE_POOL[t]) {
+      /* v5.0 FIX: BONE_POOL只有T1-T5档(怪种按文档分5档), T6-T10复用T5怪池, 否则遍历undefined报错卡死 */
+      const poolT = Math.min(t, 5);
+      for (const slug of BONE_POOL[poolT]) {
         /* v4.6 FIX 同上: 骨骼池怪工厂未就绪就不进池 —— 懒加载是 1.5s/3 只,
          * 79 只要约 40s 才建完; 不等就绪就刷, 开局必然一片灰椭圆。 */
         if (!(BONES[slug] && BONES[slug].ready)) continue;
