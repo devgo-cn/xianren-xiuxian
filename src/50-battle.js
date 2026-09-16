@@ -2328,7 +2328,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       const drawH = CH;                           /* 画满整条战斗横带(地板下方延续石板路, 无黑边) */
       const drawW = drawH * (G.bgImg.width / G.bgImg.height);
       const period = drawW * 2;
-      const off = ((G.camX * 0.5) % period + period) % period;   // 远景半速视差
+      const off = ((G.camX * 1.0) % period + period) % period;   /* v4.4: 视差 0.5→1.0, 地面滚动与玩家移速同步, 走路频率/步伐/地图三者归一 */
       const y0 = CH - drawH;
       const n0 = Math.floor(off / drawW);
       const tiles = window.BattleGL.layers.bg._tiles;
@@ -2370,7 +2370,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const drawH = CH;
     const drawW = drawH * (G.fgImg.width / G.fgImg.height);
     const period = drawW * 2;
-    const off = ((G.camX * 0.5) % period + period) % period;
+    const off = ((G.camX * 1.0) % period + period) % period;   /* v4.4: 视差 0.5→1.0, 与背景同步 */
     const n0 = Math.floor(off / drawW);
     const fgC = window.BattleGL.layers.foreground;
     const need = Math.min(8, Math.ceil(CW / drawW) + 2);
