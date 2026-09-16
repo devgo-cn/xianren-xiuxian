@@ -35,7 +35,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       jiangshi: { name:'僵尸', role:'ranged', w:40, atkRange:52, speed:76, hpK:1.15, atkK:0.6, defK:0.4, color:'#b9d0a8', bone:'jiangshi', drawH:100, hpBarW:30, tier:1 },
       slime_flynn: { name:'弗林', role:'ranged', w:35, atkRange:50, speed:88, hpK:0.85, atkK:0.5, defK:0.25, color:'#8fe8c0', bone:'slime_flynn', drawH:76, hpBarW:26, tier:1 },
       /* ---- T2 妖锐 ---- */
-      rat:   { name:'鼠妖', role:'melee', w:35, atkRange:32, speed:150, hpK:0.8, atkK:0.5, defK:0.25, color:'#c9b28f', bone:'ratty', drawH:84, tier:2 },
+      rat:   { name:'鼠妖', role:'melee', w:35, atkRange:32, speed:150, hpK:0.8, atkK:0.5, defK:0.25, color:'#c9b28f', bone:'ratty', drawH:42, tier:2 },   /* v4.4: 体型缩小一半 84→42 */
       fox:   { name:'妖狐', role:'melee', w:32, atkRange:30, speed:165, hpK:0.85, atkK:0.62, defK:0.28, color:'#e8a86b', bone:'fox', drawH:88, hpBarW:28, tier:2 },
       bee:   { name:'蜂妖', role:'melee', w:28, atkRange:26, speed:175, hpK:0.55, atkK:0.55, defK:0.15, color:'#e8d06b', bone:'bee', drawH:60, hpBarW:24, tier:2 },
       /* ---- T3 妖将 ---- */
