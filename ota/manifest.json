@@ -252,7 +252,7 @@
     "assets/db/ratty_ske.json": "ddc0a757b1b24cc2cc6c139d669731506341e6f90dbf2b3e6839499ed3f4a5fa",
     "assets/db/ratty_tex.json": "2b00ddb68d11bac3da2e65208058d58e379bedd2ffaee5d45d96c613b01a7d8e",
     "assets/db/ratty_tex.png": "fa614f4cacf27b80185634a007921d1666c082bb7bb92d2fd44e3a6b3a9cd9e2",
-    "assets/db/webgl-battle.js": "21f3de1c9cd8d23b5244def5d3d68ee0d85259a4e8d7ff493e13bb9637c8b8d6",
+    "assets/db/webgl-battle.js": "e0051a5bc28cf3a2275a8fcf2c6223d2b593f466d7db0df08d67097290ac99d2",
     "assets/main-bg.jpg": "30bda2c355760f1364da3a11f01f31cd7928babeb565ed064d0c41f66b8fb0d8",
     "assets/modals/art-furnace.webp": "bffa212a8a1aa50c3f311e10ada9171b2db9ccb6567d5c430f1467635f27c6a3",
     "assets/modals/art-ico/a0.webp": "09092265315f1b905432c8f1fa7186851cf0282bbacefa2e02a7289a13c498aa",
@@ -401,6 +401,6 @@
     "src/60-stage.js": "58e1ee5df0b972d4271ca676e65622fee3544b9ab6f226ef3f8ffaa16205ae47",
     "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
   },
-  "rev": "4bfea09a6288ece3",
+  "rev": "f4fb3b39bb88afff",
   "version": "3.5"
 }
