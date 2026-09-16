@@ -1791,13 +1791,13 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
        * 与怪的站位(dist = 玩家半宽 + 怪前伸量)配对 => 双方互相贴住、零重叠。 */
       p.moving = 1; p.walkT += dt*8;
       const standAt = near.x - (p.atkRange + enemyHalfW(near));
-      const spd = BC.playerSpeed*1.5*dt;
+      const spd = BC.playerSpeed*dt;   /* v4.4: 去掉追击1.5倍移速, 统一42px/s, 步幅固定1.17px/帧 */
       p.x += Math.sign(standAt-p.x) * Math.min(Math.abs(standAt-p.x), spd);
       /* 纵向直接向目标怪的纵深靠拢 —— 连续插值, 无换道跳变 */
       const targetDepth = yToDepth(near.y);
       const dD = targetDepth - (p.lane || 0);
       if (Math.abs(dD) > 0.002) {
-        p.lane = (p.lane || 0) + Math.sign(dD) * Math.min(Math.abs(dD), 1.2 * dt);
+        p.lane = (p.lane || 0) + Math.sign(dD) * Math.min(Math.abs(dD), 0.8 * dt);   /* v4.4: 纵向速度1.2→0.8 lane/s, 约44px/s与横向42px/s匹配, 转弯不再加速 */
       }
     } else {
       /* v6.0 无怪时向前推进 —— 防穿越按二维地面距离挑最近的挡路怪。 */
@@ -2115,7 +2115,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   }
   function updateCamera(dt) {
     const targetCam = G.player.x - stageW()*0.42;   // 玩家锁屏中间偏左: 右侧留出更多来怪空间, 推进感更强
-    G.camX += (targetCam-G.camX)*Math.min(1, dt*6);
+    G.camX += (targetCam-G.camX)*Math.min(1, dt*20);   /* v4.4: 平滑系数6→20, 相机更紧密跟随玩家, 背景滚动与玩家移动同步 */
   }
   let _pushT = 0;
   /* ── v3.9 试炼轮次状态机 ──────────────────────────────────────────
