@@ -7,7 +7,7 @@
     "assets/cultivator_robe.webp": "30b6bdf27221803a1a91d901e9c691b884c70287002bb0b5688d9684e34faf59",
     "assets/cultivator_sheet.webp": "b9b57e6a753d8cb8470f0b8b49055c39d3bb5dd417a9f9fb5be6a1e24eaa2721",
     "assets/cultivator_skill_sheet.webp": "ff960c9f75bc92e27526685c193abac1d3adc735849e719267dd7c9dcceb1125",
-    "assets/db/canvas-dragonbones.js": "474be9b716bc27f84acbe04f71f56fe28e004bda54f794f75b1d6492583ae8d2",
+    "assets/db/canvas-dragonbones.js": "a6dd32321ba9375c34c96ced13f79fd880d25a375935045d978f0d2e487e6ae8",
     "assets/db/dragonBones.js": "70b6876047fafbf805b1fcc24a44262ac376015d8ef5b0136686686cb7f7e59a",
     "assets/db/monsters/ancient_automaton/ske.json": "40ccbcb0911e691a237b05f6c9750401768854794de27d1b47c852473b6d305c",
     "assets/db/monsters/ancient_automaton/tex.json": "a0223996d5ff550ea1bb5d16c7b42bab96389d6de01e4e52f000c0ff219c3550",
@@ -398,6 +398,6 @@
     "src/60-stage.js": "f9d2da3f9cd58804ca2fdcbaf42cded7c43ac05a91f7b10fd22d2ca79275192f",
     "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
   },
-  "rev": "4b495c38e90de78a",
+  "rev": "667a37747eef5adc",
   "version": "3.5"
 }
