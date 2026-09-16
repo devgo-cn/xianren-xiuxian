@@ -51,7 +51,7 @@ import { SND } from './10-base.js';
     speedDodge:0, nextStrikeCrit:0,
     petFoxSprite:null, petFoxReady:false,
     skillSprite:null, skillReady:false,
-    smallKillsSinceBoss:0, bossActive:false, bossSpawnEvery:10,
+    smallKillsSinceBoss:0, bossActive:false, bossSpawnEvery:100,   /* v3.8.2 打满100只小怪才刷BOSS(原10) */
     skillCall:null,          /* 技能名播报槽: 覆盖式大字快闪, {name,t,dur} */
   };
 
@@ -904,6 +904,14 @@ import { SND } from './10-base.js';
       if (e.dying>0) { e.dying-=dt; if (e.armature) advanceRatty(e, dt, true); continue; }
       if (!e.alive) continue;
       if (e.armature) advanceRatty(e, dt, false);   /* 骨骼怪: 推进动画(吃倍速 dt, 与移动节奏一致) */
+      /* v3.8.2 怪寻玩家: 玩家不在本道累计计时, 超 2.5s 换道追击(BOSS 固定中道除外)。
+       * 此前怪死守出生车道, 玩家换道后旧道怪原地滞留 —— 表现为"跑到玩家后面咬空气"。 */
+      if (e.lane !== p.lane && e.type !== 'boss') {
+        e.chaseT = (e.chaseT || 0) + dt;
+        if (e.chaseT >= 2.5) { e.chaseT = 0; e.lane = p.lane; }
+      } else if (e.chaseT) e.chaseT = 0;
+      /* 车道 y 平滑过渡(与玩家同参), 换道是走位感而非瞬移 */
+      e.y += (laneOff(e.lane) - e.y) * Math.min(1, dt * 7);
       e.atkT -= dt; e.anim = Math.max(0, e.anim-dt*1.5);
       const wasHurt = e.hurtT > 0;
       e.hurtT = Math.max(0, e.hurtT-dt);
@@ -1345,8 +1353,11 @@ import { SND } from './10-base.js';
     }
   }
 
-  function drawEnemies() {
+  /* v3.8.2 遮挡分层: 接收 lane 过滤器 —— render 拆两批调用, 远于玩家的怪先画
+   * (被玩家盖), 近于玩家的怪最后画(盖玩家), 三车道遮挡关系明确(画家算法)。 */
+  function drawEnemies(laneFilter) {
     for (const e of G.enemies) {
+      if (laneFilter && !laneFilter(e)) continue;
       if (!e.alive && e.dying <= 0) continue;
       const sx = worldToScreen(e.x); const sy = floorY() + e.y;   /* v3.7: 怪站自己的车道 */
       /* 史莱姆真实 sprite 渲染 */
@@ -1463,7 +1474,7 @@ import { SND } from './10-base.js';
          * 落地对齐用当前姿态 AABB 底边中心 —— 任何动画下脚底都踩地板。素材面朝左, 与其它怪一致不翻转。
          * v3.6.1 调参: 基准高 76→56(Ratty 无帧留白, 同基准下视觉比史莱姆大半档); 素材色彩
          * 偏亮偏饱和, 整体 saturate(0.85)+brightness(0.93) 轻压融入夜色(0.72/0.85 灰暗感像半透, 已回调), 受击白闪保留。 */
-        const drawH = Math.min(CH * 0.5, 48) * (e.elite ? 1.28 : 1) * laneScale(e.lane);   /* v3.8.1 鼠妖再缩: 56→48 */
+        const drawH = Math.min(CH * 0.5, 42) * (e.elite ? 1.28 : 1) * laneScale(e.lane);   /* v3.8.2 鼠妖整体再缩: 48→42(ctx.scale等比, 宽高一起小) */
         const s = drawH / Math.max(1, RATTY.baseH || 100);
         const bb = window.CanvasDragonBones.armatureAABB(e.armature);
         ctx.save();
@@ -1702,7 +1713,12 @@ import { SND } from './10-base.js';
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, CW, CH);
     }
-    drawBg(); drawEnemies(); drawDrops(); drawPlayerSprite(); drawPets(); drawFx(); drawDmg(); drawSkillCall();
+    drawBg();
+    /* v3.8.2 遮挡分层: 远道怪 → 掉落 → 玩家 → 宠物 → 近道怪(近盖远, 画家算法) */
+    drawEnemies(e => e.y < G.player.y);
+    drawDrops(); drawPlayerSprite(); drawPets();
+    drawEnemies(e => e.y >= G.player.y);
+    drawFx(); drawDmg(); drawSkillCall();
   }
 
   /* v3.2 舞台模式绘制：把战斗画到统一舞台画布的一条横带上。
