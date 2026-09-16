@@ -143,7 +143,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     return true;
   }
 
-  const G = {    t:0, kills:0, spirit:0, speedMult:1, speedMultTimer:0, state:'walk', camX:0, paused:false,
+  const G = {    t:0, kills:0, spirit:0, speedMult:2, speedMultTimer:0, state:'walk', camX:0, paused:false,
     player:null, pets:[], enemies:[], fx:[], dmg:[], drops:[], spawnT:BC.spawnInterval,
     sprite:null, bgImg:null, spriteReady:false, bgReady:false, extraStrike:false,
     speedDodge:0, nextStrikeCrit:0,
@@ -1036,7 +1036,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* v3.2 验收用：直接设定倍速（跳过技能随机 proc），让 A/B 对照可复现。
      * 传 1 即清除加速。 */
     __setSpeedMultForTest: (m, dur) => {
-      G.speedMult = Math.max(1, m || 1);
+      G.speedMult = Math.max(2, m || 2);
       G.speedMultTimer = G.speedMult > 1 ? (dur || 30) : 0;
       if (G.speedMult <= 1) { G.speedDodge = 0; }
       updateHUD();
@@ -2299,7 +2299,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   function update(dt) {
     if (G.speedMultTimer > 0) {
       G.speedMultTimer -= dt;
-      if (G.speedMultTimer <= 0) { G.speedMult = 1; G.speedMultTimer = 0; G.speedDodge = 0; }   // 身法时效到点, 闪避加成一并散去
+      if (G.speedMultTimer <= 0) { G.speedMult = 2; G.speedMultTimer = 0; G.speedDodge = 0; }   // 身法时效到点, 退回基础2倍速, 闪避加成一并散去
       updateHUD();
     }
     const sdt = dt * G.speedMult;
@@ -3537,7 +3537,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (killsEl) killsEl.textContent = G.kills;
     if (spEl) spEl.textContent = fmtNum(G.spirit);
     if (speedEl) {
-      if (G.speedMult > 1) { speedEl.style.display = ''; speedEl.textContent = '×'+G.speedMult+' 倍速 ('+G.speedMultTimer.toFixed(1)+'s)'; }
+      /* v5.0 基础2倍速为常态不显示, 只有技能加速中(timer>0)才显示 ×3/×4 倍速 */
+      if (G.speedMultTimer > 0) { speedEl.style.display = ''; speedEl.textContent = '×'+G.speedMult+' 倍速 ('+G.speedMultTimer.toFixed(1)+'s)'; }
       else speedEl.style.display = 'none';
     }
     if (stateEl) stateEl.textContent = G.state === 'fight' ? '战斗中' : '推进中';
