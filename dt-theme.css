@@ -59,9 +59,9 @@
     vector-effect:non-scaling-stroke}
   .btn .label{position:relative;z-index:2;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:20px;white-space:nowrap}
   /* 镜像/倾斜：让每颗按钮轮廓各不同向 */
-  #btnArray .skin{transform:scaleX(-1)}
+  /* v4.4: 移除 #btnArray .skin scaleX(-1) 镜像——意义不明, 三按钮图案统一在左侧, 文字统一右移到空白区 */
   #btnBreak{--tilt:-.8deg}
-  #btnArray{--tilt:.6deg;text-align:left;padding-left:18px;padding-right:24px}   /* v4.4: 聚灵阵skin水平镜像(scaleX(-1))后图案在右侧, 文字左移到左侧空白区避开图案 */
+  #btnArray{--tilt:.6deg}
   /* v1.9.9f: hover/active 不再动 filter —— 状态切换重算 drop-shadow 高斯是 WebView 点按卡顿元凶; 反馈交给 transform(合成器) */
   .btn:hover{transform:translateY(-1px)}
   .btn:active{transform:rotate(var(--tilt,0deg)) scale(.95)}
