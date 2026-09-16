@@ -453,6 +453,8 @@
     "assets/sfx/water_footstep.ogg": "6cf4533faeae71ea5ecc6000583feb272de717d165785deff9e5edd995540ab2",
     "assets/sfx/water_hurt.ogg": "e73056e800bd4b8dfbfd21e62d292910844c9094dcab471e7d326440f28d46c3",
     "assets/skill_hengsao_sheet.webp": "db192abf8c9d982bf42092a1272ea05d5513af4572de04d97044d4fead89e226",
+    "assets/skill_orb.webp": "75fc3d3ef0184307fd492e6c5f3162a32262e0cf74457ba19dabab7ec66029fb",
+    "assets/skill_spike.webp": "6473d056c63b65e968b936a5cfa5cfd968e4524af55a6066b93767582b705530",
     "assets/ui_icons/btn_array.webp": "ca434c9518f3d12b269a9e9617cb987911ef708557d57001b4bd31397a4d1a87",
     "assets/ui_icons/btn_array_flip.webp": "a2844c6c76013d72d8386cf3df46b184cf295ff61d0f76ada788eb1f9cb2e82e",
     "assets/ui_icons/btn_break.webp": "b7afa86e2f0e06ce27412a3f4cc4cb5595bd471a9bee70982d2a40a7f959a239",
@@ -474,10 +476,10 @@
     "src/20-core.js": "801d09ca8fe1680044620e85c03f5cb757a6569178f96022e28c92629f8eccba",
     "src/30-systems.js": "8e8c6eaa0828eb56611db6b0882540af64afb3c9142599584559e55f75ad9cec",
     "src/40-app.js": "0a5ce4e9f696a5c8d707ac04d774323752558c1c1c56823f465ef9187161c82d",
-    "src/50-battle.js": "ac9282ce28659c436fc05ae703390630f5927a1b2ffd64ad801c2d172759f90b",
+    "src/50-battle.js": "8a623e5557282a6f9811d2d17200a69fef530743af278cdd1225088b23b2be67",
     "src/60-stage.js": "58e1ee5df0b972d4271ca676e65622fee3544b9ab6f226ef3f8ffaa16205ae47",
     "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
   },
-  "rev": "8c17ca92da9b2902",
+  "rev": "916e588110cebd9c",
   "version": "3.5"
 }
