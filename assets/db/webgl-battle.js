@@ -41,7 +41,7 @@
         cv.id = 'battleGL';
         /* 常态调色沿用 2D 版 #battleCanvas 的 CSS 合成层方案（GPU, 零逐帧开销）——
          * 保持战斗画面饱和度/亮度与旧渲染一致 */
-        cv.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:1;filter:saturate(0.95) brightness(1.0);';   /* v4.4: saturate .85→.95 brightness .93→1.0, 原 filter 压暗白衣角色, 恢复素材原色 */
+        cv.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:1;';   /* v4.4: 移除 saturate/brightness filter, 战斗层恢复素材原色, 与打坐角色白衣亮度一致 */
         document.body.appendChild(cv);
 
         root = new PIXI.Container();
