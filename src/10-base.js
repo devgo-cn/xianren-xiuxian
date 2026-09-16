@@ -72,8 +72,10 @@ const SND = (function () {
     get sfxOn() { return sfxOn; },
     setBgm(v) {
       bgmOn = !!v; try { localStorage.setItem(LS_BGM, bgmOn ? "1" : "0"); } catch (e) {}
-      if (bgmOn) { ac(); _bgmPlay(); }
-      else if (bgmEl) { try { bgmEl.pause(); } catch (e) {} }
+      if (bgmOn) {
+        if (!bgmEl) _armBgm();    /* bgmEl 因解码错误被销毁时重建; 不复用已存在实例(避免叠加爆红) */
+        _bgmPlay();
+      } else if (bgmEl) { try { bgmEl.pause(); } catch (e) {} }
     },
     setSfx(v) { sfxOn = !!v; try { localStorage.setItem(LS_SFX, sfxOn ? "1" : "0"); } catch (e) {} },
     suspend() { suspendAll(); },                 // 供原生层 / 黑屏挂机调用
