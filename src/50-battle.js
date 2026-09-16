@@ -17,7 +17,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
 
   const BC = {
     /* 占位怪 demon(妖将)/raptor(妖弓) 已移除 —— 只保留两种有真实素材的怪 */
-    playerAtkRange: 75, playerAspd: 1.1, playerSpeed: 28,
+    playerAtkRange: 75, playerAspd: 1.1, playerSpeed: 42,   /* v4.4: 基础移速 28→42 (×1.5), 走得太慢 */
     spawnInterval: 2.6, enemySpawnOffset: 40, maxAlive: 9, queueGap: 34,   /* v3.8.2 刷怪降密: 1.0s/只→2.6s/只, 同屏 14→9 —— 站桩硬撸改推进节奏 */
     /* v4.6 素材过目模式(当前默认开启, 过目完把 DEFAULT_MUL 那两行删掉即恢复线上节奏):
      *   window.__enemySpeedMul —— 怪移速倍率(0.35 = 慢慢挪, 便于逐只端详)
