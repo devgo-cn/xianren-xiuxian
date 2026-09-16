@@ -1,0 +1,1455 @@
+{
+"axe_goblin":{
+"dir":"Axe Goblin",
+"armature":"GoblinAxe",
+"anims":[
+"Attack A",
+"Damage",
+"Idle"
+],
+"tex":[
+128,
+128
+],
+"tier":null,
+"qual":null,
+"has_skill":false
+},
+"bee":{
+"dir":"Bee",
+"armature":"ForestBee",
+"anims":[
+"Attack A",
+"Damage",
+"Idle"
+],
+"tex":[
+128,
+128
+],
+"tier":null,
+"qual":null,
+"has_skill":false
+},
+"dagger_goblin":{
+"dir":"Dagger Goblin",
+"armature":"DaggerGoblin",
+"anims":[
+"Attack A",
+"Damage",
+"Idle"
+],
+"tex":[
+128,
+128
+],
+"tier":null,
+"qual":null,
+"has_skill":false
+},
+"forest_turtle":{
+"dir":"Forest Turtle",
+"armature":"ForestTurtle",
+"anims":[
+"Attack A",
+"Damage",
+"Idle"
+],
+"tex":[
+128,
+256
+],
+"tier":null,
+"qual":null,
+"has_skill":false
+},
+"fox":{
+"dir":"Fox",
+"armature":"ForestFox",
+"anims":[
+"Attack A",
+"Damage",
+"Idle"
+],
+"tex":[
+128,
+256
+],
+"tier":null,
+"qual":null,
+"has_skill":false
+},
+"ghost":{
+"dir":"Ghost",
+"armature":"Ghost",
+"anims":[
+"Attack A",
+"Damage",
+"Idle"
+],
+"tex":[
+128,
+128
+],
+"tier":"T2",
+"qual":"C",
+"has_skill":false
+},
+"goblin_machine_gun":{
+"dir":"Goblin Machine Gun",
+"armature":"GoblinMGun",
+"anims":[
+"Attack A",
+"Damage",
+"Idle"
+],
+"tex":[
+128,
+256
+],
+"tier":null,
+"qual":null,
+"has_skill":false
+},
+"gun_mimic":{
+"dir":"Gun Mimic",
+"armature":"GunMimic",
+"anims":[
+"Attack A",
+"Damage",
+"Idle"
+],
+"tex":[
+128,
+256
+],
+"tier":null,
+"qual":null,
+"has_skill":false
+},
+"living_armor":{
+"dir":"Living Armor",
+"armature":"LivingArmor",
+"anims":[
+"Attack A",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+256
+],
+"tier":null,
+"qual":null,
+"has_skill":false
+},
+"mageshroom":{
+"dir":"Mageshroom",
+"armature":"Mageshroom",
+"anims":[
+"Attack A",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+128
+],
+"tier":"T3",
+"qual":"C",
+"has_skill":false
+},
+"magical_girl_goblin":{
+"dir":"Magical Girl Goblin",
+"armature":"MagicalGoblin",
+"anims":[
+"Attack A",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+256
+],
+"tier":null,
+"qual":null,
+"has_skill":false
+},
+"mimic":{
+"dir":"Mimic",
+"armature":"Mimic",
+"anims":[
+"Attack A",
+"Damage",
+"Idle"
+],
+"tex":[
+128,
+256
+],
+"tier":"T2",
+"qual":"C",
+"has_skill":false
+},
+"scorpion":{
+"dir":"Scorpion",
+"armature":"ForestScorpion",
+"anims":[
+"Attack A",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+128
+],
+"tier":null,
+"qual":null,
+"has_skill":false
+},
+"sword_goblin":{
+"dir":"Sword Goblin",
+"armature":"SwordGoblin",
+"anims":[
+"Attack A",
+"Damage",
+"Idle"
+],
+"tex":[
+128,
+128
+],
+"tier":null,
+"qual":null,
+"has_skill":false
+},
+"wolf":{
+"dir":"Wolf",
+"armature":"ForestWolf",
+"anims":[
+"Attack A",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+256
+],
+"tier":null,
+"qual":null,
+"has_skill":false
+},
+"ancient_automaton":{
+"dir":"x_Aekashics-Librarium-Ancient-Automaton",
+"armature":"AncientAutomaton",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"IdleWeak",
+"Skill",
+"Skill2",
+"Ultimate"
+],
+"tex":[
+256,
+256
+],
+"tier":"T5",
+"qual":"C",
+"has_skill":true
+},
+"animated_drill_dwarf":{
+"dir":"x_Aekashics-Librarium-Animated-Drill-Dwarf",
+"armature":"DwarfDrill",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Idle Weak"
+],
+"tex":[
+256,
+256
+],
+"tier":"T4",
+"qual":"C",
+"has_skill":false
+},
+"arcane_golem":{
+"dir":"x_Aekashics-Librarium-Arcane-Golem",
+"armature":"ArcaneGolem",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Attack E",
+"Attack F",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+512
+],
+"tier":"T4",
+"qual":"B",
+"has_skill":false
+},
+"black_ant_queen":{
+"dir":"x_Aekashics-Librarium-Black-Ant-Queen",
+"armature":"AntQueen",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Attack E",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"bonemask_shadow_creature":{
+"dir":"x_Aekashics-Librarium-Bonemask-Shadow-Creature",
+"armature":"Bonemask",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Skill"
+],
+"tex":[
+512,
+512
+],
+"tier":"T3",
+"qual":"C",
+"has_skill":true
+},
+"clockwork_king":{
+"dir":"x_Aekashics-Librarium-Clockwork-King",
+"armature":"ClockworkKing",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Idle Weak",
+"Skill"
+],
+"tex":[
+512,
+512
+],
+"tier":"T5",
+"qual":"C",
+"has_skill":true
+},
+"clockwork_skull":{
+"dir":"x_Aekashics-Librarium-Clockwork-Skull",
+"armature":"ClockworkSkull",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Idle Weak",
+"Skill"
+],
+"tex":[
+256,
+512
+],
+"tier":"T4",
+"qual":"C",
+"has_skill":true
+},
+"colossal_crow":{
+"dir":"x_Aekashics-Librarium-Colossal-Crow",
+"armature":"ColossalCrow",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Idle Weak",
+"Skill"
+],
+"tex":[
+256,
+512
+],
+"tier":"T5",
+"qual":"C",
+"has_skill":true
+},
+"continental_turtle_rukkha":{
+"dir":"x_Aekashics-Librarium-Continental-Turtle-Rukkha",
+"armature":"Contiturtle",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+512
+],
+"tier":"T5",
+"qual":"C",
+"has_skill":false
+},
+"crab_king_karkinos":{
+"dir":"x_Aekashics-Librarium-Crab-King-Karkinos",
+"armature":"Karkinos",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Attack E",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"cultist_mage":{
+"dir":"x_Aekashics-Librarium-Cultist-Mage",
+"armature":"CultistMage",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Skill"
+],
+"tex":[
+256,
+256
+],
+"tier":"T3",
+"qual":"C",
+"has_skill":true
+},
+"daidarabotchi":{
+"dir":"x_Aekashics-Librarium-Daidarabotchi",
+"armature":"Daidarabotchi",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Skill"
+],
+"tex":[
+256,
+256
+],
+"tier":"T4",
+"qual":"C",
+"has_skill":true
+},
+"dark_queen_shaccadyoggoth":{
+"dir":"x_Aekashics-Librarium-Dark-Queen-ShaccadYoggoth",
+"armature":"QueenShaccad",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"darkness_titan_ilnoct":{
+"dir":"x_Aekashics-Librarium-Darkness-Titan-Ilnoct",
+"armature":"Ilnoct",
+"anims":[
+"Damage",
+"Fist Smash",
+"Idle",
+"Left Hand Skill",
+"Right Hand Skill",
+"Violent Pull"
+],
+"tex":[
+1024,
+512
+],
+"tier":"T5",
+"qual":"A",
+"has_skill":true
+},
+"dragon_huanglong":{
+"dir":"x_Aekashics-Librarium-Dragon-Huanglong",
+"armature":"HuangLong",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Attack E",
+"Attack F",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"dryad_queen_rafflesia":{
+"dir":"x_Aekashics-Librarium-Dryad-Queen-Rafflesia",
+"armature":"Rafflesia",
+"anims":[
+"Damage",
+"Idle",
+"Skill A",
+"Skill A Extended",
+"Skill B"
+],
+"tex":[
+512,
+512
+],
+"tier":"T5",
+"qual":"C",
+"has_skill":true
+},
+"dryad_yggdrasil":{
+"dir":"x_Aekashics-Librarium-Dryad-Yggdrasil",
+"armature":"ygg",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+256
+],
+"tier":"T3",
+"qual":"C",
+"has_skill":false
+},
+"eldritch_overmind":{
+"dir":"x_Aekashics-Librarium-Eldritch-Overmind",
+"armature":"Overmind",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Attack E",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"giant_kitsune":{
+"dir":"x_Aekashics-Librarium-Giant-Kitsune",
+"armature":"Kitsune",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Attack E",
+"Attack F",
+"Attack G",
+"Attack H",
+"Attack I",
+"Attack J",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+512
+],
+"tier":"T4",
+"qual":"A",
+"has_skill":false
+},
+"god_warrior_dagon":{
+"dir":"x_Aekashics-Librarium-God-Warrior-Dagon",
+"armature":"Dagon",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+256
+],
+"tier":"T5",
+"qual":"C",
+"has_skill":false
+},
+"god_warrior_isis":{
+"dir":"x_Aekashics-Librarium-God-Warrior-Isis",
+"armature":"Isis",
+"anims":[
+"Attack Slash",
+"Attack Tornado",
+"Attack Tornado B",
+"Damage",
+"Idle",
+"Skill",
+"Skill B"
+],
+"tex":[
+256,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":true
+},
+"god_warrior_osiris":{
+"dir":"x_Aekashics-Librarium-God-Warrior-Osiris",
+"armature":"Osiris",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"god_warrior_skoll":{
+"dir":"x_Aekashics-Librarium-God-Warrior-Skoll",
+"armature":"Skoll",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+256
+],
+"tier":"T5",
+"qual":"C",
+"has_skill":false
+},
+"goddess_aphrodite":{
+"dir":"x_Aekashics-Librarium-Goddess-Aphrodite",
+"armature":"Aphrodite",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+256
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"grand_sorceress_duesa":{
+"dir":"x_Aekashics-Librarium-Grand-Sorceress-Duesa",
+"armature":"Duesa",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"hades":{
+"dir":"x_Aekashics-Librarium-Hades",
+"armature":"Hades",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Idle Weak",
+"Skill"
+],
+"tex":[
+256,
+512
+],
+"tier":"T5",
+"qual":"C",
+"has_skill":true
+},
+"hellhound_garm":{
+"dir":"x_Aekashics-Librarium-Hellhound-Garm",
+"armature":"Garm",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+512
+],
+"tier":"T4",
+"qual":"B",
+"has_skill":false
+},
+"ice_titan_demeres":{
+"dir":"x_Aekashics-Librarium-Ice-Titan-Demeres",
+"armature":"Demeres",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Attack E",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"insect_queen":{
+"dir":"x_Aekashics-Librarium-Insect-Queen",
+"armature":"Insectqueen",
+"anims":[
+"Attack A",
+"Attack B",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+512
+],
+"tier":"T5",
+"qual":"C",
+"has_skill":false
+},
+"jubokko":{
+"dir":"x_Aekashics-Librarium-Jubokko",
+"armature":"Jubokko",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Skill",
+"Skill B",
+"Skill C",
+"Skill D"
+],
+"tex":[
+1024,
+2048
+],
+"tier":"T5",
+"qual":"S",
+"has_skill":true
+},
+"king_archial":{
+"dir":"x_Aekashics-Librarium-King-Archial",
+"armature":"KingArchial",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Skill"
+],
+"tex":[
+512,
+512
+],
+"tier":"T5",
+"qual":"C",
+"has_skill":true
+},
+"legendary_knight_michael":{
+"dir":"x_Aekashics-Librarium-Legendary-Knight-Michael",
+"armature":"Michael",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+256
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"legendary_knight_regulus":{
+"dir":"x_Aekashics-Librarium-Legendary-Knight-Regulus",
+"armature":"Regulus",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"IdleWeak",
+"Skill",
+"Skill2",
+"Ultimate"
+],
+"tex":[
+512,
+256
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":true
+},
+"legendary_knight_remment":{
+"dir":"x_Aekashics-Librarium-Legendary-Knight-Remment",
+"armature":"Remment",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Damage",
+"Dep",
+"Idle"
+],
+"tex":[
+256,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"light_titan_alfadriel":{
+"dir":"x_Aekashics-Librarium-Light-Titan-Alfadriel",
+"armature":"Alfadriel",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"living_hoard_midas":{
+"dir":"x_Aekashics-Librarium-Living-Hoard-Midas",
+"armature":"Midas",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+256
+],
+"tier":"T4",
+"qual":"C",
+"has_skill":false
+},
+"mecha_rattlesnake":{
+"dir":"x_Aekashics-Librarium-Mecha-Rattlesnake",
+"armature":"MechaSnake",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+256
+],
+"tier":"T4",
+"qual":"B",
+"has_skill":false
+},
+"mechascorpion":{
+"dir":"x_Aekashics-Librarium-MechaScorpion",
+"armature":"Mechascorp",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Attack E",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+512
+],
+"tier":"T4",
+"qual":"B",
+"has_skill":false
+},
+"mermaid_warrior_undeen":{
+"dir":"x_Aekashics-Librarium-Mermaid-Warrior-Undeen",
+"armature":"MermaidWarrior",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Skill"
+],
+"tex":[
+256,
+256
+],
+"tier":"T3",
+"qual":"C",
+"has_skill":true
+},
+"mythical_knight_goldnharl":{
+"dir":"x_Aekashics-Librarium-Mythical-Knight-Goldnharl",
+"armature":"MknightGoldnharl",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"parrot_king":{
+"dir":"x_Aekashics-Librarium-Parrot-King",
+"armature":"ParrotKing",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+512
+],
+"tier":"T5",
+"qual":"C",
+"has_skill":false
+},
+"poseidon":{
+"dir":"x_Aekashics-Librarium-Poseidon",
+"armature":"Poseidon",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Idle Weak",
+"Skill"
+],
+"tex":[
+256,
+256
+],
+"tier":"T5",
+"qual":"C",
+"has_skill":true
+},
+"radulac_the_voidvod":{
+"dir":"x_Aekashics-Librarium-Radulac-The-Voidvod",
+"armature":"Radulac",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"runic_stone_golem_goliath":{
+"dir":"x_Aekashics-Librarium-Runic-Stone-Golem-Goliath",
+"armature":"RunicStoneGolem",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Attack E",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+512
+],
+"tier":"T4",
+"qual":"B",
+"has_skill":false
+},
+"sea_calamity_urmica":{
+"dir":"x_Aekashics-Librarium-Sea-Calamity-Urmica",
+"armature":"Urmica",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+1024
+],
+"tier":"T5",
+"qual":"A",
+"has_skill":false
+},
+"sea_dragon_leviathan":{
+"dir":"x_Aekashics-Librarium-Sea-Dragon-Leviathan",
+"armature":"SeaDragon",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Attack E",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"shaccadyoggoth":{
+"dir":"x_Aekashics-Librarium-ShaccadYoggoth",
+"armature":"Shaccad",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+512
+],
+"tier":"T4",
+"qual":"C",
+"has_skill":false
+},
+"slime_flynn":{
+"dir":"x_Aekashics-Librarium-Slime-Flynn",
+"armature":"Flynn",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Skill Special",
+"Skill Special B",
+"Skill Special C"
+],
+"tex":[
+256,
+256
+],
+"tier":"T1",
+"qual":"C",
+"has_skill":true
+},
+"son_of_valhalla":{
+"dir":"x_Aekashics-Librarium-Son-Of-Valhalla",
+"armature":"Valhalla",
+"anims":[
+"AttackB",
+"Damage",
+"Idle",
+"Skill",
+"Skill B",
+"SkillC"
+],
+"tex":[
+256,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":true
+},
+"spirit_fighter":{
+"dir":"x_Aekashics-Librarium-Spirit-Fighter",
+"armature":"SpiritFighter",
+"anims":[
+"Damage",
+"Double Punch",
+"Double Punch Spirit",
+"Idle",
+"Single Punch",
+"Single Punch Spirit",
+"Spirit Knuckle",
+"Triple Punch",
+"Triple Punch Spirit"
+],
+"tex":[
+512,
+256
+],
+"tier":"T3",
+"qual":"B",
+"has_skill":false
+},
+"sun_goddess":{
+"dir":"x_Aekashics-Librarium-Sun-Goddess",
+"armature":"SunGoddess",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+256
+],
+"tier":"T5",
+"qual":"C",
+"has_skill":false
+},
+"tantalus":{
+"dir":"x_Aekashics-Librarium-Tantalus",
+"armature":"Tantalus",
+"anims":[
+"Attack Slash",
+"Attack thrust",
+"Damage",
+"Fierce Slash",
+"Idle",
+"Shield Charge",
+"Shield Throw"
+],
+"tex":[
+512,
+1024
+],
+"tier":"T4",
+"qual":"A",
+"has_skill":false
+},
+"thanatos":{
+"dir":"x_Aekashics-Librarium-Thanatos",
+"armature":"Thanatos",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Skill"
+],
+"tex":[
+512,
+512
+],
+"tier":"T5",
+"qual":"C",
+"has_skill":true
+},
+"the_fallen":{
+"dir":"x_Aekashics-Librarium-The-Fallen",
+"armature":"TheFallen",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Skill"
+],
+"tex":[
+128,
+256
+],
+"tier":"T5",
+"qual":"C",
+"has_skill":true
+},
+"the_horde":{
+"dir":"x_Aekashics-Librarium-The-Horde",
+"armature":"Horde",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Damage",
+"Idle",
+"Skill Attack"
+],
+"tex":[
+256,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":true
+},
+"thunder_titan_dynamo":{
+"dir":"x_Aekashics-Librarium-Thunder-Titan-Dynamo",
+"armature":"Dynamo",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Attack E",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+512
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"unicorn":{
+"dir":"x_Aekashics-Librarium-Unicorn",
+"armature":"Unicorn",
+"anims":[
+"Attack",
+"Attack B",
+"Damage",
+"Idle",
+"Skill",
+"Weak Idle"
+],
+"tex":[
+256,
+256
+],
+"tier":"T3",
+"qual":"C",
+"has_skill":true
+},
+"zeograth":{
+"dir":"x_Aekashics-Librarium-Zeograth",
+"armature":"Zeograth",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Attack E",
+"Attack F",
+"Attack G",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+256
+],
+"tier":"T5",
+"qual":"B",
+"has_skill":false
+},
+"zodiac_cancer":{
+"dir":"x_Aekashics-Librarium-Zodiac-Cancer",
+"armature":"ZodiacCancer",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack E",
+"Damage",
+"Idle"
+],
+"tex":[
+256,
+512
+],
+"tier":"T3",
+"qual":"B",
+"has_skill":false
+},
+"librarium_animated_legendary_knight_pizarro":{
+"dir":"x_Librarium-Animated-Legendary-Knight-Pizarro",
+"armature":"Pizarro",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+256
+],
+"tier":null,
+"qual":null,
+"has_skill":false
+},
+"librarium_animated_mechadragon_ladon":{
+"dir":"x_Librarium-Animated-Mechadragon-Ladon",
+"armature":"Ladon",
+"anims":[
+"Attack",
+"Attack B",
+"Attack C",
+"Damage",
+"Idle"
+],
+"tex":[
+1024,
+1024
+],
+"tier":null,
+"qual":null,
+"has_skill":false
+},
+"librarium_animated_skull_knight_xoer":{
+"dir":"x_Librarium-Animated-Skull-Knight-Xoer",
+"armature":"SKXoer",
+"anims":[
+"Attack A",
+"Attack B",
+"Attack C",
+"Attack D",
+"Attack E",
+"Damage",
+"Idle"
+],
+"tex":[
+512,
+512
+],
+"tier":null,
+"qual":null,
+"has_skill":false
+},
+"jiangshi":{
+"dir":"x_Тkashics-Librarium-Jiangshi",
+"armature":"Jiangshi",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Skill",
+"IdleWeak"
+],
+"tex":[
+128,
+128
+],
+"tier":null,
+"qual":null,
+"has_skill":true
+},
+"witch_baba":{
+"dir":"x_Тkashics-Librarium-Witch-Baba",
+"armature":"Baba",
+"anims":[
+"Attack",
+"Damage",
+"Idle",
+"Idle Weak",
+"Skill"
+],
+"tex":[
+256,
+256
+],
+"tier":null,
+"qual":null,
+"has_skill":true
+}
+}
