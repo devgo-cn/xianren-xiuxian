@@ -383,7 +383,7 @@ import { SND } from './10-base.js';
     skillCall(id === 'jifeng' ? '疾风步' : '缩地成寸');   /* 身法播报 */
     /* 身法触发特效: 玩家位置速度爆发 */
     if (G.player) {
-      G.fx.push({ kind:'speedBurst', x:G.player.x, y:-20, color: id==='suodi' ? '#a0d8ff' : '#80ffc0', t:0, dur:0.5 });
+      G.fx.push({ kind:'speedBurst', x:G.player.x, y:G.player.y-20, color: id==='suodi' ? '#a0d8ff' : '#80ffc0', t:0, dur:0.5 });  /* v3.7.2 y带玩家车道偏移 */
     }
     updateHUD();
     return id;
@@ -554,14 +554,16 @@ import { SND } from './10-base.js';
     const hs = skVal('hengsao');
     if (hs && Math.random()*100 < hs.chance) {
       skExp('hengsao', 2); skillCall('横扫千军');
-      G.fx.push({ kind:'hengsao', x:p.x, y:-30, color:'#ffc98a', t:0, dur:0.30, frame:0, startX:p.x, endX:p.x+200 });  /* v2.9 再提速: 0.6→0.38→0.30s, 起手即爆 */
+      G.fx.push({ kind:'hengsao', x:p.x, y:p.y-30, color:'#ffc98a', t:0, dur:0.30, frame:0, startX:p.x, endX:p.x+200 });  /* v3.7.2 y带玩家车道偏移(原固定-30永远画在中道); v2.9 再提速: 0.6→0.38→0.30s, 起手即爆 */
       playSfx('hengsao', 0.8);
       const n = Math.max(1, Math.round(hs.n || 1));
       let hit = 0;
       for (const o of G.enemies) {
         if (hit >= n) break;
         if (o === target || !o.alive || o.dying > 0) continue;
-        if (Math.abs(o.x - p.x) > p.atkRange + 60) continue;
+        /* v3.7.2 三车道: 剑气只扫玩家本道, 扫程与特效一致(起手前20px~扫末230px); 原按全场x距离跨道波及 */
+        if (o.lane !== p.lane) continue;
+        if (o.x < p.x - 20 || o.x > p.x + 230) continue;
         dealDamage(o, calcDmg(PST.atk, base*(hs.dmg||0)/100, o.def, pen), '#ffc98a', false);
         hit++;
       }
@@ -616,9 +618,10 @@ import { SND } from './10-base.js';
         const atkMult = (1 + (p.atkBuff || 0)) * SKILL.damageMult;
         const dmg = calcDmg(p.atk, atkMult * (0.9 + Math.random()*0.2) * r.mult, p.skillTarget.def, PST.pen || 0);
         dealDamage(p.skillTarget, dmg, '#bfe8ff', r.crit);
-        /* 剑气斩范围伤害: 波及周围敌人 */
+        /* 剑气斩范围伤害: 波及本道周围敌人(剑气只在玩家所在车道, 原按全场x距离跨道波及) */
         for (const o of G.enemies) {
           if (o === p.skillTarget || !o.alive || o.dying > 0) continue;
+          if (o.lane !== p.lane) continue;
           if (Math.abs(o.x - p.x) <= p.atkRange + 80) {
             const dmg2 = calcDmg(p.atk, atkMult * 0.5 * (0.9 + Math.random()*0.2), o.def, PST.pen || 0);
             dealDamage(o, dmg2, '#bfe8ff', false);
