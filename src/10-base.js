@@ -129,7 +129,7 @@ function adopt(s) {
   s.offlineBoostUntil = Math.max(0, fin(s.offlineBoostUntil, 0));
   /* v3.9 妖潮试炼: 纪录 + 离线收益加成(120s 击杀纪录 → 补偿档位) */
   s.trialBest = Math.max(0, Math.floor(fin(s.trialBest, 0)));
-  s.trialBoost = Math.min(.5, Math.max(0, fin(s.trialBoost, 0)));
+  s.trialBoost = Math.min(3.5, Math.max(0, fin(s.trialBoost, 0)));   /* v5.0 封顶350%(300只×1%+BOSS50%) */
   s.trialBoostUntil = Math.max(0, fin(s.trialBoostUntil, 0));
   if (!s.travel || typeof s.travel !== "object") s.travel = null;
   /* v1.8.5 化身行囊: 信匣满后由服务端 stayTravel 攒进 travel.bag。
@@ -982,24 +982,35 @@ function licBuild(cross, arr) {
 
 const EQUI_SLOTN = SLOT_TYPES.map(t => t.n);
 
-function artName(kind, q) {
+function artName(kind, q, lv) {
+  /* v5.0 境界装: 名称带境界前缀(炼气·玄天斩灵剑), 装备 = 境界(lv) × 品级(q) 双维度 */
+  const bigName = (BIGS[Math.max(0, (lv || 1) - 1)] || BIGS[0]).n;
   const sp = ART_SPECIAL.filter(s => q >= s[0]);
-  if (sp.length && Math.random() < 0.35) return sp[Math.floor(Math.random() * sp.length)][1];
-  if (kind === "w") return ART_PREFIX[Math.floor(Math.random() * ART_PREFIX.length)] + ART_SUFFIX[Math.floor(Math.random() * ART_SUFFIX.length)];
+  if (sp.length && Math.random() < 0.35) return bigName + "·" + sp[Math.floor(Math.random() * sp.length)][1];
+  if (kind === "w") return bigName + "·" + ART_PREFIX[Math.floor(Math.random() * ART_PREFIX.length)] + ART_SUFFIX[Math.floor(Math.random() * ART_SUFFIX.length)];
   const P = kind === "a" ? ARMOR_POOL : kind === "p" ? PEND_POOL : SCROLL_POOL;
-  return P[Math.floor(Math.random() * P.length)];
+  return bigName + "·" + P[Math.floor(Math.random() * P.length)];
 }
 
 function rollFx(kind, q) {                          // 装备词条(同槽不重复)
   const pool = (FX_POOL[kind] || FX_POOL.w).slice();
   const n = fxCount(q);
   const f = [];
+  /* v5.0 极品词条: 每条有概率升级为极品(数值×1.8, 带legendary标记)。
+   * 概率随品质递增: q0=3% → q5=20.5%。极品=带极品词条的装备, 不单独成品级。 */
+  const legChance = 0.03 + q * 0.035;
   /* v2.5 功法(s)必带攻速词条: 数值随品质分档(低品 3~5% / 高品 5~7%), 其余词条照常 roll;
    * 其他部位(兵/护/佩)不出攻速 */
-  if (kind === "s") f.push({ k: "aspd", v: fxValue("aspd", q) });
+  if (kind === "s") {
+    const v = fxValue("aspd", q);
+    const leg = Math.random() < legChance;
+    f.push({ k: "aspd", v: leg ? Math.round(v * 1.8) : v, legendary: leg });
+  }
   for (let i = f.length; i < n && pool.length; i++) {
     const key = pool.splice((Math.random() * pool.length) | 0, 1)[0];
-    f.push({ k: key, v: fxValue(key, q) });
+    const v = fxValue(key, q);
+    const leg = Math.random() < legChance;
+    f.push({ k: key, v: leg ? Math.round(v * 1.8) : v, legendary: leg });
   }
   return f;
 }
@@ -1016,7 +1027,7 @@ function rollMonFx(big) {                           // 词缀妖兽: ~12% 带 1~
   return f;
 }
 
-function fmtFxTag(f) { return `${FX_TXT[f.k]}+${f.v}%`; }
+function fmtFxTag(f) { return `${f.legendary ? "【极】" : ""}${FX_TXT[f.k]}+${f.v}%`; }
 
 function attrAssign(art, kind, q, lv) {          // 装备数值(随境界级×品质乘子) + 词条
   const M = eqMult(q);

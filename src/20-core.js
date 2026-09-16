@@ -5,7 +5,7 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, DROP_CFG, EQUI_CELLPOS, FX_TXT, JRN_CAP, LIC_QCOL, MATS, QUALITY, SAVE_KEY, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, STORY_BY_KEY, STORY_PAGE, __set_rate, __set_rkAt, __set_skillSaveT, __set_srvOffset, __set_state, __set_storyChap, __set_traceT, __set_travelReturned, _eqRecycle, _eqSel, _pred, _rkAt, _skillSaveT, _storyChap, _traceT, _travelReturned, cld, cnNum, esc, fmt, rnOk, selRecipe, skillExpNeed, state } from './00-pure.js';
+import { $, BIGS, DROP_CFG, EQUI_CELLPOS, FX_TXT, JRN_CAP, LIC_QCOL, MATS, QUALITY, SAVE_KEY, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, STORY_BY_KEY, STORY_PAGE, __set_rate, __set_rkAt, __set_skillSaveT, __set_srvOffset, __set_state, __set_storyChap, __set_traceT, __set_travelReturned, _eqRecycle, _eqSel, _pred, _rkAt, _skillSaveT, _storyChap, _traceT, _travelReturned, cld, cnNum, esc, fmt, rnOk, selRecipe, skillExpNeed, state } from './00-pure.js';
 import { CLD_API, EQUI_SLOTN, SND, adopt, apiRoot, artCtx, cldFlash, cldId, cldUI, closeRename, cloudSnap, cloudSoon, debugEncounter, deviceId, ensureScrollFx, exitDim, fitsRecipe, g1Pack, g1Unpack, handleKicked, licBuild, locById, mailDot, mailLine, migrate, pushBattleStats, pushMsg, renderPName, renderPillHints, renderSettings, resetDimKnob, rkSegLabel, seg, setRealmSub, sizeBurst, skillDef, skillGet, skillLv, storyItemHtml, traceRefresh, travelBtnLbl, trimJournal } from './10-base.js';
 
 function realm() { return seg(state.realmIdx); }
@@ -403,16 +403,19 @@ function artScore(a) {                    /* v1.9.6 品质锚定: 星品主导�
   let fx = 0;
   for (const f of (a.fx || [])) {
     const p = f.v / 100;
-    if (f.k === "atk") fx += p * c.atkRef;
-    else if (f.k === "hp") fx += p * c.hpRef / 30;
-    else if (f.k === "dfn") fx += p * c.defRef * 3;
-    else if (f.k === "crit") fx += p * c.atkRef * 0.55;
-    else if (f.k === "critB") fx += p * c.atkRef * 1.0;
-    else if (f.k === "critD") fx += p * c.atkRef * 0.15;
-    else if (f.k === "pen") fx += p * c.atkRef * 0.35;
-    else if (f.k === "dodge") fx += p * c.defRef * 1.4;
-    else if (f.k === "life") fx += p * c.atkRef * 0.5;
-    else if (f.k === "aspd") fx += p * c.atkRef * 0.8;   // v2.5 功法攻速: 全程 DPS 线性增益, 权重介于暴击与暴伤乘区之间
+    let val = 0;
+    if (f.k === "atk") val = p * c.atkRef;
+    else if (f.k === "hp") val = p * c.hpRef / 30;
+    else if (f.k === "dfn") val = p * c.defRef * 3;
+    else if (f.k === "crit") val = p * c.atkRef * 0.55;
+    else if (f.k === "critB") val = p * c.atkRef * 1.0;
+    else if (f.k === "critD") val = p * c.atkRef * 0.15;
+    else if (f.k === "pen") val = p * c.atkRef * 0.35;
+    else if (f.k === "dodge") val = p * c.defRef * 1.4;
+    else if (f.k === "life") val = p * c.atkRef * 0.5;
+    else if (f.k === "aspd") val = p * c.atkRef * 0.8;
+    /* v5.0 极品词条: 数值已×1.8, 评分额外再加30%权重, 确保极品在阿青择优中优先 */
+    fx += val * (f.legendary ? 1.3 : 1);
   }
   /* 星级锚: 相邻星差 ×境界逐级放宽; 三维+词条压缩成浮分且封顶在本档步长内
      → 同星内比 roll 肥瘦, 跨星看锚差 —— 2星防血装 roll 再肥也压不过 4星古宝,
@@ -470,7 +473,8 @@ function licSync() {
   const nb = lic.querySelector(".lh b");
   nb.textContent = a.name || "无名法宝";
   nb.style.color = LIC_QCOL[a.q] || "#e9e2d0";
-  lic.querySelector(".lh i").textContent = `${qn}·${EQUI_SLOTN[slotIdx] || ""} ★${a.q + 1}${a.lv ? " lv" + a.lv : ""}`;
+  const bigName = (BIGS[Math.max(0, (a.lv || 1) - 1)] || BIGS[0]).n;
+  lic.querySelector(".lh i").textContent = `${bigName}·${qn}·${EQUI_SLOTN[slotIdx] || ""} ★${a.q + 1}`;
   lic.querySelectorAll(".licface .icoim").forEach(im => im.classList.toggle("on", +im.dataset.idx === _eqSel));
   lic.querySelector('.lr[data-k="a"] b').textContent = "+" + (a.a || 0);
   lic.querySelector('.lr[data-k="d"] b').textContent = "+" + (a.d || 0);

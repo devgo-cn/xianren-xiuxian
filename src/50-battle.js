@@ -18,7 +18,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   const BC = {
     /* 占位怪 demon(妖将)/raptor(妖弓) 已移除 —— 只保留两种有真实素材的怪 */
     playerAtkRange: 75, playerAspd: 1.1, playerSpeed: 42,   /* v4.4: 基础移速 28→42 (×1.5), 走得太慢 */
-    spawnInterval: 2.6, enemySpawnOffset: 40, maxAlive: 9, queueGap: 34,   /* v3.8.2 刷怪降密: 1.0s/只→2.6s/只, 同屏 14→9 —— 站桩硬撸改推进节奏 */
+    spawnInterval: 1.5, enemySpawnOffset: 40, maxAlive: 20, queueGap: 34,   /* v5.0 妖潮分批: 1.5s/批×5只=90s刷完300只, 留30s打BOSS; 同屏9→20 */
     /* v4.6 素材过目模式(当前默认开启, 过目完把 DEFAULT_MUL 那两行删掉即恢复线上节奏):
      *   window.__enemySpeedMul —— 怪移速倍率(0.35 = 慢慢挪, 便于逐只端详)
      *   window.__spawnSlowMul   —— 刷怪间隔倍率(2.5 = 刷得更稀, 一只一只来)
@@ -51,27 +51,53 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     },
     /* v3.9 怪物三维系统: 怪包统一池(每个境界都会刷到全怪种), 三维 = 境界基准 × 怪种K × 波次tier倍率。
      * 波次内从 T1 最弱一路递进到 T5 —— tier 决定刷怪池权重与三维倍率。 */
+    /* v5.0 怪物池细分T1-T10: 301只怪池每30只升一档, 增强更平滑。
+     * 倍率控制在1.0~3.2(原T5就3.2了), 避免高tier怪血太厚玩家清不动 */
     tier: {
       1: { name:'妖群', mul:1.00 },
-      2: { name:'妖锐', mul:1.30 },
-      3: { name:'妖将', mul:1.75 },
-      4: { name:'妖王', mul:2.40 },
-      5: { name:'妖皇', mul:3.20 },
+      2: { name:'妖锐', mul:1.15 },
+      3: { name:'妖将', mul:1.35 },
+      4: { name:'妖卫', mul:1.55 },
+      5: { name:'妖王', mul:1.80 },
+      6: { name:'妖皇', mul:2.05 },
+      7: { name:'妖尊', mul:2.35 },
+      8: { name:'妖圣', mul:2.65 },
+      9: { name:'妖神', mul:2.90 },
+      10:{ name:'妖帝', mul:3.20 },
     },
     tierNeedBase: 7,      /* 首档升档击杀数: T2@7, T3@9, T4@12, T5@15(累计43) —— 120s 产能约46只, 顶尖玩家压哨进 T5 */
     tierNeedStep: 1.3,    /* 每档所需击杀数递增系数 */
     trialSecs: 120,       /* 试炼轮时长: 120 秒结算, 击杀数计入纪录 → 离线补偿 */
-    /* v3.9.2 骨骼池怪数值模板(按档位) —— 全量 79 只不再逐怪手配, 个体差异靠波次倍率+精英 roll */
+    /* v5.0 妖潮301只怪池: 300普通+1BOSS, 按序号逐渐增强(T1→T10分段),
+     * 每杀1只+1%离线加成, 杀BOSS+50%, 全杀满累计350%封顶。
+     * 刷完301只提前结算弹弹窗, 不必等120秒。 */
+    trialPool: {
+      totalMobs: 300, bossAt: 301,
+      boostPerKill: 0.01, boostPerBoss: 0.50, boostCap: 3.50,
+      tierBands: [30, 60, 90, 120, 150, 180, 210, 240, 270, 300],   /* T1@1-30 ... T10@271-300 */
+    },
+    /* v5.0 骨骼池怪数值模板细分T1-T10 —— hpK控制在0.95~2.2, 避免高tier血太厚 */
     boneTpl: {
       1: { hpK:0.95, atkK:0.55, defK:0.30, speed:110 },
-      2: { hpK:0.85, atkK:0.62, defK:0.28, speed:155 },
-      3: { hpK:1.45, atkK:0.85, defK:0.50, speed:120 },
-      4: { hpK:2.20, atkK:1.05, defK:0.80, speed:150 },
-      5: { hpK:2.80, atkK:1.20, defK:1.00, speed:110 },
+      2: { hpK:0.90, atkK:0.58, defK:0.29, speed:130 },
+      3: { hpK:0.85, atkK:0.62, defK:0.28, speed:155 },
+      4: { hpK:1.00, atkK:0.70, defK:0.35, speed:140 },
+      5: { hpK:1.20, atkK:0.80, defK:0.45, speed:120 },
+      6: { hpK:1.45, atkK:0.90, defK:0.55, speed:135 },
+      7: { hpK:1.65, atkK:1.00, defK:0.65, speed:150 },
+      8: { hpK:1.85, atkK:1.08, defK:0.75, speed:130 },
+      9: { hpK:2.00, atkK:1.15, defK:0.85, speed:110 },
+      10:{ hpK:2.20, atkK:1.25, defK:0.95, speed:125 },
     },
   };
   /* 升档所需击杀数: base × step^(t-1) */
   function tierNeed(t) { return Math.round(BC.tierNeedBase * Math.pow(BC.tierNeedStep, (t||1) - 1)); }
+  /* v5.0 301只怪池: 按序号返回tier(T1@1-30, T2@31-60, ... T10@271-300) */
+  function tierForSpawn(n) {
+    const bands = BC.trialPool.tierBands;
+    for (let t = 1; t <= 10; t++) { if (n <= bands[t-1]) return t; }
+    return 10;
+  }
 
   /* 玩家属性(主游戏 pushBattleStats 注入) —— 战斗内一切数值伤害以此为准 */
   let PST = { lv:1, atk:56, hp:430, def:31, crit:0, critB:0, critD:0, pen:0, dodge:0 };
@@ -125,8 +151,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     skillSprite:null, skillReady:false,
     smallKillsSinceBoss:0, bossActive:false, bossSpawnEvery:100,   /* v3.8.2 打满100只小怪才刷BOSS(原10) */
     skillCall:null,          /* 技能名播报槽: 覆盖式大字快闪, {name,t,dur} */
-    /* v3.9 试炼轮次: 120秒一场, 怪从T1一路刷到T5; 结算击杀数 → 纪录 → 离线补偿 */
+    /* v3.9 试炼轮次: 120秒一场, 怪从T1一路刷到T5; 结算击杀数 → 纪录 → 离线补偿
+     * v5.0 301只固定怪池: trialSpawned记录已刷序号, 按序号决定tier, 刷完301只提前结算 */
     trialT: BC.trialSecs, trialKills:0, trialTier:1, tierKills:0, trialSettled:false, trialRound:0, trialBossDone:false,
+    trialSpawned:0, trialBossKilled:false,
   };
 
   /* 加载素材 */
@@ -1255,11 +1283,12 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     return makeEnemyFrom(def, tierOverride);
   }
   function spawnWave() {
+    /* v5.0 301只怪池刷完则停刷(提前结算) */
+    if (G.trialSpawned >= BC.trialPool.bossAt) return null;
     /* BOSS活跃时不刷新小怪 */
     if (G.bossActive) return null;
-    /* v3.9 试炼轮: BOSS = T5 妖皇波次的守关演出(120s 杀不满旧门槛100只, 改按档位触发);
-     * 一轮只出一次 —— trialBossDone 拦重复, restart 时清零。 */
-    if (G.smallKillsSinceBoss >= G.bossSpawnEvery || (G.trialTier >= 5 && !G.trialBossDone)) {
+    /* v5.0 BOSS = 第301只, 300只普通怪刷完后出现, 一轮只出一次 */
+    if (G.trialSpawned >= BC.trialPool.totalMobs && !G.trialBossDone) {
       if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
       const e = makeEnemy('boss');
       e.x = G.camX + stageW() + BC.enemySpawnOffset;
@@ -1267,16 +1296,18 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       e.lane = MID_LANE; e.y = laneOff(MID_LANE);   /* BOSS 固定中道, 突出存在感 */
       G.enemies.push(e);
       G.bossActive = true;
-      G.smallKillsSinceBoss = 0;
       G.trialBossDone = true;
+      G.trialSpawned++;   /* 第301只 */
       return e;
     }
+    /* v5.0 小怪tier按已刷序号决定, 不再按击杀数升档 */
+    G.trialTier = (typeof window !== 'undefined' && window.__poolAll) ? 10 : tierForSpawn(G.trialSpawned + 1);
     /* v3.9 怪包统一池 = 手配怪(BC.enemies, 自带 w 权重) + 骨骼池怪(BONE_POOL, 全量 79 只按文档档位)。
      * 池 = tier<=当前档的全部怪; 当前档怪权重 ×3(主流), 低档怪保底出现(越打怪越杂越强)。
      * 骨骼池怪统一 w=10 —— 池子大, 单只出现频率低但种类多, 全量怪都能刷到。
      * v4.6 调试开关: window.__poolAll = true 时忽略档位限制, 79 只怪全部立刻进池 ——
      * 素材逐只过目用(不必先打到 T5 才能看后面的怪)。 */
-    const cur = (typeof window !== 'undefined' && window.__poolAll) ? 5 : (G.trialTier || 1);
+    const cur = (typeof window !== 'undefined' && window.__poolAll) ? 10 : (G.trialTier || 1);
     const entries = [];
     for (const [t, d] of Object.entries(BC.enemies)) {
       if (t === 'boss' || !d || (d.tier || 1) > cur) continue;
@@ -1304,6 +1335,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const e = pick2.kind === 'bone' ? makeBoneEnemy(pick2.key, G.trialTier) : makeEnemy(pick2.key, G.trialTier);   /* v3.9 三维: 小怪按当前档位缩放 */
     e.x = G.camX + stageW() + BC.enemySpawnOffset;
     G.enemies.push(e);
+    G.trialSpawned++;   /* v5.0 计数已刷怪序号 */
     return e;
   }
   /* ---------- 数值伤害: 减伤系数 100/(100+有效防御), 破甲按百分比削减防御 ---------- */
@@ -1371,20 +1403,16 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* BOSS/小怪击杀计数 */
     if (isBoss) {
       G.bossActive = false;
-      G.smallKillsSinceBoss = 0;
-    } else {
-      G.smallKillsSinceBoss++;
+      G.trialBossKilled = true;   /* v5.0 BOSS被杀标记, 结算时+50% */
     }
-    /* v3.9 试炼计数: 轮内击杀推进波次档位(T1→T5), 结算进纪录 */
-    if (!isBoss && !G.trialSettled) {
-      G.trialKills++; G.tierKills++;
-      const need = tierNeed(G.trialTier);
-      if (G.trialTier < 5 && G.tierKills >= need) {
-        G.tierKills = 0; G.trialTier++;
-        const td = BC.tier[G.trialTier];
-        skillCall('妖潮 · ' + td.name);
-      }
+    /* v5.0 试炼计数: BOSS和小怪都计入击杀数, 固定怪池不需要按击杀升档 */
+    if (!G.trialSettled) {
+      G.trialKills++;
       updateHUD();
+      /* v5.0 301只全刷完且BOSS已死 → 提前结算弹弹窗 */
+      if (G.trialSpawned >= BC.trialPool.bossAt && G.trialBossKilled) {
+        settleTrial();
+      }
     }
     const mul = e.elite ? DROP.eliteMul : 1;
     const jitter = 1 - DROP.spiritRand + Math.random()*DROP.spiritRand*2;
@@ -1753,11 +1781,16 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         const atkMult = (1 + (p.atkBuff || 0)) * SKILL.damageMult;
         const dmg = calcDmg(p.atk, atkMult * (0.9 + Math.random()*0.2) * r.mult, p.skillTarget.def, PST.pen || 0);
         dealDamage(p.skillTarget, dmg, '#bfe8ff', r.crit);
-        /* v5.0 剑气斩范围伤害: 按二维地面距离波及周边敌人 */
+        /* v5.0 剑气斩Y轴范围命中: 玩家前方矩形区域, X轴=攻击距离+200, Y轴宽度=120,
+         * 能同时命中多只并排/一排的敌人, 主目标全额, 其余70%伤害 */
+        const skillRangeX = p.atkRange + 200;
+        const skillRangeY = 120;
         for (const o of G.enemies) {
           if (o === p.skillTarget || !o.alive || o.dying > 0) continue;
-          if (groundDist(o, p) <= p.atkRange + 80) {
-            const dmg2 = calcDmg(p.atk, atkMult * 0.5 * (0.9 + Math.random()*0.2), o.def, PST.pen || 0);
+          const dx = o.x - p.x;
+          const dy = Math.abs((o.y || 0) - (p.y || 0));
+          if (dx > 0 && dx <= skillRangeX && dy <= skillRangeY) {
+            const dmg2 = calcDmg(p.atk, atkMult * 0.7 * (0.9 + Math.random()*0.2), o.def, PST.pen || 0);
             dealDamage(o, dmg2, '#bfe8ff', false);
           }
         }
@@ -2206,16 +2239,16 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     G.trialT -= dt;
     if (G.trialT <= 0) { G.trialT = 0; settleTrial(); }
   }
-  /* 离线补偿档位: 纪录越高加成越大; 48h 有效, 刷新纪录即续期升档 */
-  function trialBoostFor(k) { return k >= 45 ? .20 : k >= 35 ? .15 : k >= 20 ? .10 : k >= 10 ? .05 : 0; }
+  /* v5.0 离线加成累计制: 每杀1只+1%, 杀BOSS+50%, 全杀满350%封顶; 48h有效 */
   function settleTrial() {
     G.trialSettled = true;
     const kills = G.trialKills;
+    const bossKilled = G.trialBossKilled;
     /* 清场: 轮次结束, 场上怪与投射特效退去(掉落保留让玩家收完) */
     for (const e of G.enemies) { e.alive = false; e.dying = 0; }
     for (const e of G.enemies) despawnEnemy(e);   /* v4.0: GL 资源同步回收 */
     G.enemies.length = 0;
-    G.bossActive = false; G.smallKillsSinceBoss = 0;
+    G.bossActive = false;
     /* 纪录 + 离线加成(写进 state, 随云存档同步) */
     let best = 0, boost = 0, isNew = false;
     try {
@@ -2225,9 +2258,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         if (kills > best) {
           best = kills; isNew = true;
           st.trialBest = best;
-          try { window.addJournal && window.addJournal({ key: 'trial-' + Date.now(), big: realmName(), kind: '试炼', title: '妖潮试炼', text: `妖潮退去, 此番斩妖 ${kills} 只, 刷新试炼纪录。` }); } catch (err) {}
+          try { window.addJournal && window.addJournal({ key: 'trial-' + Date.now(), big: realmName(), kind: '试炼', title: '妖潮试炼', text: `妖潮退去, 此番斩妖 ${kills} 只${bossKilled ? ', 击杀妖王' : ''}, 刷新试炼纪录。` }); } catch (err) {}
         }
-        boost = trialBoostFor(best);
+        /* v5.0 累计制: 击杀数×1% + BOSS 50%, 封顶350% */
+        boost = Math.min(BC.trialPool.boostCap, kills * BC.trialPool.boostPerKill + (bossKilled ? BC.trialPool.boostPerBoss : 0));
         if (boost > 0) {
           st.trialBoost = Math.max(st.trialBoost || 0, boost);
           st.trialBoostUntil = Math.max(st.trialBoostUntil || 0, Date.now() + 48*3600*1000);
@@ -2238,11 +2272,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     try {
       const el = document.getElementById('trialModal');
       if (el) {
-        document.getElementById('trialKillsN').textContent = kills;
+        document.getElementById('trialKillsN').textContent = kills + (bossKilled ? '（含妖王）' : '');
         document.getElementById('trialTierN').textContent = (BC.tier[G.trialTier] || BC.tier[1]).name;
         document.getElementById('trialBestN').textContent = best + (isNew ? '（新纪录！）' : '');
         const bEl = document.getElementById('trialBoostN');
-        bEl.textContent = boost > 0 ? `离线游历所得 +${Math.round(boost*100)}%（48 时辰内有效）` : '再接再厉，10 只起有加成';
+        bEl.textContent = boost > 0 ? `离线游历所得 +${Math.round(boost*100)}%（48 时辰内有效）` : '再接再厉';
         el.classList.add('show');
       }
     } catch (err) {}
@@ -2250,8 +2284,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   }
   function trialRestart() {
     document.getElementById('trialModal') && document.getElementById('trialModal').classList.remove('show');
-    G.trialT = BC.trialSecs; G.trialKills = 0; G.tierKills = 0; G.trialTier = 1;
+    G.trialT = BC.trialSecs; G.trialKills = 0; G.trialTier = 1;
     G.trialSettled = false; G.trialRound++; G.trialBossDone = false;
+    G.trialSpawned = 0; G.trialBossKilled = false;   /* v5.0 重置301只怪池计数 */
     G.paused = false;
     updateHUD();
   }
@@ -2276,7 +2311,15 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* v4.8 弹道验收台: 关掉刷怪，否则试炼波次会往验收台里掺进无关怪
      * （表现为 probe 里冒出 sword_goblin / 第二只同名怪，把画面糊掉）。 */
     else if (window.__skillFreeze) { G.spawnT = spawnGap; }
-    else if (G.spawnT <= 0) { spawnWave(); G.spawnT = spawnGap; }
+    else if (G.spawnT <= 0) {
+      /* v5.0 妖潮分批刷怪: 每批5只, 1.5s/批 → 90s刷完300只, 留30s打BOSS。
+       * 同屏满了自动停刷(玩家清得慢就不会无限堆), BOSS只出1只。 */
+      for (let i = 0; i < 5; i++) {
+        if (G.trialSpawned >= BC.trialPool.bossAt) break;
+        spawnWave();
+      }
+      G.spawnT = spawnGap;
+    }
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
     _pushT -= dt;
     if (_pushT <= 0) { _pushT = 5; if (typeof window.pushBattleStats === 'function') window.pushBattleStats(); }

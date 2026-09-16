@@ -61,10 +61,11 @@ function rateNow() { return Math.max(0, fin(4 * realmMult() * artMult() * arrMul
 function maxQIdx() { return Math.min(bigIdx(), QUALITY.length - 1); }
 
 function pickQ() {
-  const pool = QUALITY.slice(0, maxQIdx() + 1);
-  const t = pool.reduce((s, r) => s + r.w, 0);
+  /* v5.0 去掉境界锁品质: 炼气期也能出玄天, 但权重天然低(玄天1/100=1%)。
+   * 装备属性 = 境界lv × 品质mult, 炼气玄天也是炼气期用的(数值低), 不破坏平衡。 */
+  const t = QUALITY.reduce((s, r) => s + r.w, 0);
   let x = Math.random() * t;
-  for (let i = 0; i < pool.length; i++) { x -= pool[i].w; if (x <= 0) return i; }
+  for (let i = 0; i < QUALITY.length; i++) { x -= QUALITY[i].w; if (x <= 0) return i; }
   return 0;
 }
 
@@ -74,7 +75,7 @@ function makeArt() {          // 四部位: 槽0兵器 1护体 2灵佩 3功法
   const slot = arts.length < 4 ? arts.length : Math.floor(Math.random() * 4);
   const tp = SLOT_TYPES[slot];
   const lv = (state.realmIdx || 0) + 1;
-  let name = artName(tp.k, q);
+  let name = artName(tp.k, q, lv);
   const art = { name, q, mult: QUALITY[q].mult, t: Date.now(), tp: tp.k, slot, lv };
   attrAssign(art, tp.k, q, lv);
   return art;
