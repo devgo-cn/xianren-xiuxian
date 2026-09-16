@@ -391,7 +391,7 @@
     "dt-theme.css": "c76cae50681e1e546130c83eb868cbbb1a3321e2063fb8e9399b2d710b748beb",
     "fx2d.js": "f1da1174d9b8d1c399b4be6257f68aae36d7d8d56986481b015ad60ec73c5de0",
     "game.js": "9754940a93231e14afc252557041836597a525a0c9c458498fbf564343e4e717",
-    "index.html": "7a365dcc211c82b40eed436fb4aeba2659e3a83a5011668a4cacf65ae182e29d",
+    "index.html": "e96d89da1a6444e1aca640ea2f35afcf614a388263754cf1bc3460cc0419cafa",
     "src/00-pure.js": "f5cb4acb0ebcc74eee7cd3024fe08d777290ffc943f994587348a9c57983ecbe",
     "src/10-base.js": "947eb2de509fc7eb6dba8fe5740021314ccfca7347f41d968717770a3644eed3",
     "src/20-core.js": "801d09ca8fe1680044620e85c03f5cb757a6569178f96022e28c92629f8eccba",
@@ -401,6 +401,6 @@
     "src/60-stage.js": "58e1ee5df0b972d4271ca676e65622fee3544b9ab6f226ef3f8ffaa16205ae47",
     "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
   },
-  "rev": "8f46dc7ecc1bdd01",
+  "rev": "fc34401f0b5261d8",
   "version": "3.5"
 }
