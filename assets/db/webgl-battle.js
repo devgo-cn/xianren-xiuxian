@@ -47,8 +47,11 @@
         root = new PIXI.Container();
         app.stage.addChild(root);
         /* z 序对应原 2D 画家算法；farUI/nearUI 分别承接远/近批次血条+法环，
-         * playerUI 是玩家血条 —— 与 2D 版"画完怪立刻画其 UI"的时序一致。 */
-        for (const n of ['bg', 'far', 'farUI', 'drops', 'player', 'playerUI', 'pets', 'near', 'nearUI', 'fx', 'text']) {
+         * playerUI 是玩家血条 —— 与 2D 版"画完怪立刻画其 UI"的时序一致。
+         * v4.2: foreground = 前景遮挡层(背景源图底部条带再画一次, 压在所有实体
+         * 之上, 实体脚踝"走在草后")；drops 提到前景之上 —— 掉落物(水晶)躺在
+         * 前景草上, 永不被怪/玩家/前景遮挡。 */
+        for (const n of ['bg', 'far', 'farUI', 'player', 'playerUI', 'pets', 'near', 'nearUI', 'foreground', 'drops', 'fx', 'text']) {
             L[n] = new PIXI.Container();
             root.addChild(L[n]);
         }
