@@ -19,6 +19,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* 占位怪 demon(妖将)/raptor(妖弓) 已移除 —— 只保留两种有真实素材的怪 */
     playerAtkRange: 75, playerAspd: 1.1, playerSpeed: 28,
     spawnInterval: 2.6, enemySpawnOffset: 40, maxAlive: 9, queueGap: 34,   /* v3.8.2 刷怪降密: 1.0s/只→2.6s/只, 同屏 14→9 —— 站桩硬撸改推进节奏 */
+    /* v4.6 素材过目模式(当前默认开启, 过目完把 DEFAULT_MUL 那两行删掉即恢复线上节奏):
+     *   window.__enemySpeedMul —— 怪移速倍率(0.35 = 慢慢挪, 便于逐只端详)
+     *   window.__spawnSlowMul   —— 刷怪间隔倍率(2.5 = 刷得更稀, 一只一只来)
+     *   window.__poolAll        —— true = 忽略档位限制, 79 只怪立刻全部进池
+     * 想要恢复原节奏: 把下面三行删掉, 或在控制台改这些值。 */
     enemies: {
       /* hpK/atkK/defK: 按玩家境界(lv)线性成长 —— 怪只随境界长, 玩家随境界+装备长, 换装即提速。
        * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。
@@ -81,8 +86,27 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     eliteHp: 3,           // 精英血量倍率
   };
 
-  const G = {
-    t:0, kills:0, spirit:0, speedMult:1, speedMultTimer:0, state:'walk', camX:0, paused:false,
+  /* ── v4.6 素材过目模式 ──────────────────────────────────────────────
+   * 目的: 让你能一只一只看 79 只怪的素材有没有问题。
+   * 三项设置(删掉本段即完全恢复线上节奏):
+   *   ① 全量进池    —— 不再等打到 T5, 79 只怪从一开始就都可能刷出来
+   *   ② 怪走慢      —— 移速 ×0.35, 慢慢挪过来, 来得及看清
+   *   ③ 刷怪稀疏    —— 间隔 ×2.5(2.6s→6.5s), 一只一只来, 不糊成一团
+   *   ④ 同屏上限    —— 9→3 只, 场上不挤
+   * 运行时也可在控制台随时改这些值, 即时生效。 */
+  if (typeof window !== 'undefined') {
+    if (window.__enemySpeedMul === undefined) window.__enemySpeedMul = 0.35;
+    if (window.__spawnSlowMul   === undefined) window.__spawnSlowMul   = 2.5;
+    if (window.__poolAll        === undefined) window.__poolAll        = true;
+    if (window.__maxAlive       === undefined) window.__maxAlive       = 3;
+  }
+  /* 同屏怪上限: 过目模式下由 window.__maxAlive 覆盖, 否则用线上值 */
+  function capAlive() {
+    const v = (typeof window !== 'undefined' && window.__maxAlive);
+    return (typeof v === 'number' && v > 0) ? v : BC.maxAlive;
+  }
+
+  const G = {    t:0, kills:0, spirit:0, speedMult:1, speedMultTimer:0, state:'walk', camX:0, paused:false,
     player:null, pets:[], enemies:[], fx:[], dmg:[], drops:[], spawnT:BC.spawnInterval,
     sprite:null, bgImg:null, spriteReady:false, bgReady:false, extraStrike:false,
     speedDodge:0, nextStrikeCrit:0,
@@ -602,9 +626,12 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const dfn = Math.round((2 + 2*lv)   * def.defK * mul);
     if (elite) { hp = Math.round(hp*DROP.eliteHp); atk = Math.round(atk*1.2); }
     const lane = (Math.random() * LANES) | 0;   /* v3.7: 三车道随机刷怪 */
+    /* v4.6 全局减速旋钮: window.__enemySpeedMul(默认 1) 统一作用于所有怪的移速 ——
+     * 走这条构造路径的怪(手配 + 骨骼池)全都会吃到, 调试时改一个数即可。 */
+    const spdMul = (typeof window !== 'undefined' && window.__enemySpeedMul) || 1;
     const r = { type:key||def.bone||'bone',name:def.name,role:def.role, elite, lane, y:laneOff(lane), x:0, hp,maxHp:hp, atk, def:dfn,
       tier:tierOverride||def.tier||1, drawH:def.drawH||0, hpBarW:def.hpBarW||0,
-      atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2)*(elite?0.85:1), color:def.color,
+      atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2)*(elite?0.85:1)*spdMul, color:def.color,
       atkT:Math.random()*0.6, anim:0,hurtT:0,stun:0, alive:true,dying:0,reach:1, animFrame:0, animTimer:0, moving:false };
     /* 骨骼怪: 工厂就绪时建一只独立骨架实例(每只怪动画独立推进) */
     if (def.bone) {
@@ -661,7 +688,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* v3.9 试炼轮: BOSS = T5 妖皇波次的守关演出(120s 杀不满旧门槛100只, 改按档位触发);
      * 一轮只出一次 —— trialBossDone 拦重复, restart 时清零。 */
     if (G.smallKillsSinceBoss >= G.bossSpawnEvery || (G.trialTier >= 5 && !G.trialBossDone)) {
-      if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= BC.maxAlive) return null;
+      if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
       const e = makeEnemy('boss');
       e.x = G.camX + stageW() + BC.enemySpawnOffset;
       e.elite = true;  /* BOSS标记为精英 */
@@ -674,8 +701,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     }
     /* v3.9 怪包统一池 = 手配怪(BC.enemies, 自带 w 权重) + 骨骼池怪(BONE_POOL, 全量 79 只按文档档位)。
      * 池 = tier<=当前档的全部怪; 当前档怪权重 ×3(主流), 低档怪保底出现(越打怪越杂越强)。
-     * 骨骼池怪统一 w=10 —— 池子大, 单只出现频率低但种类多, 全量怪都能刷到。 */
-    const cur = G.trialTier || 1;
+     * 骨骼池怪统一 w=10 —— 池子大, 单只出现频率低但种类多, 全量怪都能刷到。
+     * v4.6 调试开关: window.__poolAll = true 时忽略档位限制, 79 只怪全部立刻进池 ——
+     * 素材逐只过目用(不必先打到 T5 才能看后面的怪)。 */
+    const cur = (typeof window !== 'undefined' && window.__poolAll) ? 5 : (G.trialTier || 1);
     const entries = [];
     for (const [t, d] of Object.entries(BC.enemies)) {
       if (t === 'boss' || !d || (d.tier || 1) > cur) continue;
@@ -688,7 +717,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const twAll = entries.reduce((s,e2) => s + e2.w, 0);
     let rr = Math.random() * twAll, pick2 = entries[0];
     for (const e2 of entries) { rr -= e2.w; if (rr <= 0) { pick2 = e2; break; } }
-    if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= BC.maxAlive) return null;
+    if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
     const e = pick2.kind === 'bone' ? makeBoneEnemy(pick2.key, G.trialTier) : makeEnemy(pick2.key, G.trialTier);   /* v3.9 三维: 小怪按当前档位缩放 */
     e.x = G.camX + stageW() + BC.enemySpawnOffset;
     G.enemies.push(e);
@@ -1507,8 +1536,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const newState = aliveEnemies.length > 0 ? 'fight' : 'walk';
     if (newState !== G.state) { G.state = newState; updateHUD(); }
     G.spawnT -= sdt;
-    if (G.trialSettled) { G.spawnT = BC.spawnInterval; }   /* 结算面板期间停刷怪 */
-    else if (G.spawnT <= 0) { spawnWave(); G.spawnT = BC.spawnInterval; }
+    /* v4.6 刷怪间隔旋钮: window.__spawnSlowMul(默认 1) —— 调大则刷得更稀, 便于逐只端详。 */
+    const spawnGap = BC.spawnInterval * ((typeof window !== 'undefined' && window.__spawnSlowMul) || 1);
+    if (G.trialSettled) { G.spawnT = spawnGap; }   /* 结算面板期间停刷怪 */
+    else if (G.spawnT <= 0) { spawnWave(); G.spawnT = spawnGap; }
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
     _pushT -= dt;
     if (_pushT <= 0) { _pushT = 5; if (typeof window.pushBattleStats === 'function') window.pushBattleStats(); }
