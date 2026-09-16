@@ -3017,7 +3017,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const S = playerGL();
     S.main.visible = S.glow.visible = S.place.visible = false;
     for (const t of S.trails) t.visible = false;
-    const hurtOn = p.hurtT > 0;
+    const hurtOn = false;   /* v5.0 关掉玩家受击闪烁(alpha正弦+黑白filter), 用户反馈闪来闪去太晃 */
     /* v6.1 三套帧共用的「角色目标视觉高」: 旧渲染里 drawH 是画布高, 真正的人物高度
      * = drawH × 内容占比(普攻 0.960 / 技能起手仅 0.672), 两套素材不一样才导致换动作
      * 就变形。这里先算出统一的人高, 再由每帧内容高反推该帧应该画多大的画布。 */
