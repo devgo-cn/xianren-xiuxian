@@ -24,9 +24,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
        * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。
        * v3.9 骨骼怪批量接入: bone=BONES slug, drawH=游戏内显示高(px, 素材分辨率无关)。 */
       /* ---- T1 妖群 ---- */
+      /* v4.5 远程/近战: 按素材 has_skill 标定 —— jiangshi / slime_flynn /
+       * cultist_mage 三只素材自带 Skill 动画, 归为远程(拉开攻距、降速)。 */
       slime: { name:'妖卒', role:'melee', w:60, atkRange:30, speed:120, hpK:1.0, atkK:0.55, defK:0.35, color:'#6fe0a8', tier:1 },
-      jiangshi: { name:'僵尸', role:'melee', w:40, atkRange:32, speed:95, hpK:1.15, atkK:0.6, defK:0.4, color:'#b9d0a8', bone:'jiangshi', drawH:100, hpBarW:30, tier:1 },
-      slime_flynn: { name:'弗林', role:'melee', w:35, atkRange:28, speed:110, hpK:0.85, atkK:0.5, defK:0.25, color:'#8fe8c0', bone:'slime_flynn', drawH:76, hpBarW:26, tier:1 },
+      jiangshi: { name:'僵尸', role:'ranged', w:40, atkRange:52, speed:76, hpK:1.15, atkK:0.6, defK:0.4, color:'#b9d0a8', bone:'jiangshi', drawH:100, hpBarW:30, tier:1 },
+      slime_flynn: { name:'弗林', role:'ranged', w:35, atkRange:50, speed:88, hpK:0.85, atkK:0.5, defK:0.25, color:'#8fe8c0', bone:'slime_flynn', drawH:76, hpBarW:26, tier:1 },
       /* ---- T2 妖锐 ---- */
       rat:   { name:'鼠妖', role:'melee', w:35, atkRange:32, speed:150, hpK:0.8, atkK:0.5, defK:0.25, color:'#c9b28f', bone:'ratty', drawH:84, tier:2 },
       fox:   { name:'妖狐', role:'melee', w:32, atkRange:30, speed:165, hpK:0.85, atkK:0.62, defK:0.28, color:'#e8a86b', bone:'fox', drawH:88, hpBarW:28, tier:2 },
@@ -34,7 +36,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       /* ---- T3 妖将 ---- */
       water: { name:'水灵', role:'melee', w:40, atkRange:35, speed:80,  hpK:1.6, atkK:0.75, defK:0.60, color:'#6fd0e8', tier:3 },
       wolf:  { name:'狼妖', role:'melee', w:36, atkRange:34, speed:150, hpK:1.35, atkK:0.85, defK:0.5, color:'#9aa8c0', bone:'wolf', drawH:92, hpBarW:30, tier:3 },
-      cultist_mage: { name:'邪修', role:'melee', w:34, atkRange:38, speed:90, hpK:1.5, atkK:0.95, defK:0.5, color:'#b08ae0', bone:'cultist_mage', drawH:100, hpBarW:30, tier:3 },
+      cultist_mage: { name:'邪修', role:'ranged', w:34, atkRange:54, speed:72, hpK:1.5, atkK:0.95, defK:0.5, color:'#b08ae0', bone:'cultist_mage', drawH:100, hpBarW:30, tier:3 },
       /* ---- T4 妖王 ---- */
       hellhound_garm: { name:'狱犬', role:'melee', w:40, atkRange:36, speed:175, hpK:2.1, atkK:1.1, defK:0.75, color:'#c06a5a', bone:'hellhound_garm', drawH:108, hpBarW:34, tier:4 },
       black_ant_queen: { name:'蚁后', role:'melee', w:42, atkRange:36, speed:85, hpK:2.8, atkK:1.0, defK:1.0, color:'#7a6ae0', bone:'black_ant_queen', drawH:116, hpBarW:36, tier:4 },
@@ -486,8 +488,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         const an = it.anims || {};
         bones[k] = { ready: !!it.ready, idle: an.idle || null, walk: an.walk || null,
                      isRealWalk: !!(an.walk && an.walk !== an.idle) };
-      }
-      const live = (G.enemies || []).filter(e => e.alive && e.armature).map(e => ({
+      }      const live = (G.enemies || []).filter(e => e.alive && e.armature).map(e => ({
         slug: e.boneSlug, moving: !!e.moving, legs: (e.__legs || []).length,
         legNames: (e.__legs || []).map(l => l.names.join('>')),
         walkT: e.__walkT || 0,
@@ -497,6 +498,21 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
                          && BONES[e.boneSlug].anims.walk !== BONES[e.boneSlug].anims.idle))
       }));
       return { bones, live };
+    },
+    /* v4.5 诊断口: 远程/近战分类总览 —— 按素材 has_skill 给 79 只骨骼怪分档。
+     * 返回 { ranged:[], melee:[] } 便于核对"哪些怪被定义为远程怪"。 */
+    __roleDiag: () => {
+      const ranged = [], melee = [];
+      for (const slug in BONE_IDX) {
+        const cfg = BONE_IDX[slug] || {};
+        (cfg.has_skill ? ranged : melee).push({ slug, tier: cfg.tier, anims: cfg.anims });
+      }
+      const live = (G.enemies || []).filter(e => e.alive).map(e => ({
+        name: e.name, type: e.type, slug: e.boneSlug || null, role: e.role,
+        atkRange: e.atkRange, tier: e.tier
+      }));
+      return { rangedCount: ranged.length, meleeCount: melee.length, ranged, melee, live,
+               hand: Object.entries(BC.enemies).map(([k, d]) => ({ key:k, name:d.name, role:d.role, atkRange:d.atkRange })) };
     },
     /* v3.2 验收用：直接设定倍速（跳过技能随机 proc），让 A/B 对照可复现。
      * 传 1 即清除加速。 */
@@ -624,8 +640,18 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const tpl = BC.boneTpl[t] || BC.boneTpl[1];
     const cfg = BONE_IDX[slug] || {};
     const dh = cfg.drawH || 84;
+    /* v4.5 远程/近战分类: 素材 index.json 的 has_skill 一直标着但从没被代码读过 ——
+     * 79 只骨骼怪不论有无技能一律 role:'melee', 24 只自带技能的远程怪特征被丢掉。
+     * 现按 has_skill 判定: 有技能 = 远程(ranged), 无技能 = 近战(melee)。
+     * 远程怪的三维差异(只给参数, 不改战斗流程):
+     *   - atkRange 拉长(34→52): 隔空输出, 玩家得贴身才够得着;
+     *   - speed 收窄(×0.8): 站得远, 压迫感靠射程而非速度。 */
+    const hasSkill = !!cfg.has_skill;
+    const role = hasSkill ? 'ranged' : 'melee';
+    const atkRange = hasSkill ? 52 : 34;
+    const speed = Math.round(tpl.speed * (hasSkill ? 0.8 : 1));
     const def = { name: slug.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()),
-      role:'melee', atkRange:34, speed:tpl.speed, hpK:tpl.hpK, atkK:tpl.atkK, defK:tpl.defK,
+      role, atkRange, speed, hpK:tpl.hpK, atkK:tpl.atkK, defK:tpl.defK, hasSkill,
       color:'#9aa8b8', bone:slug, tier:t, drawH:dh, hpBarW:Math.max(24, Math.round(dh*0.55)) };
     return makeEnemyFrom(def, tierOverride);
   }
