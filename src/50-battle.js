@@ -1479,12 +1479,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     for (const e of G.enemies) { if (!e.alive||e.dying>0||e.lane!==lane) continue; const d=Math.abs(e.x-fromX); if (d<bestD){bestD=d;best=e;} }
     return best;
   }
-  /* v4.9 玩家对该怪的有效攻距: 普通怪用玩家自身攻距, 技能怪(弹道实测值 108~210)
-   * 取怪攻距+余量 —— 逐只判定, 避免一只技能怪把全道攻距一起拉远。 */
-  function reachFor(e) {
-    if (!e) return G.player.atkRange;
-    return e.__skillRange ? Math.max(G.player.atkRange, (e.atkRange || 0) + 8) : G.player.atkRange;
-  }
+  /* v4.9 贴身判定距离: 玩家攻距固定 BC.playerAtkRange(75), 够不着就走到怪身边。
+   * 技能怪弹道攻距(108~210)只决定"怪站在哪", 不改变玩家攻距。 */
+  const PLAYER_HIT_GAP = 40;
   function dealDamage(target, amount, color, crit) {
     target.hp -= amount; target.hurtT = 0.25;
     G.dmg.push({ x:target.x,y:target.y-40, val:Math.round(amount), crit:crit||false, color:color||'#e8f2fa', t:0, vx:(Math.random()-0.5)*18 });
@@ -1619,15 +1616,13 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (labActive()) return;   /* 标定台: 玩家不追击不出手 —— 位置锁在 labLayout().px */
     if (window.__skillFreeze) { p.moving = 0; return; }   /* v4.8 弹道验收台: 玩家定桩 */
 
-    /* v4.9 技能怪攻距适配: 技能怪 atkRange 是弹道实测值(108~210, 见 SK_RANGE),
-     * 远大于玩家固定攻距 75; 怪停在 p.x + e.atkRange 处, 玩家按 75 判定永远够不着
-     * —— 表现为"顶着怪往前跑却不出手"。攻距改为按"当前目标"逐只计算。 */
-    const near = findNearestEnemy(p.lane, p.x, Math.max(p.atkRange, 220)+200);
-    const reach = reachFor(near);
+    /* v4.9: 玩家攻距恒为 BC.playerAtkRange(75), 不随怪变化。
+     * 够不着就由下面的分支走到怪身边(贴身 PLAYER_HIT_GAP 处)再出手。 */
+    const near = findNearestEnemy(p.lane, p.x, p.atkRange+200);
     /* 攻击动画播放期间不中断，保持攻击状态 */
     if (p.attackAnim) {
       p.moving = 0;
-    } else if (near && Math.abs(near.x-p.x) <= reach+5) {
+    } else if (near && Math.abs(near.x-p.x) <= p.atkRange+5) {
       /* 进入攻击范围，开始攻击（触发时不立即造成伤害，伤害在动画帧中触发） */
       p.moving = 0;
       if (p.atkT <= 0) {
@@ -1642,9 +1637,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         }
       }
     } else if (near) {
-      /* 有怪但不在攻击范围，向怪移动 */
+      /* 有怪但不在攻击范围，向怪移动 —— 直接走到怪的身边(贴身位)再打,
+       * 不能提前刹车: 技能怪站位远(弹道攻距 108~210), 若按玩家攻距留距离,
+       * 玩家会在够不着的地方停住, 表现为"顶着怪不出手"。 */
       p.moving = 1; p.walkT += dt*8;
-      const targetX = near.x - reach*0.85;
+      const targetX = near.x - PLAYER_HIT_GAP;
       p.x += Math.sign(targetX-p.x)*Math.min(Math.abs(targetX-p.x), BC.playerSpeed*1.5*dt);
     } else {
       /* v3.8.1 无怪(攻击视野内)时向前推进 —— 防穿越: 玩家若从站位怪身上走过,
@@ -1654,7 +1651,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       for (const e of G.enemies) {
         if (e.alive && e.dying <= 0 && e.lane === p.lane && e.x > p.x - 1 && e.x < nearest) nearest = e.x;
       }
-      if (nearest < Infinity) p.x = Math.min(p.x, nearest - reach*0.5);
+      if (nearest < Infinity) p.x = Math.min(p.x, nearest - PLAYER_HIT_GAP);
     }
   }
   function updatePets(dt) {
