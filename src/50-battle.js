@@ -2825,58 +2825,13 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     return (r << 16) | (g << 8) | b;
   }
 
-  /* ---- 底图 1/4: 柔光核(所有弹体的通用头/身) ---- */
-  const SK_TEX = {};
-  SK_TEX.core = makeGlow('255,255,255');
-  /* ---- 底图 2/4: 尖锥(暗影弹 / 吐息头部 / 箭矢) ---- */
-  SK_TEX.spike = makeTex(32, 32, (g, W, H) => {
-    const gr = g.createLinearGradient(0, H / 2, W, H / 2);
-    gr.addColorStop(0, 'rgba(255,255,255,0)');
-    gr.addColorStop(0.55, 'rgba(255,255,255,0.75)');
-    gr.addColorStop(1, 'rgba(255,255,255,1)');
-    g.fillStyle = gr;
-    g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, 0); g.lineTo(W, H); g.closePath(); g.fill();
-    /* 中轴高光: 让尖锥有"实心"感而不是一片糊 */
-    const ax = g.createLinearGradient(0, 0, 0, H);
-    ax.addColorStop(0, 'rgba(255,255,255,0)');
-    ax.addColorStop(0.5, 'rgba(255,255,255,0.9)');
-    ax.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = ax; g.fillRect(W * 0.3, 0, W * 0.7, H);
-  });
-  /* ---- 底图 3/4: 光柱(神光柱 / 藤蔓主干) ----
-   * 横向淡出只占两端各 18% —— 留出中间 64% 的实心段, 拉伸后仍像"柱"
-   * 而不是一个两边被切平的方框(首版把淡出摊到全宽, 横拉后就成了灰白矩形)。 */
-  SK_TEX.column = makeTex(32, 64, (g, W, H) => {
-    const gr = g.createLinearGradient(0, 0, W, 0);
-    gr.addColorStop(0.00, 'rgba(255,255,255,0)');
-    gr.addColorStop(0.18, 'rgba(255,255,255,1)');
-    gr.addColorStop(0.82, 'rgba(255,255,255,1)');
-    gr.addColorStop(1.00, 'rgba(255,255,255,0)');
-    g.fillStyle = gr; g.fillRect(0, 0, W, H);
-    /* 两端淡出, 避免柱体像个矩形块 */
-    g.globalCompositeOperation = 'destination-in';
-    const vg = g.createLinearGradient(0, 0, 0, H);
-    vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(0.18, 'rgba(0,0,0,1)');
-    vg.addColorStop(0.82, 'rgba(0,0,0,1)');
-    vg.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = vg; g.fillRect(0, 0, W, H);
-    /* 中轴亮芯: 让柱体有"能量核心"的层次, 不是一个均匀色块 */
-    g.globalCompositeOperation = 'source-atop';
-    const cg = g.createLinearGradient(0, 0, 0, H);
-    cg.addColorStop(0, 'rgba(255,255,255,0)');
-    cg.addColorStop(0.5, 'rgba(255,255,255,0.85)');
-    cg.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = cg; g.fillRect(W * 0.42, 0, W * 0.16, H);
-  });
-  /* ---- 底图 4/4: 碎屑(弹幕的每颗小子弹 / 落地火星) ---- */
-  SK_TEX.shard = makeTex(16, 16, (g, W, H) => {
-    const gr = g.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W / 2);
-    gr.addColorStop(0, 'rgba(255,255,255,1)');
-    gr.addColorStop(0.45, 'rgba(255,255,255,0.55)');
-    gr.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = gr; g.beginPath(); g.arc(W / 2, H / 2, W / 2, 0, 6.283); g.fill();
-  });
+  /* ---- 底图: v4.9 改用生图模型生成的素材(替代代码绘制的程序化贴图) ----
+   * shard = 光球(通用, tint变橙黄/金白/青绿), spike = 尖锥朝右(通用, tint变暗紫/青蓝)
+   * 纯黑底 + ADD 混合 = 黑色不可见, 发光部分透亮, 正好适合弹道特效。 */
+  const SK_TEX = {
+    shard: 'assets/skill_orb.webp',
+    spike: 'assets/skill_spike.webp',
+  };
 
   /* 5 类技能的参数表 —— 改这里就能调手感, 不用碰绘制代码。
    * rgb  = 该类签名色(全 29 只共用 5 种色, 这是"控制花样"的关键:
@@ -2889,22 +2844,23 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   const PLAYER_H = 92;                     /* 玩家基准身高(与 SPRITE 尺寸同量级) */
   const SKILL_KIND = {
     /* v4.9 全部统一为 3 连发飞行弹机制(原 2/3 类原地光柱/藤蔓用户不满意),
-     * 各类靠颜色+形态+尺寸区分, 不再有"不飞"的技能。 */
+     * 各类靠颜色+形态+尺寸区分, 不再有"不飞"的技能。
+     * track = 追踪强度(0~1), 弹道朝玩家位置偏移, 前20%不追踪避免刚发射就拐弯。 */
     /* 1 暗影弹: 3连发, 暗紫尖锥 */
     1: { tex: 'spike', blend: 'ADD', rgb: '#a06ae8', len: 40, thick: 14, minLen: 0.40, dur: 0.46,
-         speedK: 1.0, alpha: 0.88, spread: 0.08, count: 3, trail: 0.45, gap: 0.07, alt: 0.62 },
+         speedK: 1.0, alpha: 0.88, spread: 0.08, count: 3, trail: 0.45, gap: 0.07, alt: 0.62, track: 0.35 },
     /* 2 神光弹: 3连发, 金白光球, 更大更亮 */
     2: { tex: 'shard', blend: 'ADD', rgb: '#ffd98a', len: 26, thick: 26, minLen: 0.26, dur: 0.46,
-         speedK: 1.05, alpha: 0.90, spread: 0.08, count: 3, trail: 0.30, gap: 0.07, alt: 0.65 },
+         speedK: 1.05, alpha: 0.90, spread: 0.08, count: 3, trail: 0.30, gap: 0.07, alt: 0.65, track: 0.30 },
     /* 3 藤蔓弹: 3连发, 青绿光球 */
     3: { tex: 'shard', blend: 'ADD', rgb: '#6ad89a', len: 22, thick: 22, minLen: 0.22, dur: 0.46,
-         speedK: 1.1, alpha: 0.85, spread: 0.10, count: 3, trail: 0.35, gap: 0.075, alt: 0.58 },
+         speedK: 1.1, alpha: 0.85, spread: 0.10, count: 3, trail: 0.35, gap: 0.075, alt: 0.58, track: 0.40 },
     /* 4 弹幕扫射: 3连发, 橙黄小子弹(用户满意, 保持不变) */
     4: { tex: 'shard', blend: 'ADD', rgb: '#ffb45c', len: 22, thick: 22, minLen: 0.22, dur: 0.46,
-         speedK: 1.15, alpha: 0.85, spread: 0.10, count: 3, trail: 0.35, gap: 0.075, alt: 0.58 },
+         speedK: 1.15, alpha: 0.85, spread: 0.10, count: 3, trail: 0.35, gap: 0.075, alt: 0.58, track: 0.25 },
     /* 5 吐息弹: 3连发, 青蓝尖锥, 更大 */
     5: { tex: 'spike', blend: 'ADD', rgb: '#5cd0ff', len: 52, thick: 18, minLen: 0.52, dur: 0.48,
-         speedK: 0.95, alpha: 0.82, spread: 0.06, count: 3, trail: 0.40, gap: 0.08, alt: 0.68 },
+         speedK: 0.95, alpha: 0.82, spread: 0.06, count: 3, trail: 0.40, gap: 0.08, alt: 0.68, track: 0.30 },
   };
 
   /* 弹道存活表 —— 同屏节流, 保证画面干净 */
@@ -2960,10 +2916,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const shot = (delay, spreadY) => ({
       kind: 'skillShot', sk: kind, rgb, tex: k.tex, blend: k.blend,
       x: ox, y: oy + spreadY, dir, len: Math.max(k.len, (k.minLen || 0) * PLAYER_H), thick: k.thick,
-      travel: (e.atkRange || 120) * k.speedK,      /* 2/3 类原地, 不前进 */
+      travel: (e.atkRange || 120) * k.speedK,
       ground: !!k.ground, drop: !!k.drop, cone: !!k.cone,
       t: -delay, dur: k.dur + delay,
-      a0: k.alpha, trail: k.trail, spread: k.spread,
+      a0: k.alpha, trail: k.trail, spread: k.spread, track: k.track || 0,
     });
     /* v4.9 所有技能均为 3 连发: 错开时间 + 轻微纵向散, 做出"连点"感 */
     for (let i = 0; i < k.count; i++) SK_LIVE.push(G.fx[G.fx.push(shot(i * (k.gap || 0.08), (i - 1) * 5)) - 1]);
@@ -3218,18 +3174,19 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         o.spr.blendMode = f.blend === 'NORMAL' ? PIXI.BLEND_MODES.NORMAL : PIXI.BLEND_MODES.ADD;
         o.spr.anchor.set(col ? 0.5 : f.dir < 0 ? 1 : 0, 0.5);
 
-        /* 位置曲线:
-         *  1/4/5 类 —— 沿朝向推进, 2/3 类原地生长(藤蔓自脚下窜出 / 神柱直接落下)
-         *  drop 类(神光柱) 额外做一次纵向坠落, 从怪上方砸到地面 */
+        /* 位置曲线: 沿朝向推进 */
         const adv = f.travel ? f.travel * Math.min(1, kx / 0.8) : 0;
-        const px = sx + f.dir * adv;
+        let px = sx + f.dir * adv;
         let py = fy;
-        if (f.drop) {
-          const fall = Math.min(1, kx / 0.45);
-          py = fy - (1 - fall) * (1 - fall) * 46;      /* 缓出下坠 */
-        } else if (f.ground) {
-          /* 藤蔓: 起步贴地, 末段抬到怪胸口 */
-          py = fy + (f.y - fy) * Math.min(1, kx / 0.55);
+        /* v4.9 弹道追踪: 朝玩家位置偏移, 前20%不追踪(避免刚发射就拐弯), 后面逐渐追踪到 track 强度 */
+        if (f.track && G.player) {
+          const trackAmt = f.track * Math.max(0, (kx - 0.2) / 0.8);
+          if (trackAmt > 0) {
+            const targetX = G.player.x;
+            const targetY = fy + (G.player.y - (f.y || 0));
+            px += (targetX - px) * trackAmt;
+            py += (targetY - py) * trackAmt;
+          }
         }
 
         /* 尺寸: 横向类长边= len(含拖尾拉伸), 纵向类(光柱)长边= 成长高度。
@@ -3242,7 +3199,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         const W = f.thick * taper * breathe;
         o.spr.width = col ? W : L;
         o.spr.height = col ? L : W;
-        o.spr.scale.x = Math.abs(o.spr.scale.x) * (f.dir < 0 ? -1 : 1);
+        /* v4.9 spike 素材朝左(尖端在左): 向左打不翻转, 向右打才水平翻转 */
+        o.spr.scale.x = Math.abs(o.spr.scale.x) * (f.dir < 0 ? 1 : -1);
         /* col 类锚点在中心, 高度从底部往上长 —— 故位置要抬高半个身高 */
         o.spr.position.set(px, col ? py - L * 0.5 : py);
 
