@@ -117,7 +117,7 @@
     "assets/db/monsters/ice_titan_demeres/ske.json": "d8b4545ad45e63bcc4cde09d404fda79905895cb8839d818458413e103ae9af9",
     "assets/db/monsters/ice_titan_demeres/tex.json": "313fefc08aa34361ea0b74547d286f800d2dcaa27aaf69f5f6ad8b434eff6848",
     "assets/db/monsters/ice_titan_demeres/tex.webp": "5767067aab1c085a93c3d9ccb8818b024d35464ab7278fd70453fd84feebe08d",
-    "assets/db/monsters/index.json": "b3e1a493d3d7fcac3b339d2fc0d0987ea535f0ba87445b5e66e307d1f079c793",
+    "assets/db/monsters/index.json": "8097f480d39f3f755625d2bc48dacc221d12bac9f6c419cb518381ab24ae3cc2",
     "assets/db/monsters/insect_queen/ske.json": "5e8104ce1e29028ccd5ae31b2ed7f7c4a08cff63a4d6e948fdfc2a93b2a25eda",
     "assets/db/monsters/insect_queen/tex.json": "51cac1f7d1f538f7e1c274025d7dd02e30069547cf88fdeb13a45b5da8aa78f5",
     "assets/db/monsters/insect_queen/tex.webp": "aca2348039a9de732e3b48f7856d4ff86888828b1567c7c504528b8532392074",
@@ -394,10 +394,10 @@
     "src/20-core.js": "801d09ca8fe1680044620e85c03f5cb757a6569178f96022e28c92629f8eccba",
     "src/30-systems.js": "dd06aa051b79740e9281ccef7b71d810a34e41a3070d9f481764296e8f7063bf",
     "src/40-app.js": "518bbd200b7cb77d2cd8ca8d3b1357babf5974426d0b066fbabf4483d0169207",
-    "src/50-battle.js": "02d62389245bfbf4a9c74a7e9ada46065853b2fcf57159f93bd663c34d9e81d4",
+    "src/50-battle.js": "b301b59244ffc0bed60cb4a73e52c0dfcacb331251e383db8a68da1d47f00672",
     "src/60-stage.js": "f9d2da3f9cd58804ca2fdcbaf42cded7c43ac05a91f7b10fd22d2ca79275192f",
     "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
   },
-  "rev": "357ee654bd23460c",
+  "rev": "0ebfb5b97867e450",
   "version": "3.5"
 }
