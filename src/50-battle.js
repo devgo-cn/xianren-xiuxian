@@ -1863,9 +1863,22 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       for (const e of queue) {
         /* 验收台定桩怪不进队列, 原地开火 */
         if (e.__skillHold) { e.stopX = e.x; prevX = Math.max(prevX, e.x); continue; }
-        const stopX = Math.max(p.x + e.atkRange, prevX + BC.queueGap);
-        e.stopX = stopX;
-        prevX = Math.max(e.x, stopX);
+        /* v5.1 停位公式修正: 原来怪站在"玩家 + 自己的 atkRange"处, 而技能怪
+         * atkRange 是弹道实测值(108~210), 远大于玩家攻距 75 —— 怪站定后玩家
+         * 永远够不着, 追也追不上(停位跟着玩家漂)。现在怪停在"玩家攻距内"的
+         * 身位处: 用玩家攻距与自身弹道攻距的较小者作为站位基准, 保证双方都能
+         * 交手(远程怪仍比近战怪站得远, 保留其"远程"定位)。 */
+        if (e.stopX == null || e.x < e.stopX - BC.queueGap) {
+          /* 站位带: 下界=近战贴身(怪攻距), 上界=玩家能打到的极限(玩家攻距×0.95)。
+           * 怪按其弹道攻距在带内取相对远近 —— 远程怪仍比近战怪站得靠后,
+           * 但一定落在玩家攻距内, 保证交手。 */
+          const lo = Math.min(e.atkRange || 0, G.player.atkRange * 0.95);
+          const hi = G.player.atkRange * 0.95;
+          const standoff = Math.max(lo, Math.min(hi, (e.atkRange || 0) * 0.75));
+          const stopX = Math.max(p.x + standoff, prevX + BC.queueGap);
+          e.stopX = stopX;
+        }
+        prevX = Math.max(e.x, e.stopX);
       }
     }
     /* v3.8.1 防交错兜底: 排队目标 stopX 恒在玩家右侧, 发现怪被留在 stopX 左侧
