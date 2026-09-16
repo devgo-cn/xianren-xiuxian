@@ -353,6 +353,15 @@ function startGame() {
   let _sleepT = 0;            /* v2.9: 限帧 sleep 句柄(便于外部/异常时清理, 防双链跑帧) */
   (function main() {
     const now = performance.now();
+    /* v4.2 PERF: 后台降频 —— 页面不可见时 main 循环从 30fps 降到 1fps,
+     * 只跑修为结算(挂机收益不能停), 跳过 tickDsp/HUD 更新(后台不可见),
+     * 回前台自动恢复 30fps。此前后台 30fps 空转是耗电主因(CPU 后台占 91%)。 */
+    if (document.hidden) {
+      const dt = Math.min(1, (now - lastLoop) / 1000); lastLoop = now;
+      if (!breaking) { const _g = rateNow() * dt; state.exp += _g; _pred.exp += _g; }
+      _sleepT = setTimeout(() => { _sleepT = 0; main(); }, 1000);
+      return;
+    }
     const wait = 33 - (now - _lastPaint);
     if (wait > 4) {
       /* v2.9 PERF: 限帧期间用 setTimeout 让出主线程(原先无条件续 rAF 会按屏幕刷新率空转)。
