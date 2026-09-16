@@ -1739,7 +1739,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   /* v4.0 WebGL: 血条/法环 → Pixi Graphics。layerName 指定绘制层(farUI/nearUI/playerUI)，
    * 该层 Graphics 每帧 render 前清空，重画顺序与原 2D 完全一致。
    * 原水平渐变按中点取纯色近似(3px 高的渐变肉眼不可辨)。 */
-  const HPBAR_COL = { e: 0xe84038, g: 0x55cc90, y: 0xe4bc54, r: 0xf46050 };
+  const HPBAR_COL = { e: 0xe84038, g: 0x4cd964, y: 0xe4bc54, r: 0xf46050 };   /* v4.4: 玩家高血量绿 0x55cc90(偏青蓝绿)→0x4cd964(标准浅绿) */
   function drawEliteRing(layerName, x, y, r) {   // 精英怪: 脚下金色法环
     const g = window.BattleGL.layers[layerName]._gfx;
     g.lineStyle(1.5, 0xe8c46b, 0.5);
