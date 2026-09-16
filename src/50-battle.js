@@ -1698,7 +1698,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
      * 按锚点缩放后实际出手周期 = 1.67/aspd, 基础节奏不变, 高攻速真实变快 */
     p.animTimer += dt;
     const frameDur = p.attackAnim ? 1 / (SPRITE.fps * (p.aspd || 1.1) / 1.1)
-                                  : 1 / SPRITE.fps;
+                                  : 1 / (SPRITE.fps * 1.5);   /* v4.4: 走路动画帧率×1.5(24→36fps), 腿摆动更快, 配合移速×1.5视觉上走得更快 */
     if (p.animTimer >= frameDur) {
       p.animTimer -= frameDur;
       if (p.attackAnim) {
