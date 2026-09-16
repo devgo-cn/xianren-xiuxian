@@ -724,15 +724,10 @@ function mountStage() {
     try { initAura(ctx); } catch (e) { console.error("[stage] aura 层初始化失败:", e); }
     try { stage.addLayer(auraLayer); } catch (e) { console.error("[stage] aura 层挂载失败:", e); }
     try { stage.addLayer(burstLayer); } catch (e) { console.error("[stage] burst 层挂载失败:", e); }
-    /* bg 层：managed 模式，不自持 rAF、不改 canvas 尺寸 */
-    import('../bg.js?v=' + CACHE_VER).then(bgMod => {
-      try {
-        const bgLayer = bgMod.initDeepSpace(canvas, { managed: true });
-        /* bg 必须在最底层：插到 aura 之前（此时顺序是 [aura, burst]） */
-        stage.insertLayerBefore("aura", bgLayer);
-      } catch (e) { console.error("[stage] bg 层初始化失败:", e); }
-      pollBattleLayer(stage);
-    }).catch(e => { console.error("[stage] bg 层加载失败:", e); pollBattleLayer(stage); });
+    /* v3.8: 去掉 bg 星空层 —— 上半屏战斗横带自绘夜色+森林图、下半屏打坐区改纯黑,
+     * 星空已无处安放, 且它画整屏大柔光图, 对战斗层的清晰度有肉眼可见的拖累(用户实测)。
+     * 保留 bg.js 文件与其独立模式(initBg, 找不到 #stage 的兜底分支仍可用)。 */
+    pollBattleLayer(stage);
     /* 丹田：动态 import fx2d，回来后挂到角色之上的 overlay */
     import('../fx2d.js?v=' + CACHE_VER).then(m => {
       const real = m.createFxLayer();

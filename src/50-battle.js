@@ -997,7 +997,8 @@ import { SND } from './10-base.js';
   function laneGap() { return CH * 0.09; }
   function laneOff(lane) { return -(LANES - 1 - lane) * laneGap(); }
   /* 纵深缩放: 越远的道越小一档(0.88/0.94/1.0), 强化三车道空间感 */
-  function laneScale(lane) { return 1 - (LANES - 1 - lane) * 0.06; }
+  /* v3.8 纵深差加大: 0.88/0.94/1.0 肉眼难辨, 改 0.80/0.90/1.0 —— 远道明显更小更远 */
+  function laneScale(lane) { return 1 - (LANES - 1 - lane) * 0.10; }
   /* v3.7.1 素材实化: 部分序列帧素材的像素 alpha 不满(实测玩家表均值仅 ~219),
    * 黑底时代看不出来, 换亮背景后角色透出背景纹理。加载时一次性处理:
    * alpha≥200 拉满 255, 30~200 线性拉伸保留软边防锯齿, <30 不动(淡出边缘)。
@@ -1529,7 +1530,10 @@ import { SND } from './10-base.js';
           const row = Math.floor(frameIdx / HENGSAO_SPRITE.cols);
           const srcX = col * HENGSAO_SPRITE.fw;
           const srcY = row * HENGSAO_SPRITE.fh;
-          const drawW = 280;
+          /* v3.8: 剑气贴合本道高度 —— 原 drawW=280(drawH≈140) 在横带里横跨约两条道,
+           * 素材内容又偏帧下部, 视觉重心砸在最下道: 换道释放也像一直在最下道放。
+           * 缩到≈玩家身高(drawH=100), 配合 y 已带车道偏移, 剑气完整落在玩家本道。 */
+          const drawW = 200;
           const drawH = drawW * (HENGSAO_SPRITE.fh / HENGSAO_SPRITE.fw);
           /* 特效从左向右移动: startX到endX插值 */
           const moveX = (f.startX || f.x) + ((f.endX || f.x+120) - (f.startX || f.x)) * k;
