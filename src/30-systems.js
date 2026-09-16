@@ -99,7 +99,7 @@ function updateHUD() {
   btn.disabled = !can;
   // 注意：绝不能 btn.textContent=...（会删除按钮内嵌的 SVG 墨块皮肤）→ 只更新文字标签
   const bt = btn.querySelector(".label");
-  if (bt) bt.innerHTML = can ? (r.isBigEnd ? "☯ 渡劫突破" : "☯ 突破") : "☯ 修为未圆满";
+  if (bt) bt.innerHTML = "突破";   /* v4.4: 统一"突破"二字, 去掉☯和"修为未圆满"——可突破状态已由 glow-gold 闪光+hint-gold 文字提亮提醒, 文字无需区分状态 */
   btn.classList.toggle("ready", can);
   if (can && !lastReadyHint) {
     __set_lastReadyHint(true);
