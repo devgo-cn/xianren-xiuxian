@@ -494,9 +494,15 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     248,248,248,248,248,248,248,248,248,248,248,248,
     248,248,248,248,248,248,248,246,245,248,248,246
   ];
-  /* cultivator_skill_sheet 24 帧(剑气斩) */
-  const SKILL_BOX_H = [172,171,178,180,181,182,182,183,181,208,235,239,243,244,248,253,256,253,228,241,225,219,225,226];
-  const SKILL_BOX_B = [219,218,223,225,226,229,233,234,234,241,248,248,248,250,251,254,256,256,247,255,228,227,239,236];
+  /* cultivator_skill_sheet 24 帧(剑气斩)。
+   * v6.2 关键修正: 技能表 f10 起画面里除了人物还有大月牙/圆环特效, 整帧 AABB 被
+   * 特效撑到 235~256 —— 上一版按整帧归一, 等于拿月牙当人身高, 月牙一出现人物
+   * 又被压小 30%。实测把特效抠掉后, 人物本身全表恒定 ≈172px(含脚下阴影)。
+   * 因此这三张表全部只量【人物簇】(按列空隙把右侧特效切开):
+   *   BOX_H 人物高 / BOX_B 人物底边(贴地用) / BOX_CX 脚底中心x(锚定玩家脚下来用) */
+  const SKILL_BOX_H = [172,171,178,180,181,182,182,183,181,181,181,173,172,173,172,172,172,172,172,172,172,173,173,173];
+  const SKILL_BOX_B = [219,218,223,225,226,229,233,234,234,233,232,233,233,235,234,235,236,236,236,231,223,223,237,235];
+  const SKILL_BOX_CX = [203,194,213,202,199,196,196,198,204,178,152,138,141,138,140,137,138,138,146,178,190,182,100,107];
   /* 横扫千军特效配置: 7列7行, 49帧, 左右渐现渐隐 */
   const HENGSAO_SPRITE = { cols:7, fw:320, fh:160, count:49, fps:12 };
   /* 史莱姆帧配置: 12列8行, walk32+attack51+hurt11 */
@@ -2950,15 +2956,15 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* 技能动画渲染 (剑气斩) */
     if (p.skillAnim && G.skillReady && G.skillSprite) {
       const frameIdx = Math.min(p.skillFrame, SKILL.count - 1);
-      const boxH = SKILL_BOX_H[frameIdx] || 240;
-      const boxB = SKILL_BOX_B[frameIdx] || 248;
+      const boxH = SKILL_BOX_H[frameIdx] || 172;
+      const boxB = SKILL_BOX_B[frameIdx] || 234;
+      const boxCX = SKILL_BOX_CX[frameIdx] || 180;
       const sk = bodyH / boxH;                  /* 帧像素 → 游戏像素 */
-      const skW = SKILL.fw * sk;
       S.main.visible = true;
       S.main.texture = frameTex(G.skillSprite, SKILL.cols, SKILL.fw, SKILL.fh, frameIdx);
-      /* 纵向用内容底边贴地板(sy - boxB*sk + boxB*sk === sy), 取代画布底边贴地。
-       * 横向沿用 0.42 锚点比例, 随缩放等比推移, 相对关系不变。 */
-      S.main.position.set(sx - skW*0.42, sy - boxB * sk);
+      /* 锚点 = 人物脚底中心(BOX_CX), 与走路渲染的脚底锚定同口径:
+       * 人物钉在 sx 不横跳, 月牙特效按帧内原始相对位置跟随, 跟着一起变大。 */
+      S.main.position.set(sx - boxCX * sk, sy - boxB * sk);
       S.main.scale.set(sk, sk);
       S.main.alpha = 1; S.main.filters = null;
       if (hurtOn) { S.main.alpha = 0.5+0.5*Math.sin(p.hurtT*40); S.main.filters = [window.BattleGL.Filters.playerHurt]; }
