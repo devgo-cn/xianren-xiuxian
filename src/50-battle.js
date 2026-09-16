@@ -3537,8 +3537,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (killsEl) killsEl.textContent = G.kills;
     if (spEl) spEl.textContent = fmtNum(G.spirit);
     if (speedEl) {
-      /* v5.0 基础2倍速为常态不显示, 只有技能加速中(timer>0)才显示 ×3/×4 倍速 */
-      if (G.speedMultTimer > 0) { speedEl.style.display = ''; speedEl.textContent = '×'+G.speedMult+' 倍速 ('+G.speedMultTimer.toFixed(1)+'s)'; }
+      /* v5.0 基础2倍速为常态隐藏不显示, 技能加速中显示玩家感知的加成倍速(实际mult-1): 疾风步×2, 缩地×3 */
+      if (G.speedMultTimer > 0) { speedEl.style.display = ''; speedEl.textContent = '×'+(G.speedMult - 1)+' 倍速 ('+G.speedMultTimer.toFixed(1)+'s)'; }
       else speedEl.style.display = 'none';
     }
     if (stateEl) stateEl.textContent = G.state === 'fight' ? '战斗中' : '推进中';
