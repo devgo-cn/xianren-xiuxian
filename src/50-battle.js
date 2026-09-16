@@ -100,6 +100,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   const bgImg = new Image();
   bgImg.onload = function() { G.bgImg = bgImg; G.bgReady = true; };
   bgImg.src = 'assets/battle-forest-bg.webp';
+  /* v4.3 前景遮挡贴图: 水晶(左右下角)抠出 + 底部草沿, 与背景图同尺寸同位对齐,
+   * 画在所有实体之上 —— 怪物大模型不再穿透水晶。未就绪时无遮挡(退化原状)。 */
+  const fgImg = new Image();
+  fgImg.onload = function() { G.fgImg = fgImg; G.fgReady = true; };
+  fgImg.src = 'assets/battle-forest-fg.webp';
   /* 怪物素材: 绿色史莱姆 */
   const slimeImg = new Image();
   slimeImg.onload = function() { G.slimeSprite = solidify(slimeImg); G.slimeReady = true; };
@@ -1419,16 +1424,16 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     }
   }
 
-  /* v4.2 前景遮挡层(红线以下视觉遮挡): 把背景源图底部条带再画一次, 压在所有
-   * 实体之上 —— 怪/玩家的脚踝被前景草盖住(视觉上"走在草后"), 大模型尾巴/腿
-   * 不再穿到红线以下遮挡水晶。条带与 drawBg 共用同一套平铺几何(同 0.5 视差/
-   * 同镜像交替/同拉伸比), 像素级对齐背景图, 视觉无缝。
+  /* v4.3 前景遮挡层(红线以下视觉遮挡): 专用前景贴图 battle-forest-fg.webp —— 从背景
+   * 裁出左右下角水晶区域抠图 + 底部草沿, 拼回与背景同尺寸(1600×800)的整图。
+   * 与 drawBg 完全同一套平铺几何(同 0.5 视差/同镜像交替/同拉伸比/同 y=0), 像素级
+   * 对齐背景图 —— 水晶"长回"背景上, 压在所有实体之上, 大模型尾巴/腿不再遮挡水晶;
+   * 草沿自然盖住实体脚踝, 无硬截断线。
    * 掉落物(drops 层)画在前景之上 —— 水晶躺在前景草上, 永不被实体遮挡。 */
-  const FG_SPLIT = 0.88;   // 红线: 横带高度的 88%(前景草顶部, 背景源图同比例处)
   function drawForeground() {
-    if (!G.bgReady || !G.bgImg) return;
+    if (!G.fgReady || !G.fgImg) return;   // fg 未就绪时跳过(无遮挡, 退化原状)
     const drawH = CH;
-    const drawW = drawH * (G.bgImg.width / G.bgImg.height);
+    const drawW = drawH * (G.fgImg.width / G.fgImg.height);
     const period = drawW * 2;
     const off = ((G.camX * 0.5) % period + period) % period;
     const n0 = Math.floor(off / drawW);
@@ -1436,16 +1441,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const need = Math.min(8, Math.ceil(CW / drawW) + 2);
     const pool = drawForeground._pool || (drawForeground._pool = []);
     while (pool.length < need) { const s = new PIXI.Sprite(); fgC.addChild(s); pool.push(s); }
-    if (!drawForeground._tex || drawForeground._img !== G.bgImg) {
-      const base = window.BattleGL.tex(G.bgImg).baseTexture;
-      const ih = G.bgImg.height, iw = G.bgImg.width;
-      const sy0 = Math.floor(ih * FG_SPLIT);
-      drawForeground._tex = new PIXI.Texture(base, new PIXI.Rectangle(0, sy0, iw, ih - sy0));
-      drawForeground._img = G.bgImg;
+    if (!drawForeground._tex || drawForeground._img !== G.fgImg) {
+      drawForeground._tex = window.BattleGL.tex(G.fgImg);
+      drawForeground._img = G.fgImg;
     }
     const tex = drawForeground._tex;
-    const bandTop = CH * FG_SPLIT;
-    const scaleY = drawH / G.bgImg.height;   // 与背景同拉伸比 → 条带与背景像素一一对应
     let k = 0;
     for (let n = n0; ; n++) {
       const x = n * drawW - off;
@@ -1453,9 +1453,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       const s = pool[k++];
       s.visible = true;
       s.texture = tex;
-      s.y = bandTop;
-      if (n % 2 === 0) { s.x = x; s.scale.set(drawW / G.bgImg.width, scaleY); }
-      else { s.x = x + drawW; s.scale.set(-drawW / G.bgImg.width, scaleY); }
+      s.y = 0;
+      if (n % 2 === 0) { s.x = x; s.scale.set(drawW / G.fgImg.width, drawH / G.fgImg.height); }
+      else { s.x = x + drawW; s.scale.set(-drawW / G.fgImg.width, drawH / G.fgImg.height); }
     }
     for (; k < pool.length; k++) pool[k].visible = false;
   }
