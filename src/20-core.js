@@ -467,8 +467,10 @@ function smartEquip(a) {
   }
 }
 
+let _licCross = null;   // 缓存 .gx-cross 根节点；renderEquip 重建 innerHTML 后旧节点脱离文档，isConnected 触发重查
+
 function licSync() {
-  const cross = document.querySelector(".gx-cross");
+  const cross = (_licCross && _licCross.isConnected) ? _licCross : (_licCross = document.querySelector(".gx-cross"));
   if (!cross) return;
   const arr = (state.arts || []).slice(-6);
   const cells = cross.querySelectorAll(".gx-cell");
@@ -484,17 +486,29 @@ function licSync() {
   cross.classList.add("licOn");
   const slotIdx = (typeof a.slot === "number" && a.slot < 4) ? a.slot : _eqSel;
   const qn = (QUALITY[a.q] || QUALITY[0]).name;
-  const nb = lic.querySelector(".lh b");
-  nb.textContent = a.name || "无名法宝";
-  nb.style.color = LIC_QCOL[a.q] || "#e9e2d0";
+  if (!lic.__els) {   // 骨架只建一次，子元素引用缓存到 lic 上，后续 sync 不再逐次 querySelector
+    lic.__els = {
+      nb: lic.querySelector(".lh b"),
+      lhI: lic.querySelector(".lh i"),
+      icoims: lic.querySelectorAll(".licface .icoim"),
+      aB: lic.querySelector('.lr[data-k="a"] b'),
+      dB: lic.querySelector('.lr[data-k="d"] b'),
+      hB: lic.querySelector('.lr[data-k="h"] b'),
+      lfx: lic.querySelector(".lfx"),
+      lsealEm: lic.querySelector(".lseal em"),
+    };
+  }
+  const E = lic.__els;
+  E.nb.textContent = a.name || "无名法宝";
+  E.nb.style.color = LIC_QCOL[a.q] || "#e9e2d0";
   const bigName = (BIGS[Math.max(0, (a.lv || 1) - 1)] || BIGS[0]).n;
-  lic.querySelector(".lh i").textContent = `${bigName}·${qn}·${EQUI_SLOTN[slotIdx] || ""} ★${a.q + 1}`;
-  lic.querySelectorAll(".licface .icoim").forEach(im => im.classList.toggle("on", +im.dataset.idx === _eqSel));
-  lic.querySelector('.lr[data-k="a"] b').textContent = "+" + (a.a || 0);
-  lic.querySelector('.lr[data-k="d"] b').textContent = "+" + (a.d || 0);
-  lic.querySelector('.lr[data-k="h"] b').textContent = "+" + (a.h || 0);
-  lic.querySelector(".lfx").innerHTML = (a.fx || []).map(f => `<div class="lr"><span>${FX_TXT[f.k] || f.k}</span><b class="teal">+${f.v}%</b></div>`).join("");
-  lic.querySelector(".lseal em").textContent = "战力 " + Math.round(artScore(a));
+  E.lhI.textContent = `${bigName}·${qn}·${EQUI_SLOTN[slotIdx] || ""} ★${a.q + 1}`;
+  E.icoims.forEach(im => im.classList.toggle("on", +im.dataset.idx === _eqSel));
+  E.aB.textContent = "+" + (a.a || 0);
+  E.dB.textContent = "+" + (a.d || 0);
+  E.hB.textContent = "+" + (a.h || 0);
+  E.lfx.innerHTML = (a.fx || []).map(f => `<div class="lr"><span>${FX_TXT[f.k] || f.k}</span><b class="teal">+${f.v}%</b></div>`).join("");
+  E.lsealEm.textContent = "战力 " + Math.round(artScore(a));
 }
 
 function skillVal(id) {
