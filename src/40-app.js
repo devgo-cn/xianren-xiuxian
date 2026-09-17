@@ -664,9 +664,14 @@ function applyEquipDrop(id) {
   if (Date.now() - _dropSaveT > 15000) { __set_dropSaveT(Date.now()); save(); cloudSoon(); }
 }
 
+let _bindPoll = 0;
 function bindBattleHooks() {                    // 战斗 IIFE 是内联脚本, 载入序不定 → 轮询挂接
   const api = window.BattleAPI;
-  if (!api) { setTimeout(bindBattleHooks, 300); return; }
+  if (!api) {
+    if (++_bindPoll > 50) return;              // 15s 后放弃
+    setTimeout(bindBattleHooks, 300);
+    return;
+  }
   api.onDrop = onBattleDrop;
   api.requestEquipDrop = requestEquipDrop;
   api.applyEquipDrop = applyEquipDrop;
