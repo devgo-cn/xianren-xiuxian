@@ -591,6 +591,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   const SLIME_SPRITE = { cols:12, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:51, hurtStart:83, hurtCount:11, fps:24 };
   /* 水精灵帧配置: 10列8行, walk32+attack33+hurt13 */
   const WATER_SPRITE = { cols:10, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:33, hurtStart:65, hurtCount:13, fps:24 };
+  const PET_SPRITE = { cols:8, fw:96, fh:80 };
 
   function fmtNum(n) {
     n = Math.round(n || 0);
@@ -2568,7 +2569,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       S.main.visible = S.glow.visible = S.place.visible = false;
       /* 灵狐真实 sprite 渲染 */
       if (G.petFoxReady && G.petFoxSprite && pet.type === 'fox') {
-        const PET_SPRITE = { cols:8, fw:96, fh:80 };
         const frameIdx = pet.flyFrame % 32;
         /* 渲染尺寸: 宠物较小, 约玩家的60% */
         const drawH = Math.min(CH * 0.35, 52);
