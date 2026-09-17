@@ -145,7 +145,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     player:null, pets:[], enemies:[], fx:[], dmg:[], drops:[], spawnT: 0,
     sprite:null, bgImg:null, spriteReady:false, bgReady:false, extraStrike:false,
     speedDodge:0, nextStrikeCrit:0,
-    petFoxSprite:null, petFoxReady:false, petEagleSprite:null, petEagleReady:false,
+    petFoxSprite:null, petFoxReady:false, petEagleSprite:null, petEagleReady:false, petEagleBoltSprite:null, petEagleBoltReady:false,
+    eagleBolts: [],  /* 灵鹰弹幕 */
     skillSprite:null, skillReady:false,
     bossActive:false,   /* v3.8.2 打满100只小怪才刷BOSS(原10) */
     skillCall:null,          /* 技能名播报槽: 覆盖式大字快闪, {name,t,dur} */
@@ -192,6 +193,10 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   const petEagleImg = new Image();
   petEagleImg.onload = function() { G.petEagleSprite = solidify(petEagleImg); G.petEagleReady = true; };
   petEagleImg.src = 'assets/pet_eagle.png';
+  /* 灵鹰弹幕 */
+  const petEagleBolt = new Image();
+  petEagleBolt.onload = function() { G.petEagleBoltSprite = solidify(petEagleBolt); G.petEagleBoltReady = true; };
+  petEagleBolt.src = 'assets/pet_eagle_bolt.png';
   /* 技能素材: 剑气月牙 */
   const skillImg = new Image();
   skillImg.onload = function() { G.skillSprite = skillImg; G.skillReady = true; };
@@ -2160,6 +2165,15 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       /* 朝向固定朝右(宠物在玩家左侧跟随, 不摆头) */
       pet.face = 1;
 
+      /* 灵鹰: 定时发射弹幕 */
+      if (pet.type === 'eagle') {
+        pet.boltTimer = (pet.boltTimer || 2) - dt;
+        if (pet.boltTimer <= 0 && G.enemies && G.enemies.some(e => e.alive)) {
+          G.eagleBolts.push({ x: p.x + 40, y: p.y - 30, vx: 400, t: 0 });
+          pet.boltTimer = 2;
+        }
+      }
+
       /* 施法系统 */
       if (pet.casting) {
         pet.castAnim += dt / 1.2;  /* 施法动画1.2秒 */
@@ -2203,6 +2217,29 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
           pet.castType = Math.random() < 0.6 ? 'heal' : 'atk';
           pet.effectTimer = 0;
         }
+      }
+    }
+
+    /* 灵鹰弹幕更新 */
+    if (G.eagleBolts) {
+      for (let i = G.eagleBolts.length - 1; i >= 0; i--) {
+        const b = G.eagleBolts[i];
+        b.x += b.vx * dt;
+        b.t += dt;
+        let hit = false;
+        if (G.enemies) {
+          for (const e of G.enemies) {
+            if (!e.alive) continue;
+            if (Math.abs(b.x - e.x) < 30 && Math.abs(b.y - e.y) < 40) {
+              /* 伤害 = 玩家攻击力 × 80%, 带破甲 */
+              const dmg = calcDmg(PST.atk, 0.8, e.def, PST.pen || 0);
+              dealDamage(e, dmg, '#7fe0ff', false);
+              hit = true;
+              break;
+            }
+          }
+        }
+        if (hit || b.x > GW + 100 || b.t > 3) G.eagleBolts.splice(i, 1);
       }
     }
 
@@ -2819,6 +2856,20 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         S.place.drawCircle(-2.5, -r-1, 1.2);
         S.place.drawCircle(2.5, -r-1, 1.2);
         S.place.endFill();
+      }
+    }
+
+    /* 渲染灵鹰弹幕 */
+    if (G.petEagleBoltReady && G.petEagleBoltSprite && G.eagleBolts) {
+      for (const b of G.eagleBolts) {
+        const spr = new PIXI.Sprite(G.petEagleBoltSprite);
+        spr.anchor.set(0.5, 0.5);
+        spr.width = 60; spr.height = 30;
+        spr.position.set(b.x, b.y);
+        spr.alpha = 0.9;
+        window.BattleGL.stage.addChild(spr);
+        G._boltSprites = G._boltSprites || [];
+        G._boltSprites.push(spr);
       }
     }
   }
