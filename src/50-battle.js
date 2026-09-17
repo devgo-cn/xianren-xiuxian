@@ -1326,10 +1326,13 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     G.trialSpawned++;   /* v5.0 计数已刷怪序号 */
     return e;
   }
-  /* ---------- 数值伤害: 减伤系数 100/(100+有效防御), 破甲按百分比削减防御 ---------- */
+  /* ---------- 数值伤害 v7.1: 量纲平衡式 dmg = atk²/(atk+有效防御), 破甲按百分比削减防御 ----------
+   * 旧式 100/(100+eff) 分母含常数 100, 怪 def 随境界 ×4 后减伤坍缩到 ≈0(高境打不动);
+   * 新式只看 def/atk 比例: def=0.5atk→×67%, def=atk→×50%, def=2atk→×33% —— 与怪物毛坯
+   * (def ≈ atk 的 12%~42%)的设计意图一致, 全境界物理意义恒定。 */
   function calcDmg(atk, mult, def, pen) {
-    const eff = Math.max(0, (def||0) * (1 - Math.min(90, pen||0)/100));
-    return Math.max(1, Math.round(atk * mult * (100/(100+eff))));
+    const a = Math.max(1, atk||0), eff = Math.max(0, (def||0) * (1 - Math.min(90, pen||0)/100));
+    return Math.max(1, Math.round(a * mult * (a/(a+eff))));
   }
   /* 玩家暴击/会心判定: 读装备词条(PST.crit 暴击率 / PST.critB 会心率 / PST.critD 爆伤);
    * kind=2 暴击(×2)、kind=1 会心(×1.5)、mult 含爆伤增幅; bonus 为技能临时加的暴击率 */

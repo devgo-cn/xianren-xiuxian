@@ -142,6 +142,9 @@ function doBreak() {
   const finishBreak = () => {
     state.realmIdx++;
     state.exp = isBigBreak ? 0 : Math.max(0, state.exp - r.need);  // 大境清零, 小境扣需
+    /* v7.1 突破续命: 兽潮离线加成(trialBoost)随突破自动续 48h —— 跨境界换怪池后
+     * 玩家需重新适应, 但加成不应在换境瞬间蒸发, 免得"离线收益加成清零、重打才回" */
+    if (state.trialBoost > 0) state.trialBoostUntil = Math.max(state.trialBoostUntil || 0, Date.now() + 48 * 3600 * 1000);
     __set_breaking(false);
     /* 黑屏挂机: 记录突破 */
     if (DIMSTAT.on) { DIMSTAT.breaks.push(next.label); try { dimRender(); } catch(e) {} }
