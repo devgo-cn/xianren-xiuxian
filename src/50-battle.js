@@ -2156,6 +2156,17 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       }
       /* 上下浮动(保留计时器, 渲染层用) */
       pet.bobT += dt * 2.5;
+      /* ═══ v8.5 灵鹰独立化(用户明确要求) ═══
+       * 灵鹰是【独立的攻击宠】, 不是跟随宠:
+       *   ① 不绑玩家: 它自己悬停在战场上方, 玩家推进/后退它不跟着平移
+       *   ② 不参与施法: 施法系统(回血/加攻光环)是灵狐的, 灵鹰只打怪
+       *   ③ 不捡装备: 已由上面的 pet.type !== 'eagle' 挡住
+       * 因此这里给灵鹰单开一条分支, 在它自己处理完攻击后 continue,
+       * 不再往下走"跟随玩家 + 施法"那两段共用逻辑。 */
+      if (pet.type === 'eagle') {
+        updateEagle(dt, pet, p);
+        continue;
+      }
       /* 跟随玩家: 左上方, 简单延迟跟随 —— 插值系数小(dt*3.5), 玩家快走时宠物
        * 先愣一下(跟不上), 随后慢慢跟上。不用弹簧/惯性模型, 倍速起来也不乱晃。 */
       const targetX = p.x + pet.offsetX;
@@ -2165,26 +2176,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       /* 朝向固定朝右(宠物在玩家左侧跟随, 不摆头) */
       pet.face = 1;
 
-      /* 灵鹰: 定时发射弹幕(追踪最近怪物) */
-      if (pet.type === 'eagle') {
-        pet.boltTimer = (pet.boltTimer || 2) - dt;
-        if (pet.boltTimer <= 0 && G.enemies && G.enemies.some(e => e.alive)) {
-          /* 找最近怪物 */
-          let target = null, minDist = Infinity;
-          for (const e of G.enemies) {
-            if (!e.alive) continue;
-            const d = Math.abs(e.x - pet.x);
-            if (d < minDist) { minDist = d; target = e; }
-          }
-          if (target) {
-            const sx = pet.x + pet.offsetX + 40, sy = pet.y + pet.offsetY - 30;
-            G.eagleBolts.push({ x: sx, y: sy, tx: target.x, ty: target.y, speed: 500, t: 0, target });
-          }
-          pet.boltTimer = 2;
-        }
-      }
-
-      /* 施法系统 */
+      /* 施法系统 —— 【只有灵狐会走到这里】。
+       * v8.5: 灵鹰已在上面 continue, 不会进来, 所以它的"施法光环"彻底消失。 */
       if (pet.casting) {
         pet.castAnim += dt / 1.2;  /* 施法动画1.2秒 */
         pet.effectTimer += dt;
@@ -2235,6 +2228,58 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       p.atkBuffTimer -= dt;
       if (p.atkBuffTimer <= 0) { p.atkBuff = 0; p.atkBuffTimer = 0; }
     }
+  }
+
+  /* ═══ v8.5 灵鹰: 独立攻击宠 ═══
+   * 用户明确要求: "这个鹰它只是个攻击宠, 它是独立的, 也不要绑定在玩家身上"。
+   *
+   * 定位: 不跟随玩家, 而是【悬停在战场上方】——横向锚在玩家与最前怪之间的空域,
+   *       玩家推进它就往右挪一点, 但绝不贴着玩家 (与灵狐的贴身跟随是两种行为)。
+   * 职责: 只做一件事 —— 定时朝最近的怪发射追踪弹幕。不捡装备、不施法、不加 buff。
+   *
+   * 为什么不直接固定世界坐标: 玩家一路向前推进, 固定点很快会被甩到屏幕外,
+   * 玩家会觉得"鹰丢了"。所以锚点按战线走, 但保持一个远离玩家的高空站位。 */
+  const EAGLE = {
+    atkInterval: 2,       /* 发射间隔(秒) */
+    boltSpeed: 500,
+    hoverBack: 150,       /* 站在"最前怪"后方 150px 的空域(不贴玩家) */
+    minGapToPlayer: 90,   /* 至少离玩家 90px, 避免看起来还粘在玩家身上 */
+    hoverH: 0.30,         /* 高度: 横带高度的 30% 处(高空) */
+  };
+  function updateEagle(dt, pet, p) {
+    /* ── 站位 ── */
+    let anchorX = p.x + EAGLE.hoverBack;      /* 兜底: 场上没怪时, 玩家前方一点 */
+    let front = -Infinity;                    /* 最靠前的怪(离玩家最近) */
+    for (const e of G.enemies) {
+      if (!e.alive || e.dying > 0) continue;
+      if (e.x > p.x && e.x < anchorX + 2000 && e.x > front) front = e.x;
+    }
+    if (front > -Infinity) anchorX = front - EAGLE.hoverBack;
+    if (anchorX < p.x + EAGLE.minGapToPlayer) anchorX = p.x + EAGLE.minGapToPlayer;
+    /* 平滑靠位(与灵狐同款延迟跟随手感, 但目标是空域锚点而非玩家) */
+    pet.x += (anchorX - pet.x) * Math.min(1, dt * 3.5);
+    /* 高度: 与玩家无关, 固定在横带高空 —— 只做轻微上下浮动 */
+    const baseY = -CH * EAGLE.hoverH;
+    pet.y += (baseY - pet.y) * Math.min(1, dt * 3.5);
+    pet.face = 1;                             /* 素材默认朝右, 不摆头 */
+
+    /* ── 攻击: 定时朝最近的怪发射追踪弹幕 ── */
+    pet.boltTimer = (pet.boltTimer == null ? EAGLE.atkInterval : pet.boltTimer) - dt;
+    if (pet.boltTimer > 0) return;
+    pet.boltTimer = EAGLE.atkInterval;
+    if (!G.enemies || !G.enemies.some(e => e.alive)) return;
+    let target = null, minDist = Infinity;
+    for (const e of G.enemies) {
+      if (!e.alive) continue;
+      const d = Math.abs(e.x - pet.x);
+      if (d < minDist) { minDist = d; target = e; }
+    }
+    if (!target) return;
+    /* 发射点: 鹰的爪子下方(不从玩家身上出) */
+    G.eagleBolts.push({
+      x: pet.x, y: pet.y + 10,
+      tx: target.x, ty: target.y, speed: EAGLE.boltSpeed, t: 0, target,
+    });
   }
 
   /* 灵鹰弹幕更新(不在宠物循环里, 只执行一次) */
@@ -2841,23 +2886,15 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       else if (G.petEagleReady && G.petEagleSprite && pet.type === 'eagle') {
         const EAGLE_SPRITE = { cols: 10, fw: 704, fh: 580 };
         const frameIdx = pet.flyFrame % 30;
-        const drawH = Math.min(CH * 0.35, 52);
+        /* v8.5: 灵鹰是独立的攻击宠, 画得比灵狐略大(战场上的"单位"而非挂件) */
+        const drawH = Math.min(CH * 0.40, 64);
         const drawW = drawH * (EAGLE_SPRITE.fw / EAGLE_SPRITE.fh);
         S.main.visible = true;
         S.main.texture = frameTex(G.petEagleSprite, EAGLE_SPRITE.cols, EAGLE_SPRITE.fw, EAGLE_SPRITE.fh, frameIdx);
         S.main.scale.set((drawW / EAGLE_SPRITE.fw) * (pet.face === -1 ? -1 : 1), drawH / EAGLE_SPRITE.fh);
         S.main.position.set(sx, sy);
-        /* 施法特效: lighter 柔光垫底(呼吸幅度收小) */
-        if (pet.casting) {
-          const pulse = 0.5 + 0.5 * Math.sin(pet.castAnim * Math.PI * 3);
-          const img = pet.castType === 'heal' ? GLOW.heal : GLOW.atk;
-          const glowR = drawH * (0.68 + pulse * 0.14);
-          S.glow.visible = true;
-          S.glow.texture = window.BattleGL.tex(img);
-          S.glow.position.set(sx, sy - drawH * 0.55);
-          S.glow.width = S.glow.height = glowR * 2;
-          S.glow.alpha = 0.3 + pulse * 0.18;
-        }
+        /* ⚠️ v8.5 移除(勿加回): 这里原本是"施法特效光环"(pet.casting → heal/atk 柔光)。
+         * 那是灵狐的施法系统, 灵鹰继承了它才冒出一圈光环。灵鹰只攻击, 不施法。 */
       } else {
         /* 其他宠物占位 */
         S.place.visible = true;
@@ -3861,7 +3898,11 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   function init() {
     if (!initCanvas()) { setTimeout(init, 200); return; }
     G.player = makePlayer(); G.player.x = 100;
-    /* 默认宠物: 灵狐 + 灵鹰(远程攻击宠) */
+    /* ═══ 默认宠物: 灵狐(跟随+拾取+施法) / 灵鹰(独立攻击) ═══
+     * ⚠️ v8.5 二者彻底解耦(用户明确要求): 灵鹰不绑玩家、不拾取、不施法。
+     * 因此灵鹰【不再带 offsetX/offsetY】(那是"相对玩家的跟随偏移", 对独立宠无意义),
+     * 也【不再带 castTimer/casting/castType】(那是灵狐的施法系统, 灵鹰继承了会冒光环)。
+     * 灵鹰只用: x/y(自身世界坐标)、boltTimer(开火节奏)、flyFrame/flyTimer(扇翅)、bobT。 */
     G.pets.push({
       id: 'pet_fox', name: '灵狐', type: 'fox',
       atk: 0, aspd: 0, atkRange: 0, hp: 999, maxHp: 999,
@@ -3874,11 +3915,10 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     G.pets.push({
       id: 'pet_eagle', name: '灵鹰', type: 'eagle',
       atk: 0, aspd: 0, atkRange: 0, hp: 999, maxHp: 999,
-      offsetX: 120, offsetY: -160,
-      x: 35, y: 0, atkT: 0, anim: 0, hurtT: 0, alive: true,
+      /* 初始站位: 玩家前上方空域(首个 updateEagle 会平滑归位到锚点) */
+      x: 240, y: 0, atkT: 0, anim: 0, hurtT: 0, alive: true,
       flyFrame: 0, flyTimer: 0, bobT: 0,
-      fetch: { state: 'idle', drop: null },
-      castTimer: 2, casting: false, castAnim: 0, castType: 'atk', effectTimer: 0
+      boltTimer: 2,      /* 开火计时 */
     });
     updateHUD();
     if (typeof window.pushBattleStats === 'function') window.pushBattleStats();
