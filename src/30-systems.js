@@ -128,6 +128,13 @@ function updateHUD() {
   if (dE > thr) spawnFloat(_hud.btnBreak, "+" + fmt(dE));   // v1.7.46: 进度条移除, 修为飘字改从突破按钮升起
   _floatPrev.exp = state.exp;
   refreshGlow(can);                       // v1.7.31: 可行动入口文字闪烁提醒(突破/聚灵阵/云游/丹房)
+  /* v7.2: 境界牌显示总战斗力 = 四槽装备评分之和 */
+  const pwEl = document.getElementById('realmPower');
+  if (pwEl) {
+    let pw = 0;
+    for (const a of (state.arts || [])) pw += artScore(a);
+    pwEl.textContent = fmt(pw);
+  }
 }
 
 function refreshGlow(canBreak) {
