@@ -132,11 +132,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     speedDodge:0, nextStrikeCrit:0,
     petFoxSprite:null, petFoxReady:false,
     skillSprite:null, skillReady:false,
-    smallKillsSinceBoss:0, bossActive:false, bossSpawnEvery:100,   /* v3.8.2 打满100只小怪才刷BOSS(原10) */
+    bossActive:false,   /* v3.8.2 打满100只小怪才刷BOSS(原10) */
     skillCall:null,          /* 技能名播报槽: 覆盖式大字快闪, {name,t,dur} */
     /* v3.9 试炼轮次: 120秒一场, 怪从T1一路刷到T5; 结算击杀数 → 纪录 → 离线补偿
      * v5.0 301只固定怪池: trialSpawned记录已刷序号, 按序号决定tier, 刷完301只提前结算 */
-    trialT: BC.trialSecs, trialKills:0, trialTier:1, tierKills:0, trialSettled:false, trialRound:0, trialBossDone:false,
+    trialT: BC.trialSecs, trialKills:0, trialTier:1, trialSettled:false, trialBossDone:false,
     trialSpawned:0, trialBossKilled:false,
   };
   let _hudRefreshT = 0;   /* v5.0 定期刷新HUD计时器: 打BOSS期间无击杀, 倒计时显示会卡住 */
@@ -173,7 +173,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   /* 技能素材: 横扫千军 */
   const hengsaoImg = new Image();
   hengsaoImg.onload = function() { G.hengsaoSprite = hengsaoImg; G.hengsaoReady = true; };
-  hengsaoImg.onerror = function() { G.hengsaoReady = false; G.hengsaoFailed = true; console.warn('横扫千军素材加载失败, 走canvas兜底'); };
+  hengsaoImg.onerror = function() { G.hengsaoReady = false; console.warn('横扫千军素材加载失败, 走canvas兜底'); };
   hengsaoImg.src = 'assets/skill_hengsao_sheet.webp';
 
   /* ---------- 骨骼怪(DragonBones → Canvas2D 桥) ----------
@@ -2026,8 +2026,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
      * walk 与 idle 不是同一支动画, 才说明素材真有 walk。 */
     const hasRealWalk = !!(an.walk && an.walk !== an.idle);
     if (!dead && !hasRealWalk && e.moving && e.hurtT <= 0 && e.anim <= 0 && e.__legs && e.__legs.length) {
-      e.__walkT = (e.__walkT || 0) + dt * (e.__walkRate || 1.0) * 2.0;
-      const amp = e.__walkAmp != null ? e.__walkAmp : 1.0;
+      e.__walkT = (e.__walkT || 0) + dt * 2.0;
+      const amp = 1.0;
       for (let i = 0; i < e.__legs.length; i++) driveLeg(e.armature, e.__legs[i], e.__walkT, amp * e.__legs[i].amp, null);
     }
   }
@@ -2280,7 +2280,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     G.bossActive = false;
     G.kills = 0;   /* v5.1 结算后HUD击杀数清零(原只重置trialKills, G.kills没重置导致HUD显示不清零) */
     G.trialT = BC.trialSecs; G.trialKills = 0; G.trialTier = 1;
-    G.trialSettled = false; G.trialRound++; G.trialBossDone = false;
+    G.trialSettled = false; G.trialBossDone = false;
     G.trialSpawned = 0; G.trialBossKilled = false;   /* v5.0 重置301只怪池计数 */
     G.paused = false;
     updateHUD();
