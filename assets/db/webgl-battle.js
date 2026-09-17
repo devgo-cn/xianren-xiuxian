@@ -46,7 +46,10 @@
         });
         const cv = app.view;
         cv.id = 'battleGL';
-        cv.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:1;';
+        /* v6.13 PERF: canvas 从全屏缩到横带(top:92px, height=bandH)。
+         * GPU 每帧只 clear+composite 横带区域, 填充率砍 ~60%。
+         * 上次 v4.1 失败是 pushFx return bug(已修), 不是 canvas 缩小本身。 */
+        cv.style.cssText = 'position:fixed;left:0;top:92px;width:100%;height:300px;pointer-events:none;z-index:1;';
         document.body.appendChild(cv);
 
         root = new PIXI.Container();
@@ -99,24 +102,33 @@
         if (!app) return;
         dpr = Math.min(global.devicePixelRatio || 1, 1.5);
         W = global.innerWidth; H = global.innerHeight;
+        /* v6.13: canvas 只分配横带高度。独立模式(无 __stageBand)才全屏。 */
+        const band = (typeof global.__stageBand === 'function') ? global.__stageBand() : null;
+        const rh = band ? band.height : H;
         app.renderer.resolution = dpr;
-        app.renderer.resize(W, H);
+        app.renderer.resize(W, rh);
     }
 
     /* 每帧末调用：同步横带几何并渲染。bandTop/bandH 来自 window.__stageBand()
      * v4.1.1: 环形记录最近调用 —— 排查"战斗画面跳顶部"抖动：
      * bandTop 只可能是 92(stage 驱动)或 0(独立泵 frame(0,innerH))，
      * 若 diag 里 top=0 出现即证明第二渲染泵存在，src 字段指认调用方。 */
-    let _bandTop = NaN, _bandH = NaN, _maskW = 0, _maskH = 0;
+    let _bandTop = NaN, _bandH = NaN, _maskW = 0;
     const _frameLog = [];
     function frame(bandTop, bandH, src) {
         if (!app) return;
         _frameLog.push({ top: bandTop, h: bandH, src: src || '?', at: (performance.now() | 0) });
         if (_frameLog.length > 60) _frameLog.shift();
-        root.y = bandTop;
-        if (bandTop !== _bandTop || bandH !== _bandH || W !== _maskW || H !== _maskH) {
-            _bandTop = bandTop; _bandH = bandH; _maskW = W; _maskH = H;
-            bandMask.clear().beginFill(0xffffff).drawRect(0, bandTop, W, bandH).endFill();
+        /* v6.13: canvas 本身已定位到横带(top/height 由 CSS 控制), root 不再 y 偏移。
+         * 只在 bandTop/bandH/W 变化时更新 canvas CSS 和 renderer 大小。 */
+        root.y = 0;
+        const cv = app.view;
+        if (bandTop !== _bandTop || bandH !== _bandH || W !== _maskW) {
+            _bandTop = bandTop; _bandH = bandH; _maskW = W;
+            cv.style.top = bandTop + 'px';
+            cv.style.height = bandH + 'px';
+            app.renderer.resize(W, bandH);
+            bandMask.clear().beginFill(0xffffff).drawRect(0, 0, W, bandH).endFill();
         }
         bgGradSprite.x = 0; bgGradSprite.y = 0;
         bgGradSprite.width = W; bgGradSprite.height = bandH;

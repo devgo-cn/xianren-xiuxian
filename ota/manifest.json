@@ -251,7 +251,7 @@
     "assets/db/ratty_ske.json": "ddc0a757b1b24cc2cc6c139d669731506341e6f90dbf2b3e6839499ed3f4a5fa",
     "assets/db/ratty_tex.json": "2b00ddb68d11bac3da2e65208058d58e379bedd2ffaee5d45d96c613b01a7d8e",
     "assets/db/ratty_tex.png": "fa614f4cacf27b80185634a007921d1666c082bb7bb92d2fd44e3a6b3a9cd9e2",
-    "assets/db/webgl-battle.js": "e82e19f05dccf50523488ccd89b30c8df26d8eb5b2ef164b3f52de5155b2e1d2",
+    "assets/db/webgl-battle.js": "14e01014d40715f8f24def7deea5f6e09d2a3539df66ff62c036c8022fe3c420",
     "assets/main-bg.jpg": "30bda2c355760f1364da3a11f01f31cd7928babeb565ed064d0c41f66b8fb0d8",
     "assets/modals/art-furnace.webp": "bffa212a8a1aa50c3f311e10ada9171b2db9ccb6567d5c430f1467635f27c6a3",
     "assets/modals/art-ico/a0.webp": "09092265315f1b905432c8f1fa7186851cf0282bbacefa2e02a7289a13c498aa",
@@ -457,7 +457,7 @@
     "assets/ui_icons/icon_treasure.webp": "fe0b83d8ece23ab09b23a013e18299de7335ba1917666a7970726e00b7eb7e17",
     "dt-theme.css": "9bfd9aa7924cdb5483f295a3ec92828b152a3f2572ffed68579614e8cb7749f1",
     "fx2d.js": "ab4794f036fc4e9976392e336e004bcef13d83976e78d719415da6c7bc10ad0d",
-    "index.html": "240b5c6d2f111d12a789d44d9b82e218b28e39abf905a095ea6aeb6c64598008",
+    "index.html": "db0387553196c0e32ed73bdd70ee85c524f5af3417f7f6cbeba06823aca7ab90",
     "src/00-pure.js": "981d48792dd12acddf89124128537f9e5b38b75dc2f0ae2069c7efc78a9f0f7a",
     "src/10-base.js": "f1df172e97759baa09e8ed1788f0a888c530050acea9a5570eac10ab61f1b182",
     "src/20-core.js": "e42d48af94ae21cb578045ac272a7508d1f3b6a674deb05fac35f2baa57adb95",
@@ -467,6 +467,6 @@
     "src/60-stage.js": "a098e6f38e898ff3fee4c6a1f79e652373f15cf791e344813fa3d76ddd521c5b",
     "src/main.js": "161f10c02a3aa4095b257cd77f5bf1834e85d1359e85555deb8e48dfd2bd9fba"
   },
-  "rev": "30a9b74e15b88f35",
-  "version": "4.4"
+  "rev": "7d27baacb6f49feb",
+  "version": "4.5"
 }
