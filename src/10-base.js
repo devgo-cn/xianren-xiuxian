@@ -355,9 +355,23 @@ function cloudNew() {
   let s = "";
   for (let i = 0; i < 12; i++) s += CLD_ALPH[Math.floor(Math.random() * CLD_ALPH.length)];
   const newId = "dt-" + s;
+  /* ⚠️⚠️ v8.4 致命 BUG 修复(勿回退) —— "新建存档建不出来" 的根因:
+   * 旧实现是【先换ID、删本地档, 然后 location.reload()】。但 reload 会触发
+   * pagehide 事件, 而 40-app.js 里挂的是 `pagehide → save(); cloudFlush()`——
+   * 此刻内存里的 state 仍是【旧存档】, save() 立刻把旧档原样写回 SAVE_KEY,
+   * 于是刚删掉的档又被写了回来 → 新档一出生就带着旧进度。
+   *
+   * 更糟的是第二步: 启动时 bootCloud() 走 cldPull(true, true)(服务器权威),
+   * 新玩家码在云端没有档 → 落到"建档上传"分支 → 把这份刚被写回的旧档
+   * 【以新玩家码的名义上传成云端档】→ 旧进度彻底"遗传"给新档, 不可逆。
+   *
+   * 正确顺序: ① 先摘掉 pagehide 落盘路径(置 reloading 标志) ② 换ID
+   * ③ 删本地档 ④ 再 reload。页面重载后 state 从空档重建, bootCloud 的
+   * cldPush 上传的就是干净的新档。 */
+  window.__reloading = true;                 /* ① 先关掉 pagehide/定时器的落盘通道 */
   try {
     localStorage.setItem(CLD_KEY, newId);
-    localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem(SAVE_KEY);       /* ② ③ */
   } catch (e) {}
   cld.id = newId; cld.ready = false; cld.dirty = false;
   location.reload();

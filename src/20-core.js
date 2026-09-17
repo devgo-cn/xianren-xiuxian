@@ -59,6 +59,11 @@ async function loadRank(force) {
 }
 
 function save() {
+  /* ⚠️ v8.4: "新建存档"正在 reload 时必须跳过落盘。
+   * cloudNew() 先删本地档再 location.reload(), 而 reload 会触发 pagehide →
+   * 这里被调用 → 把内存里的【旧存档】写回 SAVE_KEY, 刚删的档又活了。
+   * __reloading 由 cloudNew() 置位, 仅用于这一小段窗口。 */
+  if (typeof window !== "undefined" && window.__reloading) return;
   state.lastTs = Date.now();
   trimJournal();
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { console.warn('[save] 存档写入失败:', e); }   // 明文同步写: pagehide 可靠

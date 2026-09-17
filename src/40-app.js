@@ -88,6 +88,10 @@ async function cldPull(forceImport, silent) {        // v2.1 forceImport:以云�
 function cloudPullNow() { cldPull(); }
 
 function cloudFlush() {                       // v1.5.1: 关键节点/关页/切后台 → 强制立即推(不可逆操作不丢)
+  /* ⚠️ v8.4: "新建存档"正在 reload 时必须跳过上云 —— 与 save() 同一个理由:
+   * pagehide 会先 save() 再 cloudFlush(), 若不拦, 旧档会以【新玩家码】的名义
+   * 被推上云端, 变成新档的初始内容(旧进度遗传给新档, 不可逆)。 */
+  if (typeof window !== "undefined" && window.__reloading) return;
   if (!cld.ready) { cld.dirty = true; return; }
   cloudPushNow();
 }
