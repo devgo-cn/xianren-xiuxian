@@ -523,6 +523,7 @@ function skillAddExp(id, n) {
   const s = skillGet(id);
   if (s.lv >= SKILL_MAX) { s.exp = 0; return; }
   s.exp += n;
+  s.exp = Math.round(s.exp * 100) / 100;   // 浮点累加收敛到两位小数，避免 0.1+0.2 类误差累积
   let up = 0;
   while (s.lv < SKILL_MAX && s.exp >= skillExpNeed(s.lv)) { s.exp -= skillExpNeed(s.lv); s.lv++; up++; }
   if (up) {
