@@ -1358,9 +1358,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
      * 一句话：倍率永远取 max(旧, 新)，时长永远重置为本次技能满时长。
      * 旧代码用 `s.mult >= G.speedMult || G.speedMultTimer <= 0` 做门槛，会导致
      * ×2 期间再触发 ×2 被静默丢弃（buff 白放）；现在改为无条件取 max。 */
-    G.speedMult = Math.max(G.speedMult, s.mult);
-    G.speedDodge = Math.max(G.speedDodge || 0, s.dodge || 0);
-    G.speedMultTimer = s.dur;   /* 重置时间，而不是 max 延长 */
     skillCall(id === 'jifeng' ? '疾风步' : '缩地成寸');   /* 身法播报 */
     /* 身法触发特效: 玩家位置速度爆发 */
     if (G.player) {
