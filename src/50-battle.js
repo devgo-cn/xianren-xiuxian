@@ -2319,8 +2319,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (G.speedMultTimer > 0) {
       G.speedMultTimer -= dt;
       if (G.speedMultTimer <= 0) { G.speedMult = 2; G.speedMultTimer = 0; G.speedDodge = 0; }   // 身法时效到点, 退回基础2倍速, 闪避加成一并散去
-      updateHUD();
     }
+    const nowSpeedBuff = G.speedMultTimer > 0;
+    if (nowSpeedBuff !== _wasSpeedBuff) { _wasSpeedBuff = nowSpeedBuff; updateHUD(); }
     const sdt = dt * G.speedMult;
     G.t += sdt;
     /* v5.0 FIX: 结算面板已关闭但trialSettled仍为true(玩家关面板没走trialRestart) → 自动重置,
@@ -2363,6 +2364,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   let cv, ctx, CW, CH;
   const _drawList = [];   /* 复用: 避免每帧两次分配+两次排序 */
   const _waterMat = new PIXI.Matrix();   /* 复用: 避免水精灵每帧 new Matrix */
+  let _wasSpeedBuff = false;   /* 身法状态切换检测: 避免每帧调 updateHUD */
   function stageW() { return CW; }
   function stageH() { return CH; }
   function floorY() { return CH * 0.92; }
