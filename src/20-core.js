@@ -410,38 +410,35 @@ traceRefresh();
 
 window.debugEncounter = debugEncounter;
 
-function artScore(a) {                    /* v1.9.6 品质锚定: 星品主导、浮分封顶, 低星数学上永不越高星 */
-  /* v7.1 FIX: lv 必须用大境界索引, 不是 realmIdx+1。
-   * realmIdx 是小境界连续编号(元婴期=22~25), 直接用会把 anchor 放大到 5000+,
-   * 浮分 cap 也跟着放大 → 所有同品质装备评分都一样(全 6486)。 */
-  let lv = 1, _acc = 0;
-  for (let i = 0; i < BIGS.length; i++) { _acc += BIGS[i].segs; if ((state.realmIdx || 0) < _acc) { lv = i + 1; break; } }
-  let base = (a.a || 0) + 3 * (a.d || 0) + (a.h || 0) / 30;   // 斗法三维(实战权重不变)
+function artScore(a) {
+  /* v7.2 重写: 去掉anchor+cap, 改成属性加权×品质乘数。
+   * 旧公式 anchor+min(lv*STEP, ...*0.32) 导致同品质装备分全一样(cap死了)。
+   * 新公式: 基础属性按实战权重加权 + 词条按战斗公式换算 → 乘品质乘数。
+   * 同品质内 roll 好坏直接体现在分差, 跨品质靠乘数拉开。 */
   const c = artCtx();
+  /* 基础属性权重: 防权重高(防血乘算), 血量大量级小权重 */
+  const base = (a.a || 0) * 1.0 + (a.d || 0) * 2.5 + (a.h || 0) * 0.05;
+  /* 词条换算: 百分比词条按当前面板参考值换算成等效战力 */
   let fx = 0;
   for (const f of (a.fx || [])) {
     const p = f.v / 100;
     let val = 0;
     if (f.k === "atk") val = p * c.atkRef;
-    else if (f.k === "hp") val = p * c.hpRef / 30;
-    else if (f.k === "dfn") val = p * c.defRef * 3;
+    else if (f.k === "hp") val = p * c.hpRef * 0.05;
+    else if (f.k === "dfn") val = p * c.defRef * 2.5;
     else if (f.k === "crit") val = p * c.atkRef * 0.55;
     else if (f.k === "critB") val = p * c.atkRef * 1.0;
     else if (f.k === "critD") val = p * c.atkRef * 0.15;
     else if (f.k === "pen") val = p * c.atkRef * 0.35;
-    else if (f.k === "dodge") val = p * c.defRef * 1.4;
+    else if (f.k === "dodge") val = p * c.defRef * 2.5;
     else if (f.k === "life") val = p * c.atkRef * 0.5;
     else if (f.k === "aspd") val = p * c.atkRef * 0.8;
-    /* v5.0 极品词条: 数值已×1.8, 评分额外再加30%权重, 确保极品在阿青择优中优先 */
     fx += val * (f.legendary ? 1.3 : 1);
   }
-  /* 星级锚: 相邻星差 ×境界逐级放宽; 三维+词条压缩成浮分且封顶在本档步长内
-     → 同星内比 roll 肥瘦, 跨星看锚差 —— 2星防血装 roll 再肥也压不过 4星古宝,
-     阿青择优(smartEquip/keepArtQuiet 同用此分)恢复"品质优先, 同品质比养成"的直觉 */
-  const STEP = [32, 38, 44, 50, 56, 62];
+  /* 品质乘数: 白1.0 / 蓝1.4 / 绿1.8 / 金2.5 / 紫3.5 / 红5.0 */
+  const QMUL = [1.0, 1.4, 1.8, 2.5, 3.5, 5.0];
   const q = Math.max(0, Math.min(5, a.q | 0));
-  const anchor = lv * STEP.slice(0, q).reduce((s, x) => s + x, 0);
-  return Math.round(anchor + Math.min(lv * STEP[q], (base + fx) * 0.32));
+  return Math.round((base + fx) * QMUL[q]);
 }
 
 function smartEquip(a) {
