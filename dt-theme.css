@@ -1337,20 +1337,22 @@
   width:auto !important;max-width:100% !important;min-width:0 !important;
   box-sizing:border-box !important;
   padding:0 !important;
-  display:flex !important;flex-direction:row !important;flex-wrap:nowrap !important;
-  align-items:center !important;justify-content:flex-end !important;
-  gap:5px !important;text-align:right !important;position:relative !important;white-space:nowrap !important}
-/* v7.2: 战斗力显示 */
-.realm-badge .rb-power{font-size:10px;color:#f0c98a;letter-spacing:1px;font-weight:600;line-height:1.3}
-.realm-badge .rb-power::before{content:"战力 ";color:#8b94a8;font-weight:400}
+  display:flex !important;flex-direction:column !important;
+  align-items:flex-start !important;justify-content:center !important;
+  gap:2px !important;text-align:left !important;position:relative !important}
+/* v7.2: 第一行: 大境界+小境界+榜, 第二行: 战力 */
+.realm-badge .big{font-size:16px !important}
 .realm-badge .sub-a{font-size:10px !important;color:#b9c3d8 !important;letter-spacing:0 !important;font-weight:400 !important}
 .realm-badge .sub-b{display:none !important}
-/* v7.3: 榜字紧跟境界名, 加大圆形金框 */
+.realm-badge .rb-power{font-size:10px;color:#f0c98a;letter-spacing:1px;font-weight:600;line-height:1.3}
+.realm-badge .rb-power::before{content:"战力 ";color:#8b94a8;font-weight:400}
+/* 榜字圆形金框, 跟大境界名同行 */
 .realm-badge .rb-rank{
   font-size:14px !important;color:#f0c98a !important;font-weight:700 !important;
   border:1.5px solid rgba(240,201,138,.6) !important;border-radius:50% !important;
   width:28px !important;height:28px !important;line-height:25px !important;
-  text-align:center !important;flex:none !important}
+  text-align:center !important;flex:none !important;
+  position:absolute !important;right:-40px !important;top:0 !important}
 /* 玩家名在境界区下面 */
 .realm-left .pname-btn{margin-top:2px !important}
 /* 「闲人」朱印复位(左下, 与右中"榜"印呼应) */
