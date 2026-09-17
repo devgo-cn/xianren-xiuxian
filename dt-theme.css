@@ -1338,7 +1338,7 @@
 .realm-badge{
   background-color:transparent !important;
   border:0 !important;border-radius:0 !important;
-  background-image:url('../assets/realm-badge.png') !important;
+  background-image:url('assets/realm-badge.png') !important;
   background-size:100% 100% !important;background-repeat:no-repeat !important;
   box-shadow:none !important;
   filter:drop-shadow(0 5px 14px rgba(0,0,0,.5));
