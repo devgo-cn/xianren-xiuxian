@@ -58,8 +58,6 @@ function realmMult() { return Math.pow(bigIdx() + 1, 2.05); }
 
 function rateNow() { return Math.max(0, fin(4 * realmMult() * artMult() * arrMult(state.arrayLv) * buffMult(), 0)); }
 
-function maxQIdx() { return Math.min(bigIdx(), QUALITY.length - 1); }
-
 function pickQ() {
   /* v5.0 去掉境界锁品质: 炼气期也能出玄天, 但权重天然低(玄天1/100=1%)。
    * 装备属性 = 境界lv × 品质mult, 炼气玄天也是炼气期用的(数值低), 不破坏平衡。 */
@@ -525,7 +523,6 @@ export {
   loadRecipe,
   mainMoment,
   makeArt,
-  maxQIdx,
   openAlchemy,
   openEquip,
   openSkills,
