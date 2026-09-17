@@ -2309,6 +2309,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     for (const e of G.enemies) { e.alive = false; e.dying = 0; if (e.armature) { try { despawnEnemy(e); } catch(err) {} } }
     G.enemies.length = 0;
     G.bossActive = false;
+    G.kills = 0;   /* v5.1 结算后HUD击杀数清零(原只重置trialKills, G.kills没重置导致HUD显示不清零) */
     G.trialT = BC.trialSecs; G.trialKills = 0; G.trialTier = 1;
     G.trialSettled = false; G.trialRound++; G.trialBossDone = false;
     G.trialSpawned = 0; G.trialBossKilled = false;   /* v5.0 重置301只怪池计数 */
