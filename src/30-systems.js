@@ -193,7 +193,8 @@ function renderStory() {
     (state.realmIdx >= TOTAL_SEGS - 1 ? "（仙途漫漫 · 已臻极巅）" : "");
   // 只显示有记载的大境章
   const order = PLOT.slice(0, bi + 1).map(v => v[0].big);
-  const chapters = order.filter(b => state.journal.some(j => j.big === b));
+  const journalSet = new Set(state.journal.map(j => j.big));
+  const chapters = order.filter(b => journalSet.has(b));
   chips.innerHTML = "";
   if (!chapters.length) {
     body.innerHTML = `<div class="empty-hint">尚无记载。<br>仙途伊始，一切从你打坐感应灵气开始。</div>`;
