@@ -2342,7 +2342,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   let _wasSpeedBuff = false;   /* 身法状态切换检测: 避免每帧调 updateHUD */
   let _trialModalEl = null;   /* trialModal 元素懒加载缓存 */
   function stageW() { return CW; }
-  function stageH() { return CH; }
   function floorY() { return CH * 0.92; }
   /* v3.7 三车道: lane 0 最近, 1 居中, 2 最远(靠上)。v3.7.1 对齐新背景的石板路:
    * 石板路可站区间约 0.72~0.94 倍横带高(上方是花草丛, 下方是前景草), 三道按
