@@ -1289,8 +1289,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* BOSS活跃时不刷新小怪 */
     if (G.bossActive) return null;
     /* v5.0 BOSS = 第301只, 300只普通怪刷完后出现, 一轮只出一次。
-     * 双重保护: trialBossDone标记 + 场上已有存活BOSS检查, 防止因同屏满/时序问题刷出两只 */
-    if (G.trialSpawned >= BC.trialPool.totalMobs && !G.trialBossDone && !G.enemies.some(e => e.type === 'boss' && e.alive)) {
+     * 三重保护: trialBossDone标记 + bossActive + 场上有BOSS对象(含死亡动画中), 防止刷出两只 */
+    if (G.trialSpawned >= BC.trialPool.totalMobs && !G.trialBossDone && !G.bossActive && !G.enemies.some(e => e.type === 'boss')) {
       if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
       const e = makeEnemy('boss');
       e.x = G.camX + stageW() + BC.enemySpawnOffset;
