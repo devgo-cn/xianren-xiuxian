@@ -2699,14 +2699,16 @@ const SKILL_DEFS = [
     from: { threshold: 5 },                to: { threshold: 25 },
     fmt: v => `目标残血 <b>${v.threshold.toFixed(0)}%</b> 以下 · 该击伤害翻倍` },
   { id: "jifeng",  name: "疾风步", ico: "≫",
-    from: { chance: 15, dur: 8, mult: 3, dodge: 4 },   to: { chance: 85, dur: 8, mult: 3, dodge: 25 },
-    /* v5.0 实际mult=3(基础2隐藏+技能1), 说明显示"2倍速"是玩家感知的技能加成
-     * v5.1 触发方式从击杀后改为攻击时(playerStrike), 文案"击杀"→"命中"; 时长固定8秒只成长概率 */
+    from: { chance: 12, dur: 8, mult: 2.5, dodge: 4 },   to: { chance: 60, dur: 8, mult: 2.5, dodge: 25 },
+    /* v8.1 基础倍速 2→1.5, 技能 mult 同步 -1(疾风步 3→2.5), HUD 显示公式 (mult-1) 不变, 仍是"×2 倍速"
+     * v5.1 触发方式从击杀后改为攻击时(playerStrike), 文案"击杀"→"命中"; 时长固定8秒只成长概率
+     * v8.1 概率下调: 15~85 → 12~60 (满级触发率砍掉约 1/3, 缓解"全程不停"的观感) */
     fmt: v => `命中 ${v.chance.toFixed(0)}% 入 2 倍速 8 秒 · <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
   { id: "suodi",   name: "缩地成寸", ico: "⋙",
-    from: { chance: 3, dur: 8, mult: 4, dodge: 8 }, to: { chance: 35, dur: 8, mult: 4, dodge: 40 },
-    /* v5.0 实际mult=4(基础2隐藏+技能2), 说明显示"3倍速"是玩家感知的技能加成
-     * v5.1 触发方式从击杀后改为攻击时(playerStrike), 文案"击杀"→"命中"; 时长固定8秒只成长概率 */
+    from: { chance: 3, dur: 8, mult: 3.5, dodge: 8 },    to: { chance: 22, dur: 8, mult: 3.5, dodge: 40 },
+    /* v8.1 基础倍速 2→1.5, 技能 mult 同步 -1(缩地 4→3.5), HUD 显示公式 (mult-1) 不变, 仍是"×3 倍速"
+     * v5.1 触发方式从击杀后改为攻击时(playerStrike), 文案"击杀"→"命中"; 时长固定8秒只成长概率
+     * v8.1 概率下调: 3~35 → 3~22 (满级触发率 35%→22%, 三连斩一轮至少出一次的概率 72.5%→51.2%) */
     fmt: v => `命中 ${v.chance.toFixed(1)}% 入 3 倍速 8 秒 · <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
   { id: "pojia",   name: "破甲击", ico: "◆",
     from: { chance: 5, pen: 30 },          to: { chance: 25, pen: 70 },

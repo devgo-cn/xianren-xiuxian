@@ -136,7 +136,12 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     return true;
   }
 
-  const G = {    t:0, kills:0, spirit:0, speedMult:2, speedMultTimer:0, state:'walk', camX:0, paused:false,
+  /* v8.1 基础倍速 2 → 1.5 (用户要求)。
+   * 技能 mult 同步下调 1: 疾风步 3→2.5(HUD 仍显示 ×2), 缩地 4→3.5(HUD 仍显示 ×3)。
+   * HUD 公式 (mult - 1) 不变, 所以玩家看到的"2倍速/3倍速"说法完全没变,
+   * 变的只是底层真实速度 —— 相当于整体降速 25%, 战斗节奏更从容。 */
+  const BASE_SPEED_MULT = 1.5;
+  const G = {    t:0, kills:0, spirit:0, speedMult:BASE_SPEED_MULT, speedMultTimer:0, state:'walk', camX:0, paused:false,
     player:null, pets:[], enemies:[], fx:[], dmg:[], drops:[], spawnT: 0,
     sprite:null, bgImg:null, spriteReady:false, bgReady:false, extraStrike:false,
     speedDodge:0, nextStrikeCrit:0,
@@ -1068,7 +1073,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     /* v3.2 验收用：直接设定倍速（跳过技能随机 proc），让 A/B 对照可复现。
      * 传 1 即清除加速。 */
     __setSpeedMultForTest: (m, dur) => {
-      G.speedMult = Math.max(2, m || 2);
+      G.speedMult = Math.max(BASE_SPEED_MULT, m || BASE_SPEED_MULT);
       G.speedMultTimer = G.speedMult > 1 ? (dur || 30) : 0;
       if (G.speedMult <= 1) { G.speedDodge = 0; }
       updateHUD();
@@ -1476,7 +1481,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
    * 为什么把 dodge 也收进来：身法是"倍率+闪避"一体的，闪避同样只取高者，
    * 免得出现"倍率被 ×3 盖住、闪避却按 ×2 挂着"的精神分裂状态。 */
   function applySpeedBuff(mult, dur, dodge) {
-    G.speedMult = Math.max(G.speedMult, mult || 1);
+    G.speedMult = Math.max(G.speedMult, Math.max(BASE_SPEED_MULT, mult || BASE_SPEED_MULT));
     G.speedDodge = Math.max(G.speedDodge || 0, dodge || 0);
     G.speedMultTimer = dur;        /* 重置时间轴，不做 max 延长 */
     return G.speedMult;
@@ -2066,13 +2071,24 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         p.lane = (p.lane || 0) + Math.sign(dD) * Math.min(Math.abs(dD), 0.8 * dt);   /* v4.4: 纵向速度1.2→0.8 lane/s, 约44px/s与横向42px/s匹配, 转弯不再加速 */
       }
     } else {
-      /* v6.0 无怪时向前推进 —— 防穿越按二维地面距离挑最近的挡路怪。 */
+      /* v6.0 无怪时向前推进。
+       * ⚠️ v8.1 FIX (勿回退) —— 原实现会挑"最近的挡路怪"并把玩家钉在 `nearest - 40`:
+       *   1) 怪站定后玩家被永久卡住, 只能等怪自己走过来, 推进节奏发闷;
+       *   2) 与"怪站位点跟随玩家(p.x + atkRange)"形成互锁 —— 玩家被顶住、
+       *      怪被拉站位点, 一推一拉之间怪看起来就在【受击后退】。
+       * 而上面 `if (near)` 分支的 `standAt = near.x - (p.atkRange + enemyHalfW(near))`
+       * 已经保证了"走到剑尖刚好够到怪"的精确停位, 这里不需要再做一层硬卡。
+       * 现在只保留一个极简的防穿越: 不要越过最近怪的身体中心(否则会穿模/绕到怪背后)。 */
       p.moving = 1; p.walkT += dt*8; p.x += BC.playerSpeed*dt;
-      let nearest = Infinity;
+      let nearest = Infinity, nearestE = null;
       for (const e of G.enemies) {
-        if (e.alive && e.dying <= 0 && e.x > p.x - 1 && e.x < nearest) nearest = e.x;
+        if (e.alive && e.dying <= 0 && e.x > p.x - 1 && e.x < nearest) { nearest = e.x; nearestE = e; }
       }
-      if (nearest < Infinity) p.x = Math.min(p.x, nearest - PLAYER_HIT_GAP);
+      /* 只在"玩家即将越过怪"时才刹住, 且留足身位(怪半宽), 不再用大间距 PLAYER_HIT_GAP */
+      if (nearestE) {
+        const guard = nearest - Math.max(12, enemyHalfW(nearestE));
+        if (p.x > guard) p.x = guard;
+      }
     }
   }
   function updatePets(dt) {
@@ -2215,7 +2231,18 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     const an = B.anims;
     let want = an.walk;
     if (dead) want = an.dead;
-    else if (e.hurtT > 0) want = an.hurt;
+    /* ⚠️ v8.1 FIX (勿回退) —— "怪物受击后退"的根因之三(也是最隐蔽的一条):
+     * 旧实现在 hurtT > 0 时切 `an.hurt`(即素材的 Damage 动画)。实测发现这些
+     * DragonBones 素材的 Damage 动画【骨架整体带纵向/横向位移】(美术做的踉跄后仰),
+     * 而 drawEnemies 用 armatureAABB(当前姿态) 来对齐落地锚点 —— 姿态一变,
+     * AABB 中心跟着变, display 的落点就整体平移, 看上去就是"被打一下往后退一截"。
+     *
+     * 而且这个位移改的是【渲染锚点】而非 e.x, 所以逻辑层完全查不出来
+     * (e.x 全程单调递减, 没有任何后退), 只有画面上在退 —— 极难定位。
+     *
+     * 修法: 受击【不切动画】, 保持当前的 walk/idle/attack 姿态, 靠已有的
+     * alpha 0.7 + hurt 滤镜提供受击反馈。表现上依然"打到了", 但骨架不位移。
+     * 配套: drawEnemies 里对受击中的怪锁定用 idle 基准尺寸, 避免呼吸式缩放。 */
     else if (e.anim > 0) want = an.attack;
     else if (!e.moving) want = an.idle;
     if (!want || !A.hasAnimation(want)) want = an.idle || an.walk;
@@ -2293,19 +2320,31 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
          * 远程怪前伸大 -> 自然站远, "远程"定位自动成立。
          * 技能怪的 atkRange 来自 04_数据/stop_class5.json 的 stopPx(= 58.3 + reachPx),
          * 已含玩家半宽, 故这里直接用即可, 不再做 min/区间之类的人为收窄。 */
-        if (e.stopX == null || e.x < e.stopX - BC.queueGap) {
-          const stopX = Math.max(p.x + (e.atkRange || 0), prevX + BC.queueGap);
-          e.stopX = stopX;
-        }
+        /* ⚠️ v8.1 FIX (勿回退) —— "怪物受击后退"的根因之一:
+         * 旧条件 `e.stopX == null || e.x < e.stopX - queueGap` 意味着
+         * 【怪一旦走到站位点, stopX 就永久冻结】(e.x ≈ stopX, 条件不再成立)。
+         * 之后玩家继续推进, 这份冻结的旧 stopX 就落在玩家左侧 → 见下方回拉逻辑,
+         * 怪被硬拉回旧站位点, 表现为"打一下就往后退一截"。
+         * 修法: 站位点必须【每帧跟随玩家】, 因为它是相对量(p.x + atkRange),
+         * 玩家动它就动; 队列后方怪则用 prevX + queueGap 保持不重叠。 */
+        const stopX = Math.max(p.x + (e.atkRange || 0), prevX + BC.queueGap);
+        e.stopX = stopX;
         prevX = Math.max(e.x, e.stopX);
       }
     }
-    /* v3.8.1 防交错兜底: 排队目标 stopX 恒在玩家右侧, 发现怪被留在 stopX 左侧
-     * (玩家推进/移动曾可穿过站位怪)直接拉回站位 —— 杜绝"跑到玩家后面咬空气"。 */
+    /* v8.1 FIX (勿回退) —— "怪物受击后退"的根因之二:
+     * 旧代码 `if (e.x < e.stopX - 4) e.x = e.stopX;` 是【硬瞬移】,
+     * 配合上面冻结的 stopX, 就会把已经站定的怪瞬间弹到更右边(视觉=后退)。
+     *
+     * 这条兜底的初衷只是"防穿越"(玩家推进时不能穿过站位怪跑到它右边),
+     * 所以正确做法是【只拦不推】: 只有当怪真的落到了玩家左侧(异常态)才修正,
+     * 且修正目标是玩家右侧一个安全距离, 而不是把它推到 stopX 站位点。
+     * 正常战斗中 e.x >= p.x 恒成立, 这段完全不会触发 —— 怪永不后退。 */
     for (const e of G.enemies) {
       if (!e.alive || e.dying > 0 || e.stopX == null) continue;
       if (e.__skillHold) continue;           /* v4.8 定桩怪不回拉 */
-      if (e.x < e.stopX - 4) e.x = e.stopX;
+      const minX = p.x + Math.max(8, (e.atkRange || 0) * 0.5);
+      if (e.x < minX) e.x = minX;            /* 只在怪被玩家越过时才纠正, 且只纠正到玩家右侧 */
     }
     for (const e of G.enemies) {
       if (e.dying>0) { e.dying-=dt; if (e.armature) advanceRatty(e, dt, true); continue; }
@@ -2503,7 +2542,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   function update(dt) {
     if (G.speedMultTimer > 0) {
       G.speedMultTimer -= dt;
-      if (G.speedMultTimer <= 0) { G.speedMult = 2; G.speedMultTimer = 0; G.speedDodge = 0; }   // 身法时效到点, 退回基础2倍速, 闪避加成一并散去
+      if (G.speedMultTimer <= 0) { G.speedMult = BASE_SPEED_MULT; G.speedMultTimer = 0; G.speedDodge = 0; }   // 身法时效到点, 退回基础1.5倍速, 闪避加成一并散去
     }
     const nowSpeedBuff = G.speedMultTimer > 0;
     if (nowSpeedBuff !== _wasSpeedBuff) { _wasSpeedBuff = nowSpeedBuff; updateHUD(); }
@@ -3662,7 +3701,11 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     if (spEl) spEl.textContent = fmtNum(G.spirit);
     if (speedEl) {
       /* v5.0 基础2倍速为常态隐藏不显示, 技能加速中显示玩家感知的加成倍速(实际mult-1): 疾风步×2, 缩地×3 */
-      if (G.speedMultTimer > 0) { speedEl.style.display = ''; speedEl.textContent = '×'+(G.speedMult - 1)+' 倍速 ('+G.speedMultTimer.toFixed(1)+'s)'; }
+      /* v8.1 HUD 口径: 基础倍速已是 1.5(而非 2), 所以旧公式 (mult-1) 会显示成
+       * ×1.5(疾风步) / ×2.5(缩地) —— 玩家看不懂。改为按"技能档位"显示:
+       * 疾风步 2.5 → ×2, 缩地 3.5 → ×3, 与技能文案("入 2 倍速 / 入 3 倍速")完全一致。
+       * 判据用 mult >= 3.5 区分高档, 阈值取两档中点 3.0。 */
+      if (G.speedMultTimer > 0) { speedEl.style.display = ''; speedEl.textContent = '×'+(G.speedMult >= 3 ? 3 : 2)+' 倍速 ('+G.speedMultTimer.toFixed(1)+'s)'; }
       else speedEl.style.display = 'none';
     }
     if (stateEl) stateEl.textContent = G.state === 'fight' ? '战斗中' : '推进中';
