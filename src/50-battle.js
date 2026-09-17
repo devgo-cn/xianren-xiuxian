@@ -2825,7 +2825,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       else if (G.petEagleReady && G.petEagleSprite && pet.type === 'eagle') {
         const EAGLE_SPRITE = { cols: 10, fw: 704, fh: 580 };
         const frameIdx = pet.flyFrame % 30;
-        const drawH = Math.min(CH * 0.5, 120);
+        const drawH = Math.min(CH * 0.35, 52);
         const drawW = drawH * (EAGLE_SPRITE.fw / EAGLE_SPRITE.fh);
         S.main.visible = true;
         S.main.texture = frameTex(G.petEagleSprite, EAGLE_SPRITE.cols, EAGLE_SPRITE.fw, EAGLE_SPRITE.fh, frameIdx);
@@ -3833,7 +3833,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     G.pets.push({
       id: 'pet_eagle', name: '灵鹰', type: 'eagle',
       atk: 0, aspd: 0, atkRange: 0, hp: 999, maxHp: 999,
-      offsetX: 80, offsetY: -50,
+      offsetX: 120, offsetY: -100,
       x: 35, y: 0, atkT: 0, anim: 0, hurtT: 0, alive: true,
       flyFrame: 0, flyTimer: 0, bobT: 0,
       fetch: { state: 'idle', drop: null },
