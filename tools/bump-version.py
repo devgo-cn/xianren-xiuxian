@@ -47,13 +47,19 @@ def get_current_version():
 
 
 def update_index_html(version):
-    """更新 index.html 中的 window.APP_VER。"""
+    """更新 index.html 中的 window.APP_VER 和 CSS/JS 缓存版本号。"""
     html = read_file("index.html")
     new_html = re.sub(
         r'window\.APP_VER\s*=\s*"[^"]*"',
         f'window.APP_VER="{version}"',
         html,
         count=1,
+    )
+    # 同步 dt-theme.css 的缓存版本号(防 CSS 改了浏览器还用旧缓存)
+    new_html = re.sub(
+        r'dt-theme\.css\?v=[\d.]+',
+        f'dt-theme.css?v={version}',
+        new_html,
     )
     if new_html != html:
         write_file("index.html", new_html)
