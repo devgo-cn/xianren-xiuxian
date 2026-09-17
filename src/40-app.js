@@ -306,7 +306,7 @@ function startGame() {
       addJournal({ key: o0.key, big: o0.big, kind: o0.kind, title: o0.title, text: o0.text }); // 老档补记起点
     }
   }
-  setInterval(save, 30000);   // v2.3 PERF: 自动存档 8s→30s(pagehide/visibilitychange 已保证退出即存, 挂机期 30s 足够防崩溃丢档)
+  setInterval(() => { if (!document.hidden) save(); }, 30000);   // v2.3 PERF: 自动存档 8s→30s(pagehide/visibilitychange 已保证退出即存, 挂机期 30s 足够防崩溃丢档); 后台跳过
   /* v2.5: 关页/切后台的 cloudFlush 走异步 fetch, App 被杀瞬间请求常被掐断 → 进度白丢。
    * 改为会话内周期性兜底: 有脏数据且页面可见时每 20s 上云一次, 关闭时最多只差 20s,
    * 不再"白玩几分钟"。localStorage 同步写照旧保底(进程崩也不丢)。 */
@@ -340,7 +340,7 @@ function startGame() {
   });
   cloudInit();                  // 云存档面板交互 + 断网恢复
   startHeartbeat();             // v1.8.0 周期心跳(90s)
-  setInterval(stayMailCheck, 60000);   // 在线寄包: iOS 常驻标签页也能收到化身手札
+  setInterval(() => { if (document.hidden) return; stayMailCheck(); }, 60000);   // 在线寄包: iOS 常驻标签页也能收到化身手札; 后台跳过
   initFxDiag();
   /* v3.2: 装配统一舞台 —— 原先这里是 initAura() + initBg() + initFxLayer() 三次调用,
    * 各自启一张全屏 canvas + 一个 rAF。现在合成为 1 张 #stage / 1 个 ticker。
