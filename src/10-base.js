@@ -928,7 +928,7 @@ function debugEncounter() {
 function artCtx() {
   const lv = (state.realmIdx || 0) + 1;
   let fa = 0, fd = 0, fh = 0;
-  const _eb = typeof equipBonus === "function" ? equipBonus() : { atk: 0, def: 0, hp: 0 };
+  const _eb = equipBonus();
   fa = _eb.atk || 0; fd = _eb.def || 0; fh = _eb.hp || 0;
   return {
     atkRef: Math.max(220, 10 + 46 * lv + fa),
