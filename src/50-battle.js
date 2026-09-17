@@ -3017,15 +3017,15 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     const boxB = SPRITE_BOX_B[frameIdx] || SPRITE.fh;
     const bs = bodyH / boxH;
     const drawW = SPRITE.fw * bs;
-    /* 疾风步/缩地成寸残影: 加速期间玩家身后显示3个半透明残影, 倍速越高残影越多 */
-    if (G.speedMult > 1 && !p.attackAnim) {
+    /* 疾风步/缩地成寸残影: 加速期间或攻击力buff时玩家身后显示半透明残影 */
+    if ((G.speedMult > 1 || p.atkBuff > 0) && !p.attackAnim) {
       const trailCount = G.speedMult >= 3 ? 4 : 3;
       const ftex = frameTex(G.sprite, SPRITE.cols, SPRITE.fw, SPRITE.fh, frameIdx);
       for (let i = trailCount; i >= 1; i--) {
         const t = S.trails[i - 1];
         t.visible = true;
         t.texture = ftex;
-        t.alpha = 0.12 * (trailCount + 1 - i) / trailCount;
+        t.alpha = (G.speedMult > 1 ? 0.12 : 0.18) * (trailCount + 1 - i) / trailCount;
         t.position.set(sx - i * 10, sy);
         t.scale.set(bs * (1 + i * 0.03), bs);
       }
@@ -3064,7 +3064,7 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     const fxC = window.BattleGL.layers.fx;
     const pool = drawFx._pool || (drawFx._pool = []);
     for (const o of pool) o.__used = false;
-    /* 加速期间屏幕速度线: 横向线条从右向左流动, 增强速度感 */
+    /* 加速期间屏幕速度线: 横向线条从左向右流动(方向修正) */
     const lines = drawFx._lines || (drawFx._lines = (() => { const g = new PIXI.Graphics(); fxC.addChild(g); return g; })());
     lines.clear();
     if (G.speedMult > 1) {
@@ -3072,10 +3072,10 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
       const lineCount = G.speedMult >= 3 ? 12 : 8;
       for (let i = 0; i < lineCount; i++) {
         const y = (i / lineCount) * CH + (G.t * 200 * G.speedMult + i * 37) % CH;
-        const x = (G.t * 300 * G.speedMult + i * 53) % CW;
+        const x = CW - (G.t * 300 * G.speedMult + i * 53) % CW;
         const len = 30 + Math.random() * 50;
         lines.moveTo(x, y);
-        lines.lineTo(x - len, y);
+        lines.lineTo(x + len, y);
       }
     }
     for (const f of G.fx) {
