@@ -2165,11 +2165,21 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       /* 朝向固定朝右(宠物在玩家左侧跟随, 不摆头) */
       pet.face = 1;
 
-      /* 灵鹰: 定时发射弹幕 */
+      /* 灵鹰: 定时发射弹幕(追踪最近怪物) */
       if (pet.type === 'eagle') {
         pet.boltTimer = (pet.boltTimer || 2) - dt;
         if (pet.boltTimer <= 0 && G.enemies && G.enemies.some(e => e.alive)) {
-          G.eagleBolts.push({ x: pet.x + pet.offsetX + 40, y: pet.y + pet.offsetY - 30, vx: 400, t: 0 });
+          /* 找最近怪物 */
+          let target = null, minDist = Infinity;
+          for (const e of G.enemies) {
+            if (!e.alive) continue;
+            const d = Math.abs(e.x - pet.x);
+            if (d < minDist) { minDist = d; target = e; }
+          }
+          if (target) {
+            const sx = pet.x + pet.offsetX + 40, sy = pet.y + pet.offsetY - 30;
+            G.eagleBolts.push({ x: sx, y: sy, tx: target.x, ty: target.y, speed: 500, t: 0, target });
+          }
           pet.boltTimer = 2;
         }
       }
@@ -2224,22 +2234,29 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     if (G.eagleBolts) {
       for (let i = G.eagleBolts.length - 1; i >= 0; i--) {
         const b = G.eagleBolts[i];
-        b.x += b.vx * dt;
         b.t += dt;
-        let hit = false;
-        if (G.enemies) {
-          for (const e of G.enemies) {
-            if (!e.alive) continue;
-            if (Math.abs(b.x - e.x) < 30 && Math.abs(b.y - e.y) < 40) {
-              /* 伤害 = 玩家攻击力 × 80%, 带破甲 */
-              const dmg = calcDmg(PST.atk, 0.8, e.def, PST.pen || 0);
-              dealDamage(e, dmg, '#7fe0ff', false);
-              hit = true;
-              break;
-            }
-          }
+        /* 追踪目标 */
+        if (b.target && b.target.alive) {
+          b.tx = b.target.x;
+          b.ty = b.target.y;
         }
-        if (hit || b.x > GW + 100 || b.t > 3) G.eagleBolts.splice(i, 1);
+        const dx = b.tx - b.x, dy = b.ty - b.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > 5) {
+          b.x += dx / dist * b.speed * dt;
+          b.y += dy / dist * b.speed * dt;
+        }
+        let hit = false;
+        /* 命中检测 */
+        if (dist < 30) {
+          const e = b.target;
+          if (e && e.alive) {
+            const dmg = calcDmg(PST.atk, 0.8, e.def, PST.pen || 0);
+            dealDamage(e, dmg, '#7fe0ff', false);
+          }
+          hit = true;
+        }
+        if (hit || b.t > 3) G.eagleBolts.splice(i, 1);
       }
     }
 
@@ -3840,7 +3857,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     G.pets.push({
       id: 'pet_eagle', name: '灵鹰', type: 'eagle',
       atk: 0, aspd: 0, atkRange: 0, hp: 999, maxHp: 999,
-      offsetX: 120, offsetY: -100,
+      offsetX: 120, offsetY: -200,
       x: 35, y: 0, atkT: 0, anim: 0, hurtT: 0, alive: true,
       flyFrame: 0, flyTimer: 0, bobT: 0,
       fetch: { state: 'idle', drop: null },
