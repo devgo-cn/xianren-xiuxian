@@ -97,7 +97,7 @@ function updateHUD() {
   // v2.5: 所有境界突破均手动 —— 修为圆满即可点突破(小境简版/大境天劫)
   const can = state.exp >= r.need && state.realmIdx < TOTAL_SEGS - 1;
   const btn = _hud.btnBreak;
-  btn.disabled = !can;
+  if (btn) btn.disabled = !can;
   // 注意：绝不能 btn.textContent=...（会删除按钮内嵌的 SVG 墨块皮肤）→ 只更新文字标签
   const bt = btn.querySelector(".label");
   if (bt) { if (bt.textContent !== "突破") bt.textContent = "突破"; }   /* v4.4: 统一"突破"二字, 去掉☯和"修为未圆满"——可突破状态已由 glow-gold 闪光+hint-gold 文字提亮提醒, 文字无需区分状态 */
