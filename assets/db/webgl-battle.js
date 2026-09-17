@@ -36,6 +36,7 @@
             transparent: true, autoStart: false,
             antialias: false, resolution: 1, autoDensity: false,
             depth: false, stencil: false,
+            preserveDrawingBuffer: false,   /* v6.11 PERF: 显式声明不保留绘图缓冲, 省 GPU 拷贝 */
             /* v6.7 PERF: high-performance → low-power。
              * 手机 SoC 的 GPU 有大小核集群, high-performance 会强制锁大核, 是发烫主因之一。
              * 2D 骨骼动画用小核完全够, 视觉无差, 功耗显著下降。 */
@@ -50,6 +51,11 @@
 
         root = new PIXI.Container();
         app.stage.addChild(root);
+        /* v6.11 PERF: 关掉事件系统遍历。战斗层 canvas 本身 pointer-events:none,
+         * 根本不接收交互事件, Pixi 每帧遍历整棵场景树做 hit-test 是纯浪费。 */
+        root.interactiveChildren = false;
+        /* v6.11 PERF: Sprite 对齐像素网格, 避免半像素采样的额外 GPU 开销 */
+        try { PIXI.settings.ROUND_PIXELS = true; } catch (e) {}
         /* z 序对应原 2D 画家算法；farUI/nearUI 分别承接远/近批次血条+法环，
          * playerUI 是玩家血条 —— 与 2D 版"画完怪立刻画其 UI"的时序一致。
          * v4.2: foreground = 前景遮挡层(背景源图底部条带再画一次, 压在所有实体
