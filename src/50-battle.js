@@ -1988,7 +1988,20 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         else if (pet.faceAcc < -faceThresh) { pet.face = -1; pet.faceAcc = 0; }
         if (Math.abs(dxFrame) > 4) { pet.face = dxFrame > 0 ? 1 : -1; pet.faceAcc = 0; }
         if (d.t2 >= 0.7) {
-          try { if (window.BattleAPI.applyEquipDrop) window.BattleAPI.applyEquipDrop(d.eq.id); } catch (err) {}
+          /* v6.16: 宠物头顶弹装备名(品质色); 没穿上的熔作灵石飘上去 */
+          let res = null;
+          try { if (window.BattleAPI.applyEquipDrop) res = window.BattleAPI.applyEquipDrop(d.eq.id); } catch (err) {}
+          if (res) {
+            const qc = QUALITY_COLOR[Math.max(0, Math.min(5, res.q | 0))] || '#aab2c0';
+            if (res.kept) {
+              G.pushDmg({ x: pet.x, y: pet.y - 40, val: res.name, color: qc, t: 0, vx: 0 });
+            } else {
+              G.pushDmg({ x: pet.x, y: pet.y - 40, val: '+' + fmtNum(res.spirit) + ' 灵石', color: '#f0c98a', t: 0, vx: 0 });
+              /* 熔作灵石: 从宠物位置飘向上角收益区, 复用 spirit 掉落飞行逻辑 */
+              G.drops.push({ kind: 'spirit', wx: pet.x, x: worldToScreen(pet.x), y: pet.y - 10, gy: 0, vy: 0,
+                val: res.spirit, elite: false, enemy: '', t: 0, flyAt: 0.05, phase: 'fly' });
+            }
+          }
           d.phase = 'done'; pet.fetch.state = 'idle'; pet.fetch.drop = null;
         }
         continue;

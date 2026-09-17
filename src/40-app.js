@@ -645,11 +645,13 @@ function requestEquipDrop(info) {
 }
 
 function applyEquipDrop(id) {
-  if (!state) return;
+  if (!state) return { kept:false, spirit:0, name:'', q:0 };
   const i = _equipQueue.findIndex(e => e.id === id);
-  if (i < 0) return;                            // 已被拾取/超时处理过 → 幂等, 不重复入包
+  if (i < 0) return { kept:false, spirit:0, name:'', q:0 };  // 幂等
   const { a, elite } = _equipQueue.splice(i, 1)[0];
   const kept = keepArtQuiet(a);                 // 静默择优: 能顶替就换上, 不入眼熔作灵石
+  /* v6.16: 返回给战斗层——宠物头顶弹装备名/飘灵石动画 */
+  const spiritGain = kept ? Math.round(50 * Math.pow(1.6, a.q || 0)) : Math.round(40 * Math.pow(1.5, a.q || 0));
   if (kept && a.q > (state.bestArtQ || -1)) state.bestArtQ = a.q;
   if (elite || a.q >= 3) {
     pushMsg("avatar", `${elite ? "斩一精英" : "斩妖"}得宝 <b style="color:#f0c98a">${a.name}</b>`
@@ -658,6 +660,7 @@ function applyEquipDrop(id) {
   updateHUD();
   if (kept) updateArts();
   if (Date.now() - _dropSaveT > 15000) { __set_dropSaveT(Date.now()); save(); cloudSoon(); }
+  return { kept, spirit: spiritGain, name: a.name, q: a.q || 0 };
 }
 
 let _bindPoll = 0;
