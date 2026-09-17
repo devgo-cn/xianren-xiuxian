@@ -2588,6 +2588,8 @@ let _eqRecycle = [];
 
 const EQUI_SLOTI = ["w", "a", "p", "s"];
 
+const EQUI_CELLPOS = [{ pos: "left", i: 0 }, { pos: "up", i: 1 }, { pos: "right", i: 3 }, { pos: "down", i: 2 }];
+
 const EQUI_ICON = {
   w: '<svg viewBox="0 0 32 32"><path d="M23.6 2.6 C25.2 3.4 27 5.2 28 6.8 C22.4 13.6 15.6 20.2 9.4 24.8 C8.2 23.9 7.2 22.8 6.4 21.5 C11.7 15.2 17.4 8.8 23.6 2.6 Z" fill="currentColor"/><path d="M24.4 1.6 C25.6 2.2 26.8 3.2 27.8 4.4 C28.2 3.8 28.5 3 28.4 2.4 C27.5 1.6 26.3 1.2 25.2 1 Z" fill="currentColor" opacity=".8"/><path d="M7.2 20.8 C9.4 20.6 11.6 22.2 12.2 24.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6.6 23.8 C5.4 25.4 4.6 27.2 4.4 29.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8.2 25 C7.6 26.6 7.6 28.2 8.2 29.8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".75"/></svg>',
   a: '<svg viewBox="0 0 32 32"><path d="M16 2.6 C21 4.2 25.2 6 27.2 8.2 C28.2 14.2 26.8 20.8 23.2 25 C21 27.6 18.6 29.2 16 30.2 C13.2 29 10.6 27.2 8.4 24.4 C5.2 20.2 4 14 4.8 8.2 C7 6 11 4.2 16 2.6 Z" fill="currentColor"/><path d="M16 6.4 C16.1 13 16.1 20 16 26.4" stroke="rgba(8,12,20,.5)" stroke-width="1.7" fill="none" stroke-linecap="round"/><circle cx="10.6" cy="12.4" r="1.35" fill="rgba(8,12,20,.5)"/><circle cx="21.4" cy="12.4" r="1.35" fill="rgba(8,12,20,.5)"/></svg>',
@@ -2733,6 +2735,7 @@ export {
   DEV_KEY,
   DIMSTAT,
   DROP_CFG,
+  EQUI_CELLPOS,
   EQUI_ICON,
   EQUI_SLOTI,
   EVENTS,

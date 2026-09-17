@@ -5,7 +5,7 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, BIGS, DROP_CFG, FX_TXT, JRN_CAP, LIC_QCOL, MATS, QUALITY, SAVE_KEY, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, STORY_BY_KEY, STORY_PAGE, __set_rate, __set_rkAt, __set_skillSaveT, __set_srvOffset, __set_state, __set_storyChap, __set_traceT, __set_travelReturned, _eqRecycle, _eqSel, _pred, _rkAt, _skillSaveT, _storyChap, _traceT, _travelReturned, cld, cnNum, esc, fmt, rnOk, selRecipe, skillExpNeed, state } from './00-pure.js';
+import { $, BIGS, DROP_CFG, EQUI_CELLPOS, FX_TXT, JRN_CAP, LIC_QCOL, MATS, QUALITY, SAVE_KEY, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, STORY_BY_KEY, STORY_PAGE, __set_rate, __set_rkAt, __set_skillSaveT, __set_srvOffset, __set_state, __set_storyChap, __set_traceT, __set_travelReturned, _eqRecycle, _eqSel, _pred, _rkAt, _skillSaveT, _storyChap, _traceT, _travelReturned, cld, cnNum, esc, fmt, rnOk, selRecipe, skillExpNeed, state } from './00-pure.js';
 import { CLD_API, EQUI_SLOTN, SND, adopt, apiRoot, artCtx, cldFlash, cldId, cldUI, closeRename, cloudSnap, cloudSoon, debugEncounter, deviceId, ensureScrollFx, exitDim, fitsRecipe, g1Pack, g1Unpack, handleKicked, licBuild, locById, mailDot, mailLine, migrate, pushBattleStats, pushMsg, renderPName, renderPillHints, renderSettings, resetDimKnob, rkSegLabel, seg, setRealmSub, sizeBurst, skillDef, skillGet, skillLv, storyItemHtml, traceRefresh, travelBtnLbl, trimJournal } from './10-base.js';
 
 function realm() { return seg(state.realmIdx); }
