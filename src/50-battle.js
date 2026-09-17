@@ -85,8 +85,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       10:{ hpK:4.00, atkK:1.65, defK:1.12, speed:125 },
     },
   };
-  /* 升档所需击杀数: base × step^(t-1) */
-  function tierNeed(t) { return Math.round(BC.tierNeedBase * Math.pow(BC.tierNeedStep, (t||1) - 1)); }
   /* v5.0 301只怪池: 按序号返回tier(T1@1-30, T2@31-60, ... T10@271-300) */
   function tierForSpawn(n) {
     const bands = BC.trialPool.tierBands;
@@ -601,7 +599,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   }
   /* ---------- 技能读取: 等级与数值的唯一来源是主游戏 SkillAPI ---------- */
   function skVal(id)  { const api = window.SkillAPI; return api ? api.val(id) : null; }   // {chance, dmg, ...} 已按等级插值
-  function skLv(id)   { const api = window.SkillAPI; return api ? api.lv(id) : 1; }
   function skExp(id,n){ const api = window.SkillAPI; if (api) api.addExp(id, n); }
   /* ---------- 技能名播报: 战斗画布中央书法大字, 弹入→停→快淡出(~0.75s 即隐) ----------
    * 覆盖式单槽不叠字; 同名 0.9s 冷却防高频 proc 连刷拖长显示 */
@@ -646,23 +643,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     e.lane = MID_LANE; e.y = laneOff(MID_LANE);
     G.enemies.push(e);
     return e;
-  }
-  /* 按给定进度取骨架；返回该姿态的渲染尺寸（用于探针换头等场景） */
-  function labPose(arm, anim, p) {
-    const A = arm.animation;
-    try { A.play(anim, 0); } catch (err) { return null; }
-    const B = BONES[LAB.slug];
-    const durF = (A._animationData && A._animationData.duration) || 30;
-    const fr = (A._animationData && A._animationData.frameRate) || 24;
-    const total = durF / fr;
-    let t = 0; const step = Math.max(1 / 240, total / 240);
-    const target = Math.max(0, Math.min(total - 1e-4, total * p));
-    /* 重播后步进到目标时刻 */
-    arm.advanceTime(-1e6);
-    A.play(anim, 0);
-    while (t < target) { const d = Math.min(step, target - t); arm.advanceTime(d); t += d; }
-    const bb = (window.BattleGL && window.BattleGL.armatureAABB) ? window.BattleGL.armatureAABB(arm) : null;
-    return bb;
   }
   /* v4.8 给验收台用: 读取某只怪骨架工厂是否就绪 */
   window.__boneReady = (slug) => !!(BONES[slug] && BONES[slug].ready);
@@ -1651,11 +1631,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     rollSpeedSkill('suodi');
   }
   /* v3.7: 寻怪限定车道 —— 同道才算"可打目标"; 跨道由玩家换道解决(见 updatePlayer 寻道块) */
-  function findNearestEnemy(lane, fromX, maxDist) {
-    let best=null, bestD=maxDist||Infinity;
-    for (const e of G.enemies) { if (!e.alive||e.dying>0||e.lane!==lane) continue; const d=Math.abs(e.x-fromX); if (d<bestD){bestD=d;best=e;} }
-    return best;
-  }
   /* ═══════════════ v6.0 战斗距离: 统一为"边缘到边缘" ═══════════════
    *
    * 【为什么要统一】之前玩家和怪各用一套口径，互相打架：
@@ -1725,10 +1700,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   function canHit(attacker, target, reach) {
     if (!target) return false;
     return groundDist(attacker, target) <= reach + halfOf(target) + 5;
-  }
-  /* 兼容旧签名(有些地方只想知道"在不在某个距离内", 不涉及体型) */
-  function inRange(a, b, range) {
-    return groundDist(a, b) <= range + 5;
   }
   /* 按二维距离找最近的可攻击目标 —— 取代原来的"同道最近"。 */
   function findNearestEnemy2D(from, maxDist) {
