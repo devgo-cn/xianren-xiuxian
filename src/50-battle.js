@@ -155,6 +155,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     trialT: BC.trialSecs, trialKills:0, trialTier:1, tierKills:0, trialSettled:false, trialRound:0, trialBossDone:false,
     trialSpawned:0, trialBossKilled:false,
   };
+  let _hudRefreshT = 0;   /* v5.0 定期刷新HUD计时器: 打BOSS期间无击杀, 倒计时显示会卡住 */
 
   /* 加载素材 */
   const spriteImg = new Image();
@@ -2280,6 +2281,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         }
       }
     } catch (err) { console.warn('[battle] 试炼结算写档失败', err); }
+    /* v5.0 破纪录立即上传服务器, 不等下次自动同步(关键战绩不丢) */
+    if (isNew) { try { window.save && window.save(); window.cloudFlush && window.cloudFlush(); } catch (err) {} }
     /* 结算面板 */
     try {
       const el = document.getElementById('trialModal');
@@ -2319,6 +2322,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     }
     /* v3.9 试炼倒计时: 原始 dt —— 计时器与倍速分离, 倍速只加战斗节奏不加轮时 */
     updateTrial(dt);
+    /* v5.0 定期刷新HUD: 打BOSS期间无新击杀/状态不变, 倒计时数字显示会卡住, 每0.25秒刷一次 */
+    _hudRefreshT += dt;
+    if (_hudRefreshT >= 0.25) { _hudRefreshT = 0; updateHUD(); }
     const aliveEnemies = G.enemies.filter(e => e.alive && e.dying<=0);
     const newState = aliveEnemies.length > 0 ? 'fight' : 'walk';
     if (newState !== G.state) { G.state = newState; updateHUD(); }
