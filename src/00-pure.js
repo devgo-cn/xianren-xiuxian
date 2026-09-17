@@ -1039,9 +1039,18 @@ const $ = id => document.getElementById(id);
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-const fmt = n => n >= 1e8 ? (n / 1e8).toFixed(2).replace(/\.?0+$/, "") + "亿"
-             : n >= 1e4 ? (n / 1e4).toFixed(1).replace(/\.0$/, "") + "万"
-             : Math.floor(n).toLocaleString();
+/* v6.14 数字格式化: 万/亿保留, 超过万亿(1e12)走科学计数法, 防后期数值爆炸。
+ * 例: 1234 → 1,234 / 12345 → 1.2万 / 1.23亿 / 1.23e15 */
+const fmt = n => {
+  if (!isFinite(n)) return '∞';
+  if (n < 0) return '-' + fmt(-n);
+  if (n < 1e4) return Math.floor(n).toLocaleString();
+  if (n < 1e8) return (n / 1e4).toFixed(1).replace(/\.0$/, "") + "万";
+  if (n < 1e12) return (n / 1e8).toFixed(2).replace(/\.?0+$/, "") + "亿";
+  const exp = Math.floor(Math.log10(n));
+  const mant = n / Math.pow(10, exp);
+  return mant.toFixed(2) + "e" + exp;
+};
 
 function fin(v, d) { return (typeof v === "number" && isFinite(v)) ? v : d; }
 

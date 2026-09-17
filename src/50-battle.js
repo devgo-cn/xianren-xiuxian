@@ -600,10 +600,16 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   const WATER_SPRITE = { cols:10, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:33, hurtStart:65, hurtCount:13, fps:24 };
   const PET_SPRITE = { cols:8, fw:96, fh:80 };
 
+  /* v6.14: 战斗层数字格式化同步全局 fmt——万/亿, 超过万亿走科学计数法 */
   function fmtNum(n) {
     n = Math.round(n || 0);
-    if (n >= 100000000) return (n/100000000).toFixed(2) + '亿';
-    if (n >= 10000) return (n/10000).toFixed(n >= 1000000 ? 0 : 1) + '万';
+    if (n < 0) return '-' + fmtNum(-n);
+    if (n >= 1e12) {
+      const exp = Math.floor(Math.log10(n));
+      return (n / Math.pow(10, exp)).toFixed(2) + 'e' + exp;
+    }
+    if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿';
+    if (n >= 1e4) return (n / 1e4).toFixed(n >= 1e6 ? 0 : 1) + '万';
     return String(n);
   }
   /* ---------- 技能读取: 等级与数值的唯一来源是主游戏 SkillAPI ---------- */
