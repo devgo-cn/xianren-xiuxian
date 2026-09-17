@@ -2204,7 +2204,14 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         }
       }
     }
-    G.enemies = G.enemies.filter(e => { if (!(e.alive || e.dying > 0)) despawnEnemy(e); return e.alive || e.dying > 0; });
+    for (let i = G.enemies.length - 1; i >= 0; i--) {
+      const e = G.enemies[i];
+      if (!(e.alive || e.dying > 0)) {
+        despawnEnemy(e);
+        G.enemies[i] = G.enemies[G.enemies.length - 1];
+        G.enemies.length--;
+      }
+    }
   }
   function updateFx(dt) {
     for (const f of G.fx) {
@@ -2221,10 +2228,14 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         if (f.vy) f.vy += 30 * dt;  /* 轻微重力 */
       }
     }
-    G.fx = G.fx.filter(f => f.t < f.dur);
+    for (let i = G.fx.length - 1; i >= 0; i--) {
+      if (G.fx[i].t >= G.fx[i].dur) { G.fx[i] = G.fx[G.fx.length - 1]; G.fx.length--; }
+    }
     reapSkillFx();                              /* v4.8 标记弹道结束, 释放同屏配额 */
     for (const d of G.dmg) d.t += dt;
-    G.dmg = G.dmg.filter(d => d.t < 0.9);
+    for (let i = G.dmg.length - 1; i >= 0; i--) {
+      if (G.dmg[i].t >= 0.9) { G.dmg[i] = G.dmg[G.dmg.length - 1]; G.dmg.length--; }
+    }
   }
   function updateCamera(dt) {
     const targetCam = G.player.x - stageW()*0.42;   // 玩家锁屏中间偏左: 右侧留出更多来怪空间, 推进感更强
@@ -2323,8 +2334,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* v5.0 定期刷新HUD: 打BOSS期间无新击杀/状态不变, 倒计时数字显示会卡住, 每0.25秒刷一次 */
     _hudRefreshT += dt;
     if (_hudRefreshT >= 0.25) { _hudRefreshT = 0; updateHUD(); }
-    const aliveEnemies = G.enemies.filter(e => e.alive && e.dying<=0);
-    const newState = aliveEnemies.length > 0 ? 'fight' : 'walk';
+    let aliveCount = 0;
+    for (const e of G.enemies) { if (e.alive && e.dying <= 0) aliveCount++; }
+    const newState = aliveCount > 0 ? 'fight' : 'walk';
     if (newState !== G.state) { G.state = newState; updateHUD(); }
     G.spawnT -= dt;   /* v5.0 刷怪频率用原始dt, 不受身法倍速影响 —— 倍速只加战斗节奏不加刷怪密度 */
     /* v4.6 刷怪间隔旋钮: window.__spawnSlowMul(默认 1) —— 调大则刷得更稀, 便于逐只端详。 */
@@ -2336,7 +2348,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     else if (G.spawnT <= 0) {
       /* v5.1 击杀即刷新: 开局同屏少于1只时按频率填充(只填1只), 之后靠onKill击杀即刷新补充。
        * 避免按频率刷怪排队AOE全死光。同屏上限12只自动停刷, 怪池121只刷完停刷。 */
-      const aliveCount = G.enemies.filter(x => x.alive && x.dying <= 0).length;
       if (aliveCount < 1 && G.trialSpawned < BC.trialPool.bossAt) spawnWave();
       G.spawnT = spawnGap;
     }
