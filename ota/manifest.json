@@ -456,17 +456,17 @@
     "assets/ui_icons/icon_story.webp": "92ff84146f80a3d7f9a6479c477113caf2e4017ffe10767dd866be4ea378c003",
     "assets/ui_icons/icon_treasure.webp": "fe0b83d8ece23ab09b23a013e18299de7335ba1917666a7970726e00b7eb7e17",
     "dt-theme.css": "9bfd9aa7924cdb5483f295a3ec92828b152a3f2572ffed68579614e8cb7749f1",
-    "fx2d.js": "7be16983ca12fb7b9fcb393206f0e36324b65bd9bf9b39db73ed3848344b5914",
-    "index.html": "b38a12f4123530a1399a8e2c54688405c4f99a518cbbb88205b37807ff1c5f0c",
+    "fx2d.js": "ab4794f036fc4e9976392e336e004bcef13d83976e78d719415da6c7bc10ad0d",
+    "index.html": "7b154d7d203c3155b90dd3f8d0587c6d094d915fe531e3445080aa5714248823",
     "src/00-pure.js": "ab456c781172d4cc2c423c4373f5abf42b50e38edf7ce99f41f6bf02ee973f5a",
     "src/10-base.js": "4f20c8ccbf5bd7471876201a7aca86857f1fe965c1630ff8a88b2522c58457a6",
-    "src/20-core.js": "02175b39eb030422bead20d647ff29e9563d12a36eefc78ed810e2f10eb87d39",
+    "src/20-core.js": "e42d48af94ae21cb578045ac272a7508d1f3b6a674deb05fac35f2baa57adb95",
     "src/30-systems.js": "170a3e013a951672754ee11cc9b9ffc4e883d189dff95616aef3ac928c4cc1fd",
     "src/40-app.js": "af81a0da89f89ddd04054e70b2b8188ef5c7b69842a623fec7262806ea979cc8",
     "src/50-battle.js": "4598ec1eb82ff5d888e15e7a632a24514d30ac301b062bf879bd26f657fae4b5",
     "src/60-stage.js": "58e1ee5df0b972d4271ca676e65622fee3544b9ab6f226ef3f8ffaa16205ae47",
     "src/main.js": "161f10c02a3aa4095b257cd77f5bf1834e85d1359e85555deb8e48dfd2bd9fba"
   },
-  "rev": "e3ab66fbf7a9744e",
+  "rev": "ed88a057adf5da4b",
   "version": "3.5"
 }
