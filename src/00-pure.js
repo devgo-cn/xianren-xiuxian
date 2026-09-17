@@ -1035,8 +1035,6 @@ const RECIPES = {   // 丹方 v4 (v1.9.0) —— 覆盖 12 大境(0凡→11天�
 
 const PAGES_NEED = [0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 
-;
-
 const $ = id => document.getElementById(id);
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
