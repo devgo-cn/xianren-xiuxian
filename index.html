@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<script>window.APP_VER="5.16";</script>
+<script>window.APP_VER="5.17";</script>
 <title>闲人修仙</title>
 <meta name="description" content="闲人修仙：主身巡猎斗法、分身云游寻宝，离线亦在成长。">
 <link rel="icon" href="data:,">
@@ -546,7 +546,7 @@
     box-shadow:0 2px 10px rgba(0,0,0,.55);cursor:grab;touch-action:none}
   .dim-knob svg{width:20px;height:20px;display:block}
 </style>
-<link rel="stylesheet" href="dt-theme.css?v=5.16">
+<link rel="stylesheet" href="dt-theme.css?v=5.17">
 </head>
 <body>
 <!-- v1.7.58 开屏页: 品牌 + 进度 + 健康游戏忠告(load 完成或点击后淡出) -->
@@ -592,7 +592,8 @@
   <div class="hud-row">
     <div class="realm-left">
       <div class="realm-badge" id="realmBadge" onclick="openRank()" title="洞天风云榜 · 前十">
-        <span class="big" id="realmName">凡人</span><span class="sub-a" id="realmSubA"></span><span class="rb-power" id="realmPower"></span><span class="rb-rank">榜</span>
+        <div class="rb-line1"><span class="big" id="realmName">凡人</span><span class="sub-a" id="realmSubA"></span></div>
+        <div class="rb-line2"><span class="rb-power" id="realmPower"></span><span class="rb-rank">榜</span></div>
       </div>
       <button class="pname-btn" id="pName" onclick="openRename()" title="点此定道号"></button>
     </div>
