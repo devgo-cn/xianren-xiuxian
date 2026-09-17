@@ -1321,7 +1321,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     if (!(BONES[entry.slug] && BONES[entry.slug].ready)) return null;   /* 工厂未就绪这一拍不刷(避免占位图) */
     if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
     const e = makePoolEnemy(entry, false);
-    e.x = G.camX + stageW() + BC.enemySpawnOffset;   /* v5.1 击杀即刷新: 从屏幕右边生成 */
+   /* v5.1 击杀即刷新: 从屏幕右边生成; v7.2d 首只怪刷在屏内右侧1/4 —— 不然要走
+    * 半个屏宽(3~8s)才接战, 白白吃掉 120s 妖潮的开头 */
+   e.x = G.trialSpawned === 1 ? G.camX + stageW() * 0.75 : G.camX + stageW() + BC.enemySpawnOffset;
     G.enemies.push(e);
     G.trialSpawned++;   /* v5.0 计数已刷怪序号 */
     return e;
