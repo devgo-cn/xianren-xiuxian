@@ -2968,17 +2968,19 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
          * 正确做法: 先 BattleGL.tex(canvas) 转纹理, 再构造 Sprite —— 与宝箱 icon
          * (1728 行 o.icon.texture = BattleGL.tex(...)) 用的是同一套约定。 */
         const spr = new PIXI.Sprite(window.BattleGL.tex(G.petEagleBoltSprite));
-        spr.anchor.set(0.5, 0.5);
-        spr.width = 60; spr.height = 30;
         /* ⚠️ v8.3 修复(勿回退): 旧代码写 `window.BattleGL.stage.addChild(spr)`,
          * 但 BattleGL 对外【没有 stage 这个属性】(内部场景根叫 root, 私有),
-         * 属性为 undefined → `.addChild` 抛 TypeError → 同样中断 render 循环。
+         * 属性为 undefined → `.addChild` 抛 TypeError → 中断 render 循环。
          * 弹幕属于"飞出去的攻击特效", 挂在 fx 层 —— 与所有 skillShot/粒子一致,
-         * z 序也在 near 之上、text 之下, 不会被怪挡住。 */
+         * z 序也在 near 之上、text 之下, 不会被怪挡住。
+         * 另: 构造器首参必须是【Texture】。旧代码传的是 solidify() 的 canvas,
+         * PIXI 解构纹理帧时会抛 `Cannot read properties of undefined`, 即"卡屏"根因
+         * (见 1728 行宝箱 icon 的同一套约定: 一律先 BattleGL.tex() 转纹理)。 */
+        spr.anchor.set(0.5, 0.5);
         window.BattleGL.layers.fx.addChild(spr);
         G._boltPool.push(spr);
       }
-      /* 更新位置 */
+      /* 更新位置 + 朝向校正 */
       for (let i = 0; i < G._boltPool.length; i++) {
         const spr = G._boltPool[i];
         if (i < needed) {
@@ -2986,6 +2988,30 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
           spr.visible = true;
           spr.position.set(b.x, b.y);
           spr.alpha = 0.9;
+          /* ⚠️ v8.7 靶向校正(勿删) —— 弹幕要"看着是朝目标飞"。
+           * 素材原图是 1024×1024 无透明通道的 RGB, 黑底直接当弹幕用了(豆包没抠图)。
+           * 处理成两步, 都在素材侧做掉, 代码只留一个纯旋转:
+           *   ① 抠图: 按亮度(A近黑底, 弹体亮)生成 alpha 通道, 再取最大连通域去掉
+           *      零星噪点。素材是"拖尾暗、弹头亮"的能量箭, 亮度即天然的遮罩。
+           *   ② 摆正: 原图构图是 45° 对角(拖尾左上/弹头右下), 已预旋转 45° 使其
+           *      【默认朝右】, 实测主轴由 45.1° 变成 180.0°(水平)、光心偏右 +189px、
+           *      亮度峰值在右端 —— 确认箭头朝右。裁紧后 1320×314(约 4.2:1 长条)。
+           * 因为素材已经摆正, 这里只需要 rotation = 飞行方向角, 不再有 45° 偏置。
+           * 换素材时重测"主轴角/箭头端"即可, 若新素材自带偏置就在此减掉。 */
+          const dx = (b.tx - b.x), dy = (b.ty - b.y);
+          spr.rotation = Math.atan2(dy, dx);
+          /* 尺寸按素材真实宽高比展开(旧代码写死 60×30, 与素材比例完全不符会被压扁)。
+           * 素材摆正后是 1320×314 的长条(约 4.2:1), 以【短边】为基准定档再按比例推长边,
+           * 这样不管素材多长, 视觉"粗细"都稳定, 不会被拉伸成一根细线。 */
+          const BOLT_THICK = 16;                      /* 弹幕短边(垂直飞行方向上的宽度) */
+          const tex = spr.texture;
+          if (tex && tex.width && tex.height) {
+            const ar = tex.width / tex.height;        /* >1, 长条 */
+            spr.height = BOLT_THICK;
+            spr.width  = BOLT_THICK * ar;
+          } else {
+            spr.width = 74; spr.height = 34;
+          }
         } else {
           spr.visible = false;
         }
