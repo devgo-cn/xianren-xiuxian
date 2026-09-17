@@ -361,7 +361,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         B.baseH = Math.max(1, bb.maxY - bb.minY);
         probe.dispose();
         B.ready = true;
-        console.log('[battle] 骨骼怪就绪 ' + slug + ' baseH=' + B.baseH.toFixed(1));
+        if (window.__battleDebug) console.log('[battle] 骨骼怪就绪 ' + slug + ' baseH=' + B.baseH.toFixed(1));
         if (onReady) onReady();
       } catch (err) { console.error('[battle] ' + slug + ' 骨骼工厂构建失败', err); }
     };
