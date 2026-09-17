@@ -12,7 +12,7 @@
  */
 
 import { SND } from './10-base.js';
-import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档 */
+import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档; 黑屏挂机统计 */
 
 
   const BC = {
@@ -1392,6 +1392,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const jitter = 1 - DROP.spiritRand + Math.random()*DROP.spiritRand*2;
     /* v2.5 BOSS 专属产出: 灵石在精英倍率上再 ×8 */
     const sp = Math.max(1, Math.round((DROP.spiritBase + DROP.spiritPerLv*(PST.lv||1)) * jitter * mul * (isBoss ? 8 : 1)));
+    /* 黑屏挂机统计 */
+    if (DIMSTAT.on) { DIMSTAT.battles++; DIMSTAT.win++; DIMSTAT.spirit += sp; }
     spawnSpiritDrop(e, sp, e.elite);                       // 灵石落在地板, 隔1~2秒飞向顶部统计区
     /* 装备掉落: 先在游戏侧 roll 出具体部件(图标/品质), 由飞行宠物飞去拾取入包
      * v2.5 BOSS 必掉一件(品质照常按境界权重 roll, 不保底——BOSS 刷新频繁, 保底会灌金装) */
@@ -2253,16 +2255,23 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     } catch (err) { console.warn('[battle] 试炼结算写档失败', err); }
     /* v5.0 破纪录立即上传服务器, 不等下次自动同步(关键战绩不丢) */
     if (isNew) { try { window.save && window.save(); window.cloudFlush && window.cloudFlush(); } catch (err) {} }
-    /* 结算面板 */
+    /* 黑屏挂机统计: 兽潮场次+1 */
+    if (DIMSTAT.on) DIMSTAT.trials++;
+    /* 结算面板 —— 挂机(黑屏/后台)时自动确认, 不弹窗直接继续下一场 */
     try {
-      const el = document.getElementById('trialModal');
-      if (el) {
-        document.getElementById('trialKillsN').textContent = kills + (bossKilled ? '（含妖王）' : '');
-        document.getElementById('trialTierN').textContent = (BC.tier[G.trialTier] || BC.tier[1]).name;
-        document.getElementById('trialBestN').textContent = best + (isNew ? '（新纪录！）' : '');
-        const bEl = document.getElementById('trialBoostN');
-        bEl.textContent = boost > 0 ? `离线游历所得 +${Math.round(boost*100)}%（48 小时内有效）` : '再接再厉';
-        el.classList.add('show');
+      if (document.hidden || DIMSTAT.on) {
+        /* 挂机: 不显示面板, 延迟自动重置进入下一场 */
+        setTimeout(() => { try { trialRestart(); } catch(err) {} }, 200);
+      } else {
+        const el = document.getElementById('trialModal');
+        if (el) {
+          document.getElementById('trialKillsN').textContent = kills + (bossKilled ? '（含妖王）' : '');
+          document.getElementById('trialTierN').textContent = (BC.tier[G.trialTier] || BC.tier[1]).name;
+          document.getElementById('trialBestN').textContent = best + (isNew ? '（新纪录！）' : '');
+          const bEl = document.getElementById('trialBoostN');
+          bEl.textContent = boost > 0 ? `离线游历所得 +${Math.round(boost*100)}%（48 小时内有效）` : '再接再厉';
+          el.classList.add('show');
+        }
       }
     } catch (err) {}
     updateHUD();
@@ -3531,9 +3540,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       resize() { /* 几何由 battleBand() 决定，随舞台尺寸即时计算 */ },
       draw(targetCtx, W, H, dt) {
         if (!G || !G.player) return;
-        if (G.paused) return;                 /* 黑屏挂机：逻辑也停 */
+        if (G.paused) return;                 /* 真暂停: 逻辑和渲染都停 */
         /* ⚠️ dt 是【原始 dt】。倍速乘法在 update() 第一行完成，舞台绝不代劳。 */
         update(dt);
+        /* 黑屏挂机: 逻辑跑完但不渲染(省GPU), DIMSTAT由onKill/onExp等累加 */
+        if (typeof DIMSTAT !== 'undefined' && DIMSTAT.on) return;
         const band = (typeof window !== 'undefined' && window.__stageBand)
           ? window.__stageBand()
           : { top: 92, height: Math.max(1, 0.56 * H - 176) };

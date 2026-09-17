@@ -4,7 +4,7 @@
  * 拓扑层 L8~L14，31 个顶层声明。
  */
 import { $, ARRAY_MAX_LV, BIGS, CACHE_VER, CLD_KEY, DIMSTAT, DROP_CFG, EVENTS, MAIL_CAP, MAIN_STORY, MATS, PET_BONUS, PET_COIN, PET_FORGE, PET_STILL, PLOT, QUALITY, RECIPES, SAVE_KEY, SLOT_TYPES, __set_breaking, __set_cauldron, __set_dropSaveT, __set_encNext, __set_equipId, __set_hiddenAt, __set_hudAcc, __set_selRecipe, __set_state, __set_stayLast, _dropSaveT, _dsp, _equipId, _equipQueue, _floatPrev, _hiddenAt, _hudAcc, _pred, _rate, _settling, _srvOffset, _stayLast, _syncAt, autoHuntOn, breaking, cld, cnNum, fmt, hbOk, initFxDiag, selRecipe, state } from './00-pure.js';
-import { CLD_API, TOTAL_SEGS, adopt, arrayCostNow, buffAtCap, buffHintOf, burstBoom, cldApi, cldFlash, cldId, cldUI, closeTravel, cloudSnap, cloudSoon, createFxLayer, ensureScrollFx, fitsRecipe, g1Pack, g1Unpack, hbFail, hiddenUnlocked, journalHasKey, locById, mailDot, pickNoRepeat, pushBattleStats, pushBuff, pushMsg, renderAutoHunt, renderPName, renderPillHints, searchMs, seg, settleBlocked, spiritRate, srvNow, tickDsp, traceRefresh, travelBtnLbl, zoneOfLoc } from './10-base.js';
+import { CLD_API, TOTAL_SEGS, adopt, arrayCostNow, buffAtCap, buffHintOf, burstBoom, cldApi, cldFlash, cldId, cldUI, closeTravel, cloudSnap, cloudSoon, createFxLayer, dimRender, ensureScrollFx, fitsRecipe, g1Pack, g1Unpack, hbFail, hiddenUnlocked, journalHasKey, locById, mailDot, pickNoRepeat, pushBattleStats, pushBuff, pushMsg, renderAutoHunt, renderPName, renderPillHints, searchMs, seg, settleBlocked, spiritRate, srvNow, tickDsp, traceRefresh, travelBtnLbl, zoneOfLoc } from './10-base.js';
 import { addJournal, adoptKeep, bigIdx, cldFail, keepArtQuiet, load, realm, renderMailBox, save, showTravelMail, smartEquip, updateArts, updateRealmUI } from './20-core.js';
 import { checkMilestones, cldPush, cloudPushNow, cloudSettle, mainMoment, makeArt, openAlchemy, openStory, openTravel, pickLoc, rateNow, updateHUD } from './30-systems.js';
 
@@ -141,6 +141,8 @@ function doBreak() {
     state.realmIdx++;
     state.exp = isBigBreak ? 0 : Math.max(0, state.exp - r.need);  // 大境清零, 小境扣需
     __set_breaking(false);
+    /* 黑屏挂机: 记录突破 */
+    if (DIMSTAT.on) { DIMSTAT.breaks.push(next.label); try { dimRender(); } catch(e) {} }
     updateRealmUI(); updateHUD(); save(); pushBattleStats();   // 境界变了 → 战斗三围与怪物成长线重算
     cloudFlush();
     const nr = realm();
@@ -266,8 +268,14 @@ function loop(dt) {
        真正的账由服务端按自己的钟结算。 */
     const _g = rateNow() * dt;
     state.exp += _g; _pred.exp += _g;
+    if (DIMSTAT.on) DIMSTAT.exp += _g;   /* 黑屏挂机: 累加修为 */
     /* v2.5: 所有境界突破均改为手动 —— 移除自动小境界升级循环, 修为满后玩家点"突破"按钮 */
     /* v2.6 PERF: realmPlot 每帧 → 并入下方 100ms HUD 节流(幂等, 触发时机无感差异) */
+  }
+  /* 黑屏挂机: 跳过tickDsp/HUD/realmPlot等DOM更新(面板盖住了看不到), 只跑dimRender */
+  if (DIMSTAT.on) {
+    __dimT = (__dimT || 0) + dt; if (__dimT >= 0.5) { __dimT = 0; try { dimRender(); } catch(e) {} }
+    return;
   }
   tickDsp(dt);
   /* v3.2: 灵气层与爆发粒子层已并入统一舞台 #stage，由 60-stage 的 ticker 驱动。

@@ -838,6 +838,16 @@ function dimRender() {
   const b = $("dimBattles"); if (b) b.textContent = DIMSTAT.battles;
   const s = $("dimSpirit"); if (s) s.textContent = fmt(DIMSTAT.spirit);
   const e = $("dimExp"); if (e) e.textContent = fmt(DIMSTAT.exp);
+  /* 兽潮次数 */
+  const tEl = $("dimTrials"); if (tEl) tEl.textContent = DIMSTAT.trials;
+  /* 突破记录 */
+  const brEl = $("dimBreaks");
+  if (brEl) {
+    if (DIMSTAT.breaks.length) {
+      brEl.style.display = "";
+      brEl.innerHTML = DIMSTAT.breaks.map(x => `<div>突破 · ${x}</div>`).join("");
+    } else { brEl.style.display = "none"; }
+  }
   const l = $("dimLoot"); if (!l) return;
   if (!DIMSTAT.loot.length) {
     l.innerHTML = '<div class="li empty">尚未拾获物什</div>';
@@ -858,15 +868,12 @@ function enterDim() {
   d.classList.add("show");
   document.body.classList.add("dimmed");
   DIMSTAT.on = true;
-  DIMSTAT.battles = 0; DIMSTAT.win = 0; DIMSTAT.spirit = 0; DIMSTAT.exp = 0; DIMSTAT.loot = [];
+  DIMSTAT.battles = 0; DIMSTAT.win = 0; DIMSTAT.spirit = 0; DIMSTAT.exp = 0; DIMSTAT.loot = []; DIMSTAT.trials = 0; DIMSTAT.breaks = [];
   dimRender();
   SND.mute(true);                                  // 音乐 + 音效 全关(硬静音, 音效不会自己跳出来)
-  /* v3.2: 合并后只需停【一条链】—— 统一舞台自己会转发给各层。
-   * 合并前要分别停 bg / 战斗 / fx2d 三处，容易漏（漏一层就白烧电）。 */
-  try { if (window.__stage && window.__stage.pause) window.__stage.pause(); } catch (e) {}
-  try { if (window.__bgCtrl && window.__bgCtrl.pause) window.__bgCtrl.pause(); } catch (e) {}
-  try { if (window.BattleAPI && window.BattleAPI.pause) window.BattleAPI.pause(); } catch (e) {}
-  /* v2.6 省电: 黑屏挂机页面盖住主页 → 停掉 fx2d 旋臂动画的 rAF */
+  /* v5.2: 黑屏挂机不再 pause 任何层 —— ticker 继续跑, 战斗层 draw() 里
+   * update(dt) 跑逻辑(打兽潮), 检测 DIMSTAT.on 后跳过 render()。
+   * 其他层(背景/特效)由各自 draw() 检测 DIMSTAT.on 跳过渲染。 */
   try { document.dispatchEvent(new CustomEvent("fx-suspend")); } catch (e) {}
   resetDimKnob();
 }
@@ -877,11 +884,9 @@ function exitDim() {
   document.body.classList.remove("dimmed");
   DIMSTAT.on = false;
   SND.mute(false);                                 // 按玩家原有开关恢复
-  try { if (window.__stage && window.__stage.resume) window.__stage.resume(); } catch (e) {}
-  try { if (window.__bgCtrl && window.__bgCtrl.resume) window.__bgCtrl.resume(); } catch (e) {}
-  try { if (window.BattleAPI && window.BattleAPI.resume) window.BattleAPI.resume(); } catch (e) {}
+  /* v5.2: 不再 resume 任何层 —— ticker 一直在跑, 只是各层 draw() 检测 DIMSTAT.on 跳过渲染 */
   /* v2.6 省电: 回到主页 → 恢复 fx2d 旋臂动画 */
-  try { document.dispatchEvent(new CustomEvent("fx-resume")); } catch (e) {}
+  try { document.dispatchEvent("fx-resume"); } catch (e) {}
 }
 
 function searchMs() { return (SEARCH_MIN + Math.random() * (SEARCH_MAX - SEARCH_MIN)) * 1000; }

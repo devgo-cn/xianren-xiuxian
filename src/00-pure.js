@@ -2539,7 +2539,7 @@ let _settling = false;
 
 let _kicked = false;
 
-const DIMSTAT = { on: false, battles: 0, win: 0, spirit: 0, exp: 0, loot: [] };
+const DIMSTAT = { on: false, battles: 0, win: 0, spirit: 0, exp: 0, loot: [], trials: 0, breaks: [] };
 
 const MON_NAMES = [
   ["野狼妖", "灰鬃豺獠", "赤目獠牙鬼", "黑纹山猫妖", "独眼豺王", "白额虎妖", "青鬃野猪妖", "雾谷山魈"],
