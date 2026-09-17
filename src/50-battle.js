@@ -1019,8 +1019,15 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
       PST = Object.assign(PST, s);
       if (G.player) {
         G.player.atk = PST.atk;
+        /* v6.6 血量随面板等比缩放: maxHp 变化(升境/换装/法宝)时按比例换算当前血量 ——
+         * 旧逻辑"只裁剪不抬升"有初始化时序 bug: init() 先用默认面板(hp=430)建玩家,
+         * 主游戏 setStats 后 maxHp 已 1.3万, hp 还是 430 → 开局 3% 丝血(实测)。
+         * 等比换算下 makePlayer(hp=maxHp=100%) → setStats 后仍 100%, 开局必满血。 */
+        const oldMax = G.player.maxHp > 0 ? G.player.maxHp : PST.hp;
         G.player.maxHp = PST.hp;
-        if (G.player.hp > PST.hp) G.player.hp = PST.hp;
+        if (oldMax > 0 && G.player.hp > 0)
+          G.player.hp = Math.min(G.player.maxHp, Math.max(1, Math.round(G.player.hp * PST.hp / oldMax)));
+        if (G.player.hp > G.player.maxHp) G.player.hp = G.player.maxHp;
         /* v2.5 功法攻速词条: 面板攻速(基础1.1×词条乘区, 主游戏侧已封顶3.0) → 同步进玩家,
          * 战斗节奏 atkT=1/aspd 随之加快; 无词条旧档回落 BC.playerAspd */
         G.player.aspd = Math.min(3, PST.aspd || BC.playerAspd);
@@ -1281,35 +1288,28 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     }
     /* v5.0 小怪tier按已刷序号决定, 不再按击杀数升档 */
     G.trialTier = (typeof window !== 'undefined' && window.__poolAll) ? 10 : tierForSpawn(G.trialSpawned + 1);
-    /* v3.9 怪包统一池 = 手配怪(BC.enemies, 自带 w 权重) + 骨骼池怪(BONE_POOL, 全量 79 只按文档档位)。
-     * v5.0 境界怪物包: 怪种tier上限按玩家境界解锁 —— 炼气期只刷T1弱怪, 大乘期+解锁全怪种。
-     *   maxMobTier = min(5, ceil(lv/2)): lv2(炼气)→1, lv3-4(筑基/结丹)→2, lv5-6(元婴/化神)→3,
-     *   lv7-8(炼虚/合体)→4, lv9+(大乘+)→5。避免小号刷到高级怪种被虐。
-     * 池 = 怪种tier<=maxMobTier的全部怪; 当前档怪权重×3(主流), 低档怪保底出现。
-     * 骨骼池怪统一 w=10 —— 池子大, 单只出现频率低但种类多。
-     * v4.6 调试开关: window.__poolAll = true 时忽略档位限制, 79 只怪全部立刻进池。 */
+    /* v6.6 模型驱动分档: 怪种模型档 = 当前数值档(杀数段), T6-T10 复用 T5 模型 ——
+     * "前期弱怪, 后期强怪": 视觉体型与数值同步推进, 79 只模型按 5 档复用
+     * (实测分布 T1×3/T2×6/T3×13/T4×15/T5×42)。
+     * 旧版按玩家境界解锁(maxMobTier)废弃: 境界只该管玩家强度, 池内分档交给杀数段 ——
+     * 小号在低杀数段自然只遇弱怪, 高杀数段自然遇强怪, 与境界无关。 */
     const cur = (typeof window !== 'undefined' && window.__poolAll) ? 10 : (G.trialTier || 1);
-    const maxMobTier = (typeof window !== 'undefined' && window.__poolAll) ? 5 : Math.min(5, Math.ceil(Math.max(1, PST.lv || 1) / 2));
-    const weightTier = Math.min(cur, maxMobTier);   /* 权重×3给当前能刷到的最高怪种档 */
+    const wantModel = Math.min(5, cur);
     _spawnEntries.length = 0;
     for (const [t, d] of Object.entries(BC.enemies)) {
-      if (t === 'boss' || !d || (d.tier || 1) > maxMobTier) continue;
+      if (t === 'boss' || !d || (d.tier || 1) !== wantModel) continue;
       /* v4.6 FIX 占位图: 手配骨骼怪只在工厂就绪后才入池 —— 否则开局刷出的怪
        * 因工厂没建好, 会走兜底分支画成灰色椭圆(就是看到的"占位图")。 */
       if (d.bone && !(BONES[d.bone] && BONES[d.bone].ready)) continue;
       /* v4.6 FIX 同上: 纯序列帧怪(slime/water 这类没 bone 的)素材就绪前同样出占位图 */
       if (!d.bone && !spriteReadyFor(t)) continue;
-      _spawnEntries.push({ kind:'hand', key:t, w:(d.w || 1) * ((d.tier || 1) === weightTier ? 3 : 1) });
+      _spawnEntries.push({ kind:'hand', key:t, w:(d.w || 1) });
     }
-    for (let t = 1; t <= maxMobTier; t++) {
-      const mul = (t === weightTier) ? 3 : 1;
-      /* v5.0 FIX: BONE_POOL只有T1-T5档(怪种按文档分5档), 这里t<=maxMobTier<=5, 安全 */
-      for (const slug of BONE_POOL[t]) {
-        /* v4.6 FIX 同上: 骨骼池怪工厂未就绪就不进池 —— 懒加载是 1.5s/3 只,
-         * 79 只要约 40s 才建完; 不等就绪就刷, 开局必然一片灰椭圆。 */
-        if (!(BONES[slug] && BONES[slug].ready)) continue;
-        _spawnEntries.push({ kind:'bone', key:slug, w:10 * mul });
-      }
+    for (const slug of BONE_POOL[wantModel]) {
+      /* v4.6 FIX 同上: 骨骼池怪工厂未就绪就不进池 —— 懒加载是 1.5s/3 只,
+       * 79 只要约 40s 才建完; 不等就绪就刷, 开局必然一片灰椭圆。 */
+      if (!(BONES[slug] && BONES[slug].ready)) continue;
+      _spawnEntries.push({ kind:'bone', key:slug, w:10 });
     }
     if (!_spawnEntries.length) return null;   /* 工厂全部未就绪时这一拍不刷, 避免出占位图 */
     const twAll = _spawnEntries.reduce((s,e2) => s + e2.w, 0);
@@ -2265,6 +2265,11 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     /* v4.6 素材过目: window.__trialFreeze = true 冻结倒计时 —— 120s 看不完 79 只怪,
      * 冻结后不会到点结算清场, 可以慢慢逐只过目。置回 false 即恢复。 */
     if (typeof window !== 'undefined' && window.__trialFreeze) return;
+    /* v6.6 BOSS关底战独立计时: 杀满120只小怪后 BOSS 出场, 120s 倒计时冻结 ——
+     * 旧逻辑 BOSS 排第121位, 实测 120s 内 DPS 只够杀 100~110 只, BOSS 永远出不了场
+     * ("BOSS 完全打不到")。现在清完小怪即进入 BOSS 战: 倒计时停在 0, 不限时,
+     * 杀死 BOSS(提前结算+60%) 或 玩家死亡(trialRestart) 自然收束。 */
+    if (G.bossActive) return;
     G.trialT -= dt;
     if (G.trialT <= 0) { G.trialT = 0; settleTrial(); }
   }
