@@ -2881,10 +2881,23 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       const needed = G.eagleBolts.length;
       /* 补足池 */
       while (G._boltPool.length < needed) {
-        const spr = new PIXI.Sprite(G.petEagleBoltSprite);
+        /* ⚠️ v8.3 致命 BUG 修复(勿回退) —— "卡屏 + 技能放不出来" 的根因:
+         * 旧实现写的是 `new PIXI.Sprite(G.petEagleBoltSprite)`, 直接把 solidify()
+         * 返回的【canvas】当参数传了。PIXI.Sprite 首参只认 Texture, 传 canvas 会在
+         * 构造器内部解构纹理帧时报 `Cannot read properties of undefined (reading 'x')`
+         * → 异常从 drawPets 抛出 → render 中断 → 整个 tick 循环挂掉。
+         * 表现就是用户说的"卡屏 + 技能也放不出来"(update/render 都不再推进)。
+         * 正确做法: 先 BattleGL.tex(canvas) 转纹理, 再构造 Sprite —— 与宝箱 icon
+         * (1728 行 o.icon.texture = BattleGL.tex(...)) 用的是同一套约定。 */
+        const spr = new PIXI.Sprite(window.BattleGL.tex(G.petEagleBoltSprite));
         spr.anchor.set(0.5, 0.5);
         spr.width = 60; spr.height = 30;
-        window.BattleGL.stage.addChild(spr);
+        /* ⚠️ v8.3 修复(勿回退): 旧代码写 `window.BattleGL.stage.addChild(spr)`,
+         * 但 BattleGL 对外【没有 stage 这个属性】(内部场景根叫 root, 私有),
+         * 属性为 undefined → `.addChild` 抛 TypeError → 同样中断 render 循环。
+         * 弹幕属于"飞出去的攻击特效", 挂在 fx 层 —— 与所有 skillShot/粒子一致,
+         * z 序也在 near 之上、text 之下, 不会被怪挡住。 */
+        window.BattleGL.layers.fx.addChild(spr);
         G._boltPool.push(spr);
       }
       /* 更新位置 */
