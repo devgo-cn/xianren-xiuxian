@@ -279,11 +279,7 @@ function cldApi(method, body, extraQ) {
     .catch(e => { clearTimeout(tm); throw e; });
 }
 
-function cldChip() {
-  const el = $("cloudTxt");
-  if (!el) return null;
-  return el;
-}
+function cldChip() { return $("cloudTxt"); }
 
 function cldUI(mode) {
   const chip = $("cloudChip");
