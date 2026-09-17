@@ -2579,6 +2579,7 @@ let _traceT = 0, _tracePool = [], _traceLoc = "", _encNext = 0;
 
 const SEARCH_MIN = 8, SEARCH_MAX = 15;
 
+/* 预留接口，当前禁用 */
 function autoHuntOn() { return false; /* 原战斗系统已移除 */ }
 
 function seekHide() {
