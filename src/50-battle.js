@@ -2299,27 +2299,28 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     if (isNew) { try { window.save && window.save(); window.cloudFlush && window.cloudFlush(); } catch (err) {} }
     /* 黑屏挂机统计: 兽潮场次+1 */
     if (DIMSTAT.on) DIMSTAT.trials++;
-    /* 结算面板 —— 挂机(黑屏/后台)时自动确认, 不弹窗直接继续下一场 */
+    /* v5.2 结算小卡片: 遮罩+小卡片, 5秒后自动消失进入下一场 */
     try {
       if (document.hidden || DIMSTAT.on) {
-        /* 挂机: 不显示面板, 延迟自动重置进入下一场 */
         setTimeout(() => { try { trialRestart(); } catch(err) {} }, 200);
       } else {
-        const el = document.getElementById('trialModal');
+        const el = document.getElementById('trialToast');
         if (el) {
-          document.getElementById('trialKillsN').textContent = kills + (bossKilled ? '（含妖王）' : '');
-          document.getElementById('trialTierN').textContent = (BC.tier[G.trialTier] || BC.tier[1]).name;
-          document.getElementById('trialBestN').textContent = best + (isNew ? '（新纪录！）' : '');
-          const bEl = document.getElementById('trialBoostN');
-          bEl.textContent = boost > 0 ? `离线游历所得 +${Math.round(boost*100)}%（48 小时内有效）` : '再接再厉';
+          document.getElementById('trialKillsN').textContent = kills + (bossKilled ? '·含妖王' : '');
+          document.getElementById('trialBestN').textContent = best + (isNew ? '·新纪录' : '');
+          document.getElementById('trialBoostN').textContent = boost > 0 ? `+${Math.round(boost*100)}%` : '—';
           el.classList.add('show');
+          setTimeout(() => {
+            el.classList.remove('show');
+            try { trialRestart(); } catch(err) {}
+          }, 5000);
         }
       }
     } catch (err) {}
     updateHUD();
   }
   function trialRestart() {
-    document.getElementById('trialModal') && document.getElementById('trialModal').classList.remove('show');
+    document.getElementById('trialToast') && document.getElementById('trialToast').classList.remove('show');
     /* v5.0 FIX: 清场 —— 原trialRestart只重置计数不清场, 死亡/结算后旧BOSS(序列帧史莱姆王)残留,
      * 新BOSS(骨骼九尾狐王)创建后两个BOSS站一起。这里把场上怪全部清除。 */
     for (const e of G.enemies) { e.alive = false; e.dying = 0; if (e.armature) { try { despawnEnemy(e); } catch(err) {} } }
@@ -2345,7 +2346,7 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     /* v5.0 FIX: 结算面板已关闭但trialSettled仍为true(玩家关面板没走trialRestart) → 自动重置,
      * 否则新一场妖潮不倒计时不结算。杀BOSS提前结算与120秒结算都设trialSettled=true, 这是冲突根因。 */
     if (G.trialSettled) {
-      if (!_trialModalEl) _trialModalEl = document.getElementById('trialModal');
+      if (!_trialModalEl) _trialModalEl = document.getElementById('trialToast');
       const modal = _trialModalEl;
       if (!modal || !modal.classList.contains('show')) { trialRestart(); }
     }
@@ -2967,26 +2968,17 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     }
     return t;
   }
-  /* 玩家渲染对象组: 主 Sprite + 残影池 + ADD 柔光 + 占位 Graphics */
+  /* 玩家渲染对象组: 主 Sprite + ADD 柔光 + 占位 Graphics */
   function playerGL() {
     const S = drawPlayerSprite._st;
     if (S) return S;
     const C = window.BattleGL.layers.player;
-    const st = { main: new PIXI.Sprite(), glow: new PIXI.Sprite(), place: new PIXI.Graphics(), ghosts: [], ghostPool: [], ghostTimer: 0 };
+    const st = { main: new PIXI.Sprite(), glow: new PIXI.Sprite(), place: new PIXI.Graphics() };
     st.glow.anchor.set(0.5);
     st.glow.blendMode = PIXI.BLEND_MODES.ADD;
     C.addChild(st.glow);
     C.addChild(st.place);
     C.addChild(st.main);
-    /* 预建残影池(20个, 足够倍速时0.05s间隔×0.25s寿命=5个同时存活) */
-    for (let i = 0; i < 20; i++) {
-      const g = new PIXI.Sprite();
-      g.visible = false;
-      g.alpha = 0;
-      g.tint = 0x5599ff;
-      C.addChild(g);
-      st.ghostPool.push(g);
-    }
     return drawPlayerSprite._st = st;
   }
   function drawPlayerSprite() {
@@ -3077,39 +3069,6 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
       S.glow.position.set(sx - drawW*0.35 + drawW/2, sy - bodyH/2);
       S.glow.width = S.glow.height = bodyH * 1.5;
       S.glow.alpha = glowA;
-    }
-    /* 残影系统: 倍速时每0.05s快照当前帧, 生成蓝色残影, 0.25s内淡出 */
-    if (G.speedMult > 1 && !p.attackAnim) {
-      S.ghostTimer -= 1/60;  // 假设60fps
-      if (S.ghostTimer <= 0) {
-        S.ghostTimer = 0.05;
-        /* 从池里取一个幽灵 */
-        if (S.ghostPool.length > 0) {
-          const g = S.ghostPool.pop();
-          g.visible = true;
-          g.texture = frameTex(G.sprite, SPRITE.cols, SPRITE.fw, SPRITE.fh, frameIdx);
-          g.position.set(sx - drawW*0.35, sy - boxB * bs);
-          g.scale.set(bs, bs);
-          g.tint = 0x5599ff;
-          g.alpha = 0.5;
-          g._age = 0;
-          g._life = 0.25;
-          S.ghosts.push(g);
-        }
-      }
-    }
-    /* 更新所有存活残影: 年龄增长, 透明度递减 */
-    for (let i = S.ghosts.length - 1; i >= 0; i--) {
-      const g = S.ghosts[i];
-      g._age += 1/60;
-      const k = g._age / g._life;
-      if (k >= 1) {
-        g.visible = false; g.alpha = 0;
-        S.ghosts.splice(i, 1);
-        S.ghostPool.push(g);
-      } else {
-        g.alpha = 0.5 * (1 - k);
-      }
     }
     /* 血条: 挂人头顶, 与技能态同口径 */
     drawHpBar('playerUI', sx, sy - bodyH - 10, 36, p.hp, p.maxHp);

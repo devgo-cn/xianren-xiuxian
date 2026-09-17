@@ -378,6 +378,14 @@
   .trial-rows{margin:10px 0 6px}
   .trial-rows .off-row b{margin-left:auto}
   .trial-tip{font-size:10.5px;color:var(--dim);line-height:1.7;margin-bottom:6px}
+  /* v5.2 妖潮结算: 小卡片+遮罩, 5秒自动消失 */
+  .trial-toast{position:fixed;inset:0;z-index:35;display:none;align-items:center;justify-content:center;background:rgba(4,7,15,.5);pointer-events:none}
+  .trial-toast.show{display:flex;pointer-events:none}
+  .trial-toast .tt-card{background:linear-gradient(180deg,#101a30,#0a1122);border:1px solid rgba(232,197,107,.35);border-radius:14px;padding:14px 22px;min-width:220px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.5)}
+  .trial-toast .tt-title{color:var(--gold);font-size:15px;letter-spacing:.14em;margin-bottom:8px}
+  .trial-toast .tt-rows{display:flex;flex-direction:column;gap:4px}
+  .trial-toast .tt-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--dim)}
+  .trial-toast .tt-row b{color:#7fe0c3;font-weight:700;margin-left:16px}
   .chips-row{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
   .chips-row::-webkit-scrollbar{display:none}
   .chip{flex:none;font-size:10.5px;padding:4px 10px;border-radius:999px;border:1px solid rgba(232,197,107,.28);
@@ -682,17 +690,14 @@
 <div class="realm-up" id="realmUp"><div class="t" id="realmUpT">筑基</div><div class="s">天人感应 · 修为暴涨</div></div>
 
 <!-- v3.9 妖潮试炼结算: 120秒一轮, 击杀数→纪录→离线游历收益加成 -->
-<div class="modal" id="trialModal">
-  <div class="card story-card">
-    <div class="mhead"><h3>妖潮退去<i>TRIAL SETTLED</i></h3><button class="xbtn" onclick="BattleAPI && BattleAPI.trialRestart()">✕</button></div>
-    <div class="trial-rows">
-      <div class="off-row"><span class="ol">本轮斩妖</span><b class="ov" id="trialKillsN">0</b></div>
-      <div class="off-row"><span class="ol">战至波次</span><b class="ov" id="trialTierN">妖群</b></div>
-      <div class="off-row"><span class="ol">试炼纪录</span><b class="ov jade" id="trialBestN">0</b></div>
-      <div class="off-row"><span class="ol">离线补偿</span><b class="ov" id="trialBoostN">—</b></div>
+<div class="trial-toast" id="trialToast">
+  <div class="tt-card">
+    <div class="tt-title">妖潮退去</div>
+    <div class="tt-rows">
+      <div class="tt-row"><span>斩妖</span><b id="trialKillsN">0</b></div>
+      <div class="tt-row"><span>纪录</span><b id="trialBestN">0</b></div>
+      <div class="tt-row"><span>加成</span><b id="trialBoostN">—</b></div>
     </div>
-    <div class="trial-tip">纪录越高，化身离线游历所得越丰。身法倍速不缩轮时 —— 运气好，刷得多。</div>
-    <div class="cta"><button onclick="BattleAPI && BattleAPI.trialRestart()">再战一轮</button></div>
   </div>
 </div>
 
