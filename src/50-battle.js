@@ -2088,10 +2088,10 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       if (!pet.alive) continue;
       /* 飞行动画帧更新 */
       pet.flyTimer += dt;
-      const frameDur = 1 / 24;
+      const frameDur = pet.type === 'eagle' ? 1/20 : 1/24;
       if (pet.flyTimer >= frameDur) {
         pet.flyTimer -= frameDur;
-        pet.flyFrame = (pet.flyFrame + 1) % 32;
+        pet.flyFrame = (pet.flyFrame + 1) % (pet.type === 'eagle' ? 30 : 32);
       }
       /* 朝向: 仅拾取/携带阶段按移动方向判朝向, 跟随阶段固定朝右(不摆头) */
       const dxFrame = pet.x - (pet.lastX ?? pet.x);
@@ -2786,9 +2786,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       }
       /* 灵鹰 sprite 渲染 */
       else if (G.petEagleReady && G.petEagleSprite && pet.type === 'eagle') {
-        const EAGLE_SPRITE = { cols: 10, fw: 97, fh: 80 };
+        const EAGLE_SPRITE = { cols: 10, fw: 704, fh: 580 };
         const frameIdx = pet.flyFrame % 30;
-        const drawH = Math.min(CH * 0.35, 52);
+        const drawH = Math.min(CH * 0.5, 80);
         const drawW = drawH * (EAGLE_SPRITE.fw / EAGLE_SPRITE.fh);
         S.main.visible = true;
         S.main.texture = frameTex(G.petEagleSprite, EAGLE_SPRITE.cols, EAGLE_SPRITE.fw, EAGLE_SPRITE.fh, frameIdx);
@@ -3769,20 +3769,24 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   function init() {
     if (!initCanvas()) { setTimeout(init, 200); return; }
     G.player = makePlayer(); G.player.x = 100;
-    /* 默认宠物: 灵鹰, 在玩家左上方飞行跟随 */
+    /* 默认宠物: 灵狐 + 灵鹰(远程攻击宠) */
     G.pets.push({
-      id: 'pet_eagle', name: '灵鹰', type: 'eagle',
+      id: 'pet_fox', name: '灵狐', type: 'fox',
       atk: 0, aspd: 0, atkRange: 0, hp: 999, maxHp: 999,
       offsetX: -65, offsetY: -70,
       x: 35, y: 0, atkT: 0, anim: 0, hurtT: 0, alive: true,
       flyFrame: 0, flyTimer: 0, bobT: 0,
-      fetch: { state: 'idle', drop: null },   /* 拾取装备状态 */
-      /* 施法系统 */
-      castTimer: 4,       /* 首次施法4秒后 */
-      casting: false,
-      castAnim: 0,        /* 施法动画进度 0-1 */
-      castType: null,     /* 'heal' | 'atk' */
-      effectTimer: 0      /* 特效粒子计时 */
+      fetch: { state: 'idle', drop: null },
+      castTimer: 4, casting: false, castAnim: 0, castType: null, effectTimer: 0
+    });
+    G.pets.push({
+      id: 'pet_eagle', name: '灵鹰', type: 'eagle',
+      atk: 0, aspd: 0, atkRange: 0, hp: 999, maxHp: 999,
+      offsetX: 80, offsetY: -50,
+      x: 35, y: 0, atkT: 0, anim: 0, hurtT: 0, alive: true,
+      flyFrame: 0, flyTimer: 0, bobT: 0,
+      fetch: { state: 'idle', drop: null },
+      castTimer: 2, casting: false, castAnim: 0, castType: 'atk', effectTimer: 0
     });
     updateHUD();
     if (typeof window.pushBattleStats === 'function') window.pushBattleStats();
