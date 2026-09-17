@@ -4,7 +4,6 @@
     "assets/battle-forest-fg.webp": "2e24db8be91ab9ae8efb989fec826460beb24bf8c0a232b207c47ce78766a68a",
     "assets/cultivator_body.webp": "a72d9d498231d77e7f8d131152f06059ddca1091e83889c38c3224ae26927b94",
     "assets/cultivator_hair.webp": "4e83df9dfe253be84dbbfb0a183b283ef75c9c362c522d24b012e3c2070c639d",
-    "assets/cultivator_meta.json": "5ea21a40843b6fa40d875d8f10bc86b5bc9f1172e15f41690fc1bd92b77c1670",
     "assets/cultivator_robe.webp": "30b6bdf27221803a1a91d901e9c691b884c70287002bb0b5688d9684e34faf59",
     "assets/cultivator_sheet.webp": "b9b57e6a753d8cb8470f0b8b49055c39d3bb5dd417a9f9fb5be6a1e24eaa2721",
     "assets/cultivator_skill_sheet.webp": "ff960c9f75bc92e27526685c193abac1d3adc735849e719267dd7c9dcceb1125",
@@ -350,17 +349,8 @@
     "assets/modals/ico/zihou.webp": "5dc6a78f3c18c93582216276cef61de91038a294c00baab89c370656ce3f8a59",
     "assets/modals/ico/zilei.webp": "6a8fd580f989d58366165d14bd6e1d4d61ceb85baa7958bdd16217c74f5a51c8",
     "assets/monster_001_green_slime.webp": "bc53348de1e63d8a720d599f535ffd10c01b2fecaa5aa56cbcda0ee259de615e",
-    "assets/monster_001_green_slime_meta.json": "33a719f4ae861c8c07513e035ab678c9a662e30592daea9dacfbd828221d3712",
     "assets/monster_002_water_sprite.webp": "a19104128518abf8a910f14632302240b36496ffd4e756b11278275dab00f0b1",
-    "assets/monster_002_water_sprite_meta.json": "32160b5628c45ac577a5ac1d6ed69637629c602dbc3b5c882120cf00bea751c7",
-    "assets/monsters/m0_wolf.png": "6789c303957e665440519b98aa680a7f9308f960dcd5bca0576a3552e8bafbe8",
-    "assets/monsters/m1_shanyao.png": "0d7c9b8b9b2517d6755c94d0ca9a79d151ade5d7ab9bcc82bb8fbc5169ca4e06",
-    "assets/monsters/m2_xiongpi.png": "86f588d45ece7630b92f029163ac68e23180821d145879389eca08245b3ab510",
-    "assets/monsters/m3_yexia.png": "8c0d86f45842f88f87b720d81259445ae631e8485662f80f33dddc277fb17cdf",
-    "assets/monsters/m4_jiaoyao.png": "23c21be19f7cf63d4924d3d87b472e9a12af32e768a93012d191fea1bebafc54",
-    "assets/monsters/m5_tianmo.png": "4b4893a5bd5265150b3aa1be6caaf75c9f0bb546e9afc57e0309c081097a37a4",
     "assets/music/bgm.mp3": "39405d439f35245b3caea35a6dbe8a0dfc35fcbd402dc8870bf9b83b6a09f9be",
-    "assets/pet_fox_meta.json": "9c1b5e821cfbdc1355bb53b7c2530a2ace20234b5ef985dfed950cb18fe62a1b",
     "assets/pet_fox_sheet.webp": "1f5b7279fb682b63b362f7c73c4fc41e12434f517ef337fbf30f8dbf95e18956",
     "assets/sfx/attack1.ogg": "bb1e63052519c6c8a0e6e86f684035ad209f247c63b3317b48be8abf454f4b96",
     "assets/sfx/attack2.ogg": "89ee51ee4cac1e101107e68610c1b815a303bd9009d36747bb6d80f57aa71e2f",
@@ -476,6 +466,6 @@
     "src/60-stage.js": "58e1ee5df0b972d4271ca676e65622fee3544b9ab6f226ef3f8ffaa16205ae47",
     "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
   },
-  "rev": "18a40c48143b517c",
+  "rev": "f14040b906910ba3",
   "version": "3.5"
 }
