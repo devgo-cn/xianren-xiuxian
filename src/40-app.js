@@ -645,11 +645,11 @@ function applyEquipDrop(id) {
   const i = _equipQueue.findIndex(e => e.id === id);
   if (i < 0) return;                            // 已被拾取/超时处理过 → 幂等, 不重复入包
   const { a, elite } = _equipQueue.splice(i, 1)[0];
-  const kept = keepArtQuiet(a);                 // 静默择优: 能顶替就换上, 不入眼直接丢弃
+  const kept = keepArtQuiet(a);                 // 静默择优: 能顶替就换上, 不入眼熔作灵石
   if (kept && a.q > (state.bestArtQ || -1)) state.bestArtQ = a.q;
   if (elite || a.q >= 3) {
     pushMsg("avatar", `${elite ? "斩一精英" : "斩妖"}得宝 <b style="color:#f0c98a">${a.name}</b>`
-      + (kept ? "（已入囊）" : "（不及身上所佩）"));
+      + (kept ? "（已入囊）" : "（不入眼，熔作灵石）"));
   }
   updateHUD();
   if (kept) updateArts();

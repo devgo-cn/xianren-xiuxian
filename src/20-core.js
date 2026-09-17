@@ -202,9 +202,11 @@ function keepArtQuiet(a) {          // 静默版 smartEquip: 批量结算不发�
   const w = arts[idx];
   if (!w) { arts[idx] = a; return true; }
   if (artScore(a) > artScore(w)) {
+    state.spirit += Math.round(50 * Math.pow(1.6, w.q));
     arts[idx] = a; return true;
   }
-  return false;   // v5.4: 新件不入眼直接丢弃, 不熔灵石
+  state.spirit += Math.round(40 * Math.pow(1.5, a.q));
+  return false;
 }
 
 function renderCraftBtn() {
@@ -450,11 +452,17 @@ function smartEquip(a) {
   const w = arts[idx];
   if (!w) { arts[idx] = a; updateArts(true); save(); cloudSoon(); return; }
   if (artScore(a) > artScore(w)) {
+    const g = Math.round(50 * Math.pow(1.6, w.q));
+    state.spirit += g;
     arts[idx] = a;
-    pushMsg("avatar", `阿青把 ${a.name}（${q0.name}·${SLOT_TYPES[idx].n}）换上了。`);
+    _eqRecycle.unshift(`熔回 ${w.name}(${QUALITY[w.q].name}) +${fmt(g)}`);
+    if (_eqRecycle.length > 3) _eqRecycle.pop();
+    pushMsg("avatar", `阿青见 ${a.name}(${q0.name}·${SLOT_TYPES[idx].n}) 胜过旧佩，把那 ${w.name} 熔回灵石 +${fmt(g)}，新宝自动换上。`);
     updateArts(true); save(); cloudSoon();
   } else {
-    pushMsg("avatar", `${a.name}（${q0.name}）不及身上所佩，阿青摇了摇头。`);
+    const g = Math.round(40 * Math.pow(1.5, a.q));
+    state.spirit += g;
+    pushMsg("avatar", `${a.name}(${q0.name}) 不及身上同槽所佩，阿青炼作灵石 +${fmt(g)}。`);
     updateArts(false); save(); cloudSoon();
   }
 }
