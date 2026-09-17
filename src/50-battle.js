@@ -2786,12 +2786,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
    *      现在按 floorY 与怪身高的实际比例定位, 近地技能贴地、空中技能才上浮。
    * ──────────────────────────────────────────────────────────────────── */
 
-  /* 通用: 造一张带柔边的离屏贴图。fn(g, W, H) 里画形状, 边缘统一用径向渐变收口 */
-  function makeTex(W, H, fn) {
-    const c = document.createElement('canvas'); c.width = W; c.height = H;
-    fn(c.getContext('2d'), W, H);
-    return c;
-  }
   /* 色相派生: 从给定色算出一个"同色系但更亮"的技能色, 保证不跳色。
    * 注意入参是【技能类签名色】, 不是 def.color —— 见上方坑 a。 */
   function skillTint(hex, up = 1.0) {
