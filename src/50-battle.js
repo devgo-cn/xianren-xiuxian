@@ -122,8 +122,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
    * 运行时也可在控制台随时改这些值, 即时生效。 */
   if (typeof window !== 'undefined') {
     if (window.__enemySpeedMul === undefined) window.__enemySpeedMul = 0.35;
-    /* v5.0 调试开关不设默认值, 挂window上默认undefined(falsy), 避免旧值缓存导致正式游戏异常。
-     * 需要调试时在控制台手动设: window.__trialFreeze=true / __poolAll=true / __spawnSlowMul=2.5 / __maxAlive=3 */
+    /* v5.0 强制解冻妖潮倒计时: 不管旧代码残留什么值, 正式游戏必须正常结算。
+     * 需要调试冻结时在控制台手动设 window.__trialFreeze=true 后刷新 */
+    window.__trialFreeze = false;
     /* v4.7 攻距手感旋钮: 0.30~0.70 之间调 —— 调大怪站更远(更不挡人但更不近战),
      * 调小怪贴更近(更近战但大怪可能少量遮住玩家)。改完刷下一只怪即生效。 */
     if (window.__torsoFrac      === undefined) window.__torsoFrac      = 0.45;
@@ -191,6 +192,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   /* 技能素材: 横扫千军 */
   const hengsaoImg = new Image();
   hengsaoImg.onload = function() { G.hengsaoSprite = hengsaoImg; G.hengsaoReady = true; };
+  hengsaoImg.onerror = function() { G.hengsaoReady = false; G.hengsaoFailed = true; console.warn('横扫千军素材加载失败, 走canvas兜底'); };
   hengsaoImg.src = 'assets/skill_hengsao_sheet.webp';
 
   /* ---------- 骨骼怪(DragonBones → Canvas2D 桥) ----------
@@ -1813,7 +1815,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     p.animTimer += dt;
     const frameDur = p.attackAnim ? 1 / (SPRITE.fps * (p.aspd || 1.1) / 1.1)
                                   : 1 / (SPRITE.fps * 1.5);   /* v4.4: 走路动画帧率×1.5(24→36fps), 腿摆动更快, 配合移速×1.5视觉上走得更快 */
-    if (p.animTimer >= frameDur) {
+    while (p.animTimer >= frameDur) {   /* v5.0 FIX: if→while, 高倍速时一帧内可切多帧, 否则攻速被游戏循环帧率锁死 */
       p.animTimer -= frameDur;
       if (p.attackAnim) {
         p.animFrame++;
@@ -3212,6 +3214,17 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
           o.spr.texture = window.BattleGL.tex(off);
           o.spr.position.set(moveSx, fy);
           o.spr.alpha = Math.max(0, Math.min(1, alpha));
+        } else {
+          /* v5.0 兜底: 素材加载失败时用Graphics画一道金色弧光, 保证特效可见 */
+          if (o.spr) o.spr.visible = false;
+          o.g.visible = true; g.clear();
+          const moveX = (f.startX || f.x) + ((f.endX || f.x+120) - (f.startX || f.x)) * k;
+          const sx = worldToScreen(moveX);
+          let alpha = k < 0.15 ? k/0.15 : (k < 0.6 ? 1.0 : (1-k)/0.4);
+          g.lineStyle(3, 0xffc98a, Math.max(0, alpha*0.9));
+          g.arc(sx, fy, 40 + k*30, -0.8, 0.8);
+          g.lineStyle(1.5, 0xffffff, Math.max(0, alpha*0.5));
+          g.arc(sx, fy, 35 + k*25, -0.6, 0.6);
         }
       } else if (f.kind === 'skillShot') {
         /* v4.8 技能弹道: 全部程序化贴图 + ADD 混合。三条不抢画面的做法:
