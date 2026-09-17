@@ -302,12 +302,15 @@ function cldUI(mode) {
   if (idEl) idEl.textContent = cldId();
 }
 
+let _cldFlashT = 0;
+
 function cldFlash(txt) {
+  clearTimeout(_cldFlashT);
   const el = cldChip();
   if (!el) return;
   const old = el.textContent;
   el.textContent = txt;
-  setTimeout(() => { el.textContent = old; }, 1600);
+  _cldFlashT = setTimeout(() => { el.textContent = old; }, 1600);
 }
 
 function cloudSoon() { cld.dirty = true; }
