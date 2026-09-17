@@ -85,7 +85,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       10:{ hpK:4.00, atkK:1.65, defK:1.12, speed:125 },
     },
   };
-  /* v5.0 301只怪池: 按序号返回tier(T1@1-30, T2@31-60, ... T10@271-300) */
+  /* v5.0 121只怪池: 按序号返回tier(T1@1-30, T2@31-60, ... T10@271-300) */
   function tierForSpawn(n) {
     const bands = BC.trialPool.tierBands;
     for (let t = 1; t <= 10; t++) { if (n <= bands[t-1]) return t; }
@@ -135,7 +135,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     bossActive:false,   /* v3.8.2 打满100只小怪才刷BOSS(原10) */
     skillCall:null,          /* 技能名播报槽: 覆盖式大字快闪, {name,t,dur} */
     /* v3.9 试炼轮次: 120秒一场, 怪从T1一路刷到T5; 结算击杀数 → 纪录 → 离线补偿
-     * v5.0 301只固定怪池: trialSpawned记录已刷序号, 按序号决定tier, 刷完301只提前结算 */
+     * v5.0 121只固定怪池: trialSpawned记录已刷序号, 按序号决定tier, 刷完121只提前结算 */
     trialT: BC.trialSecs, trialKills:0, trialTier:1, trialSettled:false, trialBossDone:false,
     trialSpawned:0, trialBossKilled:false,
   };
@@ -677,8 +677,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       const slug = list[i];
       const e = makeBoneEnemy(slug, opts.tier || 3);
       e.elite = false;
-      /* 玩家同道 —— 敌人开火条件是 e.lane === p.lane（见 updateEnemies），
-       * 分道摆放会导致 3 道里只有 1 只够得着玩家，其余压根不开火。 */
+      /* 全部站在玩家纵深线上 —— 分道摆放会导致只有 1 只够得着玩家 */
       e.lane = MID_LANE;
       /* y 上按序号错开：全部同道会叠成一个人形粽。错开量刻意压在半个身位内，
        * 视觉上仍是"站在玩家正前方一排"，但每只都能看清轮廓。 */
@@ -1247,11 +1246,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     return makeEnemyFrom(def, tierOverride);
   }
   function spawnWave() {
-    /* v5.0 301只怪池刷完则停刷(提前结算) */
+    /* v5.0 121只怪池刷完则停刷(提前结算) */
     if (G.trialSpawned >= BC.trialPool.bossAt) return null;
     /* BOSS活跃时不刷新小怪 */
     if (G.bossActive) return null;
-    /* v5.0 BOSS = 第301只, 300只普通怪刷完后出现, 一轮只出一次。
+    /* v5.0 BOSS = 第121只, 120只普通怪刷完后出现, 一轮只出一次。
      * 三重保护: trialBossDone标记 + bossActive + 场上有BOSS对象(含死亡动画中), 防止刷出两只
      * v5.0 FIX: 骨骼工厂未就绪时不创建BOSS —— 否则BOSS没armature走序列帧(史莱姆王),
      * 后来骨骼工厂建好重置后又创建骨骼版九尾狐王, 两个BOSS站一起。等建好再创建。 */
@@ -1265,7 +1264,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       G.enemies.push(e);
       G.bossActive = true;
       G.trialBossDone = true;
-      G.trialSpawned++;   /* 第301只 */
+      G.trialSpawned++;   /* 第121只 */
       return e;
     }
     /* v5.0 小怪tier按已刷序号决定, 不再按击杀数升档 */
@@ -1633,7 +1632,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     rollSpeedSkill('jifeng');
     rollSpeedSkill('suodi');
   }
-  /* v3.7: 寻怪限定车道 —— 同道才算"可打目标"; 跨道由玩家换道解决(见 updatePlayer 寻道块) */
   /* ═══════════════ v6.0 战斗距离: 统一为"边缘到边缘" ═══════════════
    *
    * 【为什么要统一】之前玩家和怪各用一套口径，互相打架：
@@ -2229,7 +2227,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     G.trialT -= dt;
     if (G.trialT <= 0) { G.trialT = 0; settleTrial(); }
   }
-  /* v5.0 离线加成累计制: 每杀1只+1%, 杀BOSS+50%, 全杀满350%封顶; 48h有效 */
+  /* v5.0 离线加成累计制: 每杀1只+1%, 杀BOSS+60%, 全杀满180%封顶; 48h有效 */
   function settleTrial() {
     G.trialSettled = true;
     const kills = G.trialKills;
@@ -2250,7 +2248,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
           st.trialBest = best;
           try { window.addJournal && window.addJournal({ key: 'trial-' + Date.now(), big: realmName(), kind: '试炼', title: '妖潮试炼', text: `妖潮退去, 此番斩妖 ${kills} 只${bossKilled ? ', 击杀妖王' : ''}, 刷新试炼纪录。` }); } catch (err) {}
         }
-        /* v5.0 累计制: 击杀数×1% + BOSS 50%, 封顶350% */
+        /* v5.0 累计制: 击杀数×1% + BOSS 60%, 封顶180% */
         boost = Math.min(BC.trialPool.boostCap, kills * BC.trialPool.boostPerKill + (bossKilled ? BC.trialPool.boostPerBoss : 0));
         if (boost > 0) {
           st.trialBoost = Math.max(st.trialBoost || 0, boost);
@@ -2284,7 +2282,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     G.kills = 0;   /* v5.1 结算后HUD击杀数清零(原只重置trialKills, G.kills没重置导致HUD显示不清零) */
     G.trialT = BC.trialSecs; G.trialKills = 0; G.trialTier = 1;
     G.trialSettled = false; G.trialBossDone = false;
-    G.trialSpawned = 0; G.trialBossKilled = false;   /* v5.0 重置301只怪池计数 */
+    G.trialSpawned = 0; G.trialBossKilled = false;   /* v5.0 重置121只怪池计数 */
     G.paused = false;
     updateHUD();
   }
