@@ -489,7 +489,7 @@ function tickBurst(dt, target) {
   tctx.globalCompositeOperation = "source-over";
 }
 
-function closeOffline() { $("offlineModal").classList.remove("show"); }
+function closeOffline() { const m = $("offlineModal"); if (m) m.classList.remove("show"); }
 
 /* v3.2：统一舞台模式下，fx2d 不再自建 #cultFx（那是第 3 张全屏画布），
  * 改为返回一个符合 60-stage 契约的层对象 { name, draw(ctx,W,H,dt) }。
