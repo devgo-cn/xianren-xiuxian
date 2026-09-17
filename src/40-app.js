@@ -519,17 +519,16 @@ function presentSettle(r) {
   const icoExp = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.2 C13.8 2.6 16.6 5 17.4 8.4 C18.2 12.4 15.4 16.2 11.4 17.2 C10.9 17.3 10.4 17.3 10 17.2 C6 16.8 2.8 13.6 2.6 9.8 C2.4 6.2 5.2 3 9 2.3 C9.3 2.3 9.7 2.2 10 2.2 Z" fill="none" stroke="#d8b06a" stroke-width="1.5"/><circle cx="10" cy="10" r="3.1" fill="none" stroke="#d8b06a" stroke-width="1.3" opacity=".75"/><path d="M10 5.4 C11.8 5.9 13.2 7.2 13.6 9" fill="none" stroke="#d8b06a" stroke-width="1" stroke-linecap="round" opacity=".55"/></svg>';
   const icoSpi = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5 L18.5 10 L10 18.5 L1.5 10 Z" fill="#67c9ab"/><path d="M10 1.5 L10 18.5 L18.5 10 Z" fill="#b7ecda"/><path d="M10 1.5 L1.5 10 L10 10 Z" fill="#9de0c9"/></svg>';
   const icoHunt = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.4 16.8 C6.8 12.4 11.2 8 16.2 3.6 C17 4.2 17.4 4.8 17.6 5.6 C13.4 10.6 8.8 14.8 4.4 17.6 C4 17.4 3.7 17.1 3.4 16.8 Z" fill="#c9a86a"/><path d="M2.6 13.8 C4.8 11.6 6.6 12.4 6.6 14.6" fill="none" stroke="#c9a86a" stroke-width="1.4" stroke-linecap="round"/></svg>';
-  /* 巡猎行 + 细节小字(胜率/秘境/阿青收宝/熔炼) —— 原 huntTxtOf 的结构化替身 */
+  /* 巡猎: 阿青收宝数量(细节不在此展开) */
   const H = gg.hunt;
-  let huntRows = "", huntExtra = "";
-  if (H && H.waves) {
+  let huntExtra = "";
+  const totalSpirit = (gg.spirit || 0) + ((H && H.spirit) || 0);
+  let equipRow = "";
+  if (H) {
     const kN = H.keptCount != null ? H.keptCount : (Array.isArray(H.kept) ? H.kept.length : (H.kept || 0));
-    huntRows =
-      `<div class="off-row"><span class="o-ico">${icoHunt}</span><span class="ol">巡猎 ${H.waves} 波 · 灵石</span><b class="ov jade">+${fmt(H.spirit || 0)}</b></div>`;
-    const bits = [`斗法 ${H.fights} 场（胜 ${H.wins} · 负 ${H.loses}）`, `秘境 ${H.mysts} 处`];
-    if (kN) bits.push(`阿青收下 <b>${kN}</b> 件新宝${H.keptName ? `（${H.keptName} 等）` : ""}`);
-    if (H.melted) bits.push(`<b>${H.melted}</b> 件投炉熔作灵石 +${fmt(H.meltSp || 0)}`);
-    huntExtra = `<div class="off-hunt">${bits.join("；")}。</div>`;
+    const melted = H.melted || 0;
+    if (kN > 0) equipRow = `<div class="off-row"><span class="o-ico">${icoHunt}</span><span class="ol">阿青择优佩戴</span><b class="ov" style="color:#e0b45a">${kN} 件</b></div>`;
+    if (melted > 0) huntExtra = `<div class="off-hunt">另有 ${melted} 件不入眼，阿青投炉熔作灵石 +${fmt(H.meltSp || 0)}。</div>`;
   }
   /* v1.9.8: 连破境 → 横幅右上朱印; 闭关时长 → 横幅标题带(各一行小字) */
   const sealEl = $("offSeal");
@@ -546,8 +545,8 @@ function presentSettle(r) {
   $("offlineText").innerHTML =
     `<div class="off-rows">` +
     `<div class="off-row"><span class="o-ico">${icoExp}</span><span class="ol">周天运转 · 修为</span><b class="ov">+${fmt(gg.exp)}</b></div>` +
-    `<div class="off-row"><span class="o-ico">${icoSpi}</span><span class="ol">聚灵阵 · 灵石</span><b class="ov jade">+${fmt(gg.spirit)}</b></div>` +
-    huntRows +
+    `<div class="off-row"><span class="o-ico">${icoSpi}</span><span class="ol">聚灵阵 · 灵石</span><b class="ov jade">+${fmt(totalSpirit)}</b></div>` +
+    equipRow +
     `</div>` + huntExtra + bagTip;
   // 离线际遇叙事(每满 1 小时一段, 至多 3 段; 纯叙事)
   const bi = Math.min(bigIdx(), MAIN_STORY.length - 1);

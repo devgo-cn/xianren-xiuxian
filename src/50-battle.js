@@ -96,8 +96,8 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
   let PST = { lv:1, atk:56, hp:430, def:31, crit:0, critB:0, critD:0, pen:0, dodge:0 };
   /* 掉落系数(服务端可下发覆盖; 断网/离线用内置默认值, 保证照常可玩) */
   const DROP = {
-    spiritBase: 6,        // 每杀灵石基数
-    spiritPerLv: 1.2,     // 每杀灵石 · 每境界级加成
+    spiritBase: 30,       // 每杀灵石基数(v5.2: 6→30, 在线打怪灵石产出对齐聚灵阵需求)
+    spiritPerLv: 5,       // 每杀灵石 · 每境界级加成(v5.2: 1.2→5)
     spiritRand: 0.4,      // 灵石浮动 ±40%
     equipChance: 0.035,   // 掉法宝概率(装备实际生成在主游戏 makeArt)
     eliteChance: 0.06,    // 精英怪出现率
