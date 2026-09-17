@@ -129,7 +129,7 @@ function adopt(s) {
   s.offlineBoostUntil = Math.max(0, fin(s.offlineBoostUntil, 0));
   /* v3.9 妖潮试炼: 纪录 + 离线收益加成(120s 击杀纪录 → 补偿档位) */
   s.trialBest = Math.max(0, Math.floor(fin(s.trialBest, 0)));
-  s.trialBoost = Math.min(3.5, Math.max(0, fin(s.trialBoost, 0)));   /* v5.0 封顶350%(300只×1%+BOSS50%) */
+  s.trialBoost = Math.min(1.80, Math.max(0, fin(s.trialBoost, 0)));   /* v5.1 封顶180%(120只×1%+BOSS60%) */
   s.trialBoostUntil = Math.max(0, fin(s.trialBoostUntil, 0));
   if (!s.travel || typeof s.travel !== "object") s.travel = null;
   /* v1.8.5 化身行囊: 信匣满后由服务端 stayTravel 攒进 travel.bag。

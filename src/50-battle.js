@@ -51,43 +51,43 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     },
     /* v3.9 怪物三维系统: 怪包统一池(每个境界都会刷到全怪种), 三维 = 境界基准 × 怪种K × 波次tier倍率。
      * 波次内从 T1 最弱一路递进到 T5 —— tier 决定刷怪池权重与三维倍率。 */
-    /* v5.0 怪物池细分T1-T10: 301只怪池每30只升一档, 增强更平滑。
-     * 倍率控制在1.0~3.2(原T5就3.2了), 避免高tier怪血太厚玩家清不动 */
+    /* v5.1 怪物池细分T1-T10: 121只怪池每12只升一档, 小怪强度大幅上调。
+     * 倍率控制在1.5~5.0(BOSS强度不变, 仍用自身hpK/atkK), 小怪更耐打 */
     tier: {
-      1: { name:'妖群', mul:1.00 },
-      2: { name:'妖锐', mul:1.15 },
-      3: { name:'妖将', mul:1.35 },
-      4: { name:'妖卫', mul:1.55 },
-      5: { name:'妖王', mul:1.80 },
-      6: { name:'妖皇', mul:2.05 },
-      7: { name:'妖尊', mul:2.35 },
-      8: { name:'妖圣', mul:2.65 },
-      9: { name:'妖神', mul:2.90 },
-      10:{ name:'妖帝', mul:3.20 },
+      1: { name:'妖群', mul:1.50 },
+      2: { name:'妖锐', mul:1.80 },
+      3: { name:'妖将', mul:2.10 },
+      4: { name:'妖卫', mul:2.45 },
+      5: { name:'妖王', mul:2.80 },
+      6: { name:'妖皇', mul:3.20 },
+      7: { name:'妖尊', mul:3.60 },
+      8: { name:'妖圣', mul:4.05 },
+      9: { name:'妖神', mul:4.50 },
+      10:{ name:'妖帝', mul:5.00 },
     },
     tierNeedBase: 7,      /* 首档升档击杀数: T2@7, T3@9, T4@12, T5@15(累计43) —— 120s 产能约46只, 顶尖玩家压哨进 T5 */
     tierNeedStep: 1.3,    /* 每档所需击杀数递增系数 */
     trialSecs: 120,       /* 试炼轮时长: 120 秒结算, 击杀数计入纪录 → 离线补偿 */
-    /* v5.0 妖潮301只怪池: 300普通+1BOSS, 按序号逐渐增强(T1→T10分段),
-     * 每杀1只+1%离线加成, 杀BOSS+50%, 全杀满累计350%封顶。
-     * 刷完301只提前结算弹弹窗, 不必等120秒。 */
+    /* v5.1 妖潮121只怪池: 120普通+1BOSS, 按序号逐渐增强(T1→T10分段, 每12只一档),
+     * 每杀1只+1%离线加成, 杀BOSS+60%, 全杀满累计180%封顶(120+60)。
+     * 刷完121只提前结算弹弹窗, 不必等120秒。击杀即刷新(从屏幕左边生成)。 */
     trialPool: {
-      totalMobs: 300, bossAt: 301,
-      boostPerKill: 0.01, boostPerBoss: 0.50, boostCap: 3.50,
-      tierBands: [30, 60, 90, 120, 150, 180, 210, 240, 270, 300],   /* T1@1-30 ... T10@271-300 */
+      totalMobs: 120, bossAt: 121,
+      boostPerKill: 0.01, boostPerBoss: 0.60, boostCap: 1.80,
+      tierBands: [12, 24, 36, 48, 60, 72, 84, 96, 108, 120],   /* T1@1-12 ... T10@109-120 */
     },
-    /* v5.0 骨骼池怪数值模板细分T1-T10 —— hpK控制在0.95~2.2, 避免高tier血太厚 */
+    /* v5.1 骨骼池怪数值模板大幅上调 —— hpK控制在1.5~4.0, 小怪更耐打 */
     boneTpl: {
-      1: { hpK:0.95, atkK:0.55, defK:0.30, speed:110 },
-      2: { hpK:0.90, atkK:0.58, defK:0.29, speed:130 },
-      3: { hpK:0.85, atkK:0.62, defK:0.28, speed:155 },
-      4: { hpK:1.00, atkK:0.70, defK:0.35, speed:140 },
-      5: { hpK:1.20, atkK:0.80, defK:0.45, speed:120 },
-      6: { hpK:1.45, atkK:0.90, defK:0.55, speed:135 },
-      7: { hpK:1.65, atkK:1.00, defK:0.65, speed:150 },
-      8: { hpK:1.85, atkK:1.08, defK:0.75, speed:130 },
-      9: { hpK:2.00, atkK:1.15, defK:0.85, speed:110 },
-      10:{ hpK:2.20, atkK:1.25, defK:0.95, speed:125 },
+      1: { hpK:1.50, atkK:0.70, defK:0.40, speed:110 },
+      2: { hpK:1.70, atkK:0.75, defK:0.42, speed:130 },
+      3: { hpK:1.90, atkK:0.82, defK:0.45, speed:155 },
+      4: { hpK:2.20, atkK:0.92, defK:0.52, speed:140 },
+      5: { hpK:2.50, atkK:1.05, defK:0.62, speed:120 },
+      6: { hpK:2.85, atkK:1.18, defK:0.72, speed:135 },
+      7: { hpK:3.15, atkK:1.30, defK:0.82, speed:150 },
+      8: { hpK:3.45, atkK:1.42, defK:0.92, speed:130 },
+      9: { hpK:3.75, atkK:1.52, defK:1.02, speed:110 },
+      10:{ hpK:4.00, atkK:1.65, defK:1.12, speed:125 },
     },
   };
   /* 升档所需击杀数: base × step^(t-1) */
@@ -1337,7 +1337,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     for (const e2 of entries) { rr -= e2.w; if (rr <= 0) { pick2 = e2; break; } }
     if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
     const e = pick2.kind === 'bone' ? makeBoneEnemy(pick2.key, G.trialTier) : makeEnemy(pick2.key, G.trialTier);   /* v3.9 三维: 小怪按当前档位缩放 */
-    e.x = G.camX + stageW() + BC.enemySpawnOffset;
+    e.x = G.camX + stageW() + BC.enemySpawnOffset;   /* v5.1 击杀即刷新: 小怪从屏幕右边生成, 杀一只补一只 */
     G.enemies.push(e);
     G.trialSpawned++;   /* v5.0 计数已刷怪序号 */
     return e;
@@ -1413,7 +1413,12 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (!G.trialSettled) {
       G.trialKills++;
       updateHUD();
-      /* v5.0 301只全刷完且BOSS已死 → 提前结算弹弹窗 */
+      /* v5.1 击杀即刷新: 杀一只小怪立即补一只(从右边生成), 保持同屏怪数量稳定。
+       * BOSS被杀不补充(BOSS是最后一只), 怪池刷完不补充。 */
+      if (!isBoss && G.trialSpawned < BC.trialPool.bossAt) {
+        spawnWave();
+      }
+      /* v5.0 121只全刷完且BOSS已死 → 提前结算弹弹窗 */
       if (G.trialSpawned >= BC.trialPool.bossAt && G.trialBossKilled) {
         settleTrial();
       }
@@ -1431,8 +1436,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       if (eq) spawnEquipDrop(e, eq);
     } catch (err) {}
     skExpAll(isBoss ? 30 : 2);         // 每杀全体技能+2; BOSS 击杀全体+30
-    rollSpeedSkill('jifeng');
-    rollSpeedSkill('suodi');
     const zl = skVal('zhuilie');       // 追猎: 击杀后立刻再出手一次, 衔尾一击暴击率大增
     if (zl && Math.random()*100 < zl.chance) {
       skExp('zhuilie', 3); G.extraStrike = true; G.nextStrikeCrit = zl.crit || 0;
@@ -1657,6 +1660,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       dealDamage(target, calcDmg(PST.atk, base*(jq.dmg||0)/100, target.def, pen), '#bfe8ff', false);
       if (!target.alive) return;
     }
+    /* v5.1 疾风步/缩地成寸: 攻击时概率触发(与破甲/斩杀/剑气斩一致), 不再是击杀后触发 */
+    rollSpeedSkill('jifeng');
+    rollSpeedSkill('suodi');
   }
   /* v3.7: 寻怪限定车道 —— 同道才算"可打目标"; 跨道由玩家换道解决(见 updatePlayer 寻道块) */
   function findNearestEnemy(lane, fromX, maxDist) {
@@ -2340,9 +2346,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
      * （表现为 probe 里冒出 sword_goblin / 第二只同名怪，把画面糊掉）。 */
     else if (window.__skillFreeze) { G.spawnT = spawnGap; }
     else if (G.spawnT <= 0) {
-      /* v5.0 按频率刷怪: 每次1只, 0.3s/只 → 90s刷完300只, 留30s打BOSS。
-       * 同屏满了自动停刷(玩家清得慢就不会无限堆), BOSS只出1只。 */
-      if (G.trialSpawned < BC.trialPool.bossAt) spawnWave();
+      /* v5.1 击杀即刷新: 开局同屏少于6只时按频率快速填充, 达到6只后停止按频率刷,
+       * 之后靠onKill击杀即刷新补充(杀一只补一只)。同屏满了自动停刷。 */
+      const aliveCount = G.enemies.filter(x => x.alive && x.dying <= 0).length;
+      if (aliveCount < 6 && G.trialSpawned < BC.trialPool.bossAt) spawnWave();
       G.spawnT = spawnGap;
     }
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
