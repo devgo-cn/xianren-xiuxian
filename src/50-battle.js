@@ -134,7 +134,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   }
 
   const G = {    t:0, kills:0, spirit:0, speedMult:2, speedMultTimer:0, state:'walk', camX:0, paused:false,
-    player:null, pets:[], enemies:[], fx:[], dmg:[], drops:[], spawnT:BC.spawnInterval,
+    player:null, pets:[], enemies:[], fx:[], dmg:[], drops:[], spawnT: 0,
     sprite:null, bgImg:null, spriteReady:false, bgReady:false, extraStrike:false,
     speedDodge:0, nextStrikeCrit:0,
     petFoxSprite:null, petFoxReady:false,
@@ -1327,11 +1327,11 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     if (!(BONES[entry.slug] && BONES[entry.slug].ready)) return null;   /* 工厂未就绪这一拍不刷(避免占位图) */
     if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
     const e = makePoolEnemy(entry, false);
-   /* v5.1 击杀即刷新: 从屏幕右边生成; v7.2d 首只怪刷在屏内右侧1/4 —— 不然要走
-    * 半个屏宽(3~8s)才接战, 白白吃掉 120s 妖潮的开头 */
-   e.x = G.trialSpawned === 1 ? G.camX + stageW() * 0.75 : G.camX + stageW() + BC.enemySpawnOffset;
+    /* v7.1 开局立即接战: 前两只怪(trialSpawned 0/1)刷在屏内右侧1/4处,
+     * 不刷屏外走3~8s。之后正常从屏幕右边生成。 */
+    e.x = G.trialSpawned <= 1 ? G.camX + stageW() * 0.75 : G.camX + stageW() + BC.enemySpawnOffset;
     G.enemies.push(e);
-    G.trialSpawned++;   /* v5.0 计数已刷怪序号 */
+    G.trialSpawned++;
     return e;
   }
   /* ---------- 数值伤害 v7.1: 量纲平衡式 dmg = atk²/(atk+有效防御), 破甲按百分比削减防御 ----------
