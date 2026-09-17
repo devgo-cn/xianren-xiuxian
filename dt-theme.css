@@ -1052,14 +1052,13 @@
 
 /* ==================== v1.7.28 境界徽章终态: 深底金边胶囊 · 卡内居中三行(大境界/段位小字段/说明), 文字不截断 ==================== */
 .realm-badge{
-  background:rgba(12,18,34,.74) !important;
-  border:1px solid rgba(232,197,107,.4) !important;
-  border-radius:13px !important;
-  background-image:none !important;
-  box-shadow:0 4px 18px rgba(0,0,0,.4) !important;
-  width:134px !important; max-width:100% !important; min-width:0 !important;
+  background-color:transparent !important;
+  border:0 !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+  width:158px !important; max-width:100% !important; min-width:0 !important;
   box-sizing:border-box !important;
-  padding:7px 10px 6px !important;
+  padding:8px 13px 9px !important;
   display:flex !important; flex-direction:column !important;
   align-items:center !important; justify-content:center !important;
   gap:1px !important; text-align:center !important;
