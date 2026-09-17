@@ -440,7 +440,7 @@ function renderEquip() {                 // v1.9.8 十字格工作台: 四正方
     const ag = eb.agg || {};
     const rn = ["会心", "暴击", "爆伤", "破甲", "闪避", "吸血", "攻速"];
     const rk = ["crit", "critB", "critD", "pen", "dodge", "life", "aspd"];
-    var _detRows =
+    const _detRows =
       `<div class="sr"><span>气 血</span><b>${fmt(hs.hp)}</b></div>` +
       `<div class="sr"><span>攻 击</span><b>${fmt(hs.atk)}</b></div>` +
       `<div class="sr"><span>防 御</span><b>${fmt(hs.def)}</b></div>` +
