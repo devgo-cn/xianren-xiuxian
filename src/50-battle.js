@@ -178,10 +178,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   const waterSpriteImg = new Image();
   waterSpriteImg.onload = function() { G.waterSprite = solidify(waterSpriteImg); G.waterReady = true; };
   waterSpriteImg.src = 'assets/monster_002_water_sprite.webp';
-  /* BOSS素材: 史莱姆王(飘着, 2倍大) */
-  const bossSpriteImg = new Image();
-  bossSpriteImg.onload = function() { G.bossSprite = solidify(bossSpriteImg); G.bossReady = true; };
-  bossSpriteImg.src = 'assets/monster_003_slime_king.webp';
   /* 宠物素材: 灵狐 */
   const petFoxImg = new Image();
   petFoxImg.onload = function() { G.petFoxSprite = solidify(petFoxImg); G.petFoxReady = true; };
@@ -610,8 +606,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   const SLIME_SPRITE = { cols:12, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:51, hurtStart:83, hurtCount:11, fps:24 };
   /* 水精灵帧配置: 10列8行, walk32+attack33+hurt13 */
   const WATER_SPRITE = { cols:10, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:33, hurtStart:65, hurtCount:13, fps:24 };
-  /* BOSS史莱姆王: 飘着的, 2倍大, 帧0-17漂浮, 帧18-39攻击, 帧40-47恢复 */
-  const BOSS_SPRITE = { cols:8, fw:240, fh:200, walkStart:0, walkCount:18, attackStart:18, attackCount:22, hurtStart:0, hurtCount:0, fps:8, isBoss:true, floatHeight:10, sizeMult:2.0 };
 
   function fmtNum(n) {
     n = Math.round(n || 0);
@@ -1171,10 +1165,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         r.__bodyRange = true;
       }
     } else if (!def.bone) {
-      /* 序列帧怪: slime(8x200 帧) / water / boss(240x200 帧) —— 各自帧的宽高比即体型比 */
-      const sp = (key === 'boss') ? BOSS_SPRITE : (key === 'slime') ? SLIME_SPRITE : (key === 'water') ? WATER_SPRITE : null;
+      /* 序列帧怪: slime / water —— 各自帧的宽高比即体型比(BOSS已移除序列帧兜底, 强制用骨骼giant_kitsune) */
+      const sp = (key === 'slime') ? SLIME_SPRITE : (key === 'water') ? WATER_SPRITE : null;
       if (sp && sp.fw > 0 && sp.fh > 0) {
-        const dh = Math.min(def.isBoss ? (CH || 306) * 0.7 : (CH || 306) * 0.5, def.drawH || 84);
+        const dh = Math.min((CH || 306) * 0.5, def.drawH || 84);
         r.atkRange = bodyRangeWH(sp.fw / sp.fh, dh, def.role === 'ranged');
         r.__bodyRange = true;
       }
@@ -1184,7 +1178,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       const bb2 = armAABB(r.armature);
       if (bb2 && bb2.height > 0) r.__spriteRatio = bb2.width / bb2.height;
     } else {
-      const sp2 = (key === 'boss') ? BOSS_SPRITE : (key === 'slime') ? SLIME_SPRITE : (key === 'water') ? WATER_SPRITE : null;
+      const sp2 = (key === 'slime') ? SLIME_SPRITE : (key === 'water') ? WATER_SPRITE : null;
       if (sp2 && sp2.fh > 0) r.__spriteRatio = sp2.fw / sp2.fh;
     }
     r.__halfW = 0;    /* 置 0 让 enemyHalfW() 首次调用时惰性算出真实值 */
@@ -2568,34 +2562,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     g.endFill();
   }
 
-  /* v2.6 PERF: BOSS 攻击帧"左侧渐隐"掩码按帧预渲染 —— 原实现攻击期间每帧新建
-   * 离屏 canvas + 渐变(60fps 下每秒 60 次分配), 现在只在尺寸变化时重建 22 张 */
-  const BOSS_MASK = { w: 0, h: 0, frames: null };
   /* v2.9 PERF: 横扫千军帧级离屏缓存(左右渐隐贴图), 尺寸固定 280×drawH 故只需按帧号缓存 */
   const HENGSAO_MASK = { frames: null };
-  function bossMaskedFrame(fi, drawW, drawH) {
-    if (!BOSS_MASK.frames || BOSS_MASK.w !== drawW || BOSS_MASK.h !== drawH) {
-      BOSS_MASK.w = drawW; BOSS_MASK.h = drawH;
-      const cw = Math.max(1, Math.ceil(drawW)), chh = Math.max(1, Math.ceil(drawH));
-      BOSS_MASK.frames = [];
-      for (let i = 0; i < BOSS_SPRITE.attackCount; i++) {
-        const src = BOSS_SPRITE.attackStart + i;
-        const off = document.createElement('canvas');
-        off.width = cw; off.height = chh;
-        const octx = off.getContext('2d');
-        octx.drawImage(G.bossSprite, (src % BOSS_SPRITE.cols) * BOSS_SPRITE.fw,
-          Math.floor(src / BOSS_SPRITE.cols) * BOSS_SPRITE.fh, BOSS_SPRITE.fw, BOSS_SPRITE.fh, 0, 0, cw, chh);
-        octx.globalCompositeOperation = 'destination-in';
-        const grad = octx.createLinearGradient(0, 0, cw * 0.4, 0);
-        grad.addColorStop(0, 'rgba(0,0,0,0)');
-        grad.addColorStop(1, 'rgba(0,0,0,1)');
-        octx.fillStyle = grad;
-        octx.fillRect(0, 0, cw, chh);  /* 必须填充整个画布, 否则右侧变透明 */
-        BOSS_MASK.frames.push(off);
-      }
-    }
-    return BOSS_MASK.frames[fi] || null;
-  }
 
   function drawPets() {
     const C = window.BattleGL.layers.pets;
@@ -2786,41 +2754,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         /* 水精灵面朝左, 素材本身就是面朝左, 不需要翻转 */
         if (e.elite && e.alive) drawEliteRing(uiLayer, sx, sy, 16);
         if (e.alive) drawHpBar(uiLayer, sx, sy - footOffset - 4, 28, e.hp, e.maxHp, true);
-      } else if (G.bossReady && G.bossSprite && e.type === 'boss') {
-        /* BOSS史莱姆王: 飘着的, 2倍大, 攻击/漂浮分帧 */
-        let frameIdx;
-        if (e.anim > 0) {
-          const atkProgress = 1 - e.anim;
-          frameIdx = BOSS_SPRITE.attackStart + Math.min(Math.floor(atkProgress * BOSS_SPRITE.attackCount), BOSS_SPRITE.attackCount-1);
-        } else {
-          frameIdx = BOSS_SPRITE.walkStart + (Math.floor(G.t * BOSS_SPRITE.fps) % BOSS_SPRITE.walkCount);
-        }
-        const col = frameIdx % BOSS_SPRITE.cols;
-        const row = Math.floor(frameIdx / BOSS_SPRITE.cols);
-        void col; void row;
-        /* BOSS 2倍大, 漂浮不踩地板 */
-        const drawH = Math.min(CH * 0.7, 140) * laneScale(yToDepth(e.y));
-        const drawW = drawH * (BOSS_SPRITE.fw / BOSS_SPRITE.fh);
-        const floatY = BOSS_SPRITE.floatHeight + Math.sin(G.t * 1.5) * 8;  /* 漂浮上下浮动 */
-        const spr = enemySpriteGL(e, batchC);
-        enemyFxGL(spr, e);
-        /* 攻击帧左侧特效渐隐: 预渲染掩码帧直接贴图(原每帧离屏重建, 见 bossMaskedFrame) */
-        if (e.anim > 0) {
-          const fi = Math.min(frameIdx - BOSS_SPRITE.attackStart, BOSS_SPRITE.attackCount - 1);
-          const off = bossMaskedFrame(fi, drawW, drawH);
-          if (off) {
-            spr.texture = window.BattleGL.tex(off);
-            spr.position.set(sx - drawW * 0.5, sy - floatY - drawH);
-            spr.scale.set(1);
-          }
-        } else {
-          /* 漂浮帧直接绘制 */
-          spr.texture = frameTex(G.bossSprite, BOSS_SPRITE.cols, BOSS_SPRITE.fw, BOSS_SPRITE.fh, frameIdx);
-          spr.position.set(sx - drawW * 0.5, sy - floatY - drawH);
-          spr.scale.set(drawW / BOSS_SPRITE.fw, drawH / BOSS_SPRITE.fh);
-        }
-        /* BOSS血条在头顶, 右移对齐头部 */
-        if (e.alive) drawHpBar(uiLayer, sx + drawW*0.2, sy - floatY - drawH - 8, 50, e.hp, e.maxHp, true);
       } else if (!(e.armature && e.boneSlug && BONES[e.boneSlug] && BONES[e.boneSlug].ready)) {
         /* 素材未就绪时的兜底占位(骨骼怪工厂未就绪/序列帧怪素材缺失) —— 已由通用骨骼分支画过的不再进这里 */
         let pg = e.__placeG;
@@ -3207,7 +3140,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
           if (k < 0.15) alpha = k / 0.15;
           else if (k < 0.6) alpha = 1.0;
           else alpha = (1 - k) / 0.4;
-          /* v2.9 PERF: 左右渐现渐隐掩码帧按帧号缓存(同 BOSS_MASK 模式) */
+          /* v2.9 PERF: 左右渐现渐隐掩码帧按帧号缓存 */
           if (!HENGSAO_MASK.frames) HENGSAO_MASK.frames = [];
           let off = HENGSAO_MASK.frames[frameIdx];
           if (!off) {
