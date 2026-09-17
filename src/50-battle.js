@@ -2713,9 +2713,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         } else {
           frameIdx = WATER_SPRITE.walkStart + (Math.floor(G.t * WATER_SPRITE.fps) % WATER_SPRITE.walkCount);
         }
-        const col = frameIdx % WATER_SPRITE.cols;
-        const row = Math.floor(frameIdx / WATER_SPRITE.cols);
-        void col; void row;   /* v4.0: 切帧由 frameTex 完成, 保留帧选择逻辑不变 */
         /* 渲染尺寸: 适配战斗区高度(v3.7: 随车道纵深缩放) */
         const drawH = Math.min(CH * 0.5, 70) * (e.elite ? 1.28 : 1) * laneScale(yToDepth(e.y));
         const drawW = drawH * (WATER_SPRITE.fw / WATER_SPRITE.fh);
