@@ -3337,7 +3337,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   /* v4.0 WebGL: 全部内容画进 BattleGL 的 Pixi 容器（横带本地坐标）——
    * 2D 清屏/底色渐变由 bgGradSprite 接管（GL canvas 是透明层，每帧全量重建，
    * 无 clearRect 概念）；ctx 参数仅保留签名兼容，绘制链路零 2D 调用。 */
-  function render(clear) {
+  function render() {
     /* UI 层共享 Graphics 每帧 clear 重画(2D 时代靠清屏自然清, GL 必须显式清,
      * 否则血条/法环矩形逐帧累积成满屏红条 —— 首轮冒烟实锤) */
     const GL = window.BattleGL;
@@ -3533,7 +3533,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     requestAnimationFrame(loop);
     _lastPaint = t;
     const dt = Math.min(0.05, (t-lastT)/1000); lastT = t;
-    update(dt); render(true);   /* 独立模式：自己就是画布主人，清屏透出底下 #bg */
+    update(dt); render();   /* 独立模式：自己就是画布主人，清屏透出底下 #bg */
     /* v4.0 WebGL: 独立模式横带=全屏（band 语义与 stage 一致） */
     { const GL = window.BattleGL; if (GL && GL.ready) GL.frame(0, window.innerHeight, 'standalone-loop'); }
   }
@@ -3557,7 +3557,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         const savedCW = CW, savedCH = CH;
         CW = W; CH = band.height;
         try {
-          render(false);   /* 画进 GL 横带本地坐标 */
+          render();   /* 画进 GL 横带本地坐标 */
           const GL = window.BattleGL;
           if (GL && GL.ready) GL.frame(band.top, band.height, '60-stage');   /* root.y 平移 + 遮罩 + app.render() */
         } finally {
