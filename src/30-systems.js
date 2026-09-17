@@ -396,38 +396,6 @@ function openAlchemy() {
   m.classList.add("show");
 }
 
-function craftAreaHTML() {
-  const bi = bigIdx();
-  const groups = {};
-  for (const id of Object.keys(RECIPES)) {
-    const big = RECIPES[id].big;
-    (groups[big] = groups[big] || []).push(id);
-  }
-  let html = `<div class="al-sec">开炉炼丹 <i>已通晓「${DAN_ZONE[Math.min(bi, 11)] || "?"}」及以下丹道</i></div>`;
-  for (let big = 0; big <= bi; big++) {
-    const list = groups[big];
-    if (!list || !list.length) continue;
-    html += `<div class="al-zone">${DAN_ZONE[big] || big} · 丹道</div>`;
-    for (const id of list) {
-      const rp = RECIPES[id];
-      if (!rp) continue;
-      if (rp.h) {
-        if (hiddenUnlocked(big)) html += recipeCardHTML(id);
-        else {
-          const got = pagesOf(big);
-          html += `<div class="al-secret"><div class="bd">
-            <div class="qn">???.${DAN_ZONE[big]}古方残卷 <span class="pg">残页 ${got}/${PAGES_NEED[big]}</span></div>
-            <div class="tip">云游${DAN_ZONE[big]}一带有机会拾得残页，凑齐自见丹方真容。</div></div></div>`;
-        }
-        continue;
-      }
-      html += recipeCardHTML(id);
-    }
-  }
-  if (bi < 11) html += `<div class="al-empty" style="font-style:italic">更高一境的丹方，待你亲临其境，自有丹师相授。</div>`;
-  return html;
-}
-
 async function cloudSettle() {
   if (!window.fetch || !cld.id || _settling) return null;
   __set_settling(true);
@@ -518,7 +486,6 @@ export {
   closeLic,
   cloudPushNow,
   cloudSettle,
-  craftAreaHTML,
   fireMilestone,
   loadRecipe,
   mainMoment,
