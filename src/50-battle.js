@@ -395,81 +395,83 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
    * BC.bonePool = {tier:[slug...]} —— spawnWave 按当前档从池里挑(排除手配怪与BOSS)。 */
   const BONE_POOL = { 1:[], 2:[], 3:[], 4:[], 5:[] };
   const BONE_IDX = {};   /* slug -> index.json cfg(armature/anims/tier/drawH) —— makeBoneEnemy 取 drawH 用 */
+  /* v7.9: 记录已经发起过加载的 slug, 供突破时补载去重 */
+  const _boneLoaded = new Set();
+  /* 发起一只怪的骨骼加载(去重): 手配怪与懒加载泵都走这里 */
+  function ensureBone(slug, idx) {
+    if (!slug || slug === 'ratty' || _boneLoaded.has(slug)) return false;
+    const cfg = idx && idx[slug];
+    if (!cfg) { console.warn('[battle] index.json 缺怪:', slug); return false; }
+    _boneLoaded.add(slug);
+    loadBone(slug, { ske:`assets/db/monsters/${slug}/ske.json`, tex:`assets/db/monsters/${slug}/tex.json`, img:`assets/db/monsters/${slug}/tex.webp` }, cfg.armature, cfg.anims);
+    return true;
+  }
   (function loadBones() {
     if (!window.BattleGL) { console.warn('[battle] BattleGL 未加载, 骨骼怪不可用'); return; }
     loadBone('ratty', { ske:'assets/db/ratty_ske.json', tex:'assets/db/ratty_tex.json', img:'assets/db/ratty_tex.png' }, 'Ratty',
       ['idle','dead','attack','hurt','walk']);
     fetch('assets/db/monsters/index.json').then(r => r.json()).then(idx => {
+      BONE_IDX_ALL = idx;
       const handMade = new Set(Object.values(BC.enemies).map(d => d.bone).filter(Boolean));
       for (const [slug, cfg] of Object.entries(idx)) BONE_IDX[slug] = cfg;
-      /* 优先加载手配怪(BC.enemies 里的 bone) */
-      const need = [...handMade].filter(b => b && b !== 'ratty');
-      for (const slug of need) {
-        const cfg = idx[slug];
-        if (!cfg) { console.warn('[battle] index.json 缺怪:', slug); continue; }
-        loadBone(slug, { ske:`assets/db/monsters/${slug}/ske.json`, tex:`assets/db/monsters/${slug}/tex.json`, img:`assets/db/monsters/${slug}/tex.webp` }, cfg.armature, cfg.anims);
-      }
-      /* 全量池: 排除手配/BOSS/老路径, 按文档 tier 分组 */
-      const queue = [];
+      /* 手配怪(BC.enemies 里带 bone 的): 小体积、开局就要用, 立即加载 */
+      for (const slug of [...handMade].filter(b => b && b !== 'ratty')) ensureBone(slug, idx);
+      /* tier 分组(仅用于突破时按需补载, 不再驱动开局加载) */
       for (const [slug, cfg] of Object.entries(idx)) {
         if (handMade.has(slug) || slug === 'ratty') continue;
         const t = Math.min(5, Math.max(1, parseInt(String(cfg.tier || 'T1').slice(1)) || 1));
         BONE_POOL[t].push(slug);
-        queue.push(slug);
       }
-      /* ⚠️ v7.9 FIX (勿回退) —— 用户反馈"开头走个三四秒才刷一只怪"的真因:
-       * 懒加载 pump 是【每 1.5s 只加载 3 只】, 且 queue 顺序纯粹跟着 index.json 的键序走,
-       * 与实战波次毫无关系。于是:
-       *   第1波 bee / 第2波 slime_flynn 是手配怪(立即加载) → 前两只见得快;
-       *   第3波 mimic / 第4波 scorpion 排在队列第 9/10 位 → 要到第 3~4 批 ≈ 4.5s 才加载。
-       * 玩家杀完前两只后, spawnWave 因 `BONES[slug].ready === false` 一直返回 null,
-       * 只好干等着骨骼加载完 —— 这就是那"三四秒空等"。
+      /* ═══ v7.9 核心: 只加载【当前境界实际会用到的怪】, 不再预载全部 79 个包 ═══
+       * 设计事实(见 00-pure.js MOB_POOLS): 每大境界 = 12 种怪 × 各10只 + 1 BOSS = 13 个模型。
+       * 而 index.json 里有 79 个怪物包 —— 其中 58 个【永远用不到】(策划预留但没排进波次)。
        *
-       * 修法: 严格按【当前境界的实战波次顺序】重排队列 —— 第1波排最前, 第2波次之...
-       * 这样 pump 每批加载的正好是"接下来几只要用的怪", 杀到第几波就有第几波的骨骼,
-       * 不再出现"杀完这只, 下一只还没加载完"的空等。
-       * 手配怪(BC.enemies 带 bone 的)本就在 pump 之前单独加载, 这里只管池里的怪。 */
-      const priority = [];
-      try {
-        const tierNow = Math.min(5, Math.max(1, PST.lv || 1));   /* 当前大境界 */
-        const seen = new Set();
-        /* ① 当前境界的波次顺序(池表的 waves 就是实战顺序, 直接照抄) */
-        const poolsNow = MOB_POOLS[tierNow] || MOB_POOLS[1];
-        for (const w of (poolsNow.waves || [])) {
-          if (w && w.slug && queue.includes(w.slug) && !seen.has(w.slug)) { seen.add(w.slug); priority.push(w.slug); }
-        }
-        if (poolsNow.boss && queue.includes(poolsNow.boss.slug)) { seen.add(poolsNow.boss.slug); priority.push(poolsNow.boss.slug); }
-        /* ② 再补本境界 tier 组里剩下的怪 */
-        for (const slug of (BONE_POOL[tierNow] || [])) {
-          if (queue.includes(slug) && !seen.has(slug)) { seen.add(slug); priority.push(slug); }
-        }
-        /* ③ 其余境界按 tier 升序兜底 */
-        for (let ti = 1; ti <= 5; ti++) {
-          if (ti === tierNow) continue;
-          for (const slug of (BONE_POOL[ti] || [])) {
-            if (queue.includes(slug) && !seen.has(slug)) { seen.add(slug); priority.push(slug); }
-          }
-        }
-      } catch (err) {}
-      /* 若 grouping 没覆盖全(异常情况), 用原队列补齐, 保证一只都不漏 */
-      const ordered = priority.length
-        ? [...priority, ...queue.filter(s => !priority.includes(s))]
-        : queue;
-      /* 懒加载队列: 错峰构建工厂(每 1.5s 3 只), 就绪一只入池一只。
-       * v7.9: 走 ordered(本境界优先)而非原始 index.json 顺序, 避免"下一波怪还没加载完"。 */
+       * 旧实现把全部 79 个 slug 塞进懒加载队列(每 1.5s 3 只 → 要约 35~40s 才跑完),
+       * 既拖慢开局(下一波怪还没轮到加载 → spawnWave 返回 null 干等三四秒),
+       * 又白下几十个用不到的包、白占显存。
+       *
+       * 现在只挑当前境界的 13 个, 并【严格按实战波次顺序】加载:
+       *   第1波先加载 → 第1波就能立刻开打; 后面几波在玩家清理前面波次的十几秒里陆续备好。
+       * 突破换境界时由 maybeLoadBonesForTier() 按需补载新境界的 13 个。 */
+      const tierNow = Math.min(5, Math.max(1, PST.lv || 1));
+      const poolsNow = MOB_POOLS[tierNow] || MOB_POOLS[1];
+      const needed = [];
+      const seenNeed = new Set();
+      const pushNeed = (slug) => {
+        if (slug && slug !== 'ratty' && !handMade.has(slug) && !seenNeed.has(slug) && idx[slug]) { seenNeed.add(slug); needed.push(slug); }
+      };
+      for (const w of (poolsNow.waves || [])) pushNeed(w && w.slug);          /* 按波次顺序: 第1波在最前 */
+      if (poolsNow.boss) pushNeed(poolsNow.boss.slug);                        /* BOSS 最后(第121只才出场) */
+      /* 懒加载泵: 每 1.5s 3 只, 就绪一只即可刷一只。只跑本境界的 13 只 → 约 6.5s 全部到位。 */
       let i = 0;
       const pump = setInterval(() => {
-        const batch = ordered.slice(i, i + 3); i += 3;
-        for (const slug of batch) {
-          const cfg = idx[slug];
-          if (!cfg) continue;
-          loadBone(slug, { ske:`assets/db/monsters/${slug}/ske.json`, tex:`assets/db/monsters/${slug}/tex.json`, img:`assets/db/monsters/${slug}/tex.webp` }, cfg.armature, cfg.anims);
-        }
-        if (i >= ordered.length) clearInterval(pump);
+        const batch = needed.slice(i, i + 3); i += 3;
+        for (const slug of batch) ensureBone(slug, idx);
+        if (i >= needed.length) clearInterval(pump);
       }, 1500);
     }).catch(err => console.error('[battle] monsters/index.json 加载失败', err));
   })();
 
+
+  /* 音效加载 */
+  /* v7.9 突破时按需补载: 记录已为哪个境界铺过货, 境界一变就把新境界的 13 个包补上。
+   * 只加载"用得到的", 所以必须在这里兜住突破换怪的情况。 */
+  let BONE_IDX_ALL = null;   /* index.json 原始表, 供突破补载查 cfg */
+  let _bonesTierLoaded = 0;
+  function maybeLoadBonesForTier() {
+    if (!BONE_IDX_ALL) return;                       /* index.json 还没回来 */
+    const tierNow = Math.min(5, Math.max(1, PST.lv || 1));
+    if (tierNow === _bonesTierLoaded) return;        /* 没变, 直接返回(每 5s 调用无开销) */
+    _bonesTierLoaded = tierNow;
+    const poolsNow = MOB_POOLS[tierNow] || MOB_POOLS[1];
+    const need = [];
+    const seen = new Set();
+    const push = (s) => { if (s && s !== 'ratty' && !seen.has(s) && BONE_IDX_ALL[s]) { seen.add(s); need.push(s); } };
+    for (const w of (poolsNow.waves || [])) push(w && w.slug);
+    if (poolsNow.boss) push(poolsNow.boss.slug);
+    need.forEach(s => ensureBone(s, BONE_IDX_ALL));  /* ensureBone 内部去重, 已加载的跳过 */
+    if (window.__battleDebug) console.log('[battle] 境界' + tierNow + ' 怪物包补载 ' + need.length + ' 个');
+  }
 
   /* 音效加载 */
   const sfx = {
@@ -1086,6 +1088,10 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
          * 战斗节奏 atkT=1/aspd 随之加快; 无词条旧档回落 BC.playerAspd */
         G.player.aspd = Math.min(3, PST.aspd || BC.playerAspd);
       }
+      /* v7.9: 境界可能变了(突破) → 按需补载新境界的怪物包。
+       * 因为开局只加载"当前境界需要的 13 个", 突破到新境界时必须把新的一批补上,
+       * 否则新波次的怪会因骨骼未就绪而一直不刷。内部有去重, 每 5s 调一次无副作用。 */
+      maybeLoadBonesForTier();
     },
     getStats: () => Object.assign({}, PST),
     /* 服务端下发掉落系数(每击杀产出) */

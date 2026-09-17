@@ -2801,7 +2801,7 @@ const MOB_POOLS = {
       { slug:'witch_baba', hp:2040, atk:310, def:38, crit:3, dodge:5.5, pen:27, critRes:46 },
       { slug:'cultist_mage', hp:2160, atk:333, def:40, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'giant_kitsune', hp:47500, atk:733, def:80, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'jubokko', hp:47500, atk:733, def:80, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   15: { /* 筑基 */
     waves: [
@@ -2818,7 +2818,7 @@ const MOB_POOLS = {
       { slug:'magical_girl_goblin', hp:8150, atk:1240, def:151, crit:3, dodge:5.5, pen:27, critRes:46 },
       { slug:'mageshroom', hp:8640, atk:1330, def:160, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'giant_kitsune', hp:190000, atk:2930, def:320, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'ancient_automaton', hp:190000, atk:2930, def:320, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   19: { /* 结丹 */
     waves: [
@@ -2835,7 +2835,7 @@ const MOB_POOLS = {
       { slug:'living_hoard_midas', hp:32600, atk:4960, def:605, crit:3, dodge:5.5, pen:27, critRes:46 },
       { slug:'gun_mimic', hp:34600, atk:5330, def:640, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'giant_kitsune', hp:761000, atk:11700, def:1280, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'king_archial', hp:761000, atk:11700, def:1280, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   23: { /* 元婴 */
     waves: [
@@ -2852,7 +2852,7 @@ const MOB_POOLS = {
       { slug:'tantalus', hp:130000, atk:19900, def:2420, crit:3, dodge:5.5, pen:27, critRes:46 },
       { slug:'runic_stone_golem_goliath', hp:138000, atk:21300, def:2560, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'giant_kitsune', hp:3040000, atk:46900, def:5120, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'radulac_the_voidvod', hp:3040000, atk:46900, def:5120, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   27: { /* 化神 */
     waves: [
@@ -2869,7 +2869,7 @@ const MOB_POOLS = {
       { slug:'tantalus', hp:521000, atk:79400, def:9680, crit:3, dodge:5.5, pen:27, critRes:46 },
       { slug:'runic_stone_golem_goliath', hp:553000, atk:85300, def:10200, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'giant_kitsune', hp:12200000, atk:188000, def:20400, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'god_warrior_dagon', hp:12200000, atk:188000, def:20400, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   31: { /* 炼虚 */
     waves: [
@@ -2886,7 +2886,7 @@ const MOB_POOLS = {
       { slug:'crab_king_karkinos', hp:2090000, atk:318000, def:38700, crit:3, dodge:5.5, pen:27, critRes:46 },
       { slug:'dryad_queen_rafflesia', hp:2210000, atk:341000, def:41000, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'giant_kitsune', hp:48600000, atk:750000, def:82000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'god_warrior_osiris', hp:48600000, atk:750000, def:82000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   35: { /* 合体 */
     waves: [
@@ -2903,7 +2903,7 @@ const MOB_POOLS = {
       { slug:'god_warrior_isis', hp:8340000, atk:1270000, def:155000, crit:3, dodge:5.5, pen:27, critRes:46 },
       { slug:'eldritch_overmind', hp:8850000, atk:1370000, def:164000, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'giant_kitsune', hp:195000000, atk:3010000, def:328000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'poseidon', hp:195000000, atk:3010000, def:328000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   39: { /* 大乘 */
     waves: [
@@ -2920,7 +2920,7 @@ const MOB_POOLS = {
       { slug:'zeograth', hp:33400000, atk:5080000, def:620000, crit:3, dodge:5.5, pen:27, critRes:46 },
       { slug:'parrot_king', hp:35400000, atk:5460000, def:655000, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'giant_kitsune', hp:779000000, atk:12000000, def:1310000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'goddess_aphrodite', hp:779000000, atk:12000000, def:1310000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   43: { /* 渡劫 */
     waves: [
@@ -2937,14 +2937,14 @@ const MOB_POOLS = {
       { slug:'ice_titan_demeres', hp:133000000, atk:20300000, def:2480000, crit:3, dodge:5.5, pen:27, critRes:46 },
       { slug:'grand_sorceress_duesa', hp:142000000, atk:21800000, def:2620000, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'giant_kitsune', hp:3120000000, atk:48000000, def:5240000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'sun_goddess', hp:3120000000, atk:48000000, def:5240000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   47: { /* 真仙 */
     waves: [
-      { slug:'insect_queen', hp:210000000, atk:21000000, def:4190000, crit:1, dodge:0, pen:0, critRes:5 },
-      { slug:'dryad_queen_rafflesia', hp:242000000, atk:27000000, def:4770000, crit:1, dodge:0.5, pen:3, critRes:9 },
-      { slug:'god_warrior_isis', hp:275000000, atk:33000000, def:5340000, crit:1, dodge:1.1, pen:5, critRes:13 },
-      { slug:'eldritch_overmind', hp:307000000, atk:39100000, def:5910000, crit:2, dodge:1.6, pen:8, critRes:17 },
+      { slug:'legendary_knight_michael', hp:210000000, atk:21000000, def:4190000, crit:1, dodge:0, pen:0, critRes:5 },
+      { slug:'librarium_animated_mechadragon_ladon', hp:242000000, atk:27000000, def:4770000, crit:1, dodge:0.5, pen:3, critRes:9 },
+      { slug:'librarium_animated_skull_knight_xoer', hp:275000000, atk:33000000, def:5340000, crit:1, dodge:1.1, pen:5, critRes:13 },
+      { slug:'light_titan_alfadriel', hp:307000000, atk:39100000, def:5910000, crit:2, dodge:1.6, pen:8, critRes:17 },
       { slug:'zeograth', hp:339000000, atk:45100000, def:6480000, crit:2, dodge:2.2, pen:11, critRes:21 },
       { slug:'parrot_king', hp:372000000, atk:51200000, def:7050000, crit:2, dodge:2.7, pen:14, critRes:25 },
       { slug:'thunder_titan_dynamo', hp:404000000, atk:57200000, def:7630000, crit:2, dodge:3.3, pen:16, critRes:30 },
@@ -2954,24 +2954,24 @@ const MOB_POOLS = {
       { slug:'continental_turtle_rukkha', hp:534000000, atk:81300000, def:9910000, crit:3, dodge:5.5, pen:27, critRes:46 },
       { slug:'sea_dragon_leviathan', hp:566000000, atk:87400000, def:10500000, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'giant_kitsune', hp:12500000000, atk:192000000, def:21000000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'hades', hp:12500000000, atk:192000000, def:21000000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   51: { /* 天仙 */
     waves: [
-      { slug:'zeograth', hp:839000000, atk:83900000, def:16800000, crit:1, dodge:0, pen:0, critRes:5 },
-      { slug:'parrot_king', hp:969000000, atk:108000000, def:19100000, crit:1, dodge:0.5, pen:3, critRes:9 },
-      { slug:'thunder_titan_dynamo', hp:1100000000, atk:132000000, def:21400000, crit:1, dodge:1.1, pen:5, critRes:13 },
-      { slug:'ice_titan_demeres', hp:1230000000, atk:156000000, def:23600000, crit:2, dodge:1.6, pen:8, critRes:17 },
-      { slug:'grand_sorceress_duesa', hp:1360000000, atk:180000000, def:25900000, crit:2, dodge:2.2, pen:11, critRes:21 },
-      { slug:'thanatos', hp:1490000000, atk:205000000, def:28200000, crit:2, dodge:2.7, pen:14, critRes:25 },
-      { slug:'continental_turtle_rukkha', hp:1620000000, atk:229000000, def:30500000, crit:2, dodge:3.3, pen:16, critRes:30 },
-      { slug:'sea_dragon_leviathan', hp:1750000000, atk:253000000, def:32800000, crit:2, dodge:3.8, pen:19, critRes:34 },
+      { slug:'mythical_knight_goldnharl', hp:839000000, atk:83900000, def:16800000, crit:1, dodge:0, pen:0, critRes:5 },
+      { slug:'god_warrior_skoll', hp:969000000, atk:108000000, def:19100000, crit:1, dodge:0.5, pen:3, critRes:9 },
+      { slug:'legendary_knight_regulus', hp:1100000000, atk:132000000, def:21400000, crit:1, dodge:1.1, pen:5, critRes:13 },
+      { slug:'son_of_valhalla', hp:1230000000, atk:156000000, def:23600000, crit:2, dodge:1.6, pen:8, critRes:17 },
+      { slug:'legendary_knight_remment', hp:1360000000, atk:180000000, def:25900000, crit:2, dodge:2.2, pen:11, critRes:21 },
+      { slug:'the_horde', hp:1490000000, atk:205000000, def:28200000, crit:2, dodge:2.7, pen:14, critRes:25 },
+      { slug:'dark_queen_shaccadyoggoth', hp:1620000000, atk:229000000, def:30500000, crit:2, dodge:3.3, pen:16, critRes:30 },
+      { slug:'librarium_animated_legendary_knight_pizarro', hp:1750000000, atk:253000000, def:32800000, crit:2, dodge:3.8, pen:19, critRes:34 },
       { slug:'colossal_crow', hp:1880000000, atk:277000000, def:35100000, crit:2, dodge:4.4, pen:22, critRes:38 },
       { slug:'dragon_huanglong', hp:2010000000, atk:301000000, def:37400000, crit:3, dodge:4.9, pen:25, critRes:42 },
       { slug:'sea_calamity_urmica', hp:2140000000, atk:325000000, def:39700000, crit:3, dodge:5.5, pen:27, critRes:46 },
       { slug:'darkness_titan_ilnoct', hp:2260000000, atk:350000000, def:41900000, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'giant_kitsune', hp:49700000000, atk:770000000, def:83800000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'the_fallen', hp:49700000000, atk:770000000, def:83800000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
 };
 
