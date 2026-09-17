@@ -1289,8 +1289,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* BOSS活跃时不刷新小怪 */
     if (G.bossActive) return null;
     /* v5.0 BOSS = 第301只, 300只普通怪刷完后出现, 一轮只出一次。
-     * 三重保护: trialBossDone标记 + bossActive + 场上有BOSS对象(含死亡动画中), 防止刷出两只 */
+     * 三重保护: trialBossDone标记 + bossActive + 场上有BOSS对象(含死亡动画中), 防止刷出两只
+     * v5.0 FIX: 骨骼工厂未就绪时不创建BOSS —— 否则BOSS没armature走序列帧(史莱姆王),
+     * 后来骨骼工厂建好重置后又创建骨骼版九尾狐王, 两个BOSS站一起。等建好再创建。 */
     if (G.trialSpawned >= BC.trialPool.totalMobs && !G.trialBossDone && !G.bossActive && !G.enemies.some(e => e.type === 'boss')) {
+      if (!BONES['giant_kitsune'] || !BONES['giant_kitsune'].ready) return null;   /* 骨骼工厂未就绪, 等下一帧 */
       if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
       const e = makeEnemy('boss');
       e.x = G.camX + stageW() + BC.enemySpawnOffset;
@@ -2301,6 +2304,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   }
   function trialRestart() {
     document.getElementById('trialModal') && document.getElementById('trialModal').classList.remove('show');
+    /* v5.0 FIX: 清场 —— 原trialRestart只重置计数不清场, 死亡/结算后旧BOSS(序列帧史莱姆王)残留,
+     * 新BOSS(骨骼九尾狐王)创建后两个BOSS站一起。这里把场上怪全部清除。 */
+    for (const e of G.enemies) { e.alive = false; e.dying = 0; if (e.armature) { try { despawnEnemy(e); } catch(err) {} } }
+    G.enemies.length = 0;
+    G.bossActive = false;
     G.trialT = BC.trialSecs; G.trialKills = 0; G.trialTier = 1;
     G.trialSettled = false; G.trialRound++; G.trialBossDone = false;
     G.trialSpawned = 0; G.trialBossKilled = false;   /* v5.0 重置301只怪池计数 */
