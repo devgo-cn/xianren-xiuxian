@@ -422,19 +422,24 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         const t = Math.min(5, Math.max(1, parseInt(String(cfg.tier || 'T1').slice(1)) || 1));
         BONE_POOL[t].push(slug);
       }
-      /* ═══ v7.9 核心: 只加载【当前境界实际会用到的怪】, 不再预载全部 79 个包 ═══
+      /* ═══ v8.0 核心: 只加载【当前境界实际会用到的怪】, 不再预载全部 79 个包 ═══
        * 设计事实(见 00-pure.js MOB_POOLS): 每大境界 = 12 种怪 × 各10只 + 1 BOSS = 13 个模型。
-       * 而 index.json 里有 79 个怪物包 —— 其中 58 个【永远用不到】(策划预留但没排进波次)。
+       * 而 index.json 里有 79 个怪物包 —— 但 12 个境界各不重复, 当前只会用到其中 13 个。
        *
-       * 旧实现把全部 79 个 slug 塞进懒加载队列(每 1.5s 3 只 → 要约 35~40s 才跑完),
-       * 既拖慢开局(下一波怪还没轮到加载 → spawnWave 返回 null 干等三四秒),
-       * 又白下几十个用不到的包、白占显存。
+       * ⚠️⚠️ v8.0 致命 BUG 修复(勿回退) —— "一只怪都刷不出来" 的根因:
+       * 旧实现写的是 `tierNow = Math.min(5, Math.max(1, PST.lv))`, 然后 `MOB_POOLS[tierNow]`。
+       * 这把【段位 lv】当成了【池档位】, 但 MOB_POOLS 的键是【累积段位】(1/2/15/19/.../51), 不是 1~5!
+       *   lv=1   → 键 1    ✓ 凡人
+       *   lv=2~14→ 键 2    ✓ 炼气
+       *   lv=15+ → 被 Math.min 夹成 5 → MOB_POOLS[5] 不存在 → 回退 MOB_POOLS[1] = 凡人怪 ✗
+       * 后果: 筑基以上全部加载【凡人】包, 而 spawnWave 要的是当前境界包 → 永远 not ready → 干等,
+       * 且 _boneLoaded 去重导致加载过就永不重载 → 整场一只怪都刷不出来。
        *
-       * 现在只挑当前境界的 13 个, 并【严格按实战波次顺序】加载:
-       *   第1波先加载 → 第1波就能立刻开打; 后面几波在玩家清理前面波次的十几秒里陆续备好。
-       * 突破换境界时由 maybeLoadBonesForTier() 按需补载新境界的 13 个。 */
-      const tierNow = Math.min(5, Math.max(1, PST.lv || 1));
-      const poolsNow = MOB_POOLS[tierNow] || MOB_POOLS[1];
+       * 正确做法: 直接用 poolFor() 反查当前 lv 对应的池 —— 这与 spawnWave 用的是同一个函数,
+       * 从源头上保证"加载的"和"要刷的"永远是同一套 13 个包。
+       *
+       * 加载顺序: 严格按实战波次 + BOSS 最后, 第1波最先就绪 → 开局立刻能开打。 */
+      const poolsNow = poolFor(Math.max(1, PST.lv || 1));
       const needed = [];
       const seenNeed = new Set();
       const pushNeed = (slug) => {
@@ -454,23 +459,25 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
 
 
   /* 音效加载 */
-  /* v7.9 突破时按需补载: 记录已为哪个境界铺过货, 境界一变就把新境界的 13 个包补上。
-   * 只加载"用得到的", 所以必须在这里兜住突破换怪的情况。 */
+  /* v8.0 突破时按需补载: 记录已为哪个境界铺过货, 境界一变就把新境界的 13 个包补上。
+   * 只加载"用得到的", 所以必须在这里兜住突破换怪的情况。
+   * ⚠️ v8.0 修复: 旧实现用 Math.min(5, PST.lv) 取池 → 筑基以上全被夹到不存在的键 5 →
+   *    回退凡人池 → 突破后加载的仍是凡人怪, 新境界怪一只都刷不出来。改用 poolFor() 反查。 */
   let BONE_IDX_ALL = null;   /* index.json 原始表, 供突破补载查 cfg */
   let _bonesTierLoaded = 0;
   function maybeLoadBonesForTier() {
     if (!BONE_IDX_ALL) return;                       /* index.json 还没回来 */
-    const tierNow = Math.min(5, Math.max(1, PST.lv || 1));
-    if (tierNow === _bonesTierLoaded) return;        /* 没变, 直接返回(每 5s 调用无开销) */
-    _bonesTierLoaded = tierNow;
-    const poolsNow = MOB_POOLS[tierNow] || MOB_POOLS[1];
+    const lvNow = Math.max(1, PST.lv || 1);
+    if (lvNow === _bonesTierLoaded) return;          /* 没变, 直接返回(每 5s 调用无开销) */
+    _bonesTierLoaded = lvNow;
+    const poolsNow = poolFor(lvNow);
     const need = [];
     const seen = new Set();
     const push = (s) => { if (s && s !== 'ratty' && !seen.has(s) && BONE_IDX_ALL[s]) { seen.add(s); need.push(s); } };
     for (const w of (poolsNow.waves || [])) push(w && w.slug);
     if (poolsNow.boss) push(poolsNow.boss.slug);
     need.forEach(s => ensureBone(s, BONE_IDX_ALL));  /* ensureBone 内部去重, 已加载的跳过 */
-    if (window.__battleDebug) console.log('[battle] 境界' + tierNow + ' 怪物包补载 ' + need.length + ' 个');
+    if (window.__battleDebug) console.log('[battle] lv' + lvNow + ' 怪物包补载 ' + need.length + ' 个');
   }
 
   /* 音效加载 */
@@ -1099,6 +1106,30 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     getDropRates: () => Object.assign({}, DROP),
     onDrop: null,      // 主游戏赋值: ({spirit, elite, enemy}) => void
     getSpirit: () => G.spirit,
+    /* v8.0 怪物包诊断口: 定位"一只怪都不出"这类问题 —— 一眼看清
+     *   当前 lv / 该用哪个池 / 池里 13 个 slug / 哪些已请求 / 哪些已就绪。
+     * 排查口诀: 若"该加载的 13 个"里有 slug 不在"已请求"中 → 加载范围错(loadBones 的池取错);
+     *           若"已请求"但长期不在"已就绪" → 是资源 404 / 解析失败, 与刷怪逻辑无关。 */
+    boneDiag: () => {
+      const lv = Math.max(1, PST.lv || 1);
+      const pool = poolFor(lv);
+      const wanted = [];
+      for (const w of (pool.waves || [])) wanted.push(w && w.slug);
+      if (pool.boss) wanted.push(pool.boss.slug);
+      const uniq = [...new Set(wanted)].filter(Boolean);
+      const requested = Object.keys(BONES);
+      const ready = requested.filter(s => BONES[s] && BONES[s].ready);
+      return {
+        lv,
+        poolKey: Object.keys(MOB_POOLS).map(Number).sort((a,b)=>b-a).find(k => lv >= k),
+        wanted: uniq,
+        requested,
+        ready,
+        missing: uniq.filter(s => !BONES[s]),           /* 要刷却没请求加载 → 加载逻辑漏了 */
+        loading: uniq.filter(s => BONES[s] && !BONES[s].ready), /* 请求了但没就绪 → 资源问题 */
+        spawned: G.trialSpawned,
+      };
+    },
     /* 调参用调试口(只读快照) */
     debug: () => ({
       enemies: G.enemies.filter(e => e.alive && e.dying <= 0)
@@ -1377,7 +1408,20 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     /* v7.0 顺序分波: 前10只=波1, 11-20=波2, ... 波次内同种怪, 池表定值, 非随机 */
     const waveIdx = Math.min(11, Math.floor(G.trialSpawned / 10));
     const entry = pool.waves[waveIdx];
-    if (!(BONES[entry.slug] && BONES[entry.slug].ready)) return null;   /* 工厂未就绪这一拍不刷(避免占位图) */
+    if (!(BONES[entry.slug] && BONES[entry.slug].ready)) {
+      /* v8.0: 骨骼没就绪就一直不刷 —— 这里必须能报出来, 否则表现就是"一只怪都不出"却毫无线索。
+       * 排查口径: 若骨架从未被 ensureBone 请求过 → 说明加载范围与波次表不一致(见 loadBones)。
+       * 卡 8s 以上才告警一次, 避免刷屏。 */
+      if (!BONES[entry.slug]) {
+        const now = performance.now();
+        if (!G._boneMissT || now - G._boneMissT > 8000) {
+          G._boneMissT = now;
+          console.warn('[battle] 波' + (waveIdx + 1) + ' 怪物包未加载: ' + entry.slug
+            + ' (lv=' + (PST.lv || 1) + ', 池=' + pool.waves.map(w => w.slug).join(',') + ')');
+        }
+      }
+      return null;   /* 工厂未就绪这一拍不刷(避免占位图) */
+    }
     if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
     const e = makePoolEnemy(entry, false);
     /* ⚠️ v7.8 FIX (勿回退) —— 刷怪"要走好几秒才看得到"的根因:
