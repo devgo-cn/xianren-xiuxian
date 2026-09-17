@@ -1578,9 +1578,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
           o.c.addChild(o.body);
         }
         o.body.visible = true;
-        /* v6.15: 宝箱落地后轻微上下浮动(展示感), 飞行中贴宠物 */
-        const bobY = (d.phase === 'wait' || d.phase === 'fetch') ? Math.sin(d.t * 4) * 2 : 0;
-        o.body.y = -16 * sc + bobY;
+        /* v6.15: 宝箱贴地面(不浮动), 飞行中贴宠物 */
+        o.body.y = -16 * sc;
         o.body.scale.set(sc);
         const rc = colorInt(dropRarityColor(d.eq.q));
         o.g2.clear();
