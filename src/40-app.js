@@ -760,22 +760,28 @@ function mountDantianOverlay(stage, realLayer) {
   const octx = cv.getContext("2d", { alpha: true });
 
   let lastW = 0, lastH = 0, lastDpr = 0;
+  let _lastRectT = 0;
   function sync() {
     /* 对齐【#cult 自己】而不是它的父容器。
      * #cult 有 aspect-ratio，父容器 .stage 是 inset:0 的整屏 flex 盒 ——
      * 量父容器会拿到 420x860（整屏），overlay 就铺满屏幕了。
      * 量 #cult 才是 346x350 的角色框。 */
-    const r = cult.getBoundingClientRect();
-    const w = Math.max(1, Math.round(r.width));
-    const h = Math.max(1, Math.round(r.height));
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    if (w !== lastW || h !== lastH || dpr !== lastDpr) {
-      lastW = w; lastH = h; lastDpr = dpr;
-      cv.width = Math.round(w * dpr);
-      cv.height = Math.round(h * dpr);
-      cv.style.width = w + "px";
-      cv.style.height = h + "px";
-      octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    /* PERF: getBoundingClientRect 每帧调用会强制布局重排，改为 500ms 节流 */
+    const now = performance.now();
+    if (now - _lastRectT >= 500) {
+      _lastRectT = now;
+      const r = cult.getBoundingClientRect();
+      const w = Math.max(1, Math.round(r.width));
+      const h = Math.max(1, Math.round(r.height));
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      if (w !== lastW || h !== lastH || dpr !== lastDpr) {
+        lastW = w; lastH = h; lastDpr = dpr;
+        cv.width = Math.round(w * dpr);
+        cv.height = Math.round(h * dpr);
+        cv.style.width = w + "px";
+        cv.style.height = h + "px";
+        octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
     }
     /* 每帧清一次自己的 overlay（它是独立画布，不共享，clear 是安全的）。
      * clearRect 的作用域也是 [0,0,w,h]，与绘制范围完全吻合。 */
