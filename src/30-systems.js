@@ -81,26 +81,28 @@ function makeArt() {          // 四部位: 槽0兵器 1护体 2灵佩 3功法
   return art;
 }
 
+const _hud = { arrNum: null, brkNum: null, spirit: null, rateText: null, arrayLv: null, btnBreak: null };
+
 function updateHUD() {
+  if (!_hud.arrNum) { _hud.arrNum = $("arrNum"); _hud.brkNum = $("brkNum"); _hud.spirit = $("spirit"); _hud.rateText = $("rateText"); _hud.arrayLv = $("arrayLv"); _hud.btnBreak = $("btnBreak"); }
   const r = realm();
+  const _rate = rateNow();
   /* 聚灵阵: 灵石 / 下一级所需(满级满格); 突破: 修为 / 所需(need=∞ 视为满格) */
   setProg("arrFill", state.arrayLv >= ARRAY_MAX_LV ? 1 : (arrayCostNow() > 0 ? state.spirit / arrayCostNow() : 0));
   setProg("brkFill", (r.need === Infinity || !r.need) ? 1 : state.exp / r.need);   // 用真实修为(非缓动值), 进度与"能否渡劫"严格一致
   /* v1.7.52 按钮下方数字进度 */
-  const arrNumEl = $("arrNum");
-  if (arrNumEl) arrNumEl.textContent = state.arrayLv >= ARRAY_MAX_LV ? "已圆满" : fmt(state.spirit) + "/" + fmt(arrayCostNow());
-  const brkNumEl = $("brkNum");
-  if (brkNumEl) brkNumEl.textContent = (r.need === Infinity || !r.need) ? "∞" : fmt(state.exp) + "/" + fmt(r.need);
-  $("spirit").textContent = fmt(_dsp.spirit);
-  $("rateText").textContent = fmt(rateNow());
-  $("arrayLv").textContent = state.arrayLv;
+  if (_hud.arrNum) _hud.arrNum.textContent = state.arrayLv >= ARRAY_MAX_LV ? "已圆满" : fmt(state.spirit) + "/" + fmt(arrayCostNow());
+  if (_hud.brkNum) _hud.brkNum.textContent = (r.need === Infinity || !r.need) ? "∞" : fmt(state.exp) + "/" + fmt(r.need);
+  _hud.spirit.textContent = fmt(_dsp.spirit);
+  _hud.rateText.textContent = fmt(_rate);
+  _hud.arrayLv.textContent = state.arrayLv;
   // v2.5: 所有境界突破均手动 —— 修为圆满即可点突破(小境简版/大境天劫)
   const can = state.exp >= r.need && state.realmIdx < TOTAL_SEGS - 1;
-  const btn = $("btnBreak");
+  const btn = _hud.btnBreak;
   btn.disabled = !can;
   // 注意：绝不能 btn.textContent=...（会删除按钮内嵌的 SVG 墨块皮肤）→ 只更新文字标签
   const bt = btn.querySelector(".label");
-  if (bt) bt.innerHTML = "突破";   /* v4.4: 统一"突破"二字, 去掉☯和"修为未圆满"——可突破状态已由 glow-gold 闪光+hint-gold 文字提亮提醒, 文字无需区分状态 */
+  if (bt) { if (bt.textContent !== "突破") bt.textContent = "突破"; }   /* v4.4: 统一"突破"二字, 去掉☯和"修为未圆满"——可突破状态已由 glow-gold 闪光+hint-gold 文字提亮提醒, 文字无需区分状态 */
   btn.classList.toggle("ready", can);
   if (can && !lastReadyHint) {
     __set_lastReadyHint(true);
@@ -113,13 +115,13 @@ function updateHUD() {
   }
   if (!can) __set_lastReadyHint(false);
   /* v1.6.0-A: 离散增益飘字 — 单帧变化远超平滑增速阈值才视为一次获得/花费, 自动覆盖所有获得点(adventure/邮件/离线/精进) */
-  const thr = Math.max(6, rateNow() * 0.6);
+  const thr = Math.max(6, _rate * 0.6);
   const dS = state.spirit - _floatPrev.spirit;
-  if (dS > thr) { spawnFloat($("spirit").parentElement, "+" + fmt(dS)); pulseChip($("spirit").parentElement); }
-  else if (dS < -thr) { spawnFloat($("spirit").parentElement, fmt(dS), true); }
+  if (dS > thr) { spawnFloat(_hud.spirit.parentElement, "+" + fmt(dS)); pulseChip(_hud.spirit.parentElement); }
+  else if (dS < -thr) { spawnFloat(_hud.spirit.parentElement, fmt(dS), true); }
   _floatPrev.spirit = state.spirit;
   const dE = state.exp - _floatPrev.exp;
-  if (dE > thr) spawnFloat($("btnBreak"), "+" + fmt(dE));   // v1.7.46: 进度条移除, 修为飘字改从突破按钮升起
+  if (dE > thr) spawnFloat(_hud.btnBreak, "+" + fmt(dE));   // v1.7.46: 进度条移除, 修为飘字改从突破按钮升起
   _floatPrev.exp = state.exp;
   refreshGlow(can);                       // v1.7.31: 可行动入口文字闪烁提醒(突破/聚灵阵/云游/丹房)
 }
