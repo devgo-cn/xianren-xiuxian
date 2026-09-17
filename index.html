@@ -315,7 +315,8 @@
   /* v4.4: 底部三按钮专用样式(不污染全局 .btn) —— 3:1比例锁尺寸, 12px字体, padding:0 */
   #btnArray, #btnBreak, #btnTravel{display:flex;align-items:center;justify-content:flex-end;padding:0;aspect-ratio:3/1;flex:1;max-width:108px;min-width:88px;box-sizing:border-box;font-size:12px;letter-spacing:.02em}
   /* v4.4: 底部按钮label绝对定位到右侧空白区, 不换行 */
-  #btnArray .label, #btnBreak .label, #btnTravel .label{position:absolute;right:8px;top:50%;transform:translateY(-50%);z-index:2;white-space:nowrap;line-height:1;pointer-events:none}
+  #btnArray .label{position:absolute;right:8px;top:50%;transform:translateY(-50%);z-index:2;white-space:nowrap;line-height:1;pointer-events:none}
+  #btnBreak .label, #btnTravel .label{position:absolute;right:24px;top:50%;transform:translateY(-50%);z-index:2;white-space:nowrap;line-height:1;pointer-events:none}
   .btn:active{transform:scale(.94)}
   .btn.primary{background:transparent;color:inherit}
   .btn:disabled{opacity:.62}   /* v1.7.46: 进度已移入按钮, 禁用态保留可读性 */
