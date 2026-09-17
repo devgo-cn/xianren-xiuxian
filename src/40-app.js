@@ -8,6 +8,8 @@ import { CLD_API, TOTAL_SEGS, adopt, arrayCostNow, buffAtCap, buffHintOf, burstB
 import { addJournal, adoptKeep, bigIdx, cldFail, keepArtQuiet, load, realm, renderMailBox, save, showTravelMail, smartEquip, updateArts, updateRealmUI } from './20-core.js';
 import { checkMilestones, cldPush, cloudPushNow, cloudSettle, mainMoment, makeArt, openAlchemy, openStory, openTravel, pickLoc, rateNow, updateHUD } from './30-systems.js';
 
+let __dimT = 0;   /* 黑屏挂机面板刷新计时器 */
+
 function startHeartbeat() {
   setInterval(async () => {
     if (document.hidden) return;       // 后台不心跳(回前台会走强制刷新)

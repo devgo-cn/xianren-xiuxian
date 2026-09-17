@@ -69,7 +69,7 @@ const SND = (function () {
   }
   return {
     get bgmOn() { return bgmOn; },
-    get sfxOn() { return sfxOn; },
+    get sfxOn() { return sfxOn && !hardMute; },
     setBgm(v) {
       bgmOn = !!v; try { localStorage.setItem(LS_BGM, bgmOn ? "1" : "0"); } catch (e) {}
       if (bgmOn) {
@@ -835,12 +835,9 @@ function renderSettings() {
 }
 
 function dimRender() {
-  const b = $("dimBattles"); if (b) b.textContent = DIMSTAT.battles;
+  const t = $("dimTrials"); if (t) t.textContent = DIMSTAT.trials;
   const s = $("dimSpirit"); if (s) s.textContent = fmt(DIMSTAT.spirit);
   const e = $("dimExp"); if (e) e.textContent = fmt(DIMSTAT.exp);
-  /* 兽潮次数 */
-  const tEl = $("dimTrials"); if (tEl) tEl.textContent = DIMSTAT.trials;
-  /* 突破记录 */
   const brEl = $("dimBreaks");
   if (brEl) {
     if (DIMSTAT.breaks.length) {
