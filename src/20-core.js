@@ -257,7 +257,10 @@ async function _cloudSettleRun() {
   /* v1.8.0: 客户端不再报"离线基准"、也不再指定区间终点 —— 区间完全由服务端自己的两次写入间隔决定。
      这里只需要上传账本快照(见 cloudSnap: 已扣掉本地预测)。 */
   let snap = null;
-  try { snap = cloudSnap(JSON.parse(JSON.stringify(state))); } catch (e) { return null; }
+  try {
+    const clone = (typeof structuredClone === "function") ? structuredClone(state) : JSON.parse(JSON.stringify(state));
+    snap = cloudSnap(clone);
+  } catch (e) { return null; }
   const ctl = new AbortController();
   const tm = setTimeout(() => ctl.abort(), 8000);
   try {
