@@ -3017,17 +3017,20 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     const boxB = SPRITE_BOX_B[frameIdx] || SPRITE.fh;
     const bs = bodyH / boxH;
     const drawW = SPRITE.fw * bs;
-    /* 疾风步/缩地成寸残影: 加速期间或攻击力buff时玩家身后显示半透明残影 */
+    /* 残影: 加速或atkBuff时显示3道, 向左偏移+逐渐缩小+渐暗 */
     if ((G.speedMult > 1 || p.atkBuff > 0) && !p.attackAnim) {
-      const trailCount = G.speedMult >= 3 ? 4 : 3;
+      const trailCount = 3;
       const ftex = frameTex(G.sprite, SPRITE.cols, SPRITE.fw, SPRITE.fh, frameIdx);
       for (let i = trailCount; i >= 1; i--) {
         const t = S.trails[i - 1];
         t.visible = true;
         t.texture = ftex;
-        t.alpha = (G.speedMult > 1 ? 0.15 : 0.25) * (trailCount + 1 - i) / trailCount;
-        t.position.set(sx - drawW*0.35 - i * 12, sy - boxB * bs);
-        t.scale.set(bs, bs);
+        /* 越远(i大)越暗越小: 第1道最亮最大, 第3道最暗最小 */
+        const fade = 1 - (i - 1) * 0.3;
+        const shrink = 1 - (i - 1) * 0.08;
+        t.alpha = (G.speedMult > 1 ? 0.18 : 0.28) * fade;
+        t.position.set(sx - drawW*0.35 - i * 22, sy - boxB * bs);
+        t.scale.set(bs * shrink, bs * shrink);
       }
     }
     S.main.visible = true;
