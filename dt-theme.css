@@ -1322,30 +1322,19 @@
 .realm-badge{
   background-color:transparent !important;
   border:0 !important;border-radius:0 !important;
-  background:transparent !important;
-  box-shadow:none !important;
-  width:auto !important;max-width:100% !important;min-width:0 !important;
-  box-sizing:border-box !important;
-  padding:0 !important;
-  display:flex !important;flex-direction:column !important;
-  align-items:flex-start !important;justify-content:center !important;
-  gap:1px !important;text-align:left !important;position:relative !important}
-.rb-line1{display:flex;align-items:baseline;gap:4px}
-.rb-line2{display:flex;align-items:center;gap:6px}
-/* 第一行: 大境界·小境界 */
-.realm-badge .big{font-size:16px !important}
-.realm-badge .sub-a{font-size:11px !important;color:#b9c3d8 !important;letter-spacing:0 !important;font-weight:400 !important}
-.realm-badge .sub-b{display:none !important}
-/* 第二行: 战力 + 榜 */
-.realm-badge .rb-power{font-size:10px;color:#f0c98a;letter-spacing:1px;font-weight:600;line-height:1.3}
-.realm-badge .rb-power::before{content:"战力 ";color:#8b94a8;font-weight:400}
-.realm-badge .rb-rank{
-  font-size:12px !important;color:#f0c98a !important;font-weight:700 !important;
-  border:1.5px solid rgba(240,201,138,.6) !important;border-radius:50% !important;
-  width:24px !important;height:24px !important;line-height:21px !important;
-  text-align:center !important}
-/* 玩家名在境界区下面 */
-.realm-left .pname-btn{margin-top:2px !important}
+.realm-left{display:block !important;width:130px !important}
+.realm-badge{background:transparent !important;box-shadow:none !important;padding:0 !important;position:relative !important}
+.rb-table{width:100%;border-collapse:collapse}
+.rb-table td{padding:0;vertical-align:middle;white-space:nowrap}
+.rb-c1 .big{font-size:16px;color:#e8c884;font-weight:700}
+.rb-c1 .sub-a{font-size:11px;color:#b9c3d8;margin-left:4px}
+.rb-c2{font-size:10px;color:#f0c98a;font-weight:600}
+.rb-c2::before{content:"战力 ";color:#8b94a8;font-weight:400}
+.rb-rank{text-align:right;font-size:12px;color:#f0c98a;font-weight:700;
+  border:1.5px solid rgba(240,201,138,.6);border-radius:50%;
+  width:24px;height:24px;line-height:21px;text-align:center}
+.rb-c3 .pname-btn{margin-top:2px;background:none;border:none;color:#d4b87a;
+  font-size:12px;cursor:pointer;padding:0}
 /* 「闲人」朱印复位(左下, 与右中"榜"印呼应) */
 .realm-badge::after{display:block !important;content:"闲人";left:7px !important;right:auto !important;
   bottom:5px !important;top:auto !important;
