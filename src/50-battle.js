@@ -1934,21 +1934,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const p = G.player;
     for (const pet of G.pets) {
       if (!pet.alive) continue;
-      /* 朝向: 按水平移动方向决定是否镜像(素材默认头朝右)
-       * v3.4 bugfix —— 旧代码用固定阈值 0.4px 判方向：
-       *   pet.x > lastX + 0.4 → face=1
-       *   平稳跟随阶段每帧位移只有 0.2~0.5px（临界），于是"向左飞"经常够不到
-       *   0.4 这个门限，face 就卡在上一帧的值不动 —— 表现为"归位后朝向随机不对"。
-       * 现在改成：累积位移跨过门限才转向，并且【位移足够大时直接把朝向钉死】。
-       * 门限同时按 dt 缩放，保证不同帧率下手感一致。 */
-      const dxFrame = pet.x - (pet.lastX ?? pet.x);
-      pet.faceAcc = (pet.faceAcc || 0) + dxFrame;
-      const faceThresh = Math.max(0.6, 12 * dt);   /* 约 12px/秒 的死区，足够小到不迟钝 */
-      if (pet.faceAcc > faceThresh) { pet.face = 1; pet.faceAcc = 0; }         /* 向右 → 原素材 */
-      else if (pet.faceAcc < -faceThresh) { pet.face = -1; pet.faceAcc = 0; }  /* 向左 → 镜像 */
-      /* 瞬时大位移（拾取飞扑/瞬移归位）直接钉朝向，不等累积 */
-      if (Math.abs(dxFrame) > 4) { pet.face = dxFrame > 0 ? 1 : -1; pet.faceAcc = 0; }
-      pet.lastX = pet.x;
       /* 飞行动画帧更新 */
       pet.flyTimer += dt;
       const frameDur = 1 / 24;
@@ -1956,6 +1941,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         pet.flyTimer -= frameDur;
         pet.flyFrame = (pet.flyFrame + 1) % 32;
       }
+      /* 朝向: 仅拾取/携带阶段按移动方向判朝向, 跟随阶段固定朝右(不摆头) */
+      const dxFrame = pet.x - (pet.lastX ?? pet.x);
+      pet.faceAcc = (pet.faceAcc || 0) + dxFrame;
+      const faceThresh = Math.max(0.6, 12 * dt);
+      pet.lastX = pet.x;
       /* 拾取装备: 飞行宠物飞向地板掉落, 拾起后缩小带回, 抵达即入包 */
       if (pet.fetch && pet.fetch.state === 'toDrop') {
         const d = pet.fetch.drop;
@@ -1964,6 +1954,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
           const dx = d.wx - pet.x, dy = (d.y - 16) - pet.y, dist = Math.hypot(dx, dy), spd = 560;
           if (dist <= spd * dt || dist < 10) { pet.x = d.wx; pet.y = d.y - 16; d.phase = 'carry'; d.t2 = 0; pet.fetch.state = 'carry'; }
           else { pet.x += dx / dist * spd * dt; pet.y += dy / dist * spd * dt; }
+          /* 拾取阶段按移动方向判朝向 */
+          if (pet.faceAcc > faceThresh) { pet.face = 1; pet.faceAcc = 0; }
+          else if (pet.faceAcc < -faceThresh) { pet.face = -1; pet.faceAcc = 0; }
+          if (Math.abs(dxFrame) > 4) { pet.face = dxFrame > 0 ? 1 : -1; pet.faceAcc = 0; }
           continue;
         }
       }
@@ -1973,6 +1967,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         if (dist <= spd * dt || dist < 8) { pet.x = tx; pet.y = ty; }
         else { pet.x += dx / dist * spd * dt; pet.y += dy / dist * spd * dt; }
         d.x = worldToScreen(pet.x); d.y = pet.y - 6;             // 装备贴在宠物身上
+        /* 携带阶段按移动方向判朝向 */
+        if (pet.faceAcc > faceThresh) { pet.face = 1; pet.faceAcc = 0; }
+        else if (pet.faceAcc < -faceThresh) { pet.face = -1; pet.faceAcc = 0; }
+        if (Math.abs(dxFrame) > 4) { pet.face = dxFrame > 0 ? 1 : -1; pet.faceAcc = 0; }
         if (d.t2 >= 0.7) {
           try { if (window.BattleAPI.applyEquipDrop) window.BattleAPI.applyEquipDrop(d.eq.id); } catch (err) {}
           d.phase = 'done'; pet.fetch.state = 'idle'; pet.fetch.drop = null;
@@ -1984,16 +1982,16 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         const d = G.drops.find(x => x.kind === 'equip' && x.phase === 'wait' && !x.claimed);
         if (d) { d.claimed = true; d.phase = 'fetch'; pet.fetch = pet.fetch || { state: 'idle', drop: null }; pet.fetch.state = 'toDrop'; pet.fetch.drop = d; continue; }
       }
-      /* 上下浮动 */
+      /* 上下浮动(保留计时器, 渲染层用) */
       pet.bobT += dt * 2.5;
-      /* 跟随玩家: 左上方, 带惯性的平滑跟随 —— 玩家快速往前走时宠物先往后滞留, 随后加速跟上, 不僵硬。
-       * vx/vy是宠物速度(惯性), 阻尼0.82让速度自然衰减, 弹簧力拉向目标位置。 */
+      /* 跟随玩家: 左上方, 简单延迟跟随 —— 插值系数小(dt*3.5), 玩家快走时宠物
+       * 先愣一下(跟不上), 随后慢慢跟上。不用弹簧/惯性模型, 倍速起来也不乱晃。 */
       const targetX = p.x + pet.offsetX;
-      const targetY = floorY() + p.y + pet.offsetY + Math.sin(pet.bobT) * 3;
-      pet.vx = (pet.vx || 0) * 0.82 + (targetX - pet.x) * dt * 10;
-      pet.vy = (pet.vy || 0) * 0.82 + (targetY - pet.y) * dt * 10;
-      pet.x += pet.vx;
-      pet.y += pet.vy;
+      const targetY = floorY() + p.y + pet.offsetY;
+      pet.x += (targetX - pet.x) * Math.min(1, dt * 3.5);
+      pet.y += (targetY - pet.y) * Math.min(1, dt * 3.5);
+      /* 朝向固定朝右(宠物在玩家左侧跟随, 不摆头) */
+      pet.face = 1;
 
       /* 施法系统 */
       if (pet.casting) {
