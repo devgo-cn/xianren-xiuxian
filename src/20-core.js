@@ -442,25 +442,19 @@ function smartEquip(a) {
   const arts = state.arts || [];
   const idx = (typeof a.slot === "number" && a.slot < 4) ? a.slot : arts.length;
   const q0 = QUALITY[a.q];
-  if (idx >= arts.length) {                 // 空槽: 直接穿戴
+  if (idx >= arts.length) {
     arts.push(a); state.arts = arts;
     pushMsg("avatar", `阿青把 ${a.name}（${q0.name}·${SLOT_TYPES[idx].n}）放进藏宝阁 —— 已替穿戴。`);
     updateArts(true); save(); cloudSoon(); return;
   }
   const w = arts[idx];
   if (!w) { arts[idx] = a; updateArts(true); save(); cloudSoon(); return; }
-  if (artScore(a) > artScore(w)) {                          // 同槽择优: 只看综合分, 同品质可替换
-    const g = Math.round(50 * Math.pow(1.6, w.q));
-    state.spirit += g;
+  if (artScore(a) > artScore(w)) {
     arts[idx] = a;
-    _eqRecycle.unshift(`熔回 ${w.name}(${QUALITY[w.q].name}) +${fmt(g)}`);
-    if (_eqRecycle.length > 3) _eqRecycle.pop();
-    pushMsg("avatar", `阿青见 ${a.name}(${q0.name}·${SLOT_TYPES[idx].n}) 胜过旧佩，把那 ${w.name} 熔回灵石 +${fmt(g)}，新宝自动换上。`);
+    pushMsg("avatar", `阿青把 ${a.name}（${q0.name}·${SLOT_TYPES[idx].n}）换上了。`);
     updateArts(true); save(); cloudSoon();
   } else {
-    const g = Math.round(40 * Math.pow(1.5, a.q));
-    state.spirit += g;
-    pushMsg("avatar", `${a.name}(${q0.name}) 不及身上同槽所佩，阿青炼作灵石 +${fmt(g)}。`);
+    pushMsg("avatar", `${a.name}（${q0.name}）不及身上所佩，阿青摇了摇头。`);
     updateArts(false); save(); cloudSoon();
   }
 }

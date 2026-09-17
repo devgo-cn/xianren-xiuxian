@@ -244,20 +244,7 @@ function adventure() {
     const r = QUALITY[a.q];
     pushMsg("avatar", `${petTag}${pickNoRepeat(PET_FORGE, "petF")}，一件<span class="r">${a.name}</span>(<span class="${r.cls}">${r.name}</span>)出炉`);
     smartEquip(a);
-  } else if (roll < 0.30) {
-    const g = Math.round(8 + Math.random() * 30 + bigIdx() * 10);
-    state.spirit += g;
-    pushMsg("avatar", `${petTag}${pickNoRepeat(PET_COIN, "petC")}　灵石+${fmt(g)}`);
-  } else if (roll < 0.62) {
-    const g = Math.round(14 + Math.random() * 50 + bigIdx() * 16);
-    state.spirit += g;
-    pushMsg("avatar", `${petTag}${pickNoRepeat(PET_BONUS, "petB")}　气机渐盛`);
-  } else if (roll < 0.84) {
-    const bonus = rateNow() * (4 + Math.random() * 8);
-    state.exp += bonus;
-    pushMsg("avatar", `${petTag}${pickNoRepeat(PET_BONUS, "petB")}　修为+${fmt(bonus)}`);
   } else {
-    state.exp += rateNow() * 1.5;
     pushMsg("avatar", `${petTag}${pickNoRepeat(PET_STILL, "petS")}`);
   }
   state.spirit += spiritRate();
@@ -658,11 +645,11 @@ function applyEquipDrop(id) {
   const i = _equipQueue.findIndex(e => e.id === id);
   if (i < 0) return;                            // 已被拾取/超时处理过 → 幂等, 不重复入包
   const { a, elite } = _equipQueue.splice(i, 1)[0];
-  const kept = keepArtQuiet(a);                 // 静默择优: 能顶替就换上, 不入眼当场熔作灵石
+  const kept = keepArtQuiet(a);                 // 静默择优: 能顶替就换上, 不入眼直接丢弃
   if (kept && a.q > (state.bestArtQ || -1)) state.bestArtQ = a.q;
   if (elite || a.q >= 3) {
     pushMsg("avatar", `${elite ? "斩一精英" : "斩妖"}得宝 <b style="color:#f0c98a">${a.name}</b>`
-      + (kept ? "（已入囊）" : "（不入眼，熔作灵石）"));
+      + (kept ? "（已入囊）" : "（不及身上所佩）"));
   }
   updateHUD();
   if (kept) updateArts();
