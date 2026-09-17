@@ -61,13 +61,14 @@ async function loadRank(force) {
 function save() {
   state.lastTs = Date.now();
   trimJournal();
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}   // 明文同步写: pagehide 可靠
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { console.warn('[save] 存档写入失败:', e); }   // 明文同步写: pagehide 可靠
 }
 
 function load() {
   try { localStorage.removeItem("dongtian_xiuxian_v2"); } catch (e) {}          // v1.10.0 旧键退役
+  let raw = null;
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return;
     const s = migrate(JSON.parse(raw));
     const c = adopt(s);
@@ -77,7 +78,10 @@ function load() {
       state._lastTs0 = (s && s.lastTs) || c.lastTs || 0;
       ensureScrollFx();         // v2.5: 旧档功法补攻速词条
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[load] 存档读取/解析失败:', e);
+    if (raw) { try { localStorage.setItem(SAVE_KEY + '.bak', raw); } catch (e2) {} }
+  }
 }
 
 function cldFail(e) {
