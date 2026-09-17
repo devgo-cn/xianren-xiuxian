@@ -353,7 +353,7 @@
     "assets/monster_002_water_sprite.webp": "a19104128518abf8a910f14632302240b36496ffd4e756b11278275dab00f0b1",
     "assets/music/bgm.mp3": "39405d439f35245b3caea35a6dbe8a0dfc35fcbd402dc8870bf9b83b6a09f9be",
     "assets/pet_fox_sheet.webp": "1f5b7279fb682b63b362f7c73c4fc41e12434f517ef337fbf30f8dbf95e18956",
-    "assets/realm-badge.png": "91510c1689e9a272ebddebc4c5e8baf7a57e79ef30a91758914bf60a7796e083",
+    "assets/realm-badge.png": "a6fc32b9e123cac2d94eebe3da2ae25c7891f5439bbafd7c2dc4535660577e9f",
     "assets/sfx/attack1.ogg": "bb1e63052519c6c8a0e6e86f684035ad209f247c63b3317b48be8abf454f4b96",
     "assets/sfx/attack2.ogg": "89ee51ee4cac1e101107e68610c1b815a303bd9009d36747bb6d80f57aa71e2f",
     "assets/sfx/boss_attack.ogg": "115ae50fddb3bb168a18eff55dafa76f272c45b421d96d847aa3697b60c706d5",
@@ -457,9 +457,9 @@
     "assets/ui_icons/icon_skill.webp": "9f4120ba7855ce3ed6012766534ff8f068521508f4814b763463337447d9ccd6",
     "assets/ui_icons/icon_story.webp": "92ff84146f80a3d7f9a6479c477113caf2e4017ffe10767dd866be4ea378c003",
     "assets/ui_icons/icon_treasure.webp": "fe0b83d8ece23ab09b23a013e18299de7335ba1917666a7970726e00b7eb7e17",
-    "dt-theme.css": "fb6b327766fe31898571716327398a9a9cd0b17a5cc44aa5309ed72ed6ee16aa",
+    "dt-theme.css": "bd16a9169e034f01356070eb349ec163cb077c4795bba6575b3a909377786b29",
     "fx2d.js": "ab4794f036fc4e9976392e336e004bcef13d83976e78d719415da6c7bc10ad0d",
-    "index.html": "6db32535a4be0989c504f98044457072299852de6dcbaa05054346c772dfa025",
+    "index.html": "8ca35a8dfd854b251d8a94a4a1666eb3026ecd07503347ac2a984df0ab5e614b",
     "src/00-pure.js": "28600b11add4ddbdf79645a4d1d91adbe5fc48dc0e992f2fefbefeb587e212f4",
     "src/10-base.js": "f1df172e97759baa09e8ed1788f0a888c530050acea9a5570eac10ab61f1b182",
     "src/20-core.js": "d9f28b184e6e955c4dcbd82d91c10914db3a6f47be2738a0161ae311c5e5953d",
@@ -469,6 +469,6 @@
     "src/60-stage.js": "a098e6f38e898ff3fee4c6a1f79e652373f15cf791e344813fa3d76ddd521c5b",
     "src/main.js": "161f10c02a3aa4095b257cd77f5bf1834e85d1359e85555deb8e48dfd2bd9fba"
   },
-  "rev": "09188bfab5e10e88",
-  "version": "5.12"
+  "rev": "39175b7dc6f4dadf",
+  "version": "5.13"
 }
