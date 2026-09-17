@@ -147,8 +147,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     trialSpawned:0, trialBossKilled:false,
   };
   /* v6.9 PERF: 粒子上限。每次命中/击杀/技能都 push 一个粒子, 同屏激烈时无上限会堆积
-   * 几十个 PIXI.Sprite/Graphics, 每帧合成开销线性涨。同屏 80 个粒子已经足够特效密度。 */
-  G.pushFx = function(o) { if (this.fx.length < 80) this.fx.push(o); };
+   * 几十个 PIXI.Sprite/Graphics, 每帧合成开销线性涨。同屏 80 个粒子已经足够特效密度。
+   * v6.12 FIX: 返回新元素索引(模仿 Array.push 返回新长度), 第2931行依赖这个返回值。 */
+  G.pushFx = function(o) { if (this.fx.length < 80) return this.fx.push(o); return -1; };
   /* v6.12 PERF: 伤害飘字上限。每条飘字一个 PIXI.Text(canvas→GPU 纹理), 同屏最多 20 个。 */
   G.pushDmg = function(o) { if (this.dmg.length < 20) this.dmg.push(o); };
   let _hudRefreshT = 0;   /* v5.0 定期刷新HUD计时器: 打BOSS期间无击杀, 倒计时显示会卡住 */
