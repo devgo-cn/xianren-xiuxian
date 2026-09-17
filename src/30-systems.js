@@ -16,7 +16,7 @@ import { _cloudSettleRun, addJournal, artScore, bigIdx, licSync, realm, renderCr
     const s = big.segs;
     const dsecTotal = REALM_DAYS[bi] * 86400;
     const ws = [];
-    for (let j = 0; j < s; j++) ws.push(s <= 1 ? 1 : 0.05 + Math.pow(j / (s - 1), 3.0));  // v2.5 段内前快后慢更极端(原1.35→3.0)
+    for (let j = 0; j < s; j++) ws.push(s <= 1 ? 1 : (j + 1) / s);  // v2.6 线性分配: 圆满占40%, 中间段平滑递增, 消除圆满陡增
     const sw = ws.reduce((a, b) => a + b, 0);
     for (let q = 0; q < s; q++, cum++) {
       let label, isBigEnd = false;
