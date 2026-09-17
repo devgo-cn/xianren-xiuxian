@@ -2109,6 +2109,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const groups = [];
     for (const e of G.enemies) {
       if (!e.alive || e.dying > 0) continue;
+      if (e.type === 'boss') continue;   /* v5.0 BOSS不参与小怪排队, 有独立站位(攻距决定), 否则被强制站在最后一只狐狸后面 */
       let g = null;
       for (const cand of groups) {
         if (Math.abs(yToDepth(cand.y) - yToDepth(e.y)) * depthPx() < laneGap() * 0.5) { g = cand; break; }
