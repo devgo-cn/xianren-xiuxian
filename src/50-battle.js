@@ -2245,21 +2245,50 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     hoverBack: 150,       /* 站在"最前怪"后方 150px 的空域(不贴玩家) */
     minGapToPlayer: 90,   /* 至少离玩家 90px, 避免看起来还粘在玩家身上 */
     hoverH: 0.30,         /* 高度: 横带高度的 30% 处(高空) */
+    /* ⚠️ v8.6 新增(勿删) —— "鹰压根看不到"的根因是它被算到了可视区之外:
+     * 旧逻辑 anchorX 取 `front - hoverBack`, 而 front 是【世界坐标下的最前怪】,
+     * 这怪常常还在屏幕右缘之外几十~几百像素(它就是刚生成、正走进来的那只),
+     * 于是鹰被锚到更右边, 屏幕 x 一路漂到可视区之外 → 玩家反馈"压根看不到鹰"。
+     * (鹰的世界 y 也有同类错误, 见 updateEagle 里 baseY 的长注释。)
+     * 下面两条是按【屏幕坐标】做的硬钳制: 鹰是给玩家看的单位, 必须始终在视野内。
+     *   screenGapL/R: 鹰的屏幕 x 距左右边的安全余量(避免半只鹰挂在边上)。
+     * 钳制在【世界坐标】上做(scrMin/scrMax 由 camX 换算), 相机推进时鹰依然跟得住。 */
+    screenGapL: 90,
+    screenGapR: 140,
   };
   function updateEagle(dt, pet, p) {
     /* ── 站位 ── */
-    let anchorX = p.x + EAGLE.hoverBack;      /* 兜底: 场上没怪时, 玩家前方一点 */
+    let anchorX = p.x + EAGLE.hoverBack;      /* 兜底: 场上没怪时, 玩家前方空域 */
     let front = -Infinity;                    /* 最靠前的怪(离玩家最近) */
     for (const e of G.enemies) {
       if (!e.alive || e.dying > 0) continue;
-      if (e.x > p.x && e.x < anchorX + 2000 && e.x > front) front = e.x;
+      if (e.x > p.x && e.x > front) front = e.x;
     }
     if (front > -Infinity) anchorX = front - EAGLE.hoverBack;
     if (anchorX < p.x + EAGLE.minGapToPlayer) anchorX = p.x + EAGLE.minGapToPlayer;
+    /* ⚠️ v8.6 屏幕边界钳制 —— 见 EAGLE 注释。把世界锚点收进可视区, 没有这一步,
+     * 怪一旦在屏幕外, 鹰就跟着跑到屏幕外(用户反馈"游戏里压根看不到鹰")。
+     * scrMax 用 Math.max 兜底: 横带极窄时也保证左右余量之间有正区间, 不出现 scrMin>scrMax。 */
+    const scrMin = G.camX + EAGLE.screenGapL;
+    const scrMax = G.camX + Math.max(EAGLE.screenGapL + 40, CW - EAGLE.screenGapR);
+    if (anchorX < scrMin) anchorX = scrMin;
+    if (anchorX > scrMax) anchorX = scrMax;
     /* 平滑靠位(与灵狐同款延迟跟随手感, 但目标是空域锚点而非玩家) */
     pet.x += (anchorX - pet.x) * Math.min(1, dt * 3.5);
-    /* 高度: 与玩家无关, 固定在横带高空 —— 只做轻微上下浮动 */
-    const baseY = -CH * EAGLE.hoverH;
+    /* ── 高度: 战场上空, 与玩家无关 ──
+     * ⚠️⚠️ v8.6 致命 BUG 修复(勿回退) —— "鹰压根看不到"的真正根因:
+     * 渲染层对宠物用的是【绝对屏幕 y】(看 drawPets: `const sy = pet.y;
+     * 宠物y坐标已包含offsetY和上下浮动`), 与灵狐保持同一约定 ——
+     * 灵狐: `targetY = floorY() + p.y + pet.offsetY`(带 floorY!)。
+     * 而灵鹰旧代码写的是 `baseY = -CH * EAGLE.hoverH`, 【完全没加 floorY】,
+     * 于是 pet.y ≈ -68 —— 画布 y 的有效范围是 0~CH, 负值等于把鹰画到了画布
+     * 上方之外, 精灵 anchor(0.5,1) 又向上生长, 更是彻底出界。
+     * 表现就是玩家反馈的"游戏里压根看不到鹰"(对象/纹理/可见性全部正常,
+     * 只有坐标在屏幕外, 所以怎么查逻辑都查不出问题)。
+     * 正确写法: 以地面 floorY() 为基准, 往上抬 EAGLE.hoverH * CH 的"空域高度",
+     * 再减去半个鹰身, 保证整只鹰(含向上的羽翼)都落在画布内。 */
+    const eagleH = Math.min(CH * 0.40, 64);          /* 与渲染层 drawH 一致 */
+    const baseY = floorY() - CH * EAGLE.hoverH - eagleH * 0.5;
     pet.y += (baseY - pet.y) * Math.min(1, dt * 3.5);
     pet.face = 1;                             /* 素材默认朝右, 不摆头 */
 
@@ -2275,10 +2304,18 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       if (d < minDist) { minDist = d; target = e; }
     }
     if (!target) return;
-    /* 发射点: 鹰的爪子下方(不从玩家身上出) */
+    /* 发射点: 鹰的爪子下方(不从玩家身上出)。
+     * ⚠️ v8.6 坐标统一(勿回退): 弹幕是【屏幕坐标】实体 —— 渲染端直接
+     * spr.position.set(b.x, b.y), 既不做 worldToScreen 也不加 floorY。
+     * 所以这里必须存屏幕坐标:
+     *   x → worldToScreen(pet.x)(pet.x 是世界坐标, 不减 camX 会一路飞偏)
+     *   y → pet.y(鹰已是绝对屏幕 y, 再加 10 落到爪子下)
+     * 目标点同理: target.y 是【怪的原始车道偏移】, 渲染时是 floorY()+e.y,
+     * 这里要补 floorY() 才是屏幕 y; x 也要转屏幕。 */
     G.eagleBolts.push({
-      x: pet.x, y: pet.y + 10,
-      tx: target.x, ty: target.y, speed: EAGLE.boltSpeed, t: 0, target,
+      x: worldToScreen(pet.x), y: pet.y + 10,
+      tx: worldToScreen(target.x), ty: floorY() + target.y,
+      speed: EAGLE.boltSpeed, t: 0, target,
     });
   }
 
@@ -2289,7 +2326,11 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       const b = G.eagleBolts[i];
       b.t += dt;
       if (b.target && b.target.alive) {
-        b.tx = b.target.x; b.ty = b.target.y;
+        /* ⚠️ v8.6 坐标统一(勿回退): 弹幕全程走【屏幕坐标】, 见发射点处的长注释。
+         * 追踪时同样要把怪的世界 x 转屏幕、并把车道偏移加上 floorY() 换成屏幕 y,
+         * 否则弹幕会一路飘向错误位置(旧代码直接取 target.x/target.y, 两者都不是屏幕坐标)。 */
+        b.tx = worldToScreen(b.target.x);
+        b.ty = floorY() + b.target.y;
       }
       const dx = b.tx - b.x, dy = b.ty - b.y;
       const dist = Math.sqrt(dx*dx + dy*dy);
