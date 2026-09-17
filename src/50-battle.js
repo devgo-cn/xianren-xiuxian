@@ -2942,13 +2942,12 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     const S = drawPlayerSprite._st;
     if (S) return S;
     const C = window.BattleGL.layers.player;
-    const st = { main: new PIXI.Sprite(), trails: [], glow: new PIXI.Sprite(), place: new PIXI.Graphics() };
+    const st = { main: new PIXI.Sprite(), glow: new PIXI.Sprite(), place: new PIXI.Graphics() };
     st.glow.anchor.set(0.5);
     st.glow.blendMode = PIXI.BLEND_MODES.ADD;
     C.addChild(st.glow);
     C.addChild(st.place);
     C.addChild(st.main);
-    for (let i = 0; i < 4; i++) { const t = new PIXI.Sprite(); t.visible = false; C.addChild(t); st.trails.push(t); }
     return drawPlayerSprite._st = st;
   }
   function drawPlayerSprite() {
@@ -2957,7 +2956,6 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     const sy = Math.round(floorY() + p.y);   /* v3.7: 玩家随车道(y 为车道偏移, 平滑过渡); v4.4: 取整 */
     const S = playerGL();
     S.main.visible = S.glow.visible = S.place.visible = false;
-    for (const t of S.trails) t.visible = false;
     const hurtOn = false;   /* v5.0 关掉玩家受击闪烁(alpha正弦+黑白filter), 用户反馈闪来闪去太晃 */
     /* v6.1 三套帧共用的「角色目标视觉高」: 旧渲染里 drawH 是画布高, 真正的人物高度
      * = drawH × 内容占比(普攻 0.960 / 技能起手仅 0.672), 两套素材不一样才导致换动作
@@ -3017,23 +3015,6 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     const boxB = SPRITE_BOX_B[frameIdx] || SPRITE.fh;
     const bs = bodyH / boxH;
     const drawW = SPRITE.fw * bs;
-    /* 残影: 倍速时3道蓝色拖尾, 跟随角色移动方向逐渐远去 */
-    if (G.speedMult > 1 && !p.attackAnim) {
-      const ftex = frameTex(G.sprite, SPRITE.cols, SPRITE.fw, SPRITE.fh, frameIdx);
-      /* 玩家向右走, 残影在左后方拖尾; 倍速越高拖得越远 */
-      const trailDist = 30 * G.speedMult;
-      for (let i = 3; i >= 1; i--) {
-        const t = S.trails[i - 1];
-        t.visible = true;
-        t.texture = ftex;
-        t.tint = 0x5599ff;
-        const fade = 1 - (i - 1) * 0.35;
-        const shrink = 1 - (i - 1) * 0.06;
-        t.alpha = 0.4 * fade;
-        t.position.set(sx - drawW*0.35 - i * trailDist * 0.4, sy - boxB * bs);
-        t.scale.set(bs * shrink, bs * shrink);
-      }
-    }
     S.main.visible = true;
     S.main.texture = frameTex(G.sprite, SPRITE.cols, SPRITE.fw, SPRITE.fh, frameIdx);
     /* 用内容底边贴地板(旧版是画布底边贴地, 素材里脚下方留白不同就一高一低) */
