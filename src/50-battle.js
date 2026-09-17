@@ -2169,7 +2169,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       if (pet.type === 'eagle') {
         pet.boltTimer = (pet.boltTimer || 2) - dt;
         if (pet.boltTimer <= 0 && G.enemies && G.enemies.some(e => e.alive)) {
-          G.eagleBolts.push({ x: p.x + 40, y: p.y - 30, vx: 400, t: 0 });
+          G.eagleBolts.push({ x: pet.x + pet.offsetX + 40, y: pet.y + pet.offsetY - 30, vx: 400, t: 0 });
           pet.boltTimer = 2;
         }
       }
@@ -2861,6 +2861,14 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
 
     /* 渲染灵鹰弹幕 */
     if (G.petEagleBoltReady && G.petEagleBoltSprite && G.eagleBolts) {
+      /* 先清旧 sprite */
+      if (G._boltSprites) {
+        for (const s of G._boltSprites) {
+          window.BattleGL.stage.removeChild(s);
+          s.destroy();
+        }
+      }
+      G._boltSprites = [];
       for (const b of G.eagleBolts) {
         const spr = new PIXI.Sprite(G.petEagleBoltSprite);
         spr.anchor.set(0.5, 0.5);
@@ -2868,7 +2876,6 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         spr.position.set(b.x, b.y);
         spr.alpha = 0.9;
         window.BattleGL.stage.addChild(spr);
-        G._boltSprites = G._boltSprites || [];
         G._boltSprites.push(spr);
       }
     }
