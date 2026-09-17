@@ -394,7 +394,12 @@ function traceBeat() {
   if (Date.now() - _traceT > 150000) { __set_traceT(Date.now()); traceRefresh(); }
 }
 
-setInterval(traceBeat, 2500);
+function traceBeatLoop() {
+  traceBeat();
+  setTimeout(traceBeatLoop, 2500);
+}
+
+setTimeout(traceBeatLoop, 2500);
 
 traceRefresh();
 
