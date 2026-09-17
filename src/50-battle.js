@@ -2327,7 +2327,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* v5.0 FIX: 结算面板已关闭但trialSettled仍为true(玩家关面板没走trialRestart) → 自动重置,
      * 否则新一场妖潮不倒计时不结算。杀BOSS提前结算与120秒结算都设trialSettled=true, 这是冲突根因。 */
     if (G.trialSettled) {
-      const modal = document.getElementById('trialModal');
+      if (!_trialModalEl) _trialModalEl = document.getElementById('trialModal');
+      const modal = _trialModalEl;
       if (!modal || !modal.classList.contains('show')) { trialRestart(); }
     }
     /* v3.9 试炼倒计时: 原始 dt —— 计时器与倍速分离, 倍速只加战斗节奏不加轮时 */
@@ -2365,6 +2366,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   const _drawList = [];   /* 复用: 避免每帧两次分配+两次排序 */
   const _waterMat = new PIXI.Matrix();   /* 复用: 避免水精灵每帧 new Matrix */
   let _wasSpeedBuff = false;   /* 身法状态切换检测: 避免每帧调 updateHUD */
+  let _trialModalEl = null;   /* trialModal 元素懒加载缓存 */
   function stageW() { return CW; }
   function stageH() { return CH; }
   function floorY() { return CH * 0.92; }
