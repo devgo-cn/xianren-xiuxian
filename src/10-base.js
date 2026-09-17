@@ -83,9 +83,6 @@ const SND = (function () {
     /* v1.7.62 硬静音开关: 挂机期间置 true, 任何音效都不会把上下文救活 */
     mute(v) { hardMute = !!v; if (hardMute) suspendAll(); else resumeAll(); },
     get muted() { return hardMute; },
-    /* v1.7.62 硬静音开关: 挂机期间置 true, BGM 停且回前台不自恢复 */
-    mute(v) { hardMute = !!v; if (hardMute) suspendAll(); else resumeAll(); },
-    get muted() { return hardMute; },
     /* initFiles 名字沿用旧接口; 现在只负责拉起 BGM 与页面可见性联动 */
     initFiles() {
       /* BGM: 直接建 Audio 立即试播(允许时刷新即响), 被浏览器拦截则等首次点击/按键再播;
