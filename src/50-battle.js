@@ -3017,18 +3017,17 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     const boxB = SPRITE_BOX_B[frameIdx] || SPRITE.fh;
     const bs = bodyH / boxH;
     const drawW = SPRITE.fw * bs;
-    /* 残影: 加速或atkBuff时显示3道, 向左偏移+逐渐缩小+渐暗 */
-    if ((G.speedMult > 1 || p.atkBuff > 0) && !p.attackAnim) {
-      const trailCount = 3;
+    /* 残影: 倍速时3道蓝色残影, 向左远去逐渐缩小变暗 */
+    if (G.speedMult > 1 && !p.attackAnim) {
       const ftex = frameTex(G.sprite, SPRITE.cols, SPRITE.fw, SPRITE.fh, frameIdx);
-      for (let i = trailCount; i >= 1; i--) {
+      for (let i = 3; i >= 1; i--) {
         const t = S.trails[i - 1];
         t.visible = true;
         t.texture = ftex;
-        /* 越远(i大)越暗越小: 第1道最亮最大, 第3道最暗最小 */
+        t.tint = 0x88bbff;
         const fade = 1 - (i - 1) * 0.3;
         const shrink = 1 - (i - 1) * 0.08;
-        t.alpha = (G.speedMult > 1 ? 0.18 : 0.28) * fade;
+        t.alpha = 0.22 * fade;
         t.position.set(sx - drawW*0.35 - i * 22, sy - boxB * bs);
         t.scale.set(bs * shrink, bs * shrink);
       }
@@ -3044,7 +3043,7 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     let glowTex = null, glowA = 0;
     if (p.atkBuff > 0) {
       const pulse = 0.5 + 0.5 * Math.sin(G.t * 6);
-      glowTex = GLOW.atk; glowA = 0.35 + pulse*0.25;
+      glowTex = GLOW.atk; glowA = 0.15 + pulse*0.10;
     }
     if (G.speedMult > 1) {
       glowTex = GLOW.speed3 ? (G.speedMult >= 3 ? GLOW.speed3 : GLOW.speed1) : GLOW.speed1;
