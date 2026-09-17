@@ -140,6 +140,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     trialSpawned:0, trialBossKilled:false,
   };
   let _hudRefreshT = 0;   /* v5.0 定期刷新HUD计时器: 打BOSS期间无击杀, 倒计时显示会卡住 */
+  const _spawnEntries = [];   /* 刷怪权重池复用: 避免每次spawnWave新建数组 */
 
   /* 加载素材 */
   const spriteImg = new Image();
@@ -1277,7 +1278,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const cur = (typeof window !== 'undefined' && window.__poolAll) ? 10 : (G.trialTier || 1);
     const maxMobTier = (typeof window !== 'undefined' && window.__poolAll) ? 5 : Math.min(5, Math.ceil(Math.max(1, PST.lv || 1) / 2));
     const weightTier = Math.min(cur, maxMobTier);   /* 权重×3给当前能刷到的最高怪种档 */
-    const entries = [];
+    _spawnEntries.length = 0;
     for (const [t, d] of Object.entries(BC.enemies)) {
       if (t === 'boss' || !d || (d.tier || 1) > maxMobTier) continue;
       /* v4.6 FIX 占位图: 手配骨骼怪只在工厂就绪后才入池 —— 否则开局刷出的怪
@@ -1285,7 +1286,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       if (d.bone && !(BONES[d.bone] && BONES[d.bone].ready)) continue;
       /* v4.6 FIX 同上: 纯序列帧怪(slime/water 这类没 bone 的)素材就绪前同样出占位图 */
       if (!d.bone && !spriteReadyFor(t)) continue;
-      entries.push({ kind:'hand', key:t, w:(d.w || 1) * ((d.tier || 1) === weightTier ? 3 : 1) });
+      _spawnEntries.push({ kind:'hand', key:t, w:(d.w || 1) * ((d.tier || 1) === weightTier ? 3 : 1) });
     }
     for (let t = 1; t <= maxMobTier; t++) {
       const mul = (t === weightTier) ? 3 : 1;
@@ -1294,13 +1295,13 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         /* v4.6 FIX 同上: 骨骼池怪工厂未就绪就不进池 —— 懒加载是 1.5s/3 只,
          * 79 只要约 40s 才建完; 不等就绪就刷, 开局必然一片灰椭圆。 */
         if (!(BONES[slug] && BONES[slug].ready)) continue;
-        entries.push({ kind:'bone', key:slug, w:10 * mul });
+        _spawnEntries.push({ kind:'bone', key:slug, w:10 * mul });
       }
     }
-    if (!entries.length) return null;   /* 工厂全部未就绪时这一拍不刷, 避免出占位图 */
-    const twAll = entries.reduce((s,e2) => s + e2.w, 0);
-    let rr = Math.random() * twAll, pick2 = entries[0];
-    for (const e2 of entries) { rr -= e2.w; if (rr <= 0) { pick2 = e2; break; } }
+    if (!_spawnEntries.length) return null;   /* 工厂全部未就绪时这一拍不刷, 避免出占位图 */
+    const twAll = _spawnEntries.reduce((s,e2) => s + e2.w, 0);
+    let rr = Math.random() * twAll, pick2 = _spawnEntries[0];
+    for (const e2 of _spawnEntries) { rr -= e2.w; if (rr <= 0) { pick2 = e2; break; } }
     if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
     const e = pick2.kind === 'bone' ? makeBoneEnemy(pick2.key, G.trialTier) : makeEnemy(pick2.key, G.trialTier);   /* v3.9 三维: 小怪按当前档位缩放 */
     e.x = G.camX + stageW() + BC.enemySpawnOffset;   /* v5.1 击杀即刷新: 小怪从屏幕右边生成, 杀一只补一只 */
