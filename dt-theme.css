@@ -31,13 +31,6 @@
   /* 旧金 → 旧金（微调，去荧光感） */
   .realm-badge .big,.card h3,.story-body h4,.j-card h5{font-family:var(--font-brush)}
   .realm-badge .big{color:#d4b06a;text-shadow:0 0 14px rgba(212,176,106,.35)}
-  .realm-badge{position:relative;padding:14px 18px 14px;display:flex;flex-direction:column;gap:1px;min-width:170px;
-    filter:drop-shadow(0 6px 16px rgba(0,0,0,.55))}
-  /* 徽章右下角一枚小朱砂印 —— 手绘"盖印"意象 */
-  .realm-badge::after{content:"闲人";position:absolute;right:5px;bottom:4px;
-    font-family:var(--font-brush);font-size:7px;color:rgba(176,56,42,.75);
-    border:1px solid rgba(176,56,42,.5);padding:0 2px;border-radius:2px;transform:rotate(-4deg);
-    letter-spacing:.1em}
   /* ===== 按钮 = SVG 手绘墨块（2D 矢量 path，真·S 曲线）=====
      每颗按钮内嵌 <svg class="skin"><path class="ink">：轮廓由贝塞尔曲线(C/Q)构成，
      波浪起伏、绝无直线边。文字由 .label 叠加。gradGold/gradCin 渐变在 index.html <defs> 中。
@@ -164,15 +157,6 @@
     background-color:transparent !important;
     box-shadow:none !important;
   }
-  /* ---- ② 境界徽章：换 200x120 墨简(能容纳三行)，内容不溢出，子项整理 ---- */
-  .realm-badge{
-    padding:16px 20px 18px !important;min-width:0;width:auto;max-width:min(52vw,250px);
-  }
-  .realm-badge .big{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:16px;line-height:1.35}
-  .realm-badge .sub{display:block;font-size:10px;line-height:1.45;color:#a7b0c4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .realm-badge .story-btn{margin-top:7px}
-  /* 徽章朱印挪到内部内容底部右 */
-  .realm-badge::after{right:12px;bottom:10px}
   /* ---- ②' 卡片墨形随内容撑高：给足 padding 与内容安全区 ---- */
   .card{background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 150%22 preserveAspectRatio=%22none%22><path d=%22M14 10 C48 0 90 18 130 6 C168 0 190 14 196 30 C200 56 188 86 196 110 C198 136 184 146 160 148 C130 150 100 142 74 146 C48 148 22 142 10 136 C0 120 -2 100 2 76 C0 50 -4 24 14 10 Z%22 fill=%22rgba(14,19,33,.96)%22 stroke=%22rgba(201,168,106,.32)%22 stroke-width=%221.4%22 vector-effect=%22non-scaling-stroke%22/></svg>') !important;
     background-size:100% 100% !important;
@@ -777,11 +761,6 @@
  *       ③ 宝/邮件 由竖排改横排(80px→40px)
  *       ④ 剧情纲目 / 版本号 移出徽章, 与徽章同排
  * 结果: HUD 199px → ~70px, 行迹上移, 屏幕中部(道体+日志)多出一截。 */
-  .hud .realm-badge{flex-direction:row;align-items:baseline;gap:8px;
-    padding:6px 14px 7px !important;min-width:0;max-width:min(46vw,205px);}
-  .hud .realm-badge .big{font-size:15px;line-height:1.2;flex:none}
-  .hud .realm-badge .sub{font-size:9.5px;line-height:1.3;padding-right:30px;flex:1;min-width:0}
-  .hud .realm-badge::after{right:8px;bottom:1px;font-size:8px;opacity:.55}
   /* v1.6.0-A 数值成长爽感: 资源芯片微脉冲 + 离散增益飘字 */
   .res-chip{position:relative}
   .res-chip.pulse{animation:resPulse .45s ease-out}
@@ -1045,40 +1024,6 @@
 .rk-foot{font-size:10px;color:#5f6070;margin-top:8px;text-align:right}
 
 
-/* ==================== v1.7.28 境界徽章终态: 深底金边胶囊 · 卡内居中三行(大境界/段位小字段/说明), 文字不截断 ==================== */
-.realm-badge{
-  background-color:transparent !important;
-  border:0 !important;
-  border-radius:0 !important;
-  box-shadow:none !important;
-  width:158px !important; max-width:100% !important; min-width:0 !important;
-  box-sizing:border-box !important;
-  padding:8px 13px 9px !important;
-  display:flex !important; flex-direction:column !important;
-  align-items:center !important; justify-content:center !important;
-  gap:1px !important; text-align:center !important;
-}
-.realm-badge .big{
-  font-family:var(--font-brush) !important;
-  font-size:17px !important; font-weight:800 !important; letter-spacing:.16em !important;
-  color:#e9cd8a !important; line-height:1.3 !important;
-  text-shadow:0 0 12px rgba(232,197,107,.55) !important;
-  white-space:nowrap !important; overflow:visible !important; text-overflow:clip !important;
-  width:100% !important; text-align:center !important;
-}
-.realm-badge .sub-a{
-  font-size:11px !important; color:#e2c98f !important; letter-spacing:.08em !important; font-weight:600 !important;
-  line-height:1.35 !important; white-space:nowrap !important; overflow:visible !important;
-  width:100% !important; text-align:center !important;
-}
-.realm-badge .sub-b{
-  font-size:9.5px !important; color:#aeb8cd !important; letter-spacing:.05em !important; font-weight:400 !important;
-  line-height:1.4 !important; white-space:nowrap !important; overflow:visible !important;
-  width:100% !important; text-align:center !important;
-}
-.realm-badge::after{display:none !important}
-
-
 /* ==================== v1.7.32 行动提示闪烁(战字式亮度脉动: 可突破/可升阵/可遣化身/可开炉) ==================== */
 @keyframes hintGoldPulse{
   0%,100%{filter:brightness(1);color:#e9cd8a;text-shadow:0 0 3px rgba(232,197,107,.2)}
@@ -1101,7 +1046,6 @@
 @keyframes bigBreath{
   0%,100%{filter:drop-shadow(0 0 1px rgba(232,197,107,.35))}
   50%{filter:drop-shadow(0 0 5px rgba(255,222,150,.95)) drop-shadow(0 0 13px rgba(255,205,120,.55)) drop-shadow(0 0 22px rgba(232,197,107,.3))}}
-.realm-badge .big{animation:bigBreath 2.8s ease-in-out infinite}
 
 
 /* ==================== v1.7.41 装备面板: 整卡按品质档位轮廓辉光(呼吸) ==================== */
@@ -1347,8 +1291,6 @@
 /* v1.9.9g: seal 按钮自收缩 —— 内容宽自适应; 覆盖 index.html 内联 .card .btn 的
    min-width:176px/padding 38px/margin-top:16px(诊断实测两字按钮被撑到 176px 宽的元凶) */
 .btn.seal{width:-moz-fit-content;width:fit-content;flex:none;min-width:0;max-width:none;margin-top:0}
-/* HUD 徽章: 右缘为「榜」印留位(v1.7.62 既有约定, 墨简块后重申) */
-.hud .realm-badge{padding-right:36px !important}
 
 /* ---------- 面板滚动条: 原生白条 → 一线淡金 ---------- */
 .story-body::-webkit-scrollbar{width:4px}
