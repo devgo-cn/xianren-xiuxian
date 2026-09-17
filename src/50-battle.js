@@ -1986,11 +1986,14 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       }
       /* 上下浮动 */
       pet.bobT += dt * 2.5;
-      /* 跟随玩家: 左上方, 平滑跟随 (v3.7: 跟玩家所在车道, 不是固定地板) */
+      /* 跟随玩家: 左上方, 带惯性的平滑跟随 —— 玩家快速往前走时宠物先往后滞留, 随后加速跟上, 不僵硬。
+       * vx/vy是宠物速度(惯性), 阻尼0.82让速度自然衰减, 弹簧力拉向目标位置。 */
       const targetX = p.x + pet.offsetX;
       const targetY = floorY() + p.y + pet.offsetY + Math.sin(pet.bobT) * 3;
-      pet.x += (targetX - pet.x) * Math.min(1, dt * 6);
-      pet.y += (targetY - pet.y) * Math.min(1, dt * 6);
+      pet.vx = (pet.vx || 0) * 0.82 + (targetX - pet.x) * dt * 10;
+      pet.vy = (pet.vy || 0) * 0.82 + (targetY - pet.y) * dt * 10;
+      pet.x += pet.vx;
+      pet.y += pet.vy;
 
       /* 施法系统 */
       if (pet.casting) {
