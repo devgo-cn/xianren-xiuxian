@@ -42,7 +42,8 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
       black_ant_queen: { name:'蚁后', role:'melee', w:42, atkRange:36, speed:85, hpK:2.8, atkK:1.0, defK:1.0, color:'#7a6ae0', bone:'black_ant_queen', drawH:116, hpBarW:36, tier:4 },
       /* v2.6 调参: hpK 80→52(实测过厚约-35%), atkRange 70→45(玩家攻距75, 贴身才能互殴, 修复"剑够不到")
        * v3.9 BOSS 换九尾狐王: giant_kitsune(S 品质, 10 种攻击动作), 骨骼渲染 drawH 110 */
-      boss:  { name:'九尾狐王', role:'ranged', w:5,  atkRange:45, speed:40, hpK:52, atkK:3.0, defK:3.0, color:'#e8b06b', isBoss:true, floatHeight:10, sizeMult:2.0, tier:5, bone:'giant_kitsune', drawH:220, hpBarW:60 },
+      boss:  { name:'九尾狐王', role:'ranged', w:5,  atkRange:45, speed:40, hpK:52, atkK:7.5, defK:3.0, color:'#e8b06b', isBoss:true, floatHeight:10, sizeMult:2.0, tier:5, bone:'giant_kitsune', drawH:220, hpBarW:60,
+               crit:25, dodge:10, pen:40, critRes:60 },  /* v6.5: atkK 3.0×2.5(凹曲线T10满额, 模拟器定稿); 四维面板BOSS档 */
     },
     /* v3.9 怪物三维系统: 怪包统一池(每个境界都会刷到全怪种), 三维 = 境界基准 × 怪种K × 波次tier倍率。
      * 波次内从 T1 最弱一路递进到 T5 —— tier 决定刷怪池权重与三维倍率。 */
@@ -73,16 +74,21 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     },
     /* v5.1 骨骼池怪数值模板大幅上调 —— hpK控制在1.5~4.0, 小怪更耐打 */
     boneTpl: {
-      1: { hpK:1.50, atkK:0.70, defK:0.40, speed:110 },
-      2: { hpK:1.70, atkK:0.75, defK:0.42, speed:130 },
-      3: { hpK:1.90, atkK:0.82, defK:0.45, speed:155 },
-      4: { hpK:2.20, atkK:0.92, defK:0.52, speed:140 },
-      5: { hpK:2.50, atkK:1.05, defK:0.62, speed:120 },
-      6: { hpK:2.85, atkK:1.18, defK:0.72, speed:135 },
-      7: { hpK:3.15, atkK:1.30, defK:0.82, speed:150 },
-      8: { hpK:3.45, atkK:1.42, defK:0.92, speed:130 },
-      9: { hpK:3.75, atkK:1.52, defK:1.02, speed:110 },
-      10:{ hpK:4.00, atkK:1.65, defK:1.12, speed:125 },
+      /* v6.5 数值定稿(模拟器多目标扫描): atkK 已乘凹曲线 f(t)=1+1.5*((t-1)/9)^1.6 ——
+       *   T1-T5 几乎不加压(保护新手/低境界裸装段), T8-T10 陡增(T10×2.5, 血条有来有回);
+       * 新增四维面板(网游式, 按 tier 线性):
+       *   crit 暴击(怪打玩家, ×1.8) / dodge 闪避(玩家打怪 miss) /
+       *   pen 破甲(怪无视玩家 def%) / critRes 暴抗(削减玩家暴击与会心率) */
+      1: { hpK:1.50, atkK:0.70, defK:0.40, speed:110, crit:2,  dodge:0,   pen:0,  critRes:5  },
+      2: { hpK:1.70, atkK:0.78, defK:0.42, speed:130, crit:4,  dodge:0.9, pen:4,  critRes:11 },
+      3: { hpK:1.90, atkK:0.93, defK:0.45, speed:155, crit:6,  dodge:1.8, pen:9,  critRes:17 },
+      4: { hpK:2.20, atkK:1.16, defK:0.52, speed:140, crit:8,  dodge:2.7, pen:13, critRes:24 },
+      5: { hpK:2.50, atkK:1.48, defK:0.62, speed:120, crit:10, dodge:3.6, pen:18, critRes:30 },
+      6: { hpK:2.85, atkK:1.87, defK:0.72, speed:135, crit:12, dodge:4.4, pen:22, critRes:36 },
+      7: { hpK:3.15, atkK:2.32, defK:0.82, speed:150, crit:14, dodge:5.3, pen:27, critRes:42 },
+      8: { hpK:3.45, atkK:2.84, defK:0.92, speed:130, crit:16, dodge:6.2, pen:31, critRes:48 },
+      9: { hpK:3.75, atkK:3.41, defK:1.02, speed:110, crit:18, dodge:7.1, pen:36, critRes:54 },
+      10:{ hpK:4.00, atkK:4.13, defK:1.12, speed:125, crit:20, dodge:8,   pen:40, critRes:60 },
     },
   };
   /* v5.0 121只怪池: 按序号返回tier(T1@1-30, T2@31-60, ... T10@271-300) */
@@ -1089,6 +1095,11 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     const spdMul = (typeof window !== 'undefined' && window.__enemySpeedMul) || 1;
     const r = { type:key||def.bone||'bone',name:def.name,role:def.role, elite, lane, y:laneOff(lane), x:0, hp,maxHp:hp, atk, def:dfn,
       tier:tierOverride||def.tier||1, drawH:def.drawH||0, hpBarW:def.hpBarW||0,
+      /* v6.5 怪物四维面板实例化: 模板下发(骨骼怪 per-tier / BOSS 档), 手配怪缺省 0; 精英×1.3 */
+      crit: Math.min(100, Math.round((def.crit||0)*(elite?1.3:1))),
+      dodge: Math.min(60, Math.round((def.dodge||0)*(elite?1.3:1)*10)/10),
+      pen: Math.min(90, Math.round((def.pen||0)*(elite?1.3:1))),
+      critRes: Math.min(90, Math.round((def.critRes||0)*(elite?1.3:1))),
       atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2)*(elite?0.85:1)*spdMul, color:def.color,
       atkT:Math.random()*0.6, anim:0,hurtT:0, alive:true,dying:0, animFrame:0, animTimer:0, moving:false };
     /* 骨骼怪: 工厂就绪时建一只独立骨架实例(每只怪动画独立推进) */
@@ -1241,8 +1252,9 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     const atkRange = hasSkill ? 52 : 34;
     const speed = Math.round(tpl.speed * (hasSkill ? 0.8 : 1));
     const def = { name: slug.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()),
-      role, atkRange, speed, hpK:tpl.hpK, atkK:tpl.atkK, defK:tpl.defK, hasSkill,
-      color:'#9aa8b8', bone:slug, tier:t, drawH:dh, hpBarW:Math.max(24, Math.round(dh*0.55)) };
+      role, atkRange, speed, hpK:tpl.hpK, atkK:tpl.atkK, defK:tpl.defK,
+      crit:tpl.crit||0, dodge:tpl.dodge||0, pen:tpl.pen||0, critRes:tpl.critRes||0,   /* v6.5 四维面板 */
+      hasSkill, color:'#9aa8b8', bone:slug, tier:t, drawH:dh, hpBarW:Math.max(24, Math.round(dh*0.55)) };
     return makeEnemyFrom(def, tierOverride);
   }
   function spawnWave() {
@@ -1317,10 +1329,11 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
   }
   /* 玩家暴击/会心判定: 读装备词条(PST.crit 暴击率 / PST.critB 会心率 / PST.critD 爆伤);
    * kind=2 暴击(×2)、kind=1 会心(×1.5)、mult 含爆伤增幅; bonus 为技能临时加的暴击率 */
-  function playerCritRoll(bonus) {
+  function playerCritRoll(bonus, target) {
+    const res = (target && target.critRes) || 0;   /* v6.5 怪物暴抗: 削减玩家暴击/会心率 */
     let kind = 0;
-    if (Math.random()*100 < (PST.crit || 0) + (bonus || 0)) kind = 2;
-    else if (Math.random()*100 < (PST.critB || 0)) kind = 1;
+    if (Math.random()*100 < Math.max(0, (PST.crit || 0) + (bonus || 0) - res)) kind = 2;
+    else if (Math.random()*100 < Math.max(0, (PST.critB || 0) - res)) kind = 1;
     const cmul = kind === 2 ? 2 : kind === 1 ? 1.5 : 1;
     return { kind, cmul, crit: kind > 0, mult: kind ? cmul * (1 + (PST.critD || 0)/100) : 1 };
   }
@@ -1580,6 +1593,11 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
    * 一律不写回面板属性(不做常驻光环), 攻防血仍只由境界与装备决定。 */
   function playerStrike(p, target, seg) {
     if (!target || !target.alive) return;
+    /* v6.5 怪物闪避: 玩家此段落空(不出伤害不消耗追猎), 高 tier 怪开始有 miss */
+    if (Math.random()*100 < (target.dodge || 0)) {
+      G.dmg.push({ x:target.x, y:target.y-30, val:'闪', crit:false, color:'#cfd8e3', t:0 });
+      return;
+    }
     /* v2.8 普攻单段: 主段(seg1)一次全额; 三连斩的 seg2/seg3 是同一轮攻击内的补刀,
      * 各按自己的节奏给倍率, 不再出现"两段各全额"把普攻 DPS 顶到技能之上 */
     let base = seg === 3 ? 1 : seg === 2 ? (0.5 + Math.random()*0.15) : (1.0 + Math.random()*0.25);
@@ -1599,8 +1617,8 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     if (seg === 3) {
       /* 三连斩第三段: 补刀必会心(至少×1.5) */
       kind = 1;
-    } else if (Math.random()*100 < (PST.crit || 0) + critBonus) kind = 2;
-    else if (Math.random()*100 < (PST.critB || 0)) kind = 1;
+    } else if (Math.random()*100 < Math.max(0, (PST.crit || 0) + critBonus - (target.critRes || 0))) kind = 2;
+    else if (Math.random()*100 < Math.max(0, (PST.critB || 0) - (target.critRes || 0))) kind = 1;
     const cmul = kind === 2 ? 2 : kind === 1 ? 1.5 : 1;
     /* 三连斩第三段伤害倍率: sl.dmg 是"这一补刀相对本段的加成", 不是整段倍率替代 */
     const sl = seg === 3 ? skVal('sanlian') : null;
@@ -1728,6 +1746,15 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
   const PLAYER_HIT_GAP = 40;   /* 兼容旧引用 */
   function dealDamage(target, amount, color, crit) {
     target.hp -= amount; target.hurtT = 0.25;
+    /* v6.4 吸血词条(life): 按造成伤害百分比回血 —— 词条层一直下发(finalStats 返回 life),
+     * 但战斗结算层此前从未消费, 属于死词条, 现补上。封顶 maxHp。 */
+    if (PST.life > 0 && G.player && G.player.hp < G.player.maxHp) {
+      const heal = amount * PST.life / 100;
+      if (heal >= 1) {
+        G.player.hp = Math.min(G.player.maxHp, G.player.hp + heal);
+        G.dmg.push({ x:G.player.x, y:G.player.y-50, val:'+'+Math.round(heal), crit:false, color:'#7fffaa', t:0 });
+      }
+    }
     G.dmg.push({ x:target.x,y:target.y-40, val:Math.round(amount), crit:crit||false, color:color||'#e8f2fa', t:0, vx:(Math.random()-0.5)*18 });
     G.fx.push({ kind:'hitSpark', x:target.x,y:target.y-20, color:color||'#fff', t:0,dur:0.3 });
     if (target.hp <= 0) {
@@ -1756,7 +1783,7 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
       if (p.skillFrame >= SKILL.hitFrame && !p.skillHit && p.skillTarget && p.skillTarget.alive) {
         p.skillHit = true;
         playSfx('skill_attack', 0.9);  /* 剑气斩专属攻击音效 */
-        const r = playerCritRoll(0);                       // 读装备暴击/会心/爆伤
+        const r = playerCritRoll(0, p.skillTarget);        // 读装备暴击/会心/爆伤, 主目标暴抗削减(v6.5)
         const atkMult = (1 + (p.atkBuff || 0)) * SKILL.damageMult;
         const dmg = calcDmg(p.atk, atkMult * (0.9 + Math.random()*0.2) * r.mult, p.skillTarget.def, PST.pen || 0);
         dealDamage(p.skillTarget, dmg, '#bfe8ff', r.crit);
@@ -2172,9 +2199,12 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
            * 所以即使弹道被同屏节流丢掉, 战斗数值也不受影响。 */
           const sk = SK_OF[e.type];
           if (sk) spawnSkillFx(e, e, sk, e.x >= p.x ? -1 : 1);
-          const dmg = calcDmg(e.atk, 0.85+Math.random()*0.3, PST.def, 0);
+          /* v6.5 怪物破甲: 无视玩家 def 的 pen% ; 怪暴击: 命中×1.8(高 tier/精英/BOSS) */
+          const dmg0 = calcDmg(e.atk, 0.85+Math.random()*0.3, PST.def, e.pen || 0);
+          const crit = Math.random()*100 < (e.crit || 0);
+          const dmg = crit ? Math.round(dmg0*1.8) : dmg0;
           p.hp -= dmg; p.hurtT = 0.25;
-          G.dmg.push({ x:p.x,y:p.y-40, val:dmg, crit:false, color:'#ff8a7a', t:0 });
+          G.dmg.push({ x:p.x,y:p.y-40, val:dmg, crit, color: crit ? '#ff5a3c' : '#ff8a7a', t:0 });
           G.fx.push({ kind:'hitSpark', x:p.x,y:p.y-20, color:'#ff8a7a', t:0,dur:0.3 });
           if (p.hp <= 0) {
             /* v5.0 死亡判定: 玩家倒下后妖潮从头开始(清场+重置怪池+回满血) */
