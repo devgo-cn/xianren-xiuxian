@@ -411,7 +411,11 @@ traceRefresh();
 window.debugEncounter = debugEncounter;
 
 function artScore(a) {                    /* v1.9.6 品质锚定: 星品主导、浮分封顶, 低星数学上永不越高星 */
-  const lv = (state.realmIdx || 0) + 1;
+  /* v7.1 FIX: lv 必须用大境界索引, 不是 realmIdx+1。
+   * realmIdx 是小境界连续编号(元婴期=22~25), 直接用会把 anchor 放大到 5000+,
+   * 浮分 cap 也跟着放大 → 所有同品质装备评分都一样(全 6486)。 */
+  let lv = 1, _acc = 0;
+  for (let i = 0; i < BIGS.length; i++) { _acc += BIGS[i].segs; if ((state.realmIdx || 0) < _acc) { lv = i + 1; break; } }
   let base = (a.a || 0) + 3 * (a.d || 0) + (a.h || 0) / 30;   // 斗法三维(实战权重不变)
   const c = artCtx();
   let fx = 0;
