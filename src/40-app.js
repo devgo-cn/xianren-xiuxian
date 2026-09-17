@@ -142,9 +142,10 @@ function doBreak() {
   const finishBreak = () => {
     state.realmIdx++;
     state.exp = isBigBreak ? 0 : Math.max(0, state.exp - r.need);  // 大境清零, 小境扣需
-    /* v7.1 突破续命: 兽潮离线加成(trialBoost)随突破自动续 48h —— 跨境界换怪池后
-     * 玩家需重新适应, 但加成不应在换境瞬间蒸发, 免得"离线收益加成清零、重打才回" */
-    if (state.trialBoost > 0) state.trialBoostUntil = Math.max(state.trialBoostUntil || 0, Date.now() + 48 * 3600 * 1000);
+    /* v7.2 跨大境重校: 兽潮离线加成(trialBoost)与大境界绑定 —— 怪池换了, 效率必须
+     * 重新校对, 否则低境刷满 121 的 180% 常驻档案吃到天荒地老。trialBest 保留作
+     * 全程炫耀纪录, 小境界突破(同池)不清。 */
+    if (isBigBreak) { state.trialBoost = 0; state.trialBoostUntil = 0; }
     __set_breaking(false);
     /* 黑屏挂机: 记录突破 */
     if (DIMSTAT.on) { DIMSTAT.breaks.push(next.label); try { dimRender(); } catch(e) {} }
