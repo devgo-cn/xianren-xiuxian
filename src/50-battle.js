@@ -12,7 +12,7 @@
  */
 
 import { SND } from './10-base.js';
-import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档; 黑屏挂机统计 */
+import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档; 黑屏挂机统计; v7.0: 正规怪物池 */
 
 
   const BC = {
@@ -143,7 +143,7 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     skillCall:null,          /* 技能名播报槽: 覆盖式大字快闪, {name,t,dur} */
     /* v3.9 试炼轮次: 120秒一场, 怪从T1一路刷到T5; 结算击杀数 → 纪录 → 离线补偿
      * v5.0 121只固定怪池: trialSpawned记录已刷序号, 按序号决定tier, 刷完121只提前结算 */
-    trialT: BC.trialSecs, trialKills:0, trialTier:1, trialSettled:false, trialBossDone:false,
+    trialT: BC.trialSecs, trialKills:0, trialTier:1, trialSettled:false, trialBossDone:false, bossT:0,
     trialSpawned:0, trialBossKilled:false,
   };
   let _hudRefreshT = 0;   /* v5.0 定期刷新HUD计时器: 打BOSS期间无击杀, 倒计时显示会卡住 */
@@ -1268,60 +1268,60 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
       hasSkill, color:'#9aa8b8', bone:slug, tier:t, drawH:dh, hpBarW:Math.max(24, Math.round(dh*0.55)) };
     return makeEnemyFrom(def, tierOverride);
   }
+  /* ══════════ v7.0 正规怪物池: 每大境界 12 种怪 × 各10只(顺序分波, 非随机) + 1 BOSS ══════════
+   * 数值全部来自 00-pure.js 的 MOB_POOLS 手填表(运行时零公式, 调平衡直接改表)。
+   * 波次 = 已刷序号: 前10只波1怪, 打完10只换下一种, 曲线逐步上升。
+   * 锚定: 本境界毕业玩家(装备不跨境界), 120s 杀满 120 只, BOSS 30s 限时击杀。 */
+  function poolFor(lv) {
+    const keys = Object.keys(MOB_POOLS).map(Number).sort((a,b) => b-a);
+    for (const k of keys) { if (lv >= k) return MOB_POOLS[k]; }
+    return MOB_POOLS[1];
+  }
+  function makePoolEnemy(entry, isBoss) {
+    const cfg = BONE_IDX[entry.slug] || {};
+    const dh = cfg.drawH || 84;
+    const sk = SK_OF[entry.slug];
+    /* 骨架数值先走 makeEnemyFrom 通用路径(体型攻距/腿部动画), 再用池表数值整体覆盖 */
+    const def = { name: entry.slug.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()),
+      role: sk ? 'ranged' : 'melee', atkRange: sk ? 52 : 34, speed: isBoss ? 90 : 120,
+      hpK:1, atkK:1, defK:1, crit:entry.crit||0, dodge:entry.dodge||0, pen:entry.pen||0, critRes:entry.critRes||0,
+      hasSkill: !!sk, color:'#9aa8b8', bone:entry.slug, tier:1, drawH:dh, hpBarW:Math.max(24, Math.round(dh*0.55)) };
+    const e = makeEnemyFrom(def, 1, isBoss ? 'boss' : entry.slug);
+    e.hp = e.maxHp = entry.hp;
+    e.atk = entry.atk;
+    e.def = entry.def;
+    e.elite = false;             /* 池表怪不吃随机精英(数值即策划定值) */
+    return e;
+  }
   function spawnWave() {
-    /* v5.0 121只怪池刷完则停刷(提前结算) */
-    if (G.trialSpawned >= BC.trialPool.bossAt) return null;
+    const pool = poolFor(Math.max(1, PST.lv || 1));
     /* BOSS活跃时不刷新小怪 */
     if (G.bossActive) return null;
-    /* v5.0 BOSS = 第121只, 120只普通怪刷完后出现, 一轮只出一次。
-     * 三重保护: trialBossDone标记 + bossActive + 场上有BOSS对象(含死亡动画中), 防止刷出两只
-     * v5.0 FIX: 骨骼工厂未就绪时不创建BOSS —— 否则BOSS没armature走序列帧(史莱姆王),
-     * 后来骨骼工厂建好重置后又创建骨骼版九尾狐王, 两个BOSS站一起。等建好再创建。 */
+    /* v7.0 BOSS = 第121只, 120只小怪刷完后出场, 一轮一次。
+     * 三重保护: trialBossDone + bossActive + 场上BOSS对象(含死亡动画中), 防双BOSS。
+     * 工厂未就绪不创建(否则序列帧兜底与骨骼版双BOSS站一起)。 */
     if (G.trialSpawned >= BC.trialPool.totalMobs && !G.trialBossDone && !G.bossActive && !G.enemies.some(e => e.type === 'boss')) {
-      if (!BONES['giant_kitsune'] || !BONES['giant_kitsune'].ready) return null;   /* 骨骼工厂未就绪, 等下一帧 */
+      if (!BONES[pool.boss.slug] || !BONES[pool.boss.slug].ready) return null;
       if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
-      const e = makeEnemy('boss');
+      const e = makePoolEnemy(pool.boss, true);
       e.x = G.camX + stageW() + BC.enemySpawnOffset;
-      e.elite = true;  /* BOSS标记为精英 */
       e.lane = MID_LANE; e.y = laneOff(MID_LANE);   /* BOSS 固定中道, 突出存在感 */
       G.enemies.push(e);
       G.bossActive = true;
       G.trialBossDone = true;
       G.trialSpawned++;   /* 第121只 */
+      G.bossT = pool.boss.time || 30;   /* v7.0 BOSS 30s 限时: 到点打不死 → 重新开始兽潮 */
       return e;
     }
-    /* v5.0 小怪tier按已刷序号决定, 不再按击杀数升档 */
-    G.trialTier = (typeof window !== 'undefined' && window.__poolAll) ? 10 : tierForSpawn(G.trialSpawned + 1);
-    /* v6.6 模型驱动分档: 怪种模型档 = 当前数值档(杀数段), T6-T10 复用 T5 模型 ——
-     * "前期弱怪, 后期强怪": 视觉体型与数值同步推进, 79 只模型按 5 档复用
-     * (实测分布 T1×3/T2×6/T3×13/T4×15/T5×42)。
-     * 旧版按玩家境界解锁(maxMobTier)废弃: 境界只该管玩家强度, 池内分档交给杀数段 ——
-     * 小号在低杀数段自然只遇弱怪, 高杀数段自然遇强怪, 与境界无关。 */
-    const cur = (typeof window !== 'undefined' && window.__poolAll) ? 10 : (G.trialTier || 1);
-    const wantModel = Math.min(5, cur);
-    _spawnEntries.length = 0;
-    for (const [t, d] of Object.entries(BC.enemies)) {
-      if (t === 'boss' || !d || (d.tier || 1) !== wantModel) continue;
-      /* v4.6 FIX 占位图: 手配骨骼怪只在工厂就绪后才入池 —— 否则开局刷出的怪
-       * 因工厂没建好, 会走兜底分支画成灰色椭圆(就是看到的"占位图")。 */
-      if (d.bone && !(BONES[d.bone] && BONES[d.bone].ready)) continue;
-      /* v4.6 FIX 同上: 纯序列帧怪(slime/water 这类没 bone 的)素材就绪前同样出占位图 */
-      if (!d.bone && !spriteReadyFor(t)) continue;
-      _spawnEntries.push({ kind:'hand', key:t, w:(d.w || 1) });
-    }
-    for (const slug of BONE_POOL[wantModel]) {
-      /* v4.6 FIX 同上: 骨骼池怪工厂未就绪就不进池 —— 懒加载是 1.5s/3 只,
-       * 79 只要约 40s 才建完; 不等就绪就刷, 开局必然一片灰椭圆。 */
-      if (!(BONES[slug] && BONES[slug].ready)) continue;
-      _spawnEntries.push({ kind:'bone', key:slug, w:10 });
-    }
-    if (!_spawnEntries.length) return null;   /* 工厂全部未就绪时这一拍不刷, 避免出占位图 */
-    const twAll = _spawnEntries.reduce((s,e2) => s + e2.w, 0);
-    let rr = Math.random() * twAll, pick2 = _spawnEntries[0];
-    for (const e2 of _spawnEntries) { rr -= e2.w; if (rr <= 0) { pick2 = e2; break; } }
+    /* v5.0 121只怪池刷完则停刷(提前结算) */
+    if (G.trialSpawned >= BC.trialPool.bossAt) return null;
+    /* v7.0 顺序分波: 前10只=波1, 11-20=波2, ... 波次内同种怪, 池表定值, 非随机 */
+    const waveIdx = Math.min(11, Math.floor(G.trialSpawned / 10));
+    const entry = pool.waves[waveIdx];
+    if (!(BONES[entry.slug] && BONES[entry.slug].ready)) return null;   /* 工厂未就绪这一拍不刷(避免占位图) */
     if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
-    const e = pick2.kind === 'bone' ? makeBoneEnemy(pick2.key, G.trialTier) : makeEnemy(pick2.key, G.trialTier);   /* v3.9 三维: 小怪按当前档位缩放 */
-    e.x = G.camX + stageW() + BC.enemySpawnOffset;   /* v5.1 击杀即刷新: 小怪从屏幕右边生成, 杀一只补一只 */
+    const e = makePoolEnemy(entry, false);
+    e.x = G.camX + stageW() + BC.enemySpawnOffset;   /* v5.1 击杀即刷新: 从屏幕右边生成 */
     G.enemies.push(e);
     G.trialSpawned++;   /* v5.0 计数已刷怪序号 */
     return e;
@@ -2269,11 +2269,13 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     /* v4.6 素材过目: window.__trialFreeze = true 冻结倒计时 —— 120s 看不完 79 只怪,
      * 冻结后不会到点结算清场, 可以慢慢逐只过目。置回 false 即恢复。 */
     if (typeof window !== 'undefined' && window.__trialFreeze) return;
-    /* v6.6 BOSS关底战独立计时: 杀满120只小怪后 BOSS 出场, 120s 倒计时冻结 ——
-     * 旧逻辑 BOSS 排第121位, 实测 120s 内 DPS 只够杀 100~110 只, BOSS 永远出不了场
-     * ("BOSS 完全打不到")。现在清完小怪即进入 BOSS 战: 倒计时停在 0, 不限时,
-     * 杀死 BOSS(提前结算+60%) 或 玩家死亡(trialRestart) 自然收束。 */
-    if (G.bossActive) return;
+    /* v7.0 BOSS关底战 30s 限时: 杀满120只小怪后 BOSS 出场, 主倒计时冻结, 独立 30s ——
+     * 30s 内杀死 BOSS → 提前结算弹面板(+60% 加成); 打不死 → trialRestart 重新开始兽潮 */
+    if (G.bossActive) {
+      G.bossT -= dt;
+      if (G.bossT <= 0) { G.bossT = 0; trialRestart(); }
+      return;
+    }
     G.trialT -= dt;
     if (G.trialT <= 0) { G.trialT = 0; settleTrial(); }
   }
@@ -2339,6 +2341,7 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     G.trialT = BC.trialSecs; G.trialKills = 0; G.trialTier = 1;
     G.trialSettled = false; G.trialBossDone = false;
     G.trialSpawned = 0; G.trialBossKilled = false;   /* v5.0 重置121只怪池计数 */
+    G.bossT = 0;   /* v7.0 BOSS 30s 限时计时归零 */
     G.paused = false;
     updateHUD();
   }
