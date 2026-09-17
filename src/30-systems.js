@@ -75,7 +75,9 @@ function makeArt() {          // 四部位: 槽0兵器 1护体 2灵佩 3功法
   const slot = arts.length < 4 ? arts.length : Math.floor(Math.random() * 4);
   const tp = SLOT_TYPES[slot];
   const bi = bigIndexOf(state.realmIdx);   /* v7.2b 纯函数推算 */
-  const lv = (state.realmIdx || 0) + 1;
+  /* v7.1 FIX: lv 必须用大境界索引(bi+1), 不是 realmIdx+1。
+   * realmIdx 是小境界连续编号(炼气就13段), 直接当BIGS索引会越界→全返回凡人。 */
+  const lv = bi + 1;
   let name = artName(tp.k, q, lv);
   const art = { name, q, mult: QUALITY[q].mult, t: Date.now(), tp: tp.k, slot, lv };
   /* v7.1: 数值因子用 EQ_POW[ri](×4质变), art.lv 仅作展示/境界归属 */
