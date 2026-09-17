@@ -2362,6 +2362,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   /* 渲染 */
   let cv, ctx, CW, CH;
   const _drawList = [];   /* 复用: 避免每帧两次分配+两次排序 */
+  const _waterMat = new PIXI.Matrix();   /* 复用: 避免水精灵每帧 new Matrix */
   function stageW() { return CW; }
   function stageH() { return CH; }
   function floorY() { return CH * 0.92; }
@@ -2747,10 +2748,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         spr.texture = frameTex(G.waterSprite, WATER_SPRITE.cols, WATER_SPRITE.fw, WATER_SPRITE.fh, frameIdx);
         /* 原变换链(压缩0.92 + skewX(-0.03) 校正)线性合成 —— canvas 矩阵语义
          * x'=(dw/fw)x - 0.03·(drawH/fh)y + sx - dw/2 + 0.03·0.92·fo ; y'=(drawH/fh)y + sy - fo */
-        spr.transform.setFromMatrix(new PIXI.Matrix(
-          drawW / WATER_SPRITE.fw, 0,
+        _waterMat.set(drawW / WATER_SPRITE.fw, 0,
           -0.03 * drawH / WATER_SPRITE.fh, drawH / WATER_SPRITE.fh,
-          sx - drawW / 2 + 0.03 * 0.92 * footOffset, sy - footOffset));
+          sx - drawW / 2 + 0.03 * 0.92 * footOffset, sy - footOffset);
+        spr.transform.setFromMatrix(_waterMat);
         enemyFxGL(spr, e);
         /* 水精灵面朝左, 素材本身就是面朝左, 不需要翻转 */
         if (e.elite && e.alive) drawEliteRing(uiLayer, sx, sy, 16);

@@ -2,8 +2,6 @@
  * 应用装配（云引导/开屏门禁/启动/主循环/顶层副作用语句）
  *
  * 拓扑层 L8~L14，31 个顶层声明。
- * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
- * 重建: node tools/split2.js <repo> <out>
  */
 import { $, ARRAY_MAX_LV, BIGS, CACHE_VER, CLD_KEY, DIMSTAT, DROP_CFG, EVENTS, MAIL_CAP, MAIN_STORY, MATS, PET_BONUS, PET_COIN, PET_FORGE, PET_STILL, PLOT, QUALITY, RECIPES, SAVE_KEY, SLOT_TYPES, __set_breaking, __set_cauldron, __set_dropSaveT, __set_encNext, __set_equipId, __set_hiddenAt, __set_hudAcc, __set_selRecipe, __set_state, __set_stayLast, _dropSaveT, _dsp, _equipId, _equipQueue, _floatPrev, _hiddenAt, _hudAcc, _pred, _rate, _settling, _srvOffset, _stayLast, _syncAt, autoHuntOn, breaking, cld, cnNum, fmt, hbOk, initFxDiag, selRecipe, state } from './00-pure.js';
 import { CLD_API, TOTAL_SEGS, adopt, arrayCostNow, buffAtCap, buffHintOf, burstBoom, cldApi, cldFlash, cldId, cldUI, closeTravel, cloudSnap, cloudSoon, createFxLayer, ensureScrollFx, fitsRecipe, g1Pack, g1Unpack, hbFail, hiddenUnlocked, journalHasKey, locById, mailDot, pickNoRepeat, pushBattleStats, pushBuff, pushMsg, renderAutoHunt, renderPName, renderPillHints, searchMs, seg, settleBlocked, spiritRate, srvNow, tickDsp, traceRefresh, travelBtnLbl, zoneOfLoc } from './10-base.js';
