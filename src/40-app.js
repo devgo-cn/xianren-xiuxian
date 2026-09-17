@@ -26,7 +26,7 @@ function cldAdoptCloud(s) {
   const c = adopt(s);
   if (!c) return false;
   __set_state(c);
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { console.warn('[app] 本地存档写入失败:', e); }
   ensureScrollFx();             // v2.5: 云端旧档的功法可能没有攻速词条 → 补齐
   updateRealmUI(); updateHUD(); updateArts(); realmPlot();
   /* v1.5.0: 云端档可能没有 autoHunt / travel 字段(老档), 采纳后按钮与行迹要跟着重绘,
@@ -53,11 +53,11 @@ async function cldPull(forceImport, silent) {        // v2.1 forceImport:以云�
          * 不在此立刻推送/调 save() —— 它们会把 lastTs 刷成"现在", 吞掉随后的离线结算;
          * 改为直写本地保留云端 lastTs, 离线收益由启动门禁里的服务端结算统一处理 */
         let hadLocal = false;
-        try { hadLocal = !!localStorage.getItem(SAVE_KEY); } catch (e) {}
+        try { hadLocal = !!localStorage.getItem(SAVE_KEY); } catch (e) { console.warn('[app] 读取本地存档状态失败:', e); }
         const adopted = cldAdoptCloud(r.data);
         if (!adopted) { cldUI("off"); return false; }   // v2.3 FIX: 云端档采纳失败不得标记同步, 否则后续 cloudSettle 会用本地旧档覆盖服务器
         state._cloudTs = cs;
-        try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}
+        try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { console.warn('[app] 采纳云端档后写入本地失败:', e); }
         cld.ready = true; cld.lastOkTs = Date.now();
         if (forceImport && !silent) {
           cldFlash("已导入云端存档");
@@ -97,7 +97,7 @@ function cloudBind() {
   if (v.indexOf("dt-") === 0) v = v.slice(3);
   if (!/^[a-hjkmnpqrstuvwxyz2-9]{12}$/.test(v)) { cldFlash("请输入 12 位玩家码（道号不可寻档）"); return; }
   v = "dt-" + v;
-  try { localStorage.setItem(CLD_KEY, v); } catch (e) {}
+  try { localStorage.setItem(CLD_KEY, v); } catch (e) { console.warn('[app] 保存玩家码到本地失败:', e); }
   cld.id = v; cld.ready = false; cld.dirty = false;
   const idEl = $("cloudId"); if (idEl) idEl.textContent = v;
   cldPull(true);                     // v1.7.29: 主动绑定=导入, 以云端为权威(防止新设备本地新档覆盖云端存档)
@@ -123,7 +123,7 @@ async function bootCloud() {
   const pulled = await cldPull(true, true);   // v2.1 服务器权威模式: 启动时强制以云端存档为准覆盖本地, 静默不弹"已导入"提示
   if (!pulled) return false;                  // v2.3 FIX: 拉云端失败(网络/采纳失败)直接门禁不通过, 绝不能带着本地旧档去 cloudSettle —— 那会用旧档覆盖服务器
   let sr = null;
-  try { sr = await cloudSettle(); } catch (e) { sr = null; }
+  try { sr = await cloudSettle(); } catch (e) { console.warn('[app] bootCloud 结算异常:', e); sr = null; }
   if (!sr) return false;                       // 门禁不通过
   if (sr.settled && sr.gains && sr.gains.mode === "away") presentSettle(sr);
   cloudFlush();                                // 启动结算后尽快把建档/离线收益上云
@@ -285,7 +285,7 @@ async function bootGate() {
     if (wait[i]) await new Promise(s => setTimeout(s, wait[i]));
     splashStat(i ? `正在重连服务器…（第 ${i} 次）` : "正在连接服务器…");
     let ok = false;
-    try { ok = await bootCloud(); } catch (e) { ok = false; }
+    try { ok = await bootCloud(); } catch (e) { console.warn('[app] bootGate 第' + i + '次引导异常:', e); ok = false; }
     if (ok) return true;
   }
   return false;
@@ -321,7 +321,7 @@ function startGame() {
     ["w", "a", "p", "s"].forEach(si => { for (let q = 0; q < 6; q++) {
       const im = new Image();
       im.src = "assets/modals/art-ico/" + si + q + ".webp";
-      try { im.decode && im.decode().catch(() => {}); } catch (e) {}
+      try { im.decode && im.decode().catch(() => {}); } catch (e) { console.warn('[app] 法宝图标预热解码失败:', e); }
     } });
   }, 4000);
   addEventListener("pagehide", () => { save(); cloudFlush(); });
@@ -380,7 +380,7 @@ async function boot() {
   load();                      // v1.10.0: 先读本地档(明文 JSON 同步), 再走云端门禁
   _equipQueue.length = 0;      // 清空跨会话残留的未拾取装备掉落队列
   let passed = false;
-  try { passed = await bootGate(); } catch (e) { passed = false; }
+  try { passed = await bootGate(); } catch (e) { console.warn('[app] boot 门禁异常:', e); passed = false; }
   if (!passed) { splashFail(); return; }   // 连不通 → 停在失败页, 不进入游戏
   await splashFinish();                    // v1.9.1: 开屏彻底退场后才初始化主页(resolve 与 startGame 同一微任务链, 中间不会被渲染)
   startGame();
@@ -498,7 +498,7 @@ async function stayMailCheck() {
         updateRealmUI();
       }
     }
-  } catch (e) { clearTimeout(tm); }
+  } catch (e) { clearTimeout(tm); console.warn('[app] stayMailCheck 寄信请求失败:', e); }
 }
 
 function presentSettle(r) {
@@ -727,7 +727,7 @@ function mountStage() {
     import('../fx2d.js?v=' + CACHE_VER).then(m => {
       const real = m.createFxLayer();
       if (!real) return;
-      try { m.setOverlayMode(true); } catch (e) {}
+      try { m.setOverlayMode(true); } catch (e) { console.warn('[stage] setOverlayMode 调用失败:', e); }
       dantianLayer._real = real;
       mountDantianOverlay(stage, real);
     }).catch(e => console.error("[stage] dantian 加载失败:", e));
@@ -861,7 +861,7 @@ function pollBattleLayer(stage) {
       setTimeout(() => {
         if (!sp) return res();
         sp.classList.add("sp-out");
-        setTimeout(() => { try { sp.remove(); } catch (e) {} res(); }, 720);
+        setTimeout(() => { try { sp.remove(); } catch (e) { console.warn('[splash] 开屏DOM移除失败:', e); } res(); }, 720);
       }, 240);
     });
   };
