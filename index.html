@@ -24,25 +24,52 @@
       radial-gradient(120% 90% at 50% 8%, transparent 40%, rgba(4,8,18,.55) 100%),
       linear-gradient(180deg, rgba(5,8,18,.35), transparent 30%, transparent 70%, rgba(4,6,14,.72))}
 
-  /* ---- HUD ---- */
-  /* v2.6.1: 第一行 = 境界牌(最左) + 资源 chip(右移, 避开右上角小图标列) */
+  /* ---- HUD ----
+   * v7.5 资源栏迁入战斗区左下角(用户钦点): 顶部太挤, 战斗区底部有现成空白。
+   *   灵石/修为 = 裸文字无底板, 与右下 .big-icons 同水平带, 左右对称。
+   *   保留 v7.4 数字定宽(tabular-nums + 定宽居中): 数值跳动不外推, 实测漂移 9.7px → 0。
+   */
   .hud{position:fixed;left:0;right:0;top:0;z-index:10;
     padding:calc(8px + env(safe-area-inset-top, 0px)) 12px 0;
     display:flex;flex-direction:column;gap:2px}
-  .res-bar{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:nowrap;
-    margin-right:calc(78px + env(safe-area-inset-right, 0px))}
-  .res-chip{flex:none}
-  .res-bar .spirit{padding:3px 10px;font-size:12px}
-  .res-bar .rate{padding:3px 9px;font-size:10.5px}
-  /* v1.8.0 极窄屏(≤345px, 如 320 宽老机型): 收紧资源栏, 避免折成两行 */
-  @media (max-width:345px){
-    .res-bar{gap:3px}
-    .res-bar .spirit{padding:3px 6px;font-size:11px}
-    .res-bar .rate{padding:3px 5px;font-size:9.5px}
-    .res-bar .cloud-mini{padding:3px 6px;font-size:10.5px}
-    .atk-toggle{padding:0 6px}
+  /* 顶部 hud-row: 境界牌(左) + 弹性列 + 图标列占位(右) */
+  .hud-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;
+    gap:8px 6px;padding-left:env(safe-area-inset-left, 0px)}
+  /* 第三列: 右上角 2×2 小图标列(60px) + 右边距(8px) + 刘海安全区的占位 */
+  .hud-icons-slot{width:60px;height:60px;flex:none;pointer-events:none;
+    margin-right:calc(8px + env(safe-area-inset-right, 0px))}
+  /* 资源栏: 战斗区左下角裸文字, 与右下大图标(bottom:6px)同一水平带
+     v7.5b: 战斗地板有草地/花色纹理, 纯文字发虚 → 加极轻暗色渐变衬底(左浓右透), 保证可读性不抢画面 */
+  .res-bar{position:absolute;left:12px;bottom:9px;z-index:2;
+    display:flex;align-items:center;gap:12px;flex-wrap:nowrap;min-width:0;max-width:64%;
+    padding:3px 26px 4px 6px;margin-left:-6px;border-radius:999px;
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
+    background:linear-gradient(90deg, rgba(4,8,16,.62) 0%, rgba(4,8,16,.42) 68%, rgba(4,8,16,0) 100%);
+    pointer-events:none}
+  .res-bar .spirit,.res-bar .rate{display:flex;align-items:center;gap:4px;white-space:nowrap;
+    flex:none;line-height:1.2;font-weight:700;
+    text-shadow:0 1px 5px rgba(0,0,0,.9),0 0 10px rgba(0,0,0,.55)}
+  .res-bar .spirit{color:#9ed7b8;font-size:13px}
+  .res-bar .rate{color:#c2c9d6;font-weight:600;font-size:11px}
+  .res-bar .rate b{color:#b9c6dd;font-weight:700;font-size:13px}
+  .res-bar .rate .rl{color:#8d97a9;font-size:10.5px;font-weight:500}
+  /* 数字定宽居中: 位数变化只在预留框内伸缩, 图标/单位位置恒定 */
+  .res-bar .spirit #spirit{display:inline-block;box-sizing:border-box;text-align:center;width:5.4ch}
+  .res-bar .rate #rateText{display:inline-block;box-sizing:border-box;text-align:center;width:4.6ch}
+  /* v7.5 窄屏(≤375px): 字号微降 + 数字预留收窄, 保证一行不折 */
+  @media (max-width:375px){
+    .res-bar{left:9px;bottom:8px;gap:9px;max-width:68%}
+    .res-bar .spirit{gap:3px;font-size:12px}
+    .res-bar .spirit .sico{width:13px;height:13px}
+    .res-bar .rate{gap:2px;font-size:10px}
+    .res-bar .rate b{font-size:12px}
+    .res-bar .rate .rl{font-size:10px}
+    .res-bar .spirit #spirit{width:4.6ch}
+    .res-bar .rate #rateText{width:3.8ch}
+    .realm-badge{min-width:96px}
+    .hud-icons-slot{width:52px}
+    .hud-row{gap:6px 5px}
   }
-  .hud-row{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px}
   /* hud-row 第二行: 境界卡(左) + 按钮组(中) + hud-icons(右), grid 三列; 段位允许换行不截断 */
     .realm-left{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
   .realm-left .realm-badge{flex:none}
@@ -73,8 +100,8 @@
   @keyframes atkGlow{0%,100%{box-shadow:0 0 6px rgba(217,88,63,.28)}50%{box-shadow:0 0 13px rgba(255,140,100,.6)}}
     /* v1.9.5: 境界牌皮肤全权移交 dt-theme.css(墨简皮) —— 内联只留排版骨架, 防圆角矩形借尸还魂 */
   .realm-badge{position:relative;
-    width:150px;box-sizing:border-box;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    width:fit-content;min-width:104px;box-sizing:border-box;
+    display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;
     text-align:center}
   .realm-badge .big{font-size:16px;font-weight:800;letter-spacing:.14em;color:var(--gold);line-height:1.25;
     text-shadow:0 0 12px rgba(232,197,107,.5);white-space:nowrap;width:100%}
@@ -107,11 +134,8 @@
     box-shadow:0 12px 34px rgba(0,0,0,.5);pointer-events:auto}
   .aura-tooltip .t{font-size:10.5px;color:#93a0b8;letter-spacing:.05em}
   .hud-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
-  .spirit{background:rgba(12,18,34,.72);border:1px solid rgba(232,197,107,.3);border-radius:999px;padding:6px 12px;
-    font-size:13px;font-weight:700;color:#7fe0c3;display:flex;gap:5px;align-items:center}
-  .rate{font-size:11px;color:var(--dim);background:rgba(12,18,34,.6);padding:5px 10px;border-radius:999px}
-  .rate b{color:#8fb6ff}
-  /* v1.5.0: 旧右侧纵列(hud-stats)已并入顶部资源栏, 此选择器保留防旧存档页面残留 */
+  /* v7.4: 旧 .spirit/.rate 圆角容器样式已废除 —— 资源栏改裸文字(见顶部 .res-bar 段), 此处仅留占位说明
+     v1.5.0: 旧右侧纵列(hud-stats)已并入顶部资源栏, 此选择器保留防旧存档页面残留 */
   .hud-stats{display:contents}
 
   /* 修为进度 */
@@ -600,10 +624,8 @@
         </table>
       </div>
     </div>
-    <div class="res-bar">
-      <div class="spirit res-chip"><svg class="sico" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5 L18.5 10 L10 18.5 L1.5 10 Z" fill="#67c9ab"/><path d="M10 1.5 L10 18.5 L18.5 10 Z" fill="#b7ecda"/><path d="M10 1.5 L1.5 10 L10 10 Z" fill="#9de0c9"/></svg><span id="spirit">0</span></div>
-      <div class="rate res-chip">修为 <b id="rateText">0</b>/秒</div>
-    </div>
+    <!-- v7.5: 资源栏已迁至战斗区左下角(见 .battle-ui 内), 此处仅留图标列占位维持顶部排版 -->
+    <div class="hud-icons-slot" aria-hidden="true"></div>
   </div>
 </div>
 
@@ -636,14 +658,20 @@
   <button class="icon-btn small" id="storyBtn" onclick="openStory()" title="剧情纲目"><img src="assets/ui_icons/icon_story.webp" alt="剧情"></button>
 </div>
 
-<!-- 战斗区UI图标层：大图标(地板右下) + 顶部HUD(击杀/灵石/妖潮/倍速/状态) -->
+<!-- 战斗区UI图标层：大图标(地板右下) + 顶部HUD(击杀/妖潮/倍速/状态) + 资源栏(左下裸文字) -->
 <div class="battle-ui" id="battleUI">
   <div class="battle-hud">
     <span class="kills">击杀 <b id="battleKills">0</b></span>
-    <span class="kills">灵石 <b id="battleSpirit">0</b></span>
+    <!-- v7.5: 灵石已迁到战斗区左下角资源栏, 此处仅留隐藏锚点(供旧逻辑引用), 不再显示 -->
+    <span class="kills" style="display:none" aria-hidden="true">灵石 <b id="battleSpirit">0</b></span>
     <span class="trial" id="battleTrial">妖潮·妖群 2:00</span>
     <span class="speed" id="battleSpeed" style="display:none">×2 倍速</span>
     <span id="battleState">推进中</span>
+  </div>
+  <!-- v7.5 资源栏(灵石 + 修为): 战斗区左下角裸文字, 与右下大图标同一水平带 -->
+  <div class="res-bar">
+    <div class="spirit" title="灵石"><svg class="sico" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5 L18.5 10 L10 18.5 L1.5 10 Z" fill="#67c9ab"/><path d="M10 1.5 L10 18.5 L18.5 10 Z" fill="#b7ecda"/><path d="M10 1.5 L1.5 10 L10 10 Z" fill="#9de0c9"/></svg><span id="spirit">0</span></div>
+    <div class="rate"><span class="rl">修为</span><b id="rateText">0</b><span class="rl">/秒</span></div>
   </div>
   <div class="big-icons">
     <div class="icon-btn" id="equipChip" onclick="openEquip()" title="法宝·装备"><img src="assets/ui_icons/icon_treasure.webp" alt="宝物"></div>

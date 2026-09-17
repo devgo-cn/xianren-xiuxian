@@ -1452,8 +1452,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   /* ---------- 掉落物: 灵石/装备落在地板; 灵石飞向顶部统计区; 装备由飞行宠物拾取 ---------- */
   const QUALITY_COLOR = ['#aab2c0', '#6b9df5', '#3fc9a2', '#e0b45a', '#c08af0', '#ff5257'];
   function dropRarityColor(q) { return QUALITY_COLOR[Math.max(0, Math.min(5, q | 0))] || '#aab2c0'; }
-  function hudTarget() {                          // 顶部统计区"灵石"数字位置(canvas 局部坐标)
-    const el = document.getElementById('battleSpirit');
+  function hudTarget() {                          // 灵石飞入锚点 = 战斗区左下角资源栏的数字位置(canvas 局部坐标)
+    /* v7.5: 资源栏已从顶部统计区迁到战斗区左下角, 锚点随之改为 #spirit(总灵石) */
+    const el = document.getElementById('spirit') || document.getElementById('battleSpirit');
     if (el && cv) { const r = el.getBoundingClientRect(), c = cv.getBoundingClientRect(); return { x: r.left + r.width / 2 - c.left, y: r.top + r.height / 2 - c.top }; }
     return { x: CW * 0.5, y: 20 };
   }

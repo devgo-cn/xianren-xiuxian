@@ -70,14 +70,12 @@
   .feed-avatar .fmsg .r{color:#8f7a4d}
   .rate b,.story-sum,.j-big{color:#b9c6dd}
   .card h3{color:#d8b06a}
-  .spirit{position:relative;color:#9ed7b8;font-weight:700;display:flex;gap:4px;align-items:center;padding:3px 10px;font-size:11.5px;height:22px;
-    background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 40%22 preserveAspectRatio=%22none%22><path d=%22M12 8 C42 -2 88 16 138 2 C172 -4 198 6 200 18 C202 30 188 38 174 36 C136 44 88 30 48 38 C18 40 2 36 0 24 C-2 14 6 8 12 8 Z%22 fill=%22rgba(12,18,34,.9)%22 stroke=%22rgba(201,168,106,.28)%22 stroke-width=%221.2%22 vector-effect=%22non-scaling-stroke%22/></svg>');
-    background-size:100% 100%;background-repeat:no-repeat;
-    filter:drop-shadow(0 2px 6px rgba(0,0,0,.4))}
-  .rate{position:relative;font-size:10.5px;color:#cbd2dc;font-weight:600;display:flex;gap:3px;align-items:center;padding:3px 9px;height:22px;
-    background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 40%22 preserveAspectRatio=%22none%22><path d=%22M12 8 C42 -2 88 16 138 2 C172 -4 198 6 200 18 C202 30 188 38 174 36 C136 44 88 30 48 38 C18 40 2 36 0 24 C-2 14 6 8 12 8 Z%22 fill=%22rgba(12,18,34,.9)%22 stroke=%22rgba(201,168,106,.28)%22 stroke-width=%221.2%22 vector-effect=%22non-scaling-stroke%22/></svg>');
-    background-size:100% 100%;background-repeat:no-repeat;
-    filter:drop-shadow(0 2px 6px rgba(0,0,0,.4))}
+  /* v7.4 资源栏去容器皮: 修为/灵石改裸文字(用户钦点) —— 单薄处不留无谓留白,
+     原墨形背景(SVG data-URI)+边框+内距+固定高一并移除, 只留配色/字重/发光 */
+  .spirit{position:relative;color:#9ed7b8;font-weight:700;
+    filter:drop-shadow(0 1px 3px rgba(0,0,0,.6))}
+  .rate{position:relative;color:#c2c9d6;font-weight:600;
+    filter:drop-shadow(0 1px 3px rgba(0,0,0,.6))}
   .rate b{color:#b9c6dd;font-weight:700}
   #cloudChip{position:relative;display:flex;align-items:center;gap:4px;max-width:128px;white-space:nowrap;overflow:hidden;padding:2px 9px;font-size:10.5px;color:#cdd9e8;cursor:pointer;user-select:none;line-height:1.2;height:20px;
     background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 40%22 preserveAspectRatio=%22none%22><path d=%22M12 8 C42 -2 88 16 138 2 C172 -4 198 6 200 18 C202 30 188 38 174 36 C136 44 88 30 48 38 C18 40 2 36 0 24 C-2 14 6 8 12 8 Z%22 fill=%22rgba(12,18,34,.9)%22 stroke=%22rgba(201,168,106,.28)%22 stroke-width=%221.2%22 vector-effect=%22non-scaling-stroke%22/></svg>');
