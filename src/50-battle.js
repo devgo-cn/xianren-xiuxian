@@ -3017,18 +3017,20 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     const boxB = SPRITE_BOX_B[frameIdx] || SPRITE.fh;
     const bs = bodyH / boxH;
     const drawW = SPRITE.fw * bs;
-    /* 残影: 倍速时3道蓝色残影, 向左远去逐渐缩小变暗 */
+    /* 残影: 倍速时3道蓝色拖尾, 跟随角色移动方向逐渐远去 */
     if (G.speedMult > 1 && !p.attackAnim) {
       const ftex = frameTex(G.sprite, SPRITE.cols, SPRITE.fw, SPRITE.fh, frameIdx);
+      /* 玩家向右走, 残影在左后方拖尾; 倍速越高拖得越远 */
+      const trailDist = 30 * G.speedMult;
       for (let i = 3; i >= 1; i--) {
         const t = S.trails[i - 1];
         t.visible = true;
         t.texture = ftex;
-        t.tint = 0x88bbff;
-        const fade = 1 - (i - 1) * 0.3;
-        const shrink = 1 - (i - 1) * 0.08;
-        t.alpha = 0.22 * fade;
-        t.position.set(sx - drawW*0.35 - i * 22, sy - boxB * bs);
+        t.tint = 0x5599ff;
+        const fade = 1 - (i - 1) * 0.35;
+        const shrink = 1 - (i - 1) * 0.06;
+        t.alpha = 0.4 * fade;
+        t.position.set(sx - drawW*0.35 - i * trailDist * 0.4, sy - boxB * bs);
         t.scale.set(bs * shrink, bs * shrink);
       }
     }
