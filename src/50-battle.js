@@ -2346,11 +2346,10 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
      * （表现为 probe 里冒出 sword_goblin / 第二只同名怪，把画面糊掉）。 */
     else if (window.__skillFreeze) { G.spawnT = spawnGap; }
     else if (G.spawnT <= 0) {
-      /* v5.1 击杀即刷新: 开局同屏少于10只时按频率快速填充(0.25s/只), 达到10只后停止按频率刷,
-       * 之后靠onKill击杀即刷新补充(杀一只补一只)。避免按频率刷怪排队AOE全死光。
-       * 同屏上限12只自动停刷, 怪池121只刷完停刷。 */
+      /* v5.1 击杀即刷新: 开局同屏少于1只时按频率填充(只填1只), 之后靠onKill击杀即刷新补充。
+       * 避免按频率刷怪排队AOE全死光。同屏上限12只自动停刷, 怪池121只刷完停刷。 */
       const aliveCount = G.enemies.filter(x => x.alive && x.dying <= 0).length;
-      if (aliveCount < 10 && G.trialSpawned < BC.trialPool.bossAt) spawnWave();
+      if (aliveCount < 1 && G.trialSpawned < BC.trialPool.bossAt) spawnWave();
       G.spawnT = spawnGap;
     }
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
