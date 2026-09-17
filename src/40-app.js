@@ -525,8 +525,7 @@ function presentSettle(r) {
   if (H && H.waves) {
     const kN = H.keptCount != null ? H.keptCount : (Array.isArray(H.kept) ? H.kept.length : (H.kept || 0));
     huntRows =
-      `<div class="off-row"><span class="o-ico">${icoHunt}</span><span class="ol">巡猎 ${H.waves} 波 · 修为</span><b class="ov">+${fmt(H.exp || 0)}</b></div>` +
-      `<div class="off-row"><span class="o-ico">${icoSpi}</span><span class="ol">巡猎斩获 · 灵石</span><b class="ov jade">+${fmt(H.spirit || 0)}</b></div>`;
+      `<div class="off-row"><span class="o-ico">${icoHunt}</span><span class="ol">巡猎 ${H.waves} 波 · 灵石</span><b class="ov jade">+${fmt(H.spirit || 0)}</b></div>`;
     const bits = [`斗法 ${H.fights} 场（胜 ${H.wins} · 负 ${H.loses}）`, `秘境 ${H.mysts} 处`];
     if (kN) bits.push(`阿青收下 <b>${kN}</b> 件新宝${H.keptName ? `（${H.keptName} 等）` : ""}`);
     if (H.melted) bits.push(`<b>${H.melted}</b> 件投炉熔作灵石 +${fmt(H.meltSp || 0)}`);
