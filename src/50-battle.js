@@ -1085,7 +1085,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   };
 
   function makePlayer() {
-    return { x:0,y:laneOff(MID_LANE), lane:MID_LANE, hp:PST.hp,maxHp:PST.hp, atk:PST.atk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0,stun:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false, attackTarget:null, hit1:false, hit2:false, hit3:false, sanlianTriggered:false, atkBuff:0, atkBuffTimer:0, skillAnim:false, skillFrame:0, skillTimer:0, skillHit:false, skillCooldown:0, skillTarget:null };
+    return { x:0,y:laneOff(MID_LANE), lane:MID_LANE, hp:PST.hp,maxHp:PST.hp, atk:PST.atk,aspd:BC.playerAspd, atkRange:BC.playerAtkRange, atkT:Math.random()*0.4, anim:0,hurtT:0, walkT:Math.random()*6.28, moving:1, alive:true, animFrame:0, animTimer:0, attackAnim:false, attackTarget:null, hit1:false, hit2:false, hit3:false, sanlianTriggered:false, atkBuff:0, atkBuffTimer:0, skillAnim:false, skillFrame:0, skillTimer:0, skillHit:false, skillCooldown:0, skillTarget:null };
   }
   /* 怪物成长系统: 三围随玩家境界 lv 线性成长(怪只吃境界, 不吃装备 → 换装备=变快)。
    * v3.9 三维系统: 三围 = 境界基准 × 怪种hpK/atkK/defK × 波次tier倍率 ——
@@ -1108,7 +1108,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const r = { type:key||def.bone||'bone',name:def.name,role:def.role, elite, lane, y:laneOff(lane), x:0, hp,maxHp:hp, atk, def:dfn,
       tier:tierOverride||def.tier||1, drawH:def.drawH||0, hpBarW:def.hpBarW||0,
       atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2)*(elite?0.85:1)*spdMul, color:def.color,
-      atkT:Math.random()*0.6, anim:0,hurtT:0,stun:0, alive:true,dying:0,reach:1, animFrame:0, animTimer:0, moving:false };
+      atkT:Math.random()*0.6, anim:0,hurtT:0, alive:true,dying:0, animFrame:0, animTimer:0, moving:false };
     /* 骨骼怪: 工厂就绪时建一只独立骨架实例(每只怪动画独立推进) */
     if (def.bone) {
       const B = BONES[def.bone];
@@ -1758,7 +1758,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   function updatePlayer(dt) {
     const p = G.player;
     if (!p.alive) return;
-    p.atkT -= dt; p.anim = Math.max(0, p.anim-dt*1.5); p.hurtT = Math.max(0, p.hurtT-dt); p.stun = Math.max(0, p.stun-dt*3);
+    p.atkT -= dt; p.anim = Math.max(0, p.anim-dt*1.5); p.hurtT = Math.max(0, p.hurtT-dt);
     p.skillCooldown = Math.max(0, p.skillCooldown - dt);
 
     /* 技能动画更新 (剑气斩) */
@@ -2190,7 +2190,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
           const sk = SK_OF[e.type];
           if (sk) spawnSkillFx(e, e, sk, e.x >= p.x ? -1 : 1);
           const dmg = calcDmg(e.atk, 0.85+Math.random()*0.3, PST.def, 0);
-          p.hp -= dmg; p.hurtT = 0.25; p.stun = 0.5;
+          p.hp -= dmg; p.hurtT = 0.25;
           G.dmg.push({ x:p.x,y:p.y-40, val:dmg, crit:false, color:'#ff8a7a', t:0 });
           G.fx.push({ kind:'hitSpark', x:p.x,y:p.y-20, color:'#ff8a7a', t:0,dur:0.3 });
           if (p.hp <= 0) {
