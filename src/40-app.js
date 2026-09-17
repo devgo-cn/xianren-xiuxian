@@ -693,7 +693,6 @@ function bindBattleHooks() {                    // 战斗 IIFE 是内联脚本, 
  *
  * 战斗层是动态 import 的（见 main.js 尾部说明），所以轮询等它就绪后再插入。
  */
-const _stageLayers = { bg: null, battle: null, dantian: null };
 function mountStage() {
   if (window.__stage) return;                       // 幂等
   /* v4.1 渲染栈统一 WebGL：#stage 2D 画布已删除。
