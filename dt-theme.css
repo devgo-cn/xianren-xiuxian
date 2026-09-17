@@ -1128,17 +1128,7 @@
  * 现在整块境界牌可点, 牌右侧嵌一枚"榜"印 —— 不占资源栏, 也不撑高 HUD。
  * 注意: 上面 @media(max-width:400px) 里也有一条 .hud .realm-badge, 故本段放最后显式覆盖。 */
 .realm-badge:active{transform:scale(.985)}
-.hud .realm-badge{padding-right:34px !important}
-.hud .realm-badge .rb-rank{
-  position:absolute;right:8px;top:50%;transform:translateY(-50%);
-  width:20px;height:20px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  font-family:var(--font-brush);font-size:11.5px;line-height:1;letter-spacing:0;
-  color:#e6cf9a;background:rgba(232,197,107,.13);border:1px solid rgba(232,197,107,.42);
-  box-shadow:0 0 7px rgba(232,197,107,.16);pointer-events:none}
-@media (max-width:400px){
-  .hud .realm-badge{padding-right:30px !important}
-  .hud .realm-badge .rb-rank{right:6px;width:18px;height:18px;font-size:10.5px}
+.hud .realm-badge{padding-right:0 !important}
 }
 
 
