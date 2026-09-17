@@ -140,7 +140,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     player:null, pets:[], enemies:[], fx:[], dmg:[], drops:[], spawnT: 0,
     sprite:null, bgImg:null, spriteReady:false, bgReady:false, extraStrike:false,
     speedDodge:0, nextStrikeCrit:0,
-    petFoxSprite:null, petFoxReady:false,
+    petFoxSprite:null, petFoxReady:false, petEagleSprite:null, petEagleReady:false,
     skillSprite:null, skillReady:false,
     bossActive:false,   /* v3.8.2 打满100只小怪才刷BOSS(原10) */
     skillCall:null,          /* 技能名播报槽: 覆盖式大字快闪, {name,t,dur} */
@@ -183,6 +183,10 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   const petFoxImg = new Image();
   petFoxImg.onload = function() { G.petFoxSprite = solidify(petFoxImg); G.petFoxReady = true; };
   petFoxImg.src = 'assets/pet_fox_sheet.webp';
+  /* 灵鹰宠物 */
+  const petEagleImg = new Image();
+  petEagleImg.onload = function() { G.petEagleSprite = solidify(petEagleImg); G.petEagleReady = true; };
+  petEagleImg.src = 'assets/pet_eagle.png';
   /* 技能素材: 剑气月牙 */
   const skillImg = new Image();
   skillImg.onload = function() { G.skillSprite = skillImg; G.skillReady = true; };
@@ -2677,6 +2681,17 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         /* 向左飞: 水平镜像(素材默认朝右) —— scale.x 取负 */
         S.main.scale.set((drawW / PET_SPRITE.fw) * (pet.face === -1 ? -1 : 1), drawH / PET_SPRITE.fh);
         S.main.position.set(sx, sy);
+      }
+      /* 灵鹰 sprite 渲染 */
+      else if (G.petEagleReady && G.petEagleSprite && pet.type === 'eagle') {
+        const EAGLE_SPRITE = { cols: 10, fw: 97, fh: 80 };
+        const frameIdx = pet.flyFrame % 30;
+        const drawH = Math.min(CH * 0.35, 52);
+        const drawW = drawH * (EAGLE_SPRITE.fw / EAGLE_SPRITE.fh);
+        S.main.visible = true;
+        S.main.texture = frameTex(G.petEagleSprite, EAGLE_SPRITE.cols, EAGLE_SPRITE.fw, EAGLE_SPRITE.fh, frameIdx);
+        S.main.scale.set((drawW / EAGLE_SPRITE.fw) * (pet.face === -1 ? -1 : 1), drawH / EAGLE_SPRITE.fh);
+        S.main.position.set(sx, sy);
         /* 施法特效: lighter 柔光垫底(呼吸幅度收小) */
         if (pet.casting) {
           const pulse = 0.5 + 0.5 * Math.sin(pet.castAnim * Math.PI * 3);
@@ -3648,9 +3663,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   function init() {
     if (!initCanvas()) { setTimeout(init, 200); return; }
     G.player = makePlayer(); G.player.x = 100;
-    /* 默认宠物: 灵狐, 在玩家左上方飞行跟随 */
+    /* 默认宠物: 灵鹰, 在玩家左上方飞行跟随 */
     G.pets.push({
-      id: 'pet_fox', name: '灵狐', type: 'fox',
+      id: 'pet_eagle', name: '灵鹰', type: 'eagle',
       atk: 0, aspd: 0, atkRange: 0, hp: 999, maxHp: 999,
       offsetX: -65, offsetY: -70,
       x: 35, y: 0, atkT: 0, anim: 0, hurtT: 0, alive: true,
