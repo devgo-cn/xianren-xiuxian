@@ -3025,9 +3025,9 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
         const t = S.trails[i - 1];
         t.visible = true;
         t.texture = ftex;
-        t.alpha = (G.speedMult > 1 ? 0.12 : 0.18) * (trailCount + 1 - i) / trailCount;
-        t.position.set(sx - i * 10, sy);
-        t.scale.set(bs * (1 + i * 0.03), bs);
+        t.alpha = (G.speedMult > 1 ? 0.15 : 0.25) * (trailCount + 1 - i) / trailCount;
+        t.position.set(sx - drawW*0.35 - i * 12, sy - boxB * bs);
+        t.scale.set(bs, bs);
       }
     }
     S.main.visible = true;
