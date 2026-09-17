@@ -42,8 +42,8 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
       black_ant_queen: { name:'蚁后', role:'melee', w:42, atkRange:36, speed:85, hpK:2.8, atkK:1.0, defK:1.0, color:'#7a6ae0', bone:'black_ant_queen', drawH:116, hpBarW:36, tier:4 },
       /* v2.6 调参: hpK 80→52(实测过厚约-35%), atkRange 70→45(玩家攻距75, 贴身才能互殴, 修复"剑够不到")
        * v3.9 BOSS 换九尾狐王: giant_kitsune(S 品质, 10 种攻击动作), 骨骼渲染 drawH 110 */
-      boss:  { name:'九尾狐王', role:'ranged', w:5,  atkRange:45, speed:40, hpK:52, atkK:7.5, defK:3.0, color:'#e8b06b', isBoss:true, floatHeight:10, sizeMult:2.0, tier:5, bone:'giant_kitsune', drawH:220, hpBarW:60,
-               crit:25, dodge:10, pen:40, critRes:60 },  /* v6.5: atkK 3.0×2.5(凹曲线T10满额, 模拟器定稿); 四维面板BOSS档 */
+      boss:  { name:'九尾狐王', role:'ranged', w:5,  atkRange:45, speed:40, hpK:52, atkK:4.5, defK:3.0, color:'#e8b06b', isBoss:true, floatHeight:10, sizeMult:2.0, tier:5, bone:'giant_kitsune', drawH:220, hpBarW:60,
+               crit:25, dodge:10, pen:40, critRes:60 },  /* v6.6: atkK 3.0×1.5(凹曲线T10满额, ATK_K=1.5 定稿); 四维面板BOSS档 */
     },
     /* v3.9 怪物三维系统: 怪包统一池(每个境界都会刷到全怪种), 三维 = 境界基准 × 怪种K × 波次tier倍率。
      * 波次内从 T1 最弱一路递进到 T5 —— tier 决定刷怪池权重与三维倍率。 */
@@ -74,21 +74,22 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     },
     /* v5.1 骨骼池怪数值模板大幅上调 —— hpK控制在1.5~4.0, 小怪更耐打 */
     boneTpl: {
-      /* v6.5 数值定稿(模拟器多目标扫描): atkK 已乘凹曲线 f(t)=1+1.5*((t-1)/9)^1.6 ——
-       *   T1-T5 几乎不加压(保护新手/低境界裸装段), T8-T10 陡增(T10×2.5, 血条有来有回);
-       * 新增四维面板(网游式, 按 tier 线性):
+      /* v6.6 数值定稿(毕业档+法宝模拟, 二次扫描): atkK 已乘凹曲线 f(t)=1+0.5*((t-1)/9)^1.6
+       * (ATK_K=1.5, T10×1.5); 怪攻基数斜率 5→15(见 makeEnemyFrom)。
+       *   实测(毕业装备+法宝): 元婴~大乘最低血线 35~48%, 血条有来有回; T1-T5 保护新手段;
+       * 四维面板(网游式, 按 tier 线性):
        *   crit 暴击(怪打玩家, ×1.8) / dodge 闪避(玩家打怪 miss) /
        *   pen 破甲(怪无视玩家 def%) / critRes 暴抗(削减玩家暴击与会心率) */
       1: { hpK:1.50, atkK:0.70, defK:0.40, speed:110, crit:2,  dodge:0,   pen:0,  critRes:5  },
-      2: { hpK:1.70, atkK:0.78, defK:0.42, speed:130, crit:4,  dodge:0.9, pen:4,  critRes:11 },
-      3: { hpK:1.90, atkK:0.93, defK:0.45, speed:155, crit:6,  dodge:1.8, pen:9,  critRes:17 },
-      4: { hpK:2.20, atkK:1.16, defK:0.52, speed:140, crit:8,  dodge:2.7, pen:13, critRes:24 },
-      5: { hpK:2.50, atkK:1.48, defK:0.62, speed:120, crit:10, dodge:3.6, pen:18, critRes:30 },
-      6: { hpK:2.85, atkK:1.87, defK:0.72, speed:135, crit:12, dodge:4.4, pen:22, critRes:36 },
-      7: { hpK:3.15, atkK:2.32, defK:0.82, speed:150, crit:14, dodge:5.3, pen:27, critRes:42 },
-      8: { hpK:3.45, atkK:2.84, defK:0.92, speed:130, crit:16, dodge:6.2, pen:31, critRes:48 },
-      9: { hpK:3.75, atkK:3.41, defK:1.02, speed:110, crit:18, dodge:7.1, pen:36, critRes:54 },
-      10:{ hpK:4.00, atkK:4.13, defK:1.12, speed:125, crit:20, dodge:8,   pen:40, critRes:60 },
+      2: { hpK:1.70, atkK:0.76, defK:0.42, speed:130, crit:4,  dodge:0.9, pen:4,  critRes:11 },
+      3: { hpK:1.90, atkK:0.86, defK:0.45, speed:155, crit:6,  dodge:1.8, pen:9,  critRes:17 },
+      4: { hpK:2.20, atkK:1.00, defK:0.52, speed:140, crit:8,  dodge:2.7, pen:13, critRes:24 },
+      5: { hpK:2.50, atkK:1.19, defK:0.62, speed:120, crit:10, dodge:3.6, pen:18, critRes:30 },
+      6: { hpK:2.85, atkK:1.41, defK:0.72, speed:135, crit:12, dodge:4.4, pen:22, critRes:36 },
+      7: { hpK:3.15, atkK:1.64, defK:0.82, speed:150, crit:14, dodge:5.3, pen:27, critRes:42 },
+      8: { hpK:3.45, atkK:1.89, defK:0.92, speed:130, crit:16, dodge:6.2, pen:31, critRes:48 },
+      9: { hpK:3.75, atkK:2.15, defK:1.02, speed:110, crit:18, dodge:7.1, pen:36, critRes:54 },
+      10:{ hpK:4.00, atkK:2.48, defK:1.12, speed:125, crit:20, dodge:8,   pen:40, critRes:60 },
     },
   };
   /* v5.0 121只怪池: 按序号返回tier(T1@1-30, T2@31-60, ... T10@271-300) */
@@ -1093,7 +1094,10 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     const elite = Math.random() < DROP.eliteChance;
     const mul = tierMul(tierOverride);
     let hp  = Math.round((60 + 26*lv) * def.hpK * mul);
-    let atk = Math.round((8 + 5*lv)   * def.atkK * mul);
+    /* v6.6 怪攻基数斜率 5→15: 玩家血量随装备/法宝成长(每境×2~3), 旧斜率下怪攻成长(×2.2)跟不上,
+     * 高境界(渡劫+)血线常年 90%+ 碾压(实测)。斜率15 让怪攻与玩家面板同速 ——
+     * 各境界威胁度拉平, 中段实测血线 35~48%(模拟器毕业档定稿)。 */
+    let atk = Math.round((8 + 15*lv)  * def.atkK * mul);
     const dfn = Math.round((2 + 2*lv)   * def.defK * mul);
     if (elite) { hp = Math.round(hp*DROP.eliteHp); atk = Math.round(atk*1.2); }
     const lane = Math.random();   /* v5.0: 纵深比例 0~1 连续随机(无道) */
