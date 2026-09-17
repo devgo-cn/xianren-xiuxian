@@ -2529,11 +2529,7 @@ const TRAVEL_LATE_STEP = 7200;
 
 const TRAVEL_SPAN = 48 * 3600;
 
-const TRAVEL_SPAN_MAILS = 30;
-
 const BUFF_CAP_MS = 24 * 3600 * 1000;
-
-const PAGE_RATE = 0.25;
 
 const DAN_ZONE = ["凡尘", "炼气", "筑基", "结丹", "元婴", "化神", "炼虚", "合体", "大乘", "渡劫", "真仙", "天仙"];
 
@@ -2544,8 +2540,6 @@ let _travelReturned = false;
 let _settling = false;
 
 let _kicked = false;
-
-const MAIL_BTN_PATH = "M12 8 C28 2 44 10 62 6 C78 3 94 9 112 6 C128 3 146 8 162 5 C178 2 192 8 197 15 C200 24 197 33 194 40 C192 46 196 52 182 53 C168 55 152 49 138 53 C122 57 108 50 92 54 C76 58 60 52 46 55 C32 58 20 52 10 54 C2 54 2 46 3 38 C4 28 2 20 6 14 C8 11 10 9 12 8 Z";
 
 const DIMSTAT = { on: false, battles: 0, win: 0, spirit: 0, exp: 0, loot: [] };
 
@@ -2670,8 +2664,6 @@ function finalStats(base, flat, agg) {
   };
 }
 
-function hashRand(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; }
-
 const SKILL_MAX = 20;
 
 const SKILL_DEFS = [
@@ -2752,7 +2744,6 @@ export {
   JRN_CAP,
   JRN_TAIL,
   LIC_QCOL,
-  MAIL_BTN_PATH,
   MAIL_CAP,
   MAIN_STORY,
   MATS,
@@ -2766,7 +2757,6 @@ export {
   MYST,
   OFFLINE_CAP,
   PAGES_NEED,
-  PAGE_RATE,
   PEND_POOL,
   PET,
   PET_BONUS,
@@ -2799,7 +2789,6 @@ export {
   TRAVEL_FIRST_WINDOW,
   TRAVEL_LATE_STEP,
   TRAVEL_SPAN,
-  TRAVEL_SPAN_MAILS,
   ZONES,
   _dropSaveT,
   _dsp,
@@ -2851,7 +2840,6 @@ export {
   g1merge,
   g1prune,
   g1unb64,
-  hashRand,
   hbOk,
   initFxDiag,
   lastReadyHint,
