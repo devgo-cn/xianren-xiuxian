@@ -44,9 +44,11 @@
         });
         const cv = app.view;
         cv.id = 'battleGL';
-        /* 常态调色沿用 2D 版 #battleCanvas 的 CSS 合成层方案（GPU, 零逐帧开销）——
-         * 保持战斗画面饱和度/亮度与旧渲染一致 */
-        cv.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:1;';   /* v4.4: 移除 saturate/brightness filter, 战斗层恢复素材原色, 与打坐角色白衣亮度一致 */
+        /* v6.12 PERF: canvas 从全屏缩小到横带大小。
+         * 原来 width:100% height:100%, GPU 每帧 clear+composite 整个屏幕像素;
+         * 实际内容只在 top:92px 起的横带(约 40% 屏高), 现在 canvas CSS 定位到横带,
+         * 内部像素 buffer 也只分配横带大小, GPU 填充率直接砍 ~60%。 */
+        cv.style.cssText = 'position:fixed;left:0;top:92px;width:100%;height:300px;pointer-events:none;z-index:1;';
         document.body.appendChild(cv);
 
         root = new PIXI.Container();
@@ -101,9 +103,12 @@
          * 像素量 = (dpr×宽)×(dpr×高), 2.0 → 1.5 直接砍掉 44% GPU 填充率。
          * 1.5x 在手机屏幕上肉眼无差(行业通行做法), 换来明显降温。 */
         dpr = Math.min(global.devicePixelRatio || 1, 1.5);
-        W = global.innerWidth; H = global.innerHeight;
+        W = global.innerWidth;
+        /* v6.12: canvas 只分配横带高度, 不再全屏。横带几何由 __stageBand() 提供。 */
+        const band = (typeof global.__stageBand === 'function') ? global.__stageBand() : { top: 0, height: global.innerHeight };
+        const bandH = band.height;
         app.renderer.resolution = dpr;
-        app.renderer.resize(W, H);
+        app.renderer.resize(W, bandH);
     }
 
     /* 每帧末调用：同步横带几何并渲染。bandTop/bandH 来自 window.__stageBand()
@@ -116,10 +121,17 @@
         if (!app) return;
         _frameLog.push({ top: bandTop, h: bandH, src: src || '?', at: (performance.now() | 0) });
         if (_frameLog.length > 60) _frameLog.shift();
-        root.y = bandTop;
-        if (bandTop !== _bandTop || bandH !== _bandH || W !== _maskW || H !== _maskH) {
-            _bandTop = bandTop; _bandH = bandH; _maskW = W; _maskH = H;
-            bandMask.clear().beginFill(0xffffff).drawRect(0, bandTop, W, bandH).endFill();
+        /* v6.12: canvas 本身已定位到横带(top:92px), root 不再需要 y 偏移。
+         * 只在 bandTop/bandH 变化时更新 canvas CSS 位置和 renderer 尺寸(避免每帧 resize)。
+         * 独立模式(standalone)传 bandTop=0, canvas 从顶开始全屏。 */
+        root.y = 0;
+        const cv = app.view;
+        if (bandTop !== _bandTop || bandH !== _bandH || W !== _maskW) {
+            _bandTop = bandTop; _bandH = bandH; _maskW = W;
+            cv.style.top = bandTop + 'px';
+            cv.style.height = bandH + 'px';
+            app.renderer.resize(W, bandH);
+            bandMask.clear().beginFill(0xffffff).drawRect(0, 0, W, bandH).endFill();
         }
         bgGradSprite.x = 0; bgGradSprite.y = 0;
         bgGradSprite.width = W; bgGradSprite.height = bandH;

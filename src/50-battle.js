@@ -149,6 +149,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   /* v6.9 PERF: 粒子上限。每次命中/击杀/技能都 push 一个粒子, 同屏激烈时无上限会堆积
    * 几十个 PIXI.Sprite/Graphics, 每帧合成开销线性涨。同屏 80 个粒子已经足够特效密度。 */
   G.pushFx = function(o) { if (this.fx.length < 80) this.fx.push(o); };
+  /* v6.12 PERF: 伤害飘字上限。每条飘字一个 PIXI.Text(canvas→GPU 纹理), 同屏最多 20 个。 */
+  G.pushDmg = function(o) { if (this.dmg.length < 20) this.dmg.push(o); };
   let _hudRefreshT = 0;   /* v5.0 定期刷新HUD计时器: 打BOSS期间无击杀, 倒计时显示会卡住 */
   const _spawnEntries = [];   /* 刷怪权重池复用: 避免每次spawnWave新建数组 */
 
@@ -1601,7 +1603,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     if (!target || !target.alive) return;
     /* v6.5 怪物闪避: 玩家此段落空(不出伤害不消耗追猎), 高 tier 怪开始有 miss */
     if (Math.random()*100 < (target.dodge || 0)) {
-      G.dmg.push({ x:target.x, y:target.y-30, val:'闪', crit:false, color:'#cfd8e3', t:0 });
+      G.pushDmg({ x:target.x, y:target.y-30, val:'闪', crit:false, color:'#cfd8e3', t:0 });
       return;
     }
     /* v2.8 普攻单段: 主段(seg1)一次全额; 三连斩的 seg2/seg3 是同一轮攻击内的补刀,
@@ -1758,10 +1760,10 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       const heal = amount * PST.life / 100;
       if (heal >= 1) {
         G.player.hp = Math.min(G.player.maxHp, G.player.hp + heal);
-        G.dmg.push({ x:G.player.x, y:G.player.y-50, val:'+'+Math.round(heal), crit:false, color:'#7fffaa', t:0 });
+        G.pushDmg({ x:G.player.x, y:G.player.y-50, val:'+'+Math.round(heal), crit:false, color:'#7fffaa', t:0 });
       }
     }
-    G.dmg.push({ x:target.x,y:target.y-40, val:Math.round(amount), crit:crit||false, color:color||'#e8f2fa', t:0, vx:(Math.random()-0.5)*18 });
+    G.pushDmg({ x:target.x,y:target.y-40, val:Math.round(amount), crit:crit||false, color:color||'#e8f2fa', t:0, vx:(Math.random()-0.5)*18 });
     G.pushFx({ kind:'hitSpark', x:target.x,y:target.y-20, color:color||'#fff', t:0,dur:0.3 });
     if (target.hp <= 0) {
       target.hp=0; target.alive=false; target.dying=0.4;
@@ -2016,13 +2018,13 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
             /* 回血: 恢复20%最大生命 */
             const healAmt = Math.round(p.maxHp * 0.2);
             p.hp = Math.min(p.maxHp, p.hp + healAmt);
-            G.dmg.push({ x:p.x, y:p.y-50, val:'+'+healAmt, crit:false, color:'#7fffaa', t:0 });
+            G.pushDmg({ x:p.x, y:p.y-50, val:'+'+healAmt, crit:false, color:'#7fffaa', t:0 });
             G.pushFx({ kind:'healBurst', x:p.x, y:p.y-30, t:0, dur:0.5 });
           } else if (pet.castType === 'atk') {
             /* 加攻击: +30%攻击力, 持续6秒 */
             p.atkBuff = 0.3;
             p.atkBuffTimer = 6;
-            G.dmg.push({ x:p.x, y:p.y-50, val:'攻击+30%', crit:false, color:'#ffaa55', t:0 });
+            G.pushDmg({ x:p.x, y:p.y-50, val:'攻击+30%', crit:false, color:'#ffaa55', t:0 });
             G.pushFx({ kind:'atkBurst', x:p.x, y:p.y-30, t:0, dur:0.5 });
           }
           pet.castType = null;
@@ -2192,7 +2194,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         if (!wasAttacking) monAttackSfx(e);
         /* 闪避判定(装备词条 + 身法技能时效加成) —— 落空则不进伤害 */
         if (Math.random()*100 < ((PST.dodge || 0) + G.speedDodge)) {
-          G.dmg.push({ x:p.x,y:p.y-40, val:'闪', crit:false, color:'#9fd8ff', t:0 });
+          G.pushDmg({ x:p.x,y:p.y-40, val:'闪', crit:false, color:'#9fd8ff', t:0 });
         } else {
           /* v4.8 技能怪: 按 skills5.json 映射发一条程序化弹道。
            * 弹道纯表现层 —— 伤害仍在上面这一帧照常结算, 不参与命中判定,
@@ -2204,7 +2206,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
           const crit = Math.random()*100 < (e.crit || 0);
           const dmg = crit ? Math.round(dmg0*1.8) : dmg0;
           p.hp -= dmg; p.hurtT = 0.25;
-          G.dmg.push({ x:p.x,y:p.y-40, val:dmg, crit, color: crit ? '#ff5a3c' : '#ff8a7a', t:0 });
+          G.pushDmg({ x:p.x,y:p.y-40, val:dmg, crit, color: crit ? '#ff5a3c' : '#ff8a7a', t:0 });
           G.pushFx({ kind:'hitSpark', x:p.x,y:p.y-20, color:'#ff8a7a', t:0,dur:0.3 });
           if (p.hp <= 0) {
             /* v5.0 死亡判定: 玩家倒下后妖潮从头开始(清场+重置怪池+回满血) */
