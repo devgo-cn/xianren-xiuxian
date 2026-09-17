@@ -2480,6 +2480,7 @@ function initFxDiag() {
     };
     window.addEventListener("error", e => show("运行错误: " + (e.message || e.type)));
     setInterval(() => {
+      if (document.hidden) return;
       if (window.__fxMode === "2d") { show("特效模式: 2D 兜底 (WebGL不可用)"); window.__fxMode = null; }
       if (window.__fxErr) { show("特效错误: " + window.__fxErr); window.__fxErr = null; }
     }, 3500);
