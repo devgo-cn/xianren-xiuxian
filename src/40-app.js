@@ -649,9 +649,11 @@ function applyEquipDrop(id) {
   const i = _equipQueue.findIndex(e => e.id === id);
   if (i < 0) return { kept:false, spirit:0, name:'', q:0 };  // 幂等
   const { a, elite } = _equipQueue.splice(i, 1)[0];
-  const kept = keepArtQuiet(a);                 // 静默择优: 能顶替就换上, 不入眼熔作灵石
-  /* v6.16: 返回给战斗层——宠物头顶弹装备名/飘灵石动画 */
-  const spiritGain = kept ? Math.round(50 * Math.pow(1.6, a.q || 0)) : Math.round(40 * Math.pow(1.5, a.q || 0));
+  /* v6.16 FIX: 不自己算灵石——keepArtQuiet内部直接改state.spirit, 口径以它为准。
+   * 用 spiritBefore/after diff 拿到实际熔了多少灵石, 避免两套口径对不上。 */
+  const spiritBefore = state.spirit;
+  const kept = keepArtQuiet(a);
+  const spiritGain = state.spirit - spiritBefore;
   if (kept && a.q > (state.bestArtQ || -1)) state.bestArtQ = a.q;
   if (elite || a.q >= 3) {
     pushMsg("avatar", `${elite ? "斩一精英" : "斩妖"}得宝 <b style="color:#f0c98a">${a.name}</b>`
