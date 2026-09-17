@@ -35,8 +35,10 @@
             width: 8, height: 8,
             transparent: true, autoStart: false,
             antialias: false, resolution: 1, autoDensity: false,
-            depth: false, stencil: false,
-            preserveDrawingBuffer: false,   /* v6.11 PERF: 显式声明不保留绘图缓冲, 省 GPU 拷贝 */
+            /* v6.12 FIX: stencil 必须开——root.mask=bandMask 是 Graphics mask, 走 stencil buffer。
+             * 之前 v6.10 误关 stencil 导致 mask 失效、渲染异常卡屏。depth 不影响 2D, 可关。 */
+            depth: false, stencil: true,
+            preserveDrawingBuffer: false,
             /* v6.7 PERF: high-performance → low-power。
              * 手机 SoC 的 GPU 有大小核集群, high-performance 会强制锁大核, 是发烫主因之一。
              * 2D 骨骼动画用小核完全够, 视觉无差, 功耗显著下降。 */
