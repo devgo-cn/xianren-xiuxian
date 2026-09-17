@@ -417,15 +417,55 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         BONE_POOL[t].push(slug);
         queue.push(slug);
       }
-      /* 懒加载队列: 错峰构建工厂(每 1.5s 3 只), 就绪一只入池一只 */
+      /* ⚠️ v7.9 FIX (勿回退) —— 用户反馈"开头走个三四秒才刷一只怪"的真因:
+       * 懒加载 pump 是【每 1.5s 只加载 3 只】, 且 queue 顺序纯粹跟着 index.json 的键序走,
+       * 与实战波次毫无关系。于是:
+       *   第1波 bee / 第2波 slime_flynn 是手配怪(立即加载) → 前两只见得快;
+       *   第3波 mimic / 第4波 scorpion 排在队列第 9/10 位 → 要到第 3~4 批 ≈ 4.5s 才加载。
+       * 玩家杀完前两只后, spawnWave 因 `BONES[slug].ready === false` 一直返回 null,
+       * 只好干等着骨骼加载完 —— 这就是那"三四秒空等"。
+       *
+       * 修法: 严格按【当前境界的实战波次顺序】重排队列 —— 第1波排最前, 第2波次之...
+       * 这样 pump 每批加载的正好是"接下来几只要用的怪", 杀到第几波就有第几波的骨骼,
+       * 不再出现"杀完这只, 下一只还没加载完"的空等。
+       * 手配怪(BC.enemies 带 bone 的)本就在 pump 之前单独加载, 这里只管池里的怪。 */
+      const priority = [];
+      try {
+        const tierNow = Math.min(5, Math.max(1, PST.lv || 1));   /* 当前大境界 */
+        const seen = new Set();
+        /* ① 当前境界的波次顺序(池表的 waves 就是实战顺序, 直接照抄) */
+        const poolsNow = MOB_POOLS[tierNow] || MOB_POOLS[1];
+        for (const w of (poolsNow.waves || [])) {
+          if (w && w.slug && queue.includes(w.slug) && !seen.has(w.slug)) { seen.add(w.slug); priority.push(w.slug); }
+        }
+        if (poolsNow.boss && queue.includes(poolsNow.boss.slug)) { seen.add(poolsNow.boss.slug); priority.push(poolsNow.boss.slug); }
+        /* ② 再补本境界 tier 组里剩下的怪 */
+        for (const slug of (BONE_POOL[tierNow] || [])) {
+          if (queue.includes(slug) && !seen.has(slug)) { seen.add(slug); priority.push(slug); }
+        }
+        /* ③ 其余境界按 tier 升序兜底 */
+        for (let ti = 1; ti <= 5; ti++) {
+          if (ti === tierNow) continue;
+          for (const slug of (BONE_POOL[ti] || [])) {
+            if (queue.includes(slug) && !seen.has(slug)) { seen.add(slug); priority.push(slug); }
+          }
+        }
+      } catch (err) {}
+      /* 若 grouping 没覆盖全(异常情况), 用原队列补齐, 保证一只都不漏 */
+      const ordered = priority.length
+        ? [...priority, ...queue.filter(s => !priority.includes(s))]
+        : queue;
+      /* 懒加载队列: 错峰构建工厂(每 1.5s 3 只), 就绪一只入池一只。
+       * v7.9: 走 ordered(本境界优先)而非原始 index.json 顺序, 避免"下一波怪还没加载完"。 */
       let i = 0;
       const pump = setInterval(() => {
-        const batch = queue.slice(i, i + 3); i += 3;
+        const batch = ordered.slice(i, i + 3); i += 3;
         for (const slug of batch) {
           const cfg = idx[slug];
+          if (!cfg) continue;
           loadBone(slug, { ske:`assets/db/monsters/${slug}/ske.json`, tex:`assets/db/monsters/${slug}/tex.json`, img:`assets/db/monsters/${slug}/tex.webp` }, cfg.armature, cfg.anims);
         }
-        if (i >= queue.length) clearInterval(pump);
+        if (i >= ordered.length) clearInterval(pump);
       }, 1500);
     }).catch(err => console.error('[battle] monsters/index.json 加载失败', err));
   })();
@@ -1317,9 +1357,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       if (!BONES[pool.boss.slug] || !BONES[pool.boss.slug].ready) return null;
       if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
       const e = makePoolEnemy(pool.boss, true);
-      /* v7.8: BOSS 同样改为可视区右缘内侧生成(原 camX+stageW()+40 在屏外, 要等它走进来)。
-       * BOSS 体型大(220px 高), 比小怪晚一点也无妨, 但没必要让玩家对着空场等。 */
-      e.x = G.camX + stageW() * 0.92;
+      e.x = G.camX + stageW() + BC.enemySpawnOffset;
       e.lane = MID_LANE; e.y = laneOff(MID_LANE);   /* BOSS 固定中道, 突出存在感 */
       G.enemies.push(e);
       G.bossActive = true;
@@ -1337,21 +1375,22 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
     const e = makePoolEnemy(entry, false);
     /* ⚠️ v7.8 FIX (勿回退) —— 刷怪"要走好几秒才看得到"的根因:
-     * 相机把玩家锁在屏幕 42% 处(见 updateCamera: targetCam = player.x - stageW()*0.42),
-     * 所以玩家在屏幕上的位置恒为 stageW()*0.42 ≈ 173px(412 宽机型)。
-     * 旧逻辑把怪生成在 camX + stageW() + 40 = 屏幕 x 452 → 完全在可视区(0~412)之外,
-     * 必须先走完 452→412 这段【屏幕外】路程才露头, 玩家看到的就是"空的等好几秒"。
+     * 【v7.8 修正】设计意图(用户明确): 砍死一只 → 刷新一只, 同屏基本只有 1 只。
+     * 所以 spawnWave 的生成点【保持原样】(从屏幕右侧外一点生成, 让怪"走进来"有推进感),
+     * 只是把开局的"入场空等"修掉 —— 见下方 firstWave 特判。
+     *   e.x = camX + stageW() + 40  → 屏幕 x 452(可视区 0~412), 屏外 40px
+     *   该值本身是设计的一部分, 不要改成屏内生成(会造成"凭空出现"且与"补一只"节奏冲突)。 */
+    e.x = G.camX + stageW() + BC.enemySpawnOffset;
+    /* ⚠️ v7.8 FIX —— 用户反馈的"开头走个三四秒才出现一只怪":
+     * 开局那一刻 camX 还是 0 且玩家在 x=100, 相机尚未收敛到 player.x-173;
+     * 同时场上一只怪都没有, spawnT 从 0 起算要等 0.25s 才首次生成,
+     * 生成后怪又要从屏幕外 452 走到玩家面前 ≈250px 才被看见 —— 叠加就是三四秒的空场。
      *
-     * v7.1 曾用 `trialSpawned <= 1` 只修了开局前两只, 第 3 只起又退回屏外生成 ——
-     * 而且 aliveCount<1 才补怪的机制让怪总是一只只从屏外踱进来, 场上长期显得空荡。
-     *
-     * 正确做法: 生成点就落在【可视区右边缘内侧】, 玩家立刻看得见它入场。
-     *   spawnScreenX = stageW()*0.92  → 刚进画面右缘, 仍有"从右边走来"的方向感
-     *   (不是凭空出现在中间), 但不再有屏幕外空走时间。 */
-    const spawnScreenX = stageW() * 0.92;
-    e.x = G.camX + spawnScreenX;
-    /* 开局前两只再靠前一点(75% 处), 让进游戏第一眼就有怪在近处, 衔接更紧 */
-    if (G.trialSpawned <= 1) e.x = G.camX + stageW() * 0.75;
+     * 修法(只动开局, 不动稳态): 本场第一只怪(spawned 0)直接生成在玩家前方不远处,
+     * 玩家一进游戏就看见怪在眼前; 第 2 只起恢复"从屏幕右边走进来", 节奏与设计一致。 */
+    if (G.trialSpawned === 0) {
+      e.x = (G.player ? G.player.x : 100) + stageW() * 0.30;   /* 玩家前方约 124px 处, 屏内可见 */
+    }
     G.enemies.push(e);
     G.trialSpawned++;
     return e;
@@ -2449,17 +2488,12 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
      * （表现为 probe 里冒出 sword_goblin / 第二只同名怪，把画面糊掉）。 */
     else if (window.__skillFreeze) { G.spawnT = spawnGap; }
     else if (G.spawnT <= 0) {
-      /* ⚠️ v7.8 FIX (勿回退) —— 场上"一直只有 1 只怪、看着很空"的根因:
-       * b80bbf2 把这里的门槛从 `< 10` 改成 `< 1`(提交信息"开局只填1只怪"),
-       * 含义变成【只有场上彻底空了才补怪】。于是玩家杀一只→补一只, 同屏恒为 1 只,
-       * BC.maxAlive=12 形同虚设, 视觉上就是"打完一只对着空场等下一只"。
-       * 注意 onKill 里已有一份"击杀即刷新"补怪, 两者门槛必须一致, 否则互相掣肘。
-       *
-       * 恢复为填充到 OPENING_FILL 只(低于 maxAlive, 留出余量): 开局与清场后都会
-       * 快速铺开一小片怪, 既有"兽潮"的密度感, 又不会一次堆满 12 只把 AOE 收益打爆。
-       * 该值可用 window.__openFill 临时调整, 便于手感调试。 */
-      const OPENING_FILL = (typeof window !== 'undefined' && window.__openFill) || 6;
-      if (aliveCount < OPENING_FILL && G.trialSpawned < BC.trialPool.bossAt) spawnWave();
+      /* ⚠️ v7.8/v7.9 定案 —— 设计意图(用户明确): 同屏基本只留 1 只, 砍死一只→刷新一只。
+       * 曾误判 `< 1` 是 bug 并改成填充 6 只, 结果出现"一波十几只、一刀全秒"的过密场面,
+       * 与设计冲突, 现已改回。这里的 `< 1` 是【刻意】的: 只在场上彻底空了才补,
+       * 与 onKill 里的"击杀即刷新"互为兜底(正常路径靠 onKill 补, 这里防漏)。
+       * 不要把它改成 >1 的填充值。 */
+      if (aliveCount < 1 && G.trialSpawned < BC.trialPool.bossAt) spawnWave();
       G.spawnT = spawnGap;
     }
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
