@@ -922,7 +922,6 @@ renderAutoHunt();
 function debugEncounter() {
   if (BTL || MYST) { pushMsg("main", "正在斗法/探秘中，且待收场。"); return; }
   closeTravel();
-  // fireEvent();                           // 文字巡猎已废(空 stub), 注释留档 —— 战斗已迁至动画战斗区
   pushMsg("main", "文字斗法已撤，妖物都在下方战斗区里 —— 看着打便是。");
 }
 
