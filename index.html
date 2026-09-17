@@ -381,7 +381,7 @@
   /* v5.2 妖潮结算: 小卡片+遮罩, 5秒自动消失 */
   .trial-toast{position:fixed;inset:0;z-index:35;display:none;align-items:center;justify-content:center;pointer-events:none}
   .trial-toast.show{display:flex;pointer-events:none}
-  .trial-toast .tt-card{background:linear-gradient(180deg,#101a30,#0a1122);border:1px solid rgba(232,197,107,.35);border-radius:14px;padding:14px 22px;min-width:220px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.5)}
+  .trial-toast .tt-card{background:rgba(10,17,34,.7);border:1px solid rgba(232,197,107,.25);border-radius:14px;padding:14px 22px;min-width:220px;text-align:center;backdrop-filter:blur(4px)}
   .trial-toast .tt-title{color:var(--gold);font-size:15px;letter-spacing:.14em;margin-bottom:8px}
   .trial-toast .tt-rows{display:flex;flex-direction:column;gap:4px}
   .trial-toast .tt-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--dim)}
