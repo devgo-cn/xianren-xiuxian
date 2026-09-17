@@ -3229,10 +3229,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         const fadeIn = Math.min(1, kx / 0.20), fadeOut = Math.min(1, (1 - kx) / 0.35);
         o.spr.alpha = f.a0 * Math.min(fadeIn, fadeOut);
         o.spr.tint = tintToInt(f.rgb);
-        window.__skDrawn = (window.__skDrawn || 0) + 1;
-        window.__skLast = { sk: f.sk, tex: f.tex, x: Math.round(px), y: Math.round(py),
-                            L: Math.round(L), W: Math.round(W), a: +o.spr.alpha.toFixed(2),
-                            parented: !!o.spr.parent, visShared: fxC.visible };
       } else if (f.kind === 'sweep') {                    // 横扫千军: 一道贴地弧光(兜底)
         g.lineStyle(2.5, colorInt(f.color), (1-k)*0.9);
         g.arc(0, 0, 18 + k*46, -Math.PI*0.15, Math.PI*0.42);
