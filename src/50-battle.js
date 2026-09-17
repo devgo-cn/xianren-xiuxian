@@ -3219,11 +3219,12 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       } else if (f.kind === 'speedBurst') {
         /* 身法触发: 速度爆发 —— 冲击波圆环 + 向后气流线 + 粒子飞溅(原 shadowBlur 略去) */
         g.position.set(sx, fy - 25);
+        const fc = colorInt(f.color);
         /* 冲击波圆环: 从中心向外扩散 */
-        g.lineStyle(2, colorInt(f.color), (1-k) * 0.6);
+        g.lineStyle(2, fc, (1-k) * 0.6);
         g.drawCircle(0, 0, 5 + k*35);
         /* 向后气流线: 8条, 从中心向后扩散 */
-        g.lineStyle(1.8, colorInt(f.color), (1-k) * 0.9);
+        g.lineStyle(1.8, fc, (1-k) * 0.9);
         for (let i=0; i<8; i++) {
           const ang = Math.PI + (i/7 - 0.5) * 1.2;  /* 向后扇形扩散 */
           const r1 = 3 + k*8, r2 = 12 + k*40;
@@ -3232,7 +3233,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         }
         /* 粒子飞溅: 6个小光点向后飞 */
         g.lineStyle(0);
-        g.beginFill(colorInt(f.color), (1-k) * 0.7);
+        g.beginFill(fc, (1-k) * 0.7);
         for (let i=0; i<6; i++) {
           const ang = Math.PI + (Math.random()-0.5)*1.5;
           const r = 8 + k*45;
