@@ -2704,13 +2704,15 @@ const SKILL_DEFS = [
     from: { threshold: 5 },                to: { threshold: 25 },
     fmt: v => `目标残血 <b>${v.threshold.toFixed(0)}%</b> 以下 · 该击伤害翻倍` },
   { id: "jifeng",  name: "疾风步", ico: "≫",
-    from: { chance: 5, dur: 4, mult: 3, dodge: 4 },   to: { chance: 65, dur: 8, mult: 3, dodge: 25 },
-    /* v5.0 实际mult=3(基础2隐藏+技能1), 说明显示"2倍速"是玩家感知的技能加成 */
-    fmt: v => `击杀 ${v.chance.toFixed(0)}% 入 2 倍速 ${v.dur.toFixed(0)} 秒 · <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
+    from: { chance: 15, dur: 6, mult: 3, dodge: 4 },   to: { chance: 85, dur: 10, mult: 3, dodge: 25 },
+    /* v5.0 实际mult=3(基础2隐藏+技能1), 说明显示"2倍速"是玩家感知的技能加成
+     * v5.1 触发方式从击杀后改为攻击时(playerStrike), 文案"击杀"→"命中"; 概率时长大幅上调 */
+    fmt: v => `命中 ${v.chance.toFixed(0)}% 入 2 倍速 ${v.dur.toFixed(0)} 秒 · <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
   { id: "suodi",   name: "缩地成寸", ico: "⋙",
-    from: { chance: 0.5, dur: 2, mult: 4, dodge: 8 }, to: { chance: 12, dur: 4, mult: 4, dodge: 40 },
-    /* v5.0 实际mult=4(基础2隐藏+技能2), 说明显示"3倍速"是玩家感知的技能加成 */
-    fmt: v => `击杀 ${v.chance.toFixed(1)}% 入 3 倍速 ${v.dur.toFixed(0)} 秒 · <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
+    from: { chance: 3, dur: 4, mult: 4, dodge: 8 }, to: { chance: 35, dur: 8, mult: 4, dodge: 40 },
+    /* v5.0 实际mult=4(基础2隐藏+技能2), 说明显示"3倍速"是玩家感知的技能加成
+     * v5.1 触发方式从击杀后改为攻击时(playerStrike), 文案"击杀"→"命中"; 概率时长大幅上调 */
+    fmt: v => `命中 ${v.chance.toFixed(1)}% 入 3 倍速 ${v.dur.toFixed(0)} 秒 · <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
   { id: "pojia",   name: "破甲击", ico: "◆",
     from: { chance: 5, pen: 30 },          to: { chance: 25, pen: 70 },
     fmt: v => `命中 ${v.chance.toFixed(0)}% 无视目标 <b>${v.pen.toFixed(0)}% 防御</b>` },
