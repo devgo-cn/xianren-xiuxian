@@ -2361,6 +2361,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
 
   /* 渲染 */
   let cv, ctx, CW, CH;
+  const _drawList = [];   /* 复用: 避免每帧两次分配+两次排序 */
   function stageW() { return CW; }
   function stageH() { return CH; }
   function floorY() { return CH * 0.92; }
@@ -2660,20 +2661,14 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     spr.alpha = (e.dying > 0 ? Math.max(0, e.dying / 0.4) : 1) * (e.hurtT > 0 ? 0.7 : 1);
     spr.filters = e.hurtT > 0 ? [window.BattleGL.Filters.hurt] : null;
   }
-  function drawEnemies(laneFilter, batch) {
+  function drawEnemies(startIdx, endIdx, batch) {
     const batchC = window.BattleGL.layers[batch === 'near' ? 'near' : 'far'];
     const uiLayer = batch === 'near' ? 'nearUI' : 'farUI';
     /* v5.0 同层内按纵深排序绘制(近盖远): 原按数组顺序画, 同层怪互相重叠时
      * 遮挡关系取决于入队顺序而非前后位置。地面已是连续纵深, 直接按 y 降序
      * (y 大 = 靠屏幕下方 = 更近 = 后画) 即为正确的画家顺序。 */
-    const list = [];
-    for (const e of G.enemies) {
-      if (laneFilter && !laneFilter(e)) continue;
-      if (!e.alive && e.dying <= 0) continue;
-      list.push(e);
-    }
-    list.sort((a, b) => (a.y || 0) - (b.y || 0));
-    for (const e of list) {
+    for (let li = startIdx; li < endIdx; li++) {
+      const e = _drawList[li];
       const sx = worldToScreen(e.x); const sy = floorY() + e.y;   /* v3.7: 怪站自己的车道 */
       /* v3.9 通用骨骼怪分支(链最前): 所有带 armature 的怪 —— 鼠妖/僵尸/妖狐/…/骨骼BOSS 统一走这。
        * 体型缩放用 idle 基准高(BONES.baseH 建厂时测定, 避免动画间呼吸式缩放);
@@ -3386,9 +3381,18 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* v5.0 分层切换点加半身位迟滞: 怪与玩家纵深几乎相同(同一水平线)时判为远景,
      * 避免怪恰好站在玩家所在线上时把玩家整个盖住 —— 玩家永远可见。 */
     const splitY = G.player.y + laneGap() * 0.5;
-    drawEnemies(e => e.y < splitY, 'far');
+    /* 复用 _drawList: 全量填充+排序一次, 再按 splitY 分界分 far/near 两段绘制 */
+    _drawList.length = 0;
+    for (const e of G.enemies) {
+      if (!e.alive && e.dying <= 0) continue;
+      _drawList.push(e);
+    }
+    _drawList.sort((a, b) => (a.y || 0) - (b.y || 0));
+    let splitIdx = 0;
+    while (splitIdx < _drawList.length && (_drawList[splitIdx].y || 0) < splitY) splitIdx++;
+    drawEnemies(0, splitIdx, 'far');
     drawPlayerSprite(); drawPets();
-    drawEnemies(e => e.y >= splitY, 'near');
+    drawEnemies(splitIdx, _drawList.length, 'near');
     drawForeground(); drawDrops();
     drawFx(); drawDmg(); drawSkillCall();
     if (labActive()) drawLabOverlay();
