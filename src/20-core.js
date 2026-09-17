@@ -128,7 +128,7 @@ function updateRealmUI() {
   if (cult0) {
     const c = r.color || "#e8c56b";
     const n = parseInt(c.slice(1), 16);
-    cult0.style.setProperty("--rg", `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},.5)`);
+    cult0.style.setProperty("--rg", `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},.25)`);
   }
 }
 

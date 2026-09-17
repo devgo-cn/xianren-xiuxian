@@ -183,7 +183,7 @@ function draw(dt) {
    *    不是自己发光。alpha 一高整块就糊成平光，单峰就没了。
    *    ⚠️ v3.4 丹田翻倍后外晕也跟着翻倍，但 alpha 不跟着调高：
    *       半径大了本来就更容易糊，保持中心 0.16 才守得住单峰。 */
-  const haloR = R * hk * (0.94 + 0.06 * Math.sin(t * 0.55));
+  const haloR = R * hk * (0.88 + 0.12 * Math.sin(t * 0.55));
   const g0 = ctx.createRadialGradient(cx, cy, 0, cx, cy, haloR);
   g0.addColorStop(0.00, `rgba(${oc[0]},${oc[1]},${oc[2]},0.16)`);
   g0.addColorStop(0.40, `rgba(${oc[0]},${oc[1]},${oc[2]},0.065)`);
@@ -194,7 +194,7 @@ function draw(dt) {
 
   /* 2. 丹体：凝实的轮缘，呼吸比外晕快一档、相位错开 1.1，避免"整团一起胀"。
    *    半径收在 coreR 内，保证亮度集中、外缘快速衰减。 */
-  const bodyR = coreR * (0.96 + 0.10 * Math.sin(t * 0.9 + 1.1));
+  const bodyR = coreR * (0.92 + 0.16 * Math.sin(t * 0.9 + 1.1));
   const g1 = ctx.createRadialGradient(cx, cy, 0, cx, cy, bodyR);
   g1.addColorStop(0.00, `rgba(${cc[0]},${cc[1]},${cc[2]},0.70)`);
   g1.addColorStop(0.30, `rgba(${cc[0]},${cc[1]},${cc[2]},0.34)`);

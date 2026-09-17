@@ -217,11 +217,10 @@
   /* 头发两层: .hair-top(头/鬓 0-18%)静止且不发光; .hair-low(垂发 18%+)以分界为轴缩放并带呼吸辉光 */
   .cult .hair-top{clip-path:inset(0 0 82% 0);-webkit-clip-path:inset(0 0 82% 0);filter:none}
   .cult .hair-low{clip-path:inset(18% 0 0 0);-webkit-clip-path:inset(18% 0 0 0);
-    transform-origin:50% 18%;animation:hairLowBreath 5.4s ease-in-out .4s infinite, cultGlow 3.6s ease-in-out .15s infinite}
+    transform-origin:50% 18%;animation:cultGlow 3.6s ease-in-out .15s infinite}
   @keyframes bodyBreath{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.012)}}
   @keyframes robeBreath{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.02)}}
-  @keyframes hairLowBreath{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.02)}}
-  @keyframes cultGlow{0%,100%{filter:drop-shadow(0 0 3px var(--rg,rgba(232,197,107,.5))) drop-shadow(0 0 10px var(--rg,rgba(232,197,107,.5)))}50%{filter:drop-shadow(0 0 8px var(--rg,rgba(232,197,107,.6))) drop-shadow(0 0 26px var(--rg,rgba(232,197,107,.6)))}}
+  @keyframes cultGlow{0%,100%{filter:drop-shadow(0 0 2px var(--rg,rgba(232,197,107,.25))) drop-shadow(0 0 6px var(--rg,rgba(232,197,107,.25)))}50%{filter:drop-shadow(0 0 5px var(--rg,rgba(232,197,107,.3)))} drop-shadow(0 0 14px var(--rg,rgba(232,197,107,.3)))}}
   /* v5.0 阿青(青丘灵狐): 打坐角色左下方蒲团边, 模型做好后替换 assets/pet_ahqing.webp */
   .pet-ahqing{position:absolute;left:calc(50% - 28vh);bottom:0;height:min(13vh,100px);aspect-ratio:1;pointer-events:none;z-index:6}
   .pet-ahqing img{width:100%;height:100%;object-fit:contain;animation:petIdle 3.2s ease-in-out infinite}
