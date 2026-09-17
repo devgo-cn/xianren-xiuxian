@@ -632,6 +632,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (G.enemies) { for (const e of G.enemies) { e.alive = false; e.dying = 0; } G.enemies.length = 0; }
     if (G.drops) G.drops.length = 0;
     if (G.fx) G.fx.length = 0;
+    SK_LIVE.length = 0;   /* 同步清掉技能弹道活引用, 否则 G.fx 清空后 SK_LIVE 成悬空 */
     if (G.dmg) G.dmg.length = 0;
     if (G.pets) G.pets.length = 0;
   }
