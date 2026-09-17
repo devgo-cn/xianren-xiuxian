@@ -18,7 +18,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   const BC = {
     /* 占位怪 demon(妖将)/raptor(妖弓) 已移除 —— 只保留两种有真实素材的怪 */
     playerAtkRange: 75, playerAspd: 1.1, playerSpeed: 42,   /* v4.4: 基础移速 28→42 (×1.5), 走得太慢 */
-    spawnInterval: 1.5, enemySpawnOffset: 40, maxAlive: 12, queueGap: 34,   /* v5.0 妖潮分批: 1.5s/批×5只=90s刷完300只, 留30s打BOSS; 同屏12(平衡性能) */
+    spawnInterval: 0.3, enemySpawnOffset: 40, maxAlive: 12, queueGap: 34,   /* v5.0 按频率刷怪: 0.3s/只×300只=90s刷完, 留30s打BOSS; 用原始dt不受倍速影响 */
     /* v4.6 素材过目模式(当前默认开启, 过目完把 DEFAULT_MUL 那两行删掉即恢复线上节奏):
      *   window.__enemySpeedMul —— 怪移速倍率(0.35 = 慢慢挪, 便于逐只端详)
      *   window.__spawnSlowMul   —— 刷怪间隔倍率(2.5 = 刷得更稀, 一只一只来)
@@ -1288,8 +1288,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (G.trialSpawned >= BC.trialPool.bossAt) return null;
     /* BOSS活跃时不刷新小怪 */
     if (G.bossActive) return null;
-    /* v5.0 BOSS = 第301只, 300只普通怪刷完后出现, 一轮只出一次 */
-    if (G.trialSpawned >= BC.trialPool.totalMobs && !G.trialBossDone) {
+    /* v5.0 BOSS = 第301只, 300只普通怪刷完后出现, 一轮只出一次。
+     * 双重保护: trialBossDone标记 + 场上已有存活BOSS检查, 防止因同屏满/时序问题刷出两只 */
+    if (G.trialSpawned >= BC.trialPool.totalMobs && !G.trialBossDone && !G.enemies.some(e => e.type === 'boss' && e.alive)) {
       if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
       const e = makeEnemy('boss');
       e.x = G.camX + stageW() + BC.enemySpawnOffset;
@@ -2328,7 +2329,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     const aliveEnemies = G.enemies.filter(e => e.alive && e.dying<=0);
     const newState = aliveEnemies.length > 0 ? 'fight' : 'walk';
     if (newState !== G.state) { G.state = newState; updateHUD(); }
-    G.spawnT -= sdt;
+    G.spawnT -= dt;   /* v5.0 刷怪频率用原始dt, 不受身法倍速影响 —— 倍速只加战斗节奏不加刷怪密度 */
     /* v4.6 刷怪间隔旋钮: window.__spawnSlowMul(默认 1) —— 调大则刷得更稀, 便于逐只端详。 */
     const spawnGap = BC.spawnInterval * ((typeof window !== 'undefined' && window.__spawnSlowMul) || 1);
     if (G.trialSettled) { G.spawnT = spawnGap; }   /* 结算面板期间停刷怪 */
@@ -2336,12 +2337,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
      * （表现为 probe 里冒出 sword_goblin / 第二只同名怪，把画面糊掉）。 */
     else if (window.__skillFreeze) { G.spawnT = spawnGap; }
     else if (G.spawnT <= 0) {
-      /* v5.0 妖潮分批刷怪: 每批5只, 1.5s/批 → 90s刷完300只, 留30s打BOSS。
+      /* v5.0 按频率刷怪: 每次1只, 0.3s/只 → 90s刷完300只, 留30s打BOSS。
        * 同屏满了自动停刷(玩家清得慢就不会无限堆), BOSS只出1只。 */
-      for (let i = 0; i < 5; i++) {
-        if (G.trialSpawned >= BC.trialPool.bossAt) break;
-        spawnWave();
-      }
+      if (G.trialSpawned < BC.trialPool.bossAt) spawnWave();
       G.spawnT = spawnGap;
     }
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
