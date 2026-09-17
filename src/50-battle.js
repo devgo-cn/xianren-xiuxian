@@ -1393,15 +1393,27 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     /* v2.5 BOSS 专属产出: 灵石在精英倍率上再 ×8 */
     const sp = Math.max(1, Math.round((DROP.spiritBase + DROP.spiritPerLv*(PST.lv||1)) * jitter * mul * (isBoss ? 8 : 1)));
     /* 黑屏挂机统计 */
-    if (DIMSTAT.on) { DIMSTAT.battles++; DIMSTAT.win++; DIMSTAT.spirit += sp; }
-    spawnSpiritDrop(e, sp, e.elite);                       // 灵石落在地板, 隔1~2秒飞向顶部统计区
-    /* 装备掉落: 先在游戏侧 roll 出具体部件(图标/品质), 由飞行宠物飞去拾取入包
-     * v2.5 BOSS 必掉一件(品质照常按境界权重 roll, 不保底——BOSS 刷新频繁, 保底会灌金装) */
-    try {
-      const eq = (window.BattleAPI && window.BattleAPI.requestEquipDrop)
-        ? window.BattleAPI.requestEquipDrop({ elite: !!e.elite, boss: isBoss, enemy: e.name }) : null;
-      if (eq) spawnEquipDrop(e, eq);
-    } catch (err) {}
+    if (DIMSTAT.on) {
+      DIMSTAT.battles++; DIMSTAT.win++; DIMSTAT.spirit += sp;
+      /* 黑屏: 跳过掉落动画, 灵石直接入账, 装备直接入包 */
+      G.spirit += sp;
+      try { if (window.BattleAPI.onDrop) window.BattleAPI.onDrop({ spirit: sp, elite: !!e.elite, enemy: e.name }); } catch (err) {}
+      try {
+        const eq = (window.BattleAPI && window.BattleAPI.requestEquipDrop)
+          ? window.BattleAPI.requestEquipDrop({ elite: !!e.elite, boss: isBoss, enemy: e.name }) : null;
+        if (eq) {
+          DIMSTAT.loot.push({ n: eq.name || eq.n || '装备', q: eq.q || 0, qn: (eq.qn || ''), slot: (eq.slot || '') });
+          if (window.BattleAPI.onDrop) window.BattleAPI.onDrop({ equip: eq, enemy: e.name });
+        }
+      } catch (err) {}
+    } else {
+      spawnSpiritDrop(e, sp, e.elite);
+      try {
+        const eq = (window.BattleAPI && window.BattleAPI.requestEquipDrop)
+          ? window.BattleAPI.requestEquipDrop({ elite: !!e.elite, boss: isBoss, enemy: e.name }) : null;
+        if (eq) spawnEquipDrop(e, eq);
+      } catch (err) {}
+    }
     skExpAll(isBoss ? 30 : 2);         // 每杀全体技能+2; BOSS 击杀全体+30
     const zl = skVal('zhuilie');       // 追猎: 击杀后立刻再出手一次, 衔尾一击暴击率大增
     if (zl && Math.random()*100 < zl.chance) {
