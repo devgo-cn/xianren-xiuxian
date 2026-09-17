@@ -18,7 +18,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   const BC = {
     /* 占位怪 demon(妖将)/raptor(妖弓) 已移除 —— 只保留两种有真实素材的怪 */
     playerAtkRange: 75, playerAspd: 1.1, playerSpeed: 42,   /* v4.4: 基础移速 28→42 (×1.5), 走得太慢 */
-    spawnInterval: 1.5, enemySpawnOffset: 40, maxAlive: 20, queueGap: 34,   /* v5.0 妖潮分批: 1.5s/批×5只=90s刷完300只, 留30s打BOSS; 同屏9→20 */
+    spawnInterval: 1.5, enemySpawnOffset: 40, maxAlive: 12, queueGap: 34,   /* v5.0 妖潮分批: 1.5s/批×5只=90s刷完300只, 留30s打BOSS; 同屏12(平衡性能) */
     /* v4.6 素材过目模式(当前默认开启, 过目完把 DEFAULT_MUL 那两行删掉即恢复线上节奏):
      *   window.__enemySpeedMul —— 怪移速倍率(0.35 = 慢慢挪, 便于逐只端详)
      *   window.__spawnSlowMul   —— 刷怪间隔倍率(2.5 = 刷得更稀, 一只一只来)
@@ -122,11 +122,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
    * 运行时也可在控制台随时改这些值, 即时生效。 */
   if (typeof window !== 'undefined') {
     if (window.__enemySpeedMul === undefined) window.__enemySpeedMul = 0.35;
-    /* v5.0 调试开关恢复默认值(之前调试时设的非默认值会影响正式游戏) */
-    if (window.__spawnSlowMul   === undefined) window.__spawnSlowMul   = 1;
-    if (window.__poolAll        === undefined) window.__poolAll        = false;
-    if (window.__maxAlive       === undefined) window.__maxAlive       = 20;
-    if (window.__trialFreeze    === undefined) window.__trialFreeze    = false;  /* 妖潮倒计时正常走 */
+    /* v5.0 调试开关不设默认值, 挂window上默认undefined(falsy), 避免旧值缓存导致正式游戏异常。
+     * 需要调试时在控制台手动设: window.__trialFreeze=true / __poolAll=true / __spawnSlowMul=2.5 / __maxAlive=3 */
     /* v4.7 攻距手感旋钮: 0.30~0.70 之间调 —— 调大怪站更远(更不挡人但更不近战),
      * 调小怪贴更近(更近战但大怪可能少量遮住玩家)。改完刷下一只怪即生效。 */
     if (window.__torsoFrac      === undefined) window.__torsoFrac      = 0.45;
