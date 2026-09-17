@@ -1336,15 +1336,17 @@
   background-size:100% 100% !important;background-repeat:no-repeat !important;
   box-shadow:none !important;
   filter:drop-shadow(0 5px 14px rgba(0,0,0,.5));
-  width:158px !important;max-width:100% !important;min-width:0 !important;
+  width:200px !important;max-width:100% !important;min-width:0 !important;
   box-sizing:border-box !important;
-  padding:8px 13px 9px !important;
-  display:flex !important;flex-direction:column !important;
-  align-items:center !important;justify-content:center !important;
-  gap:1px !important;text-align:center !important}
+  padding:6px 14px 6px !important;
+  display:flex !important;flex-direction:row !important;flex-wrap:wrap !important;
+  align-items:baseline !important;justify-content:center !important;
+  gap:4px !important;text-align:center !important}
 /* v7.2: 战斗力显示 */
-.realm-badge .rb-power{font-size:10px;color:#f0c98a;letter-spacing:1px;font-weight:600;line-height:1.3}
+.realm-badge .rb-power{font-size:9px;color:#f0c98a;letter-spacing:1px;font-weight:600;line-height:1.3;flex-basis:100%}
 .realm-badge .rb-power::before{content:"战力 ";color:#8b94a8;font-weight:400}
+.realm-badge .sub-a{font-size:9px !important;color:#b9c3d8 !important;letter-spacing:0 !important;font-weight:400 !important}
+.realm-badge .sub-b{display:none !important}
 /* 「闲人」朱印复位(左下, 与右中"榜"印呼应) */
 .realm-badge::after{display:block !important;content:"闲人";left:7px !important;right:auto !important;
   bottom:5px !important;top:auto !important;
