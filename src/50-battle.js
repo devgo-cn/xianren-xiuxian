@@ -2071,24 +2071,15 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         p.lane = (p.lane || 0) + Math.sign(dD) * Math.min(Math.abs(dD), 0.8 * dt);   /* v4.4: 纵向速度1.2→0.8 lane/s, 约44px/s与横向42px/s匹配, 转弯不再加速 */
       }
     } else {
-      /* v6.0 无怪时向前推进。
-       * ⚠️ v8.1 FIX (勿回退) —— 原实现会挑"最近的挡路怪"并把玩家钉在 `nearest - 40`:
-       *   1) 怪站定后玩家被永久卡住, 只能等怪自己走过来, 推进节奏发闷;
-       *   2) 与"怪站位点跟随玩家(p.x + atkRange)"形成互锁 —— 玩家被顶住、
-       *      怪被拉站位点, 一推一拉之间怪看起来就在【受击后退】。
-       * 而上面 `if (near)` 分支的 `standAt = near.x - (p.atkRange + enemyHalfW(near))`
-       * 已经保证了"走到剑尖刚好够到怪"的精确停位, 这里不需要再做一层硬卡。
-       * 现在只保留一个极简的防穿越: 不要越过最近怪的身体中心(否则会穿模/绕到怪背后)。 */
+      /* v6.0 无怪时向前推进 —— 防穿越按二维地面距离挑最近的挡路怪。
+       * ⚠️ v8.2 回退 (勿再改): v8.1 曾把这里的 (nearest - PLAYER_HIT_GAP) 硬卡
+       * 改成"按怪半宽刹停", 参与造成了手感变坏。恢复原样 —— 下午的手感就是它。 */
       p.moving = 1; p.walkT += dt*8; p.x += BC.playerSpeed*dt;
-      let nearest = Infinity, nearestE = null;
+      let nearest = Infinity;
       for (const e of G.enemies) {
-        if (e.alive && e.dying <= 0 && e.x > p.x - 1 && e.x < nearest) { nearest = e.x; nearestE = e; }
+        if (e.alive && e.dying <= 0 && e.x > p.x - 1 && e.x < nearest) nearest = e.x;
       }
-      /* 只在"玩家即将越过怪"时才刹住, 且留足身位(怪半宽), 不再用大间距 PLAYER_HIT_GAP */
-      if (nearestE) {
-        const guard = nearest - Math.max(12, enemyHalfW(nearestE));
-        if (p.x > guard) p.x = guard;
-      }
+      if (nearest < Infinity) p.x = Math.min(p.x, nearest - PLAYER_HIT_GAP);
     }
   }
   function updatePets(dt) {
@@ -2231,18 +2222,11 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     const an = B.anims;
     let want = an.walk;
     if (dead) want = an.dead;
-    /* ⚠️ v8.1 FIX (勿回退) —— "怪物受击后退"的根因之三(也是最隐蔽的一条):
-     * 旧实现在 hurtT > 0 时切 `an.hurt`(即素材的 Damage 动画)。实测发现这些
-     * DragonBones 素材的 Damage 动画【骨架整体带纵向/横向位移】(美术做的踉跄后仰),
-     * 而 drawEnemies 用 armatureAABB(当前姿态) 来对齐落地锚点 —— 姿态一变,
-     * AABB 中心跟着变, display 的落点就整体平移, 看上去就是"被打一下往后退一截"。
-     *
-     * 而且这个位移改的是【渲染锚点】而非 e.x, 所以逻辑层完全查不出来
-     * (e.x 全程单调递减, 没有任何后退), 只有画面上在退 —— 极难定位。
-     *
-     * 修法: 受击【不切动画】, 保持当前的 walk/idle/attack 姿态, 靠已有的
-     * alpha 0.7 + hurt 滤镜提供受击反馈。表现上依然"打到了", 但骨架不位移。
-     * 配套: drawEnemies 里对受击中的怪锁定用 idle 基准尺寸, 避免呼吸式缩放。 */
+    /* ⚠️ v8.2 回退 (勿再改) —— v8.1 曾删掉这一行(受击不切 hurt 动画), 理由是
+     * "Damage 素材自带骨架位移导致画面横移"。事后证明那是误判: 用户实测的后退
+     * 另有其因(玩家被一刀秒后新怪从更远处刷出, 观感像"怪后退")。而删掉这行让
+     * 怪挨打时【完全没有受击反馈】, 手感更差。恢复原始行为。 */
+    else if (e.hurtT > 0) want = an.hurt;
     else if (e.anim > 0) want = an.attack;
     else if (!e.moving) want = an.idle;
     if (!want || !A.hasAnimation(want)) want = an.idle || an.walk;
@@ -2320,31 +2304,26 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
          * 远程怪前伸大 -> 自然站远, "远程"定位自动成立。
          * 技能怪的 atkRange 来自 04_数据/stop_class5.json 的 stopPx(= 58.3 + reachPx),
          * 已含玩家半宽, 故这里直接用即可, 不再做 min/区间之类的人为收窄。 */
-        /* ⚠️ v8.1 FIX (勿回退) —— "怪物受击后退"的根因之一:
-         * 旧条件 `e.stopX == null || e.x < e.stopX - queueGap` 意味着
-         * 【怪一旦走到站位点, stopX 就永久冻结】(e.x ≈ stopX, 条件不再成立)。
-         * 之后玩家继续推进, 这份冻结的旧 stopX 就落在玩家左侧 → 见下方回拉逻辑,
-         * 怪被硬拉回旧站位点, 表现为"打一下就往后退一截"。
-         * 修法: 站位点必须【每帧跟随玩家】, 因为它是相对量(p.x + atkRange),
-         * 玩家动它就动; 队列后方怪则用 prevX + queueGap 保持不重叠。 */
-        const stopX = Math.max(p.x + (e.atkRange || 0), prevX + BC.queueGap);
-        e.stopX = stopX;
+        /* ⚠️ v8.2 回退 (勿再改) —— v8.1 曾把这里改成"每帧重算 stopX = p.x + atkRange",
+         * 结果手感立刻变坏(用户反馈"怪一直后退/打的是另一只"): 玩家推进时 stopX 跟着涨,
+         * 已经站定的怪被持续"往后顶", 加上相机移动, 观感就是怪在不断退后。
+         * 用户下午玩的那版(340fd61)本来是好的 —— 恢复原条件: stopX 只在
+         * 【怪还没到位】时计算一次, 到位后冻结, 怪就安心站在原地打。
+         * 排队后方怪用 prevX + queueGap 保证不重叠。 */
+        if (e.stopX == null || e.x < e.stopX - BC.queueGap) {
+          const stopX = Math.max(p.x + (e.atkRange || 0), prevX + BC.queueGap);
+          e.stopX = stopX;
+        }
         prevX = Math.max(e.x, e.stopX);
       }
     }
-    /* v8.1 FIX (勿回退) —— "怪物受击后退"的根因之二:
-     * 旧代码 `if (e.x < e.stopX - 4) e.x = e.stopX;` 是【硬瞬移】,
-     * 配合上面冻结的 stopX, 就会把已经站定的怪瞬间弹到更右边(视觉=后退)。
-     *
-     * 这条兜底的初衷只是"防穿越"(玩家推进时不能穿过站位怪跑到它右边),
-     * 所以正确做法是【只拦不推】: 只有当怪真的落到了玩家左侧(异常态)才修正,
-     * 且修正目标是玩家右侧一个安全距离, 而不是把它推到 stopX 站位点。
-     * 正常战斗中 e.x >= p.x 恒成立, 这段完全不会触发 —— 怪永不后退。 */
+    /* ⚠️ v8.2 回退 (勿再改) —— v8.1 曾把这条兜底改成"只拦不推", 同样参与了手感变坏。
+     * 恢复原始行为: 怪若被留在站位点左侧(玩家推进穿过), 直接拉回站位点。
+     * 这是 v3.8.1 起就有的防交错兜底, 下午的手感就是建立在它之上。 */
     for (const e of G.enemies) {
       if (!e.alive || e.dying > 0 || e.stopX == null) continue;
       if (e.__skillHold) continue;           /* v4.8 定桩怪不回拉 */
-      const minX = p.x + Math.max(8, (e.atkRange || 0) * 0.5);
-      if (e.x < minX) e.x = minX;            /* 只在怪被玩家越过时才纠正, 且只纠正到玩家右侧 */
+      if (e.x < e.stopX - 4) e.x = e.stopX;
     }
     for (const e of G.enemies) {
       if (e.dying>0) { e.dying-=dt; if (e.armature) advanceRatty(e, dt, true); continue; }
