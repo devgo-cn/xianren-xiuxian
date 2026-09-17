@@ -1467,9 +1467,15 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       val, elite: !!elite, enemy: e.name, t: 0, flyAt: 1.0 + Math.random() * 0.8, phase: 'land' });
   }
   function spawnEquipDrop(e, eq) {
-    const img = new Image(); img.src = eq.icon; img.onerror = function () {};
+    /* v6.15: 装备掉落改成宝箱——掉落后先展示 1.5 秒, 宠物再飞来捡。
+     * 宝箱图预加载一次, 所有掉落共享。 */
+    if (!spawnEquipDrop._chestImg) {
+      spawnEquipDrop._chestImg = new Image();
+      spawnEquipDrop._chestImg.src = 'assets/chest.png';
+    }
     G.drops.push({ kind: 'equip', wx: e.x, x: worldToScreen(e.x), y: floorY() + e.y - 14, gy: e.y, vy: -80,
-      eq, img, t: 0, t2: 0, scale: 0, phase: 'wait', claimed: false });
+      eq, img: spawnEquipDrop._chestImg, t: 0, t2: 0, scale: 0, phase: 'wait', claimed: false,
+      showT: 1.5 });   /* v6.15: 落地后展示 1.5 秒宠物才来捡 */
   }
   function updateDrops(dt) {
     for (let i = G.drops.length - 1; i >= 0; i--) {
@@ -1564,34 +1570,34 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         }
         if (!o.body) {
           o.body = new PIXI.Container();
-          o.g2 = new PIXI.Graphics();
-          o.iconMask = new PIXI.Graphics();
-          o.iconMask.beginFill(0xffffff).drawCircle(0, 0, 12).endFill();
-          o.icon = new PIXI.Sprite();
+          o.g2 = new PIXI.Graphics();          /* 品质色光环(在宝箱后面) */
+          o.icon = new PIXI.Sprite();          /* v6.15: 宝箱图, 不再用圆形 mask */
           o.icon.anchor.set(0.5);
-          o.icon.width = 24; o.icon.height = 24;
           o.body.addChild(o.g2);
-          o.body.addChild(o.iconMask);
           o.body.addChild(o.icon);
-          o.icon.mask = o.iconMask;   /* 图标裁成圆形宝珠(素材自带深色方底) */
           o.c.addChild(o.body);
         }
         o.body.visible = true;
-        o.body.y = -14 * sc;
+        /* v6.15: 宝箱落地后轻微上下浮动(展示感), 飞行中贴宠物 */
+        const bobY = (d.phase === 'wait' || d.phase === 'fetch') ? Math.sin(d.t * 4) * 2 : 0;
+        o.body.y = -16 * sc + bobY;
         o.body.scale.set(sc);
         const rc = colorInt(dropRarityColor(d.eq.q));
         o.g2.clear();
-        o.g2.lineStyle(2, rc, 0.5);
-        o.g2.drawCircle(0, 0, 14);
+        /* 品质色光圈: 半透明圆, 宝箱落地时脉冲 */
+        const pulseR = 14 + Math.sin(d.t * 5) * 2;
+        o.g2.beginFill(rc, 0.18);
+        o.g2.drawCircle(0, 0, pulseR);
+        o.g2.endFill();
+        o.g2.lineStyle(1.5, rc, 0.6);
+        o.g2.drawCircle(0, 0, pulseR);
         o.g2.lineStyle(0);
         if (d.img && d.img.complete && d.img.naturalWidth) {
           o.icon.visible = true;
           o.icon.texture = window.BattleGL.tex(d.img);
+          o.icon.width = 28; o.icon.height = 28;
         } else {
           o.icon.visible = false;
-          o.g2.beginFill(rc, 1);
-          o.g2.drawRoundedRect(-11, -11, 22, 22, 4);
-          o.g2.endFill();
         }
       }
     }
@@ -1988,9 +1994,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         }
         continue;
       }
-      /* 空闲宠物认领待拾装备 */
+      /* 空闲宠物认领待拾装备 —— v6.15: 宝箱落地后先展示 showT 秒, 宠物不立刻来 */
       if (!pet.fetch || pet.fetch.state === 'idle') {
-        const d = G.drops.find(x => x.kind === 'equip' && x.phase === 'wait' && !x.claimed);
+        const d = G.drops.find(x => x.kind === 'equip' && x.phase === 'wait' && !x.claimed && (!x.showT || x.t >= x.showT));
         if (d) { d.claimed = true; d.phase = 'fetch'; pet.fetch = pet.fetch || { state: 'idle', drop: null }; pet.fetch.state = 'toDrop'; pet.fetch.drop = d; continue; }
       }
       /* 上下浮动(保留计时器, 渲染层用) */
@@ -2397,7 +2403,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
     _pushT -= dt;
     if (_pushT <= 0) { _pushT = 5; if (typeof window.pushBattleStats === 'function') window.pushBattleStats(); }
-    updatePlayer(sdt); updatePets(sdt); updateEnemies(sdt); updateFx(sdt); updateDrops(sdt); updateCamera(sdt);
+    updatePlayer(sdt); updatePets(dt); updateEnemies(sdt); updateFx(sdt); updateDrops(dt); updateCamera(sdt);
     /* 技能名播报: 独立推进(不吃身法倍速, 固定节奏即隐) */
     if (G.skillCall) { G.skillCall.t += dt; if (G.skillCall.t >= G.skillCall.dur) G.skillCall = null; }
   }
