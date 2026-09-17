@@ -979,7 +979,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* v4.1.2: 舞台接管时必须显式置 _managed —— 此前 initManaged 无人调用,
      * _managed 恒 false, 模块加载自启的独立泵从未停过(双泵: update 双跑=逻辑
      * 双倍速潜伏至今; GL 迁移后独立泵 frame(0,innerH) 可见 = 画面上下抖动)。 */
-    createStageLayer: () => { _managed = true; _rafOn = false; return battleLayer(); },
+    createStageLayer: () => { _managed = true; _rafOn = false; trialRestart(); return battleLayer(); },  /* v5.0 FIX: 每次进入战斗重置妖潮状态, 否则上一场结算后trialSettled=true残留, 新一场不倒计时不结算 */
     getKills: () => G.kills,
     resetKills: () => { G.kills = 0; },
     /* v3.4: 统一走 applySpeedBuff 的叠加规则（取 max 倍率 + 重置时长），
@@ -2311,6 +2311,12 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     }
     const sdt = dt * G.speedMult;
     G.t += sdt;
+    /* v5.0 FIX: 结算面板已关闭但trialSettled仍为true(玩家关面板没走trialRestart) → 自动重置,
+     * 否则新一场妖潮不倒计时不结算。杀BOSS提前结算与120秒结算都设trialSettled=true, 这是冲突根因。 */
+    if (G.trialSettled) {
+      const modal = document.getElementById('trialModal');
+      if (!modal || !modal.classList.contains('show')) { trialRestart(); }
+    }
     /* v3.9 试炼倒计时: 原始 dt —— 计时器与倍速分离, 倍速只加战斗节奏不加轮时 */
     updateTrial(dt);
     const aliveEnemies = G.enemies.filter(e => e.alive && e.dying<=0);
