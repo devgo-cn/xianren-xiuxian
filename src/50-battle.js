@@ -2230,42 +2230,41 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       }
     }
 
-    /* 灵鹰弹幕更新 */
-    if (G.eagleBolts) {
-      for (let i = G.eagleBolts.length - 1; i >= 0; i--) {
-        const b = G.eagleBolts[i];
-        b.t += dt;
-        /* 追踪目标 */
-        if (b.target && b.target.alive) {
-          b.tx = b.target.x;
-          b.ty = b.target.y;
-        }
-        const dx = b.tx - b.x, dy = b.ty - b.y;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist > 5) {
-          b.x += dx / dist * b.speed * dt;
-          b.y += dy / dist * b.speed * dt;
-        }
-        let hit = false;
-        /* 命中检测 */
-        if (dist < 30) {
-          const e = b.target;
-          if (e && e.alive) {
-            const dmg = calcDmg(PST.atk, 0.8, e.def, PST.pen || 0);
-            dealDamage(e, dmg, '#7fe0ff', false);
-          }
-          hit = true;
-        }
-        if (hit || b.t > 3) G.eagleBolts.splice(i, 1);
-      }
-    }
-
     /* 玩家攻击buff计时 */
     if (p.atkBuffTimer > 0) {
       p.atkBuffTimer -= dt;
       if (p.atkBuffTimer <= 0) { p.atkBuff = 0; p.atkBuffTimer = 0; }
     }
   }
+
+  /* 灵鹰弹幕更新(不在宠物循环里, 只执行一次) */
+  function updateEagleBolts(dt) {
+    if (!G.eagleBolts || G.eagleBolts.length === 0) return;
+    for (let i = G.eagleBolts.length - 1; i >= 0; i--) {
+      const b = G.eagleBolts[i];
+      b.t += dt;
+      if (b.target && b.target.alive) {
+        b.tx = b.target.x; b.ty = b.target.y;
+      }
+      const dx = b.tx - b.x, dy = b.ty - b.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist > 5) {
+        b.x += dx / dist * b.speed * dt;
+        b.y += dy / dist * b.speed * dt;
+      }
+      let hit = false;
+      if (dist < 30) {
+        const e = b.target;
+        if (e && e.alive) {
+          const dmg = calcDmg(PST.atk, 0.8, e.def, PST.pen || 0);
+          dealDamage(e, dmg, '#7fe0ff', false);
+        }
+        hit = true;
+      }
+      if (hit || b.t > 3) G.eagleBolts.splice(i, 1);
+    }
+  }
+
   /* 骨骼怪动画状态机: 游戏状态(hurt/anim/moving/dying) → 动作, fadeIn 平滑过渡。
    * playTimes=-1 走动画数据自带循环设置(循环动作无限循环, attack/hurt/dead 播一次定格)。
    * v3.9 通用化: 动画名从 BONES[e.boneSlug].anims 查(加载时已归一化+回退), 永远有效。 */
@@ -2621,7 +2620,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
     _pushT -= dt;
     if (_pushT <= 0) { _pushT = 5; if (typeof window.pushBattleStats === 'function') window.pushBattleStats(); }
-    updatePlayer(sdt); updatePets(dt); updateEnemies(sdt); updateFx(sdt); updateDrops(dt); updateCamera(sdt);
+    updatePlayer(sdt); updatePets(dt); updateEagleBolts(dt); updateEnemies(sdt); updateFx(sdt); updateDrops(dt); updateCamera(sdt);
     /* 技能名播报: 独立推进(不吃身法倍速, 固定节奏即隐) */
     if (G.skillCall) { G.skillCall.t += dt; if (G.skillCall.t >= G.skillCall.dur) G.skillCall = null; }
   }
