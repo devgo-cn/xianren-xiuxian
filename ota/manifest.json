@@ -251,7 +251,7 @@
     "assets/db/ratty_ske.json": "ddc0a757b1b24cc2cc6c139d669731506341e6f90dbf2b3e6839499ed3f4a5fa",
     "assets/db/ratty_tex.json": "2b00ddb68d11bac3da2e65208058d58e379bedd2ffaee5d45d96c613b01a7d8e",
     "assets/db/ratty_tex.png": "fa614f4cacf27b80185634a007921d1666c082bb7bb92d2fd44e3a6b3a9cd9e2",
-    "assets/db/webgl-battle.js": "6105d7a5d0108b3363f452a307cd7111796d53531e61fde902dcaf20e5f60b91",
+    "assets/db/webgl-battle.js": "769ea2808a1ec2103c0147579d7ead81544886484559a4c27ea8b2a1ae9e2a3e",
     "assets/main-bg.jpg": "30bda2c355760f1364da3a11f01f31cd7928babeb565ed064d0c41f66b8fb0d8",
     "assets/modals/art-furnace.webp": "bffa212a8a1aa50c3f311e10ada9171b2db9ccb6567d5c430f1467635f27c6a3",
     "assets/modals/art-ico/a0.webp": "09092265315f1b905432c8f1fa7186851cf0282bbacefa2e02a7289a13c498aa",
@@ -457,16 +457,16 @@
     "assets/ui_icons/icon_treasure.webp": "fe0b83d8ece23ab09b23a013e18299de7335ba1917666a7970726e00b7eb7e17",
     "dt-theme.css": "9bfd9aa7924cdb5483f295a3ec92828b152a3f2572ffed68579614e8cb7749f1",
     "fx2d.js": "ab4794f036fc4e9976392e336e004bcef13d83976e78d719415da6c7bc10ad0d",
-    "index.html": "51719c0217351272a0a708f4ab686b2ee3edd1d70545f9e78e3be9c71619748f",
+    "index.html": "86b71014f16b35981760843eddbac850141803074614aeeccfd7da672c70af21",
     "src/00-pure.js": "981d48792dd12acddf89124128537f9e5b38b75dc2f0ae2069c7efc78a9f0f7a",
-    "src/10-base.js": "bd37ea0d96e26f5d900766c7fe324e223329208f9f54face3b557e393bcf2d02",
+    "src/10-base.js": "f1df172e97759baa09e8ed1788f0a888c530050acea9a5570eac10ab61f1b182",
     "src/20-core.js": "e42d48af94ae21cb578045ac272a7508d1f3b6a674deb05fac35f2baa57adb95",
     "src/30-systems.js": "0bdb3aba4eb823453559b6270241004d662c992b9cc8eb63c6b987ee3c5a6b64",
     "src/40-app.js": "f08bf1af32f33086a89dee1c5b08104ce12cf97ccbb9226d8e53794ed2ed8c22",
-    "src/50-battle.js": "cfed723bd6a34b8ee9883ad0b0255dd01c858ee888c03aee81cf76367df081b3",
-    "src/60-stage.js": "82911b5180de3e4e531829d9d46af3c7137e2a434ac576d4af488b30fb4d1d3b",
+    "src/50-battle.js": "cfa26f76b258c3c3d4cec2a1b4170b3799df50d45179a80ff96d83ce3b2657ee",
+    "src/60-stage.js": "a098e6f38e898ff3fee4c6a1f79e652373f15cf791e344813fa3d76ddd521c5b",
     "src/main.js": "161f10c02a3aa4095b257cd77f5bf1834e85d1359e85555deb8e48dfd2bd9fba"
   },
-  "rev": "e47697bd3a33ebe8",
-  "version": "3.8"
+  "rev": "033c220fb24a80c3",
+  "version": "3.9"
 }

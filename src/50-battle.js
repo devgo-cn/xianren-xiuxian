@@ -457,13 +457,10 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   }
   function playSfx(name, vol, rate) {
     if (!sfx.ready || !sfx[name]) return;
-    if (typeof SND !== 'undefined' && !SND.sfxOn) return;   /* 设置页「音效」开关统一管控战斗音效 */
     const a = sfxGet(name);
     if (!a) return;
-    a.volume = vol || 0.6;
-    if (rate) { try { a.playbackRate = rate; } catch (e) {} }   /* v6.3: 脚步/同源变调用的变速 */
-    try { a.currentTime = 0; } catch (e) {}
-    a.play().catch(() => {});
+    /* v6.10: 走 SND 统一播放层(并发限制+同名去抖), 不再直接 a.play() */
+    if (typeof SND !== 'undefined') SND.play(a, vol, rate);
   }
 
   /* ── v6.3 骨骼怪专属音效 ──────────────────────────────────────────────
@@ -506,7 +503,6 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   const MON_SRC = Object.create(null), MON_POOL = Object.create(null);
   function playMonSfx(file, vol, rate) {
     if (!file) return;
-    if (typeof SND !== 'undefined' && !SND.sfxOn) return;   /* 同样受设置页「音效」开关管控 */
     const pool = MON_POOL[file] || (MON_POOL[file] = []);
     let a = null;
     for (const x of pool) { if (x.paused || x.ended) { a = x; break; } }
@@ -516,10 +512,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         || (MON_SRC[file] = new Audio('assets/sfx/monster/' + file + '.ogg'));
       a = src.cloneNode(); pool.push(a);
     }
-    a.volume = vol || 0.5;
-    if (rate) { try { a.playbackRate = rate; } catch (e) {} }
-    try { a.currentTime = 0; } catch (e) {}
-    a.play().catch(() => {});
+    /* v6.10: 走 SND 统一播放层 */
+    if (typeof SND !== 'undefined') SND.play(a, vol, rate);
   }
   /* 怪的三类发声: 攻击走专属音, 受击轮播 hurt 组, 脚步复用现有 footstep 变调(存在感低, 不值得每人一条) */
   function monAttackSfx(e) {
@@ -2357,6 +2351,11 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     if (nowSpeedBuff !== _wasSpeedBuff) { _wasSpeedBuff = nowSpeedBuff; updateHUD(); }
     const sdt = dt * G.speedMult;
     G.t += sdt;
+    /* v6.10 PERF: 动态帧率。场上怪少(alive<5)且无BOSS/倍速 → 20fps(50ms), 激烈时 24fps(42ms)。
+     * 挂机推图时怪一波一波来, 间隙期降到 20fps 省 CPU/GPU。 */
+    let _aliveCount = 0;
+    for (const e of G.enemies) if (e.alive) _aliveCount++;
+    G.targetFrameMs = (_aliveCount < 5 && !G.bossActive && G.speedMultTimer <= 0) ? 50 : 42;
     /* v5.0 FIX: 结算面板已关闭但trialSettled仍为true(玩家关面板没走trialRestart) → 自动重置,
      * 否则新一场妖潮不倒计时不结算。杀BOSS提前结算与120秒结算都设trialSettled=true, 这是冲突根因。 */
     if (G.trialSettled) {

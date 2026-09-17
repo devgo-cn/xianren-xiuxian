@@ -89,7 +89,10 @@ function resize() {
 
 function tick(now) {
   if (!_running || _paused) return;
-  const wait = FRAME_MS - (now - _lastPaint);
+  /* v6.10 PERF: 动态帧率。战斗层在 update 里按场上压力设 G.targetFrameMs:
+   * 怪少/无 BOSS → 50ms(20fps), 激烈 → 42ms(24fps)。挂机时省 CPU/GPU。 */
+  const frameMs = (typeof G !== 'undefined' && G.targetFrameMs) ? G.targetFrameMs : FRAME_MS;
+  const wait = frameMs - (now - _lastPaint);
   if (wait > 4) {
     /* 限帧期间真正让出主线程：原各层各自 setTimeout，合并后只需一处。
      * 阈值 >4ms 才睡，余量过小 setTimeout 会立即返回、退化成紧凑循环。 */

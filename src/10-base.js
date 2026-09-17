@@ -67,6 +67,34 @@ const SND = (function () {
     document.addEventListener("keydown", _armOnce);
     _bgmPlay();                                        // 立即尝试; 浏览器允许则无需任何点击
   }
+  /* v6.10 PERF: 统一 SFX 播放层。
+   * 之前战斗里 14 只怪同时攻击/受击, 每只都 new Audio().play(), 手机音频硬件被反复唤醒。
+   * 现在走这里统一节流:
+   *   - 全局最多 4 个 SFX 同时在播(超出直接丢, 不排队)
+   *   - 同名音效最小间隔 50ms(防止同一帧 14 只怪同时播 slime_attack)
+   *   - 播完/失败自动回收计数
+   * BGM 不经过这里(它是长循环, 单独管)。 */
+  let _sfxActive = 0;
+  const _sfxLast = new Map();
+  const SFX_MAX = 4;
+  const SFX_GAP = 50;
+  function playSfxAudio(a, vol, rate) {
+    if (!a) return;
+    if (!sfxOn || hardMute) return;
+    try { if (document.hidden) return; } catch (e) {}
+    if (_sfxActive >= SFX_MAX) return;
+    const key = a.src || 'anon';
+    const now = performance.now();
+    if (now - (_sfxLast.get(key) || 0) < SFX_GAP) return;
+    _sfxLast.set(key, now);
+    _sfxActive++;
+    a.volume = vol || 0.6;
+    if (rate) { try { a.playbackRate = rate; } catch (e) {} }
+    try { a.currentTime = 0; } catch (e) {}
+    const done = () => { _sfxActive = Math.max(0, _sfxActive - 1); };
+    const p = a.play();
+    if (p && p.then) p.then(done).catch(done); else done();
+  }
   return {
     get bgmOn() { return bgmOn; },
     get sfxOn() { return sfxOn && !hardMute; },
@@ -83,6 +111,8 @@ const SND = (function () {
     /* v1.7.62 硬静音开关: 挂机期间置 true, 任何音效都不会把上下文救活 */
     mute(v) { hardMute = !!v; if (hardMute) suspendAll(); else resumeAll(); },
     get muted() { return hardMute; },
+    /* v6.10: 统一 SFX 入口, 战斗层所有 Audio.play() 都走这里 */
+    play: playSfxAudio,
     /* initFiles 名字沿用旧接口; 现在只负责拉起 BGM 与页面可见性联动 */
     initFiles() {
       /* BGM: 直接建 Audio 立即试播(允许时刷新即响), 被浏览器拦截则等首次点击/按键再播;

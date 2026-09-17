@@ -35,6 +35,7 @@
             width: 8, height: 8,
             transparent: true, autoStart: false,
             antialias: false, resolution: 1, autoDensity: false,
+            depth: false, stencil: false,
             /* v6.7 PERF: high-performance → low-power。
              * 手机 SoC 的 GPU 有大小核集群, high-performance 会强制锁大核, 是发烫主因之一。
              * 2D 骨骼动画用小核完全够, 视觉无差, 功耗显著下降。 */
