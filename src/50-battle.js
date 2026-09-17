@@ -19,6 +19,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     /* 占位怪 demon(妖将)/raptor(妖弓) 已移除 —— 只保留两种有真实素材的怪 */
     playerAtkRange: 75, playerAspd: 1.1, playerSpeed: 42,   /* v4.4: 基础移速 28→42 (×1.5), 走得太慢 */
     spawnInterval: 0.25, enemySpawnOffset: 40, maxAlive: 12, queueGap: 34,   /* v5.1 按频率刷怪: 0.25s/只×120只=30s刷完小怪, 然后BOSS出现; 同屏12 */
+    /* ⚠️ enemySpawnOffset 自 v7.8 起【已废弃】: 它当年用于把怪生成在屏外
+     * (camX+stageW()+offset), 造成"进游戏要等好几秒才看到怪"。
+     * 现在生成点改为可视区右缘内侧 stageW()*0.92。保留字段仅为兼容旧引用, 勿再用于生成。 */
     enemies: {
       /* hpK/atkK/defK: 按玩家境界(lv)线性成长 —— 怪只随境界长, 玩家随境界+装备长, 换装即提速。
        * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。
@@ -1310,7 +1313,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       if (!BONES[pool.boss.slug] || !BONES[pool.boss.slug].ready) return null;
       if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
       const e = makePoolEnemy(pool.boss, true);
-      e.x = G.camX + stageW() + BC.enemySpawnOffset;
+      /* v7.8: BOSS 同样改为可视区右缘内侧生成(原 camX+stageW()+40 在屏外, 要等它走进来)。
+       * BOSS 体型大(220px 高), 比小怪晚一点也无妨, 但没必要让玩家对着空场等。 */
+      e.x = G.camX + stageW() * 0.92;
       e.lane = MID_LANE; e.y = laneOff(MID_LANE);   /* BOSS 固定中道, 突出存在感 */
       G.enemies.push(e);
       G.bossActive = true;
@@ -1327,9 +1332,22 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     if (!(BONES[entry.slug] && BONES[entry.slug].ready)) return null;   /* 工厂未就绪这一拍不刷(避免占位图) */
     if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
     const e = makePoolEnemy(entry, false);
-    /* v7.1 开局立即接战: 前两只怪(trialSpawned 0/1)刷在屏内右侧1/4处,
-     * 不刷屏外走3~8s。之后正常从屏幕右边生成。 */
-    e.x = G.trialSpawned <= 1 ? G.camX + stageW() * 0.75 : G.camX + stageW() + BC.enemySpawnOffset;
+    /* ⚠️ v7.8 FIX (勿回退) —— 刷怪"要走好几秒才看得到"的根因:
+     * 相机把玩家锁在屏幕 42% 处(见 updateCamera: targetCam = player.x - stageW()*0.42),
+     * 所以玩家在屏幕上的位置恒为 stageW()*0.42 ≈ 173px(412 宽机型)。
+     * 旧逻辑把怪生成在 camX + stageW() + 40 = 屏幕 x 452 → 完全在可视区(0~412)之外,
+     * 必须先走完 452→412 这段【屏幕外】路程才露头, 玩家看到的就是"空的等好几秒"。
+     *
+     * v7.1 曾用 `trialSpawned <= 1` 只修了开局前两只, 第 3 只起又退回屏外生成 ——
+     * 而且 aliveCount<1 才补怪的机制让怪总是一只只从屏外踱进来, 场上长期显得空荡。
+     *
+     * 正确做法: 生成点就落在【可视区右边缘内侧】, 玩家立刻看得见它入场。
+     *   spawnScreenX = stageW()*0.92  → 刚进画面右缘, 仍有"从右边走来"的方向感
+     *   (不是凭空出现在中间), 但不再有屏幕外空走时间。 */
+    const spawnScreenX = stageW() * 0.92;
+    e.x = G.camX + spawnScreenX;
+    /* 开局前两只再靠前一点(75% 处), 让进游戏第一眼就有怪在近处, 衔接更紧 */
+    if (G.trialSpawned <= 1) e.x = G.camX + stageW() * 0.75;
     G.enemies.push(e);
     G.trialSpawned++;
     return e;
@@ -2427,9 +2445,17 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
      * （表现为 probe 里冒出 sword_goblin / 第二只同名怪，把画面糊掉）。 */
     else if (window.__skillFreeze) { G.spawnT = spawnGap; }
     else if (G.spawnT <= 0) {
-      /* v5.1 击杀即刷新: 开局同屏少于1只时按频率填充(只填1只), 之后靠onKill击杀即刷新补充。
-       * 避免按频率刷怪排队AOE全死光。同屏上限12只自动停刷, 怪池121只刷完停刷。 */
-      if (aliveCount < 1 && G.trialSpawned < BC.trialPool.bossAt) spawnWave();
+      /* ⚠️ v7.8 FIX (勿回退) —— 场上"一直只有 1 只怪、看着很空"的根因:
+       * b80bbf2 把这里的门槛从 `< 10` 改成 `< 1`(提交信息"开局只填1只怪"),
+       * 含义变成【只有场上彻底空了才补怪】。于是玩家杀一只→补一只, 同屏恒为 1 只,
+       * BC.maxAlive=12 形同虚设, 视觉上就是"打完一只对着空场等下一只"。
+       * 注意 onKill 里已有一份"击杀即刷新"补怪, 两者门槛必须一致, 否则互相掣肘。
+       *
+       * 恢复为填充到 OPENING_FILL 只(低于 maxAlive, 留出余量): 开局与清场后都会
+       * 快速铺开一小片怪, 既有"兽潮"的密度感, 又不会一次堆满 12 只把 AOE 收益打爆。
+       * 该值可用 window.__openFill 临时调整, 便于手感调试。 */
+      const OPENING_FILL = (typeof window !== 'undefined' && window.__openFill) || 6;
+      if (aliveCount < OPENING_FILL && G.trialSpawned < BC.trialPool.bossAt) spawnWave();
       G.spawnT = spawnGap;
     }
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
