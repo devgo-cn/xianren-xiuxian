@@ -2149,8 +2149,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         }
         continue;
       }
-      /* 空闲宠物认领待拾装备 —— v6.15: 宝箱落地后先展示 showT 秒, 宠物不立刻来 */
-      if (!pet.fetch || pet.fetch.state === 'idle') {
+      /* 空闲宠物认领待拾装备 —— 只有灵狐捡, 灵鹰只打怪 */
+      if (pet.type !== 'eagle' && (!pet.fetch || pet.fetch.state === 'idle')) {
         const d = G.drops.find(x => x.kind === 'equip' && x.phase === 'wait' && !x.claimed && (!x.showT || x.t >= x.showT));
         if (d) { d.claimed = true; d.phase = 'fetch'; pet.fetch = pet.fetch || { state: 'idle', drop: null }; pet.fetch.state = 'toDrop'; pet.fetch.drop = d; continue; }
       }
