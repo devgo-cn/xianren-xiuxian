@@ -723,7 +723,7 @@ function pushBuff(mult, durSec) {
 
 function buffHintOf(mult) {
   const left = BUFF_CAP_MS - buffSpanMs(mult);
-  if (left <= 60000) return `（药力已积满 24 时辰）`;
+  if (left <= 60000) return `（药力已积满 24 小时）`;
   return `（药力共余 ${durTxt(Math.round(left / 1000))}）`;
 }
 
@@ -732,7 +732,7 @@ function renderPillHints() {
   const n = (state.buffs || []).length;
   const o = (state.offlineBoostUntil || 0) > now;
   const el = $("pillHints");
-  /* v1.9.0: 附一句药力剩余时长, 让"累加到 24 时辰封顶"这件事可见 */
+  /* v1.9.0: 附一句药力剩余时长, 让"累加到 24 小时封顶"这件事可见 */
   let spanTxt = "";
   if (n) {
     const mm = buffMult();

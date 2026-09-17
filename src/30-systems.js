@@ -311,7 +311,7 @@ function travelAvatarHTML() {
         : "";
     return `<div style="text-align:center;padding:14px 4px">
         <div style="font-family:var(--font-brush);font-size:18px;color:#d8b06a;letter-spacing:.12em">化身在${l ? l.n : "远方"} · ${durTxt(awaySec)}</div>
-        <p style="color:#a7b0c4;margin-top:10px;line-height:1.9">化身在外游历，${pace}。已寄回 <b style="color:#c9b98a">${sent}</b> 封手札。<br>满 <b style="color:#c9b98a">八封</b>（四个时辰）化身便自行回山，<b style="color:#c9b98a">无从召回</b>——它在外的所得，全在信里。</p>
+        <p style="color:#a7b0c4;margin-top:10px;line-height:1.9">化身在外游历，${pace}。已寄回 <b style="color:#c9b98a">${sent}</b> 封手札。<br>满 <b style="color:#c9b98a">八封</b>（四个小时）化身便自行回山，<b style="color:#c9b98a">无从召回</b>——它在外的所得，全在信里。</p>
         <div style="height:4px;background:rgba(201,168,106,.14);margin:11px 18px 0">
           <i style="display:block;height:100%;width:${Math.min(100, progPct)}%;background:linear-gradient(90deg,rgba(201,168,106,.55),rgba(232,197,107,.95))"></i>
         </div>
@@ -328,7 +328,7 @@ function travelAvatarHTML() {
   const placeNames = z.locs.map(x => x.n).join("、");
   return `<div style="padding:10px 4px 14px;text-align:center;border-bottom:1px dashed rgba(201,168,106,.16)">
       <div style="font-family:var(--font-brush);font-size:16px;color:#d8b06a;letter-spacing:.06em">${z.name}</div>
-      <p style="color:#8b94a8;font-size:11.5px;margin-top:6px;line-height:1.9">化身会顺着自己的心意，在 ${placeNames} 一带游历。<br>在外每满 <b style="color:#a98a5a">30 分钟</b> 寄回一封手札，八封（四个时辰）后<b style="color:#a98a5a">自行回山</b>；若你久不归来，它便放慢到<b style="color:#a98a5a">每 2 小时</b>一封，最多在外守候 <b style="color:#a98a5a">两日</b>。</p>
+      <p style="color:#8b94a8;font-size:11.5px;margin-top:6px;line-height:1.9">化身会顺着自己的心意，在 ${placeNames} 一带游历。<br>在外每满 <b style="color:#a98a5a">30 分钟</b> 寄回一封手札，八封（四个小时）后<b style="color:#a98a5a">自行回山</b>；若你久不归来，它便放慢到<b style="color:#a98a5a">每 2 小时</b>一封，最多在外守候 <b style="color:#a98a5a">两日</b>。</p>
       <button class="btn" style="margin-top:10px" onclick="startTravel()"><svg class="skin" viewBox="0 0 200 60" preserveAspectRatio="none"><path class="ink" d="M12 9 C28 3 44 10 60 6 C76 2 92 8 108 6 C124 4 140 8 158 6 C174 4 192 8 197 16 C199 26 198 34 195 41 C193 46 196 52 182 53 C168 55 154 50 140 53 C124 56 110 50 96 53 C82 56 68 51 56 53 C42 55 30 50 20 52 C8 54 2 46 3 38 C3 28 2 20 5 15 C7 12 9 10 12 9 Z"/></svg><span class="label">遣化身出门</span></button>
     </div>
     <div style="font-size:10.5px;color:#6d7688;text-align:center;padding:10px 4px;line-height:1.8">拾得的药草与丹方残页都装在<b style="color:#a98a5a">鸿雁信匣</b>里，拆开才算你的。<br>信匣最多存 <b style="color:#a98a5a">${MAIL_CAP}</b> 封，满了化身就停笔。</div>`;

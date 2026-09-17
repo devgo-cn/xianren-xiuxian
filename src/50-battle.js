@@ -2291,7 +2291,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         document.getElementById('trialTierN').textContent = (BC.tier[G.trialTier] || BC.tier[1]).name;
         document.getElementById('trialBestN').textContent = best + (isNew ? '（新纪录！）' : '');
         const bEl = document.getElementById('trialBoostN');
-        bEl.textContent = boost > 0 ? `离线游历所得 +${Math.round(boost*100)}%（48 时辰内有效）` : '再接再厉';
+        bEl.textContent = boost > 0 ? `离线游历所得 +${Math.round(boost*100)}%（48 小时内有效）` : '再接再厉';
         el.classList.add('show');
       }
     } catch (err) {}

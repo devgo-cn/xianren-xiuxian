@@ -425,7 +425,7 @@ function startTravel() {
   __set_encNext(autoHuntOn() ? Date.now() + searchMs() : 0);   // 重置巡猎: 自动斗法开则重新起算搜寻
   pushMsg("main", `你为化身备好行囊。它往<span class="r">${l.n}</span>的方向去了，阿青蹲在门口目送，尾巴搭在你脚边。`);
   pushMsg("avatar", `阿青送化身到山门口，回来在你蒲团边卧下`);
-  pushMsg("main", `<span class="b">化身在外每满 30 分钟寄回一封手札</span>，满八封（四个时辰）便自行回山。<br>记得常去右上角鸿雁处拆信——信里的东西，隔着匣子不算你的。`);
+  pushMsg("main", `<span class="b">化身在外每满 30 分钟寄回一封手札</span>，满八封（四个小时）便自行回山。<br>记得常去右上角鸿雁处拆信——信里的东西，隔着匣子不算你的。`);
   travelBtnLbl(); traceRefresh(); updateHUD(); save(); cloudSoon();
   closeTravel();
 }
@@ -436,7 +436,7 @@ function consumePill(id) {
   const now = Date.now(); const e = rp.eff;
   /* v1.9.0: 增益类丹药到顶(累计 24 小时)就不再允许服用 —— 提示而非静默失败 */
   if ((e.k === "buff" || e.k === "grand") && buffAtCap(e.mult)) {
-    pushMsg("main", `<span class="b">药力已至上限</span>：此丹药力已积满 <b>24 时辰</b>，再服无益，且待药力散去。`);
+    pushMsg("main", `<span class="b">药力已至上限</span>：此丹药力已积满 <b>24 小时</b>，再服无益，且待药力散去。`);
     renderPillHints();
     return;
   }
@@ -541,7 +541,7 @@ function presentSettle(r) {
     `<div class="off-row"><span class="o-ico">${icoSpi}</span><span class="ol">聚灵阵 · 灵石</span><b class="ov jade">+${fmt(gg.spirit)}</b></div>` +
     huntRows +
     `</div>` + huntExtra + bagTip;
-  // 离线际遇叙事(每满 1 时辰一段, 至多 3 段; 纯叙事)
+  // 离线际遇叙事(每满 1 小时一段, 至多 3 段; 纯叙事)
   const bi = Math.min(bigIdx(), MAIN_STORY.length - 1);
   const bigName = realm().big;
   const cnt = Math.min(3, Math.max(1, Math.floor(dt / 3600)));
