@@ -144,15 +144,16 @@ function addJournal(entry) {
   save();
 }
 
+let _chapterList = [];   // showChapter 时缓存该大境界的倒序纪事，storyLoadMore 分页直接 slice
+
 function storyLoadMore(reset) {
   const body = $("storyBody");
   if (!body) return;
   const big = body.dataset.big || _storyChap;
   if (!big) return;
-  const list = state.journal.filter(j => j.big === big).reverse(); // 最新在前
   let page = parseInt(body.dataset.page || "0", 10);
   if (reset) { page = 0; body.innerHTML = ""; }
-  const slice = list.slice(page * STORY_PAGE, (page + 1) * STORY_PAGE);
+  const slice = _chapterList.slice(page * STORY_PAGE, (page + 1) * STORY_PAGE);
   if (reset || slice.length) { page++; body.dataset.page = String(page); }
   if (slice.length) body.insertAdjacentHTML("beforeend", slice.map(storyItemHtml).join(""));
   if (reset) body.scrollTop = 0;
@@ -167,6 +168,7 @@ function showChapter(bigName) {
   if (!body) return;
   __set_storyChap(bigName);
   body.dataset.big = bigName;
+  _chapterList = state.journal.filter(j => j.big === bigName).reverse(); // 最新在前
   body.onscroll = () => {
     if (body.scrollTop + body.clientHeight >= body.scrollHeight - 60) storyLoadMore(false);
   };
