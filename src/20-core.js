@@ -499,9 +499,18 @@ function licSync() {
     };
   }
   const E = lic.__els;
-  E.nb.textContent = a.name || "无名法宝";
+  /* v7.1 FIX: 旧存档装备 lv=realmIdx+1(大境界越界), licSync 里也越界返回凡人。
+   * 用当前大境界名显示, 并把 a.name 里存的旧"凡人·"前缀替换掉。 */
+  const _bi = Math.max(0, Math.min(BIGS.length - 1, Math.floor((state.realmIdx || 0) / 1)));
+  /* bigIndexOf 纯函数: 累加 BIGS[i].segs */
+  let bigIdx = 0, _acc = 0;
+  for (let i = 0; i < BIGS.length; i++) { _acc += BIGS[i].segs; if ((state.realmIdx || 0) < _acc) { bigIdx = i; break; } }
+  const bigName = BIGS[bigIdx].n;
+  let dispName = a.name || "无名法宝";
+  /* 旧装备 name 里存了错误的"凡人·"前缀, 替换成当前大境界 */
+  dispName = dispName.replace(/^凡人·/, bigName + "·");
+  E.nb.textContent = dispName;
   E.nb.style.color = LIC_QCOL[a.q] || "#e9e2d0";
-  const bigName = (BIGS[Math.max(0, (a.lv || 1) - 1)] || BIGS[0]).n;
   E.lhI.textContent = `${bigName}·${qn}·${EQUI_SLOTN[slotIdx] || ""} ★${a.q + 1}`;
   E.icoims.forEach(im => im.classList.toggle("on", +im.dataset.idx === _eqSel));
   E.aB.textContent = "+" + (a.a || 0);

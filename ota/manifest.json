@@ -456,18 +456,18 @@
     "assets/ui_icons/icon_skill.webp": "9f4120ba7855ce3ed6012766534ff8f068521508f4814b763463337447d9ccd6",
     "assets/ui_icons/icon_story.webp": "92ff84146f80a3d7f9a6479c477113caf2e4017ffe10767dd866be4ea378c003",
     "assets/ui_icons/icon_treasure.webp": "fe0b83d8ece23ab09b23a013e18299de7335ba1917666a7970726e00b7eb7e17",
-    "dt-theme.css": "9bfd9aa7924cdb5483f295a3ec92828b152a3f2572ffed68579614e8cb7749f1",
+    "dt-theme.css": "c5b49c45a2f0fb5deb1ad7b9e46a75cf302db0e3207d707e01b4eef80045060d",
     "fx2d.js": "ab4794f036fc4e9976392e336e004bcef13d83976e78d719415da6c7bc10ad0d",
-    "index.html": "a76e2c175292dd39f4c8a314c1bfa997b58fba85563d6b7ea45b6ae5b73de5d1",
+    "index.html": "fdebca127a0b93fa7ca7dd2ae357331f9746c8b6eee5428a26a6c951c53cc6ea",
     "src/00-pure.js": "28600b11add4ddbdf79645a4d1d91adbe5fc48dc0e992f2fefbefeb587e212f4",
     "src/10-base.js": "f1df172e97759baa09e8ed1788f0a888c530050acea9a5570eac10ab61f1b182",
-    "src/20-core.js": "e42d48af94ae21cb578045ac272a7508d1f3b6a674deb05fac35f2baa57adb95",
+    "src/20-core.js": "4f560ca4a4c2d2766b339116105c933d84fbbf3f83fe3cc4fdd7af19a5836782",
     "src/30-systems.js": "c0720a76009cd7000dea3bc8eedf373f6d35af843359b3f889c249ea4f02b738",
     "src/40-app.js": "ca2f81b1140e308c1b5e27daa8c9b0380cc846b27172ce9c73d4eeaa5556bf8b",
-    "src/50-battle.js": "91ba5ead81222270f4484876576326eb4f1f0e4629f07751185164011337a0eb",
+    "src/50-battle.js": "adbe2070c4ece61423b89505885b09b3c8d47871b926551f3264cbbf46aef7f1",
     "src/60-stage.js": "a098e6f38e898ff3fee4c6a1f79e652373f15cf791e344813fa3d76ddd521c5b",
     "src/main.js": "161f10c02a3aa4095b257cd77f5bf1834e85d1359e85555deb8e48dfd2bd9fba"
   },
-  "rev": "adf0896b59bf2cf9",
-  "version": "5.2"
+  "rev": "3addec4c9c39606b",
+  "version": "5.3"
 }

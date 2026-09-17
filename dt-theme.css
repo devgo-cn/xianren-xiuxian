@@ -1622,9 +1622,9 @@
   .gx-lic .licface .icoim{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .16s ease}
   .gx-lic .licface .icoim.on{opacity:1}
   .gx-lic .lh{display:flex;align-items:center;gap:8px;padding-bottom:7px;margin-bottom:7px;
-    border-bottom:1px dashed rgba(216,176,106,.3)}
-  .gx-lic .lh b{font-size:13px;letter-spacing:1px;font-weight:normal}
-  .gx-lic .lh i{font-style:normal;font-size:8.5px;color:#8b94a8;letter-spacing:1px;margin-left:auto;white-space:nowrap}
+    border-bottom:1px dashed rgba(216,176,106,.3);flex-wrap:wrap}
+  .gx-lic .lh b{font-size:13px;letter-spacing:1px;font-weight:normal;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gx-lic .lh i{font-style:normal;font-size:8.5px;color:#8b94a8;letter-spacing:1px;flex-basis:100%;order:3;white-space:nowrap;margin-left:46px}
   .gx-lic .lr{display:flex;align-items:center;justify-content:space-between;padding:3.5px 0}
   .gx-lic .lr span{font-size:10px;color:#8b94a8;letter-spacing:2px}
   .gx-lic .lr b{font-size:11.5px;color:#e9e2d0;font-weight:normal;letter-spacing:.5px}
