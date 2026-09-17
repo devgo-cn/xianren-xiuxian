@@ -1413,6 +1413,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (!G.trialSettled) {
       G.trialKills++;
       updateHUD();
+      /* v5.1 击杀即刷新: 杀一只小怪立即补一只(从右边生成), 避免按频率刷怪排队AOE全死光。
+       * 同屏上限12只自动停刷, BOSS被杀不补充, 怪池刷完不补充。 */
+      if (!isBoss && G.trialSpawned < BC.trialPool.bossAt) {
+        spawnWave();
+      }
       /* v5.0 121只全刷完且BOSS已死 → 提前结算弹弹窗 */
       if (G.trialSpawned >= BC.trialPool.bossAt && G.trialBossKilled) {
         settleTrial();
@@ -2341,9 +2346,11 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
      * （表现为 probe 里冒出 sword_goblin / 第二只同名怪，把画面糊掉）。 */
     else if (window.__skillFreeze) { G.spawnT = spawnGap; }
     else if (G.spawnT <= 0) {
-      /* v5.1 按频率刷怪: 0.25s/只 → 30s刷完120只小怪, 然后BOSS出现。
-       * 同屏满了自动停刷(玩家清得慢就不会无限堆), 怪池121只刷完停刷。 */
-      if (G.trialSpawned < BC.trialPool.bossAt) spawnWave();
+      /* v5.1 击杀即刷新: 开局同屏少于10只时按频率快速填充(0.25s/只), 达到10只后停止按频率刷,
+       * 之后靠onKill击杀即刷新补充(杀一只补一只)。避免按频率刷怪排队AOE全死光。
+       * 同屏上限12只自动停刷, 怪池121只刷完停刷。 */
+      const aliveCount = G.enemies.filter(x => x.alive && x.dying <= 0).length;
+      if (aliveCount < 10 && G.trialSpawned < BC.trialPool.bossAt) spawnWave();
       G.spawnT = spawnGap;
     }
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
