@@ -1372,20 +1372,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   }
 
   /* ---------- 身法技能(疾风步 2x / 缩地成寸 3x): 独立 roll, 取高者, 时长可刷新 ----------
-   * 身法不是光环: 只在生效的那几秒里加闪避(身形飘忽), 时效一到即散, 不进面板属性
-   *
-   * v7.7 FIX —— 为什么玩家"只看得到 3 倍速, 2 倍速永不触发"：
-   *   playerStrike 里两行 rollSpeedSkill('jifeng') / ('suodi') 是背靠背执行的,
-   *   同一击内两个技能各自独立 roll。疾风步 mult=3(HUD×2)、缩地 mult=4(HUD×3),
-   *   applySpeedBuff 用 Math.max 取高者 —— 于是只要缩地也中了, 疾风刚写进去的
-   *   3 会立刻被 4 盖掉, ×2 状态【存在时间为零】, HUD 永远只闪 ×3。
-   *   纯疾风概率 16.1%、纯缩地 3.0%, 但肉眼看到的 ×2 = 0%, 就是被这样吃掉的。
-   *
-   * 修法（干净数值, 不加机制）：同一击内高倍率技能【只取消本击的低倍率同伴】,
-   *   而不是把已经挂上的旧 buff 也一起盖掉。即: 若本击缩地已命中, 则放弃本击疾风,
-   *   让 ×2/×3 互不干扰地各自生效 —— 谁先独立 roll 中, 谁就上 HUD。 */
-  function rollSpeedSkill(id, suppressLower) {
-    if (suppressLower) return null;
+   * 身法不是光环: 只在生效的那几秒里加闪避(身形飘忽), 时效一到即散, 不进面板属性 */
+  function rollSpeedSkill(id) {
     const s = skVal(id);
     if (!s || Math.random()*100 >= s.chance) return null;
     skExp(id, 3);
@@ -1464,9 +1452,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   /* ---------- 掉落物: 灵石/装备落在地板; 灵石飞向顶部统计区; 装备由飞行宠物拾取 ---------- */
   const QUALITY_COLOR = ['#aab2c0', '#6b9df5', '#3fc9a2', '#e0b45a', '#c08af0', '#ff5257'];
   function dropRarityColor(q) { return QUALITY_COLOR[Math.max(0, Math.min(5, q | 0))] || '#aab2c0'; }
-  function hudTarget() {                          // 灵石飞入锚点 = 战斗区左下角资源栏的数字位置(canvas 局部坐标)
-    /* v7.5: 资源栏已从顶部统计区迁到战斗区左下角, 锚点随之改为 #spirit(总灵石) */
-    const el = document.getElementById('spirit') || document.getElementById('battleSpirit');
+  function hudTarget() {                          // 顶部统计区"灵石"数字位置(canvas 局部坐标)
+    const el = document.getElementById('battleSpirit');
     if (el && cv) { const r = el.getBoundingClientRect(), c = cv.getBoundingClientRect(); return { x: r.left + r.width / 2 - c.left, y: r.top + r.height / 2 - c.top }; }
     return { x: CW * 0.5, y: 20 };
   }
@@ -1631,13 +1618,6 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       G.pushDmg({ x:target.x, y:target.y-30, val:'闪', crit:false, color:'#cfd8e3', t:0 });
       return;
     }
-    /* 身法是「攻击命中时概率触发」(和破甲击/斩杀同一个触发族),
-     * 挂在【命中的那一下】上, 与这一击是否击杀目标无关 —— 打死了也该照常 roll。
-     * 因此移到所有早期 return 之前: 只要这一击真的打出去了(未被闪避), 就 roll 一次。
-     * v7.7: 先 roll 高档(缩地 ×3), 中了就让低档(疾风 ×2)本击让位, 避免 4 把 3 盖掉
-     * 导致 ×2 存在时间为零、玩家"永远看不到 2 倍速"。 */
-    const _hi = rollSpeedSkill('suodi');
-    rollSpeedSkill('jifeng', !!_hi);
     /* v2.8 普攻单段: 主段(seg1)一次全额; 三连斩的 seg2/seg3 是同一轮攻击内的补刀,
      * 各按自己的节奏给倍率, 不再出现"两段各全额"把普攻 DPS 顶到技能之上 */
     let base = seg === 3 ? 1 : seg === 2 ? (0.5 + Math.random()*0.15) : (1.0 + Math.random()*0.25);
@@ -1697,6 +1677,10 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       dealDamage(target, calcDmg(PST.atk, base*(jq.dmg||0)/100, target.def, pen), '#bfe8ff', false);
       if (!target.alive) return;
     }
+    /* v5.1 疾风步/缩地成寸: 攻击时概率触发(与破甲/斩杀/剑气斩一致), 不再是击杀后触发 */
+    console.log('[skill] playerStrike hit, rolling speed skills');
+    rollSpeedSkill('jifeng');
+    rollSpeedSkill('suodi');
   }
   /* ═══════════════ v6.0 战斗距离: 统一为"边缘到边缘" ═══════════════
    *
