@@ -2905,7 +2905,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
       x: ox, y: oy + spreadY, dir, dx, dy,
       len: Math.max(k.len, (k.minLen || 0) * PLAYER_H), thick: k.thick,
       travel: (e.atkRange || 120) * k.speedK,
-      ground: !!k.ground, drop: !!k.drop, cone: !!k.cone,
       t: -delay, dur: k.dur + delay,
       a0: k.alpha, trail: k.trail, spread: k.spread, track: k.track || 0,
     });
@@ -3169,9 +3168,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
         o.spr.visible = true;
         o.spr.texture = window.BattleGL.tex(SK_TEX[f.tex]);
 
-        const col = f.tex === 'column';
         o.spr.blendMode = f.blend === 'NORMAL' ? PIXI.BLEND_MODES.NORMAL : PIXI.BLEND_MODES.ADD;
-        o.spr.anchor.set(col ? 0.5 : f.dir < 0 ? 1 : 0, 0.5);
+        o.spr.anchor.set(f.dir < 0 ? 1 : 0, 0.5);
 
         /* 位置曲线: v4.9 沿 2 维瞄准方向推进(dx/dy 为发射时朝玩家的归一化方向) */
         const adv = f.travel ? f.travel * Math.min(1, kx / 0.8) : 0;
@@ -3192,16 +3190,14 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
          * cone(吐息) 让粗端留在近处、远端收细 —— 靠 thick 的二次衰减做锥形,
          * 而不是把三角贴图整体拉长(那样尖端会被拉平成矩形)。 */
         const breathe = (f.sk === 5 || f.sk === 3) ? 1 + Math.sin(kx * Math.PI) * 0.14 : 1;
-        const grow = col ? Math.min(1, kx / 0.35) : 1;   /* 光柱从 0 拔起, 不凭空出现 */
-        const L = f.len * (1 + (f.trail || 0) * kx) * breathe * grow;
-        const taper = f.cone ? (1 - kx * 0.55) : (1 - kx * 0.22);
+        const L = f.len * (1 + (f.trail || 0) * kx) * breathe;
+        const taper = (1 - kx * 0.22);
         const W = f.thick * taper * breathe;
-        o.spr.width = col ? W : L;
-        o.spr.height = col ? L : W;
+        o.spr.width = L;
+        o.spr.height = W;
         /* v4.9 spike 素材朝左(尖端在左): 向左打不翻转, 向右打才水平翻转 */
         o.spr.scale.x = Math.abs(o.spr.scale.x) * (f.dir < 0 ? 1 : -1);
-        /* col 类锚点在中心, 高度从底部往上长 —— 故位置要抬高半个身高 */
-        o.spr.position.set(px, col ? py - L * 0.5 : py);
+        o.spr.position.set(px, py);
 
         const fadeIn = Math.min(1, kx / 0.20), fadeOut = Math.min(1, (1 - kx) / 0.35);
         o.spr.alpha = f.a0 * Math.min(fadeIn, fadeOut);
