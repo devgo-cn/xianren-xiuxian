@@ -1094,9 +1094,12 @@ function closeSkills() { const m = $("skillModal"); if (m) m.classList.remove("s
 window.closeSkills = closeSkills;
 
 export {
+  BASE_STATS,
   CLD_API,
+  EQ_POW,
   EQUI_SLOTN,
   SND,
+  bigIndexOf,
   TOTAL_SEGS,
   _auraAcc,
   _auraColor,
