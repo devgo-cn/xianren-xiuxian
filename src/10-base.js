@@ -479,6 +479,7 @@ function burstBoom() {
  * 舞台模式下不能 clearRect（会抹掉背景/战斗/灵气），粒子自然衰减到 0 即可。
  * ⚠️ dt 一律是【原始 dt】，本层不吃身法倍速。 */
 function tickBurst(dt, target) {
+  if (!parts.length) return;
   __set_parts(parts.filter(p => p.life > 0));
   const tctx = (target && target.ctx) || bctx;
   if (!tctx) return;
