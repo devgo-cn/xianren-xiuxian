@@ -2229,10 +2229,8 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     G.trialSettled = true;
     const kills = G.trialKills;
     const bossKilled = G.trialBossKilled;
-    /* 清场: 轮次结束, 场上怪与投射特效退去(掉落保留让玩家收完) */
-    for (const e of G.enemies) { e.alive = false; e.dying = 0; }
-    for (const e of G.enemies) despawnEnemy(e);   /* v4.0: GL 资源同步回收 */
-    G.enemies.length = 0;
+    /* 清场: 轮次结束, 场上怪走死亡动画自然退去(掉落保留让玩家收完) */
+    for (const e of G.enemies) { e.alive = false; if (e.dying <= 0) e.dying = 0.4; }
     G.bossActive = false;
     /* 纪录 + 离线加成(写进 state, 随云存档同步) */
     let best = 0, boost = 0, isNew = false;
