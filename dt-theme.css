@@ -1264,19 +1264,20 @@
    境界牌拨乱反正: 废弃 v1.7.28 圆角矩形, 回归 200x120 墨简
    ============================================================ */
 .realm-badge{background:transparent !important;box-shadow:none !important;padding:0 !important;position:relative !important;border:0 !important}
-.realm-left{display:block !important;width:130px !important;text-align:left !important}
-.rb-table{width:100%;border-collapse:collapse;text-align:left}
+.realm-left{display:block !important;width:auto !important;text-align:left !important}
+.rb-table{border-collapse:collapse;text-align:left}
 .rb-table td{padding:0;vertical-align:middle;white-space:nowrap;text-align:left}
 .rb-c1 .big{font-size:16px;color:#e8c884;font-weight:700;display:inline}
 .rb-c1 .sub-a{font-size:11px;color:#b9c3d8;margin-left:4px;display:inline}
 .rb-c2{font-size:10px;color:#f0c98a;font-weight:600;text-align:left}
 .rb-c2::before{content:"战力 ";color:#8b94a8;font-weight:400}
-.rb-rank{text-align:right;font-size:12px;color:#f0c98a;font-weight:700;
+.rb-rank{font-size:12px;color:#f0c98a;font-weight:700;
   border:1.5px solid rgba(240,201,138,.6);border-radius:50%;
   width:24px;height:24px;line-height:21px;text-align:center}
 .rb-c3 .pname-btn{margin-top:2px;background:none;border:none;color:#d4b87a;
   font-size:12px;cursor:pointer;padding:0;text-align:left}
 .realm-badge::after{display:none !important}
+.res-bar{flex-wrap:nowrap !important}
 
 /* ---------- 模态按钮补皮: 无 inline skin 的 .btn 统一给手绘墨形底 ----------
    v1.9.9g: :not(.seal) —— .btn.seal(信匣收取/一键收取)是正经 CSS 实底按钮,
