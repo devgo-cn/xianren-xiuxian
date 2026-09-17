@@ -18,7 +18,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
   const BC = {
     /* 占位怪 demon(妖将)/raptor(妖弓) 已移除 —— 只保留两种有真实素材的怪 */
     playerAtkRange: 75, playerAspd: 1.1, playerSpeed: 42,   /* v4.4: 基础移速 28→42 (×1.5), 走得太慢 */
-    spawnInterval: 0.3, enemySpawnOffset: 40, maxAlive: 12, queueGap: 34,   /* v5.0 按频率刷怪: 0.3s/只×300只=90s刷完, 留30s打BOSS; 用原始dt不受倍速影响 */
+    spawnInterval: 0.25, enemySpawnOffset: 40, maxAlive: 12, queueGap: 34,   /* v5.1 按频率刷怪: 0.25s/只×120只=30s刷完小怪, 然后BOSS出现; 同屏12 */
     /* v4.6 素材过目模式(当前默认开启, 过目完把 DEFAULT_MUL 那两行删掉即恢复线上节奏):
      *   window.__enemySpeedMul —— 怪移速倍率(0.35 = 慢慢挪, 便于逐只端详)
      *   window.__spawnSlowMul   —— 刷怪间隔倍率(2.5 = 刷得更稀, 一只一只来)
@@ -1413,11 +1413,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     if (!G.trialSettled) {
       G.trialKills++;
       updateHUD();
-      /* v5.1 击杀即刷新: 杀一只小怪立即补一只(从右边生成), 保持同屏怪数量稳定。
-       * BOSS被杀不补充(BOSS是最后一只), 怪池刷完不补充。 */
-      if (!isBoss && G.trialSpawned < BC.trialPool.bossAt) {
-        spawnWave();
-      }
       /* v5.0 121只全刷完且BOSS已死 → 提前结算弹弹窗 */
       if (G.trialSpawned >= BC.trialPool.bossAt && G.trialBossKilled) {
         settleTrial();
@@ -2346,10 +2341,9 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
      * （表现为 probe 里冒出 sword_goblin / 第二只同名怪，把画面糊掉）。 */
     else if (window.__skillFreeze) { G.spawnT = spawnGap; }
     else if (G.spawnT <= 0) {
-      /* v5.1 击杀即刷新: 开局同屏少于6只时按频率快速填充, 达到6只后停止按频率刷,
-       * 之后靠onKill击杀即刷新补充(杀一只补一只)。同屏满了自动停刷。 */
-      const aliveCount = G.enemies.filter(x => x.alive && x.dying <= 0).length;
-      if (aliveCount < 6 && G.trialSpawned < BC.trialPool.bossAt) spawnWave();
+      /* v5.1 按频率刷怪: 0.25s/只 → 30s刷完120只小怪, 然后BOSS出现。
+       * 同屏满了自动停刷(玩家清得慢就不会无限堆), 怪池121只刷完停刷。 */
+      if (G.trialSpawned < BC.trialPool.bossAt) spawnWave();
       G.spawnT = spawnGap;
     }
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
