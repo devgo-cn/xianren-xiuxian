@@ -338,15 +338,16 @@ function artMult() { /* v1.9.9 累乘→弱化加算: 4件玄天级(3.8)从 55x 
 }
 
 let _buffCache = null;
-let _buffCacheKey = 0;
+let _buffCacheT = 0;
 
 function buffMult() {
-  if (_buffCache) return _buffCache;
-  const t = Date.now();
+  const now = Date.now();
+  if (_buffCache && now - _buffCacheT < 500) return _buffCache;
+  const t = now;
   /* v1.9.0: 清理只丢"已过期"的; 累加出来的多段同 mult 药力一律保留 ——
    * 它们共同构成 24 小时的总时长, 提前合并会丢掉时长信息。 */
   state.buffs = (state.buffs || []).filter(b => b.until > t);
-  if (!state.buffs.length) { _buffCache = 1; return 1; }
+  if (!state.buffs.length) { _buffCache = 1; _buffCacheT = now; return 1; }
   /* 整理: 同 mult 的相邻/重叠段合并成一段, 让增长期长度可控(每服一道最多 +1 段) */
   const by = {};
   for (const b of state.buffs) {
@@ -361,9 +362,10 @@ function buffMult() {
   for (const m of merged) if (m.until - m.start > BUFF_CAP_MS) m.until = m.start + BUFF_CAP_MS;
   state.buffs = merged;
   // 药力相冲，只取当前最强的一道（防 buff 叠乘指数爆炸）
-  if (!state.buffs.length) { _buffCache = 1; return 1; }
+  if (!state.buffs.length) { _buffCache = 1; _buffCacheT = now; return 1; }
   const result = Math.max(...state.buffs.map(b => fin(b.mult, 1)));
   _buffCache = result;
+  _buffCacheT = now;
   return result;
 }
 
