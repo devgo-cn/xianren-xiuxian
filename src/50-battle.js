@@ -2788,7 +2788,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       else if (G.petEagleReady && G.petEagleSprite && pet.type === 'eagle') {
         const EAGLE_SPRITE = { cols: 10, fw: 704, fh: 580 };
         const frameIdx = pet.flyFrame % 30;
-        const drawH = Math.min(CH * 0.5, 80);
+        const drawH = Math.min(CH * 0.5, 120);
         const drawW = drawH * (EAGLE_SPRITE.fw / EAGLE_SPRITE.fh);
         S.main.visible = true;
         S.main.texture = frameTex(G.petEagleSprite, EAGLE_SPRITE.cols, EAGLE_SPRITE.fw, EAGLE_SPRITE.fh, frameIdx);
