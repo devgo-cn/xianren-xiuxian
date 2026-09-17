@@ -353,7 +353,6 @@
     "assets/monster_001_green_slime_meta.json": "33a719f4ae861c8c07513e035ab678c9a662e30592daea9dacfbd828221d3712",
     "assets/monster_002_water_sprite.webp": "a19104128518abf8a910f14632302240b36496ffd4e756b11278275dab00f0b1",
     "assets/monster_002_water_sprite_meta.json": "32160b5628c45ac577a5ac1d6ed69637629c602dbc3b5c882120cf00bea751c7",
-    "assets/monster_003_slime_king.webp": "665c23ae8e6b63f0aa842c60bb0650492701863f6de63efb1c596e754cb75ad3",
     "assets/monsters/m0_wolf.png": "6789c303957e665440519b98aa680a7f9308f960dcd5bca0576a3552e8bafbe8",
     "assets/monsters/m1_shanyao.png": "0d7c9b8b9b2517d6755c94d0ca9a79d151ade5d7ab9bcc82bb8fbc5169ca4e06",
     "assets/monsters/m2_xiongpi.png": "86f588d45ece7630b92f029163ac68e23180821d145879389eca08245b3ab510",
@@ -476,10 +475,10 @@
     "src/20-core.js": "0a91e421bc308dd63a5ff9cadb297d1290f425e7af2fdae6f0d7d9f298114de2",
     "src/30-systems.js": "f61b73a495d92f84fdc40326baf348273be45bb022947fca9d35a3573d0ab65d",
     "src/40-app.js": "aae66de082a0e89a98930a0f7cf2a94644d48d3d38e2e233c4e768ebc98827a4",
-    "src/50-battle.js": "295b039932487399373a7bdb9df7bf11cda0ba56445889ea13094f56952b24b5",
+    "src/50-battle.js": "0c21efa968e510c197e4429b6a528f4ca9029abcdcf20ca6c28829d2bb95a68b",
     "src/60-stage.js": "58e1ee5df0b972d4271ca676e65622fee3544b9ab6f226ef3f8ffaa16205ae47",
     "src/main.js": "1517a99d7dbac636ad1e00f8365ff9283579a3c75eb92b5cd56545efef76bcbb"
   },
-  "rev": "5d6a2c6f35494536",
+  "rev": "704ac7986f26e998",
   "version": "3.5"
 }
