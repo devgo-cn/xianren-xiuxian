@@ -202,11 +202,9 @@ function keepArtQuiet(a) {          // 静默版 smartEquip: 批量结算不发�
   const w = arts[idx];
   if (!w) { arts[idx] = a; return true; }
   if (artScore(a) > artScore(w)) {
-    state.spirit += Math.round(50 * Math.pow(1.6, w.q));    // 旧件熔回
     arts[idx] = a; return true;
   }
-  state.spirit += Math.round(40 * Math.pow(1.5, a.q));      // 新件不入眼, 当场熔作灵石
-  return false;
+  return false;   // v5.4: 新件不入眼直接丢弃, 不熔灵石
 }
 
 function renderCraftBtn() {
