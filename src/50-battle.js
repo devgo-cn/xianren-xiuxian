@@ -2876,24 +2876,29 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       }
     }
 
-    /* 渲染灵鹰弹幕 */
+    /* 渲染灵鹰弹幕(对象池复用) */
     if (G.petEagleBoltReady && G.petEagleBoltSprite && G.eagleBolts) {
-      /* 先清旧 sprite */
-      if (G._boltSprites) {
-        for (const s of G._boltSprites) {
-          window.BattleGL.stage.removeChild(s);
-          s.destroy();
-        }
-      }
-      G._boltSprites = [];
-      for (const b of G.eagleBolts) {
+      if (!G._boltPool) G._boltPool = [];
+      const needed = G.eagleBolts.length;
+      /* 补足池 */
+      while (G._boltPool.length < needed) {
         const spr = new PIXI.Sprite(G.petEagleBoltSprite);
         spr.anchor.set(0.5, 0.5);
         spr.width = 60; spr.height = 30;
-        spr.position.set(b.x, b.y);
-        spr.alpha = 0.9;
         window.BattleGL.stage.addChild(spr);
-        G._boltSprites.push(spr);
+        G._boltPool.push(spr);
+      }
+      /* 更新位置 */
+      for (let i = 0; i < G._boltPool.length; i++) {
+        const spr = G._boltPool[i];
+        if (i < needed) {
+          const b = G.eagleBolts[i];
+          spr.visible = true;
+          spr.position.set(b.x, b.y);
+          spr.alpha = 0.9;
+        } else {
+          spr.visible = false;
+        }
       }
     }
   }
@@ -3857,7 +3862,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     G.pets.push({
       id: 'pet_eagle', name: '灵鹰', type: 'eagle',
       atk: 0, aspd: 0, atkRange: 0, hp: 999, maxHp: 999,
-      offsetX: 120, offsetY: -200,
+      offsetX: 120, offsetY: -160,
       x: 35, y: 0, atkT: 0, anim: 0, hurtT: 0, alive: true,
       flyFrame: 0, flyTimer: 0, bobT: 0,
       fetch: { state: 'idle', drop: null },
