@@ -618,8 +618,11 @@
     <div class="realm-left">
       <div class="realm-badge" id="realmBadge" onclick="openRank()" title="洞天风云榜 · 前十">
         <table class="rb-table" cellpadding="0" cellspacing="0">
-          <tr><td class="rb-c1"><span class="big" id="realmName">凡人</span><span class="sub-a" id="realmSubA"></span></td></tr>
-          <tr><td class="rb-c2"><span class="rb-power" id="realmPower"></span></td><td class="rb-rank">榜</td></tr>
+          <tr><td class="rb-c1" colspan="2"><span class="big" id="realmName">凡人</span><span class="sub-a" id="realmSubA"></span></td></tr>
+          <!-- v7.6: 补 realmSubB 元素 —— 此前该 id 在 HTML 中缺失, 导致 setRealmSub 第二行(大境界法门说明)
+               一直被静默丢弃(console 无报错, 只是看不到)。小境界段位在 rb-c1 的 #realmSubA。 -->
+          <tr><td class="rb-c4" colspan="2"><span class="sub-b" id="realmSubB"></span></td></tr>
+          <tr><td class="rb-c2"><span class="rb-power" id="realmPower"></span><span class="rb-rank">榜</span></td></tr>
           <tr><td class="rb-c3" colspan="2"><button class="pname-btn" id="pName" onclick="event.stopPropagation();openRename()" title="点此定道号"></button></td></tr>
         </table>
       </div>
