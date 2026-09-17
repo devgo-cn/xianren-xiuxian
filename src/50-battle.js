@@ -2937,17 +2937,26 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
     }
     return t;
   }
-  /* 玩家渲染对象组: 主 Sprite + 4 残影 + ADD 柔光 + 占位 Graphics（懒建单例） */
+  /* 玩家渲染对象组: 主 Sprite + 残影池 + ADD 柔光 + 占位 Graphics */
   function playerGL() {
     const S = drawPlayerSprite._st;
     if (S) return S;
     const C = window.BattleGL.layers.player;
-    const st = { main: new PIXI.Sprite(), glow: new PIXI.Sprite(), place: new PIXI.Graphics() };
+    const st = { main: new PIXI.Sprite(), glow: new PIXI.Sprite(), place: new PIXI.Graphics(), ghosts: [], ghostPool: [], ghostTimer: 0 };
     st.glow.anchor.set(0.5);
     st.glow.blendMode = PIXI.BLEND_MODES.ADD;
     C.addChild(st.glow);
     C.addChild(st.place);
     C.addChild(st.main);
+    /* 预建残影池(20个, 足够倍速时0.05s间隔×0.25s寿命=5个同时存活) */
+    for (let i = 0; i < 20; i++) {
+      const g = new PIXI.Sprite();
+      g.visible = false;
+      g.alpha = 0;
+      g.tint = 0x5599ff;
+      C.addChild(g);
+      st.ghostPool.push(g);
+    }
     return drawPlayerSprite._st = st;
   }
   function drawPlayerSprite() {
@@ -3038,6 +3047,39 @@ import { state, DIMSTAT } from './00-pure.js';   /* v3.9: 试炼纪录/离线加
       S.glow.position.set(sx - drawW*0.35 + drawW/2, sy - bodyH/2);
       S.glow.width = S.glow.height = bodyH * 1.5;
       S.glow.alpha = glowA;
+    }
+    /* 残影系统: 倍速时每0.05s快照当前帧, 生成蓝色残影, 0.25s内淡出 */
+    if (G.speedMult > 1 && !p.attackAnim) {
+      S.ghostTimer -= 1/60;  // 假设60fps
+      if (S.ghostTimer <= 0) {
+        S.ghostTimer = 0.05;
+        /* 从池里取一个幽灵 */
+        if (S.ghostPool.length > 0) {
+          const g = S.ghostPool.pop();
+          g.visible = true;
+          g.texture = frameTex(G.sprite, SPRITE.cols, SPRITE.fw, SPRITE.fh, frameIdx);
+          g.position.set(sx - drawW*0.35, sy - boxB * bs);
+          g.scale.set(bs, bs);
+          g.tint = 0x5599ff;
+          g.alpha = 0.5;
+          g._age = 0;
+          g._life = 0.25;
+          S.ghosts.push(g);
+        }
+      }
+    }
+    /* 更新所有存活残影: 年龄增长, 透明度递减 */
+    for (let i = S.ghosts.length - 1; i >= 0; i--) {
+      const g = S.ghosts[i];
+      g._age += 1/60;
+      const k = g._age / g._life;
+      if (k >= 1) {
+        g.visible = false; g.alpha = 0;
+        S.ghosts.splice(i, 1);
+        S.ghostPool.push(g);
+      } else {
+        g.alpha = 0.5 * (1 - k);
+      }
     }
     /* 血条: 挂人头顶, 与技能态同口径 */
     drawHpBar('playerUI', sx, sy - bodyH - 10, 36, p.hp, p.maxHp);
