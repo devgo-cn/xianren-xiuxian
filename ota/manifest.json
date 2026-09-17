@@ -458,15 +458,15 @@
     "dt-theme.css": "9bfd9aa7924cdb5483f295a3ec92828b152a3f2572ffed68579614e8cb7749f1",
     "fx2d.js": "ab4794f036fc4e9976392e336e004bcef13d83976e78d719415da6c7bc10ad0d",
     "index.html": "2ccf9e4fb2ffcc99aea7a217d1757bba47f8261db7e09b9a625bd0133ed54998",
-    "src/00-pure.js": "1f3bb4fcd5038f7a006d807667d7444f3fd88b4c42401fe896836835e483dfdd",
-    "src/10-base.js": "4f20c8ccbf5bd7471876201a7aca86857f1fe965c1630ff8a88b2522c58457a6",
+    "src/00-pure.js": "1440be0a9636cd634fd3538b9bec3caefafd30128e45c472af4d9b87754e92b9",
+    "src/10-base.js": "e2f66721353acebfcdc57a1886ce58dabe4da4e1ecc6261ebda66fa72b76af68",
     "src/20-core.js": "e42d48af94ae21cb578045ac272a7508d1f3b6a674deb05fac35f2baa57adb95",
-    "src/30-systems.js": "170a3e013a951672754ee11cc9b9ffc4e883d189dff95616aef3ac928c4cc1fd",
-    "src/40-app.js": "af81a0da89f89ddd04054e70b2b8188ef5c7b69842a623fec7262806ea979cc8",
-    "src/50-battle.js": "82840ceaa34e90701509f34de42caa190b044d67714a1a535678b92b62c34ce3",
+    "src/30-systems.js": "d50c3e490f7b17174026549110cd2f0badcb91351341c972d3da3fcd7f03f642",
+    "src/40-app.js": "8210efd300627532e2f1e135d543d7da065a480be61b1ff684fc12700055501c",
+    "src/50-battle.js": "2e5075440c1889860ce057ef4d6e7ab5ceebb0c58b2d6bf353d046c472389084",
     "src/60-stage.js": "58e1ee5df0b972d4271ca676e65622fee3544b9ab6f226ef3f8ffaa16205ae47",
     "src/main.js": "161f10c02a3aa4095b257cd77f5bf1834e85d1359e85555deb8e48dfd2bd9fba"
   },
-  "rev": "aa62f29a33a6e600",
+  "rev": "9ac85d239d2b7e31",
   "version": "3.5"
 }
