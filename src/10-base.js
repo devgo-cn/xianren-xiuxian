@@ -5,7 +5,7 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, ARMOR_POOL, BASE_STATS, EQ_POW, ARRAY_COST, ART_PREFIX, ART_SPECIAL, ART_SUFFIX, AURA_COLORS, BIGS, BTL, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, EQUI_ICON, EQUI_SLOTI, FX_POOL, FX_TXT, G1_TPL, GAME_VER, JRN_TAIL, MATS, MIGRATIONS, MON_ATK_SCALE, MON_FX_POOL, MON_NAMES, MYST, PAGES_NEED, PEND_POOL, PLOT, QUALITY, RECIPES, RK_NAMES, RK_SEGS, SAVE_KEY, SCROLL_POOL, SEARCH_MAX, SEARCH_MIN, SEG_META, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, TRACE_ACT, TRAVEL_FIRST_MAX, TRAVEL_FIRST_STEP, TRAVEL_FIRST_WINDOW, TRAVEL_LATE_STEP, TRAVEL_SPAN, ZONES, __set_alTipT, __set_hbFails, __set_kicked, __set_parts, __set_tracePool, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, _tracePool, alIcoCls, alTipT, autoHuntOn, capDeviceDpr, cauldron, cld, cldApiBase, cnNum, durTxt, eqMult, esc, fin, finalStats, fmt, fxAgg, fxCount, fxValue, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, selRecipe, state } from './00-pure.js';
+import { $, ARMOR_POOL, BASE_STATS, EQ_POW, bigIndexOf, ARRAY_COST, ART_PREFIX, ART_SPECIAL, ART_SUFFIX, AURA_COLORS, BIGS, BTL, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, EQUI_ICON, EQUI_SLOTI, FX_POOL, FX_TXT, G1_TPL, GAME_VER, JRN_TAIL, MATS, MIGRATIONS, MON_ATK_SCALE, MON_FX_POOL, MON_NAMES, MYST, PAGES_NEED, PEND_POOL, PLOT, QUALITY, RECIPES, RK_NAMES, RK_SEGS, SAVE_KEY, SCROLL_POOL, SEARCH_MAX, SEARCH_MIN, SEG_META, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, TRACE_ACT, TRAVEL_FIRST_MAX, TRAVEL_FIRST_STEP, TRAVEL_FIRST_WINDOW, TRAVEL_LATE_STEP, TRAVEL_SPAN, ZONES, __set_alTipT, __set_hbFails, __set_kicked, __set_parts, __set_tracePool, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, _tracePool, alIcoCls, alTipT, autoHuntOn, capDeviceDpr, cauldron, cld, cldApiBase, cnNum, durTxt, eqMult, esc, fin, finalStats, fmt, fxAgg, fxCount, fxValue, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, selRecipe, state } from './00-pure.js';
 
 (function () {
   const vt = document.getElementById("verTag"); if (vt) vt.textContent = GAME_VER;
@@ -124,7 +124,7 @@ function adopt(s) {
   if (!s.pills || typeof s.pills !== "object") s.pills = {};
   if (!Array.isArray(s.buffs)) s.buffs = [];
   s.offlineBoostUntil = Math.max(0, fin(s.offlineBoostUntil, 0));
-  /* v3.9 妖潮试炼: 纪录 + 离线收益加成(120s 击杀纪录 → 补偿档位) */
+    /* v3.9 妖潮试炼: 纪录 + 离线收益加成(120s 击杀纪录 → 补偿档位) */
   s.trialBest = Math.max(0, Math.floor(fin(s.trialBest, 0)));
   s.trialBoost = Math.min(1.80, Math.max(0, fin(s.trialBoost, 0)));   /* v5.1 封顶180%(120只×1%+BOSS60%) */
   s.trialBoostUntil = Math.max(0, fin(s.trialBoostUntil, 0));
@@ -934,7 +934,7 @@ function artCtx() {
   let fa = 0, fd = 0, fh = 0;
   const _eb = equipBonus();
   fa = _eb.atk || 0; fd = _eb.def || 0; fh = _eb.hp || 0;
-  const _bi = seg(state.realmIdx || 0).bigIdx || 0;   /* v7.1: 按大境界序号 */
+  const _bi = bigIndexOf(state.realmIdx);   /* v7.2b 同上 */
   const _bs = BASE_STATS[Math.min(BASE_STATS.length - 1, _bi)] || BASE_STATS[0];
   return {
     atkRef: Math.max(220, _bs[0] + fa),
@@ -1005,21 +1005,21 @@ function rollFx(kind, q) {                          // 装备词条(同槽不重
   const pool = (FX_POOL[kind] || FX_POOL.w).slice();
   const n = fxCount(q);
   const f = [];
-  /* v5.0 极品词条: 每条有概率升级为极品(数值×1.8, 带legendary标记)。
+  /* v5.0 极品词条: 每条有概率升级为极品(数值×2.4, 带legendary标记)。
    * 概率随品质递增: q0=3% → q5=20.5%。极品=带极品词条的装备, 不单独成品级。 */
-  const legChance = 0.03 + q * 0.035;
+  const legChance = 0.04 + q * 0.052;   /* v7.2b 极品概率上调: q0=4% → q5玄天=30% */
   /* v2.5 功法(s)必带攻速词条: 数值随品质分档(低品 3~5% / 高品 5~7%), 其余词条照常 roll;
    * 其他部位(兵/护/佩)不出攻速 */
   if (kind === "s") {
     const v = fxValue("aspd", q);
     const leg = Math.random() < legChance;
-    f.push({ k: "aspd", v: leg ? Math.round(v * 1.8) : v, legendary: leg });
+    f.push({ k: "aspd", v: leg ? Math.round(v * 2.4) : v, legendary: leg });
   }
   for (let i = f.length; i < n && pool.length; i++) {
     const key = pool.splice((Math.random() * pool.length) | 0, 1)[0];
     const v = fxValue(key, q);
     const leg = Math.random() < legChance;
-    f.push({ k: key, v: leg ? Math.round(v * 1.8) : v, legendary: leg });
+    f.push({ k: key, v: leg ? Math.round(v * 2.4) : v, legendary: leg });
   }
   return f;
 }
@@ -1081,7 +1081,7 @@ function pushBattleStats() {
   if (!api || !api.setStats) return;
   const lv = (state.realmIdx || 0) + 1, eb = equipBonus();
   /* v7.1: 基础三围改手动表 BASE_STATS —— 围绕怪物毛坯(境界间×4质变), 旧线性 10+46*lv 退役 */
-  const bi = seg(state.realmIdx || 0).bigIdx || 0;   /* v7.1: 三表按大境界序号索引 */
+  const bi = bigIndexOf(state.realmIdx);   /* v7.2b 纯函数推算, 修复启动期 SEG_META 未填充卡导入 */
   const bs = BASE_STATS[Math.min(BASE_STATS.length - 1, bi)] || BASE_STATS[0];
   const s = finalStats({ hp: bs[1], atk: bs[0], def: bs[2] },
     { hp: eb.hp || 0, atk: eb.atk || 0, def: eb.def || 0 }, eb.agg);

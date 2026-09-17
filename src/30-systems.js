@@ -6,7 +6,7 @@
  * 重建: node tools/split2.js <repo> <out>
  */
 import { $, ARRAY_MAX_LV, AURA_COLORS, AURA_FPS, BIGS, BTL, DAN_ZONE, EQUI_CELLPOS, EQUI_ICON, EQUI_SLOTI, MAIL_CAP, MAIN_STORY, MATS, MS_ARRAY, MS_ART, MS_SPIRIT, MYST, PAGES_NEED, PLOT, QUALITY, REALM_DAYS, RECIPES, SEG4, SEG_META, SEG_SCALE, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, TRAVEL_FIRST_WINDOW, TRAVEL_SPAN, __set_cauldron, __set_eqSel, __set_lastReadyHint, __set_selRecipe, __set_settling, _dsp, _eqSel, _floatPrev, _settling, arrMult, bigSub, cauldron, cld, cnNum, durTxt, fin, finalStats, fmt, lastReadyHint, pulseChip, selRecipe, setProg, skillExpNeed, spawnFloat, state } from './00-pure.js';
-import { BASE_STATS, EQ_POW, EQUI_SLOTN, TOTAL_SEGS, __set_auraAcc, __set_auraT, _auraAcc, _auraColor, _auraCtx, _auraP, _auraT, alHave, alInFurn, alTip, arrayCostNow, artMult, artName, attrAssign, buffMult, cldUI, equipBonus, fitsRecipe, hiddenUnlocked, locById, pagesOf, pickNoRepeat, pushMsg, recipeCan, recipeCardHTML, renderBag, renderCabinet, renderFurn, seg, skillGet, skillLv, srvNow, travelBtnLbl, travelMailCount, travelNextMailIn, travelSent, zoneOfBig, 段名 } from './10-base.js';
+import { BASE_STATS, EQ_POW, bigIndexOf, EQUI_SLOTN, TOTAL_SEGS, __set_auraAcc, __set_auraT, _auraAcc, _auraColor, _auraCtx, _auraP, _auraT, alHave, alInFurn, alTip, arrayCostNow, artMult, artName, attrAssign, buffMult, cldUI, equipBonus, fitsRecipe, hiddenUnlocked, locById, pagesOf, pickNoRepeat, pushMsg, recipeCan, recipeCardHTML, renderBag, renderCabinet, renderFurn, seg, skillGet, skillLv, srvNow, travelBtnLbl, travelMailCount, travelNextMailIn, travelSent, zoneOfBig, 段名 } from './10-base.js';
 import { _cloudSettleRun, addJournal, artScore, bigIdx, licSync, realm, renderCraftBtn, renderSkills, save, showChapter, skillAddExp, skillTotalLv, skillVal } from './20-core.js';
 
 (function buildSegs() {
@@ -61,7 +61,7 @@ function rateNow() { return Math.max(0, fin(4 * realmMult() * artMult() * arrMul
 function pickQ() {
   /* v7.1: 品质权重按大境界走 QW_TABLE 手动表 —— 前期玄天极稀(1%), 中后期抬升,
    * 合体之后可攒全红毕业 → 虐杀 121。装备仍境界卡死(数值=本境 EQ_POW), 不破坏平衡。 */
-  const bi = seg(state.realmIdx || 0).bigIdx || 0;   /* v7.1: 按大境界序号 */
+  const bi = bigIndexOf(state.realmIdx);   /* v7.2b 纯函数推算 */
   const qw = QW_TABLE[Math.min(QW_TABLE.length - 1, bi)] || QUALITY.map(r => r.w);
   const t = qw.reduce((s, r) => s + r, 0);
   let x = Math.random() * t;
@@ -74,7 +74,7 @@ function makeArt() {          // 四部位: 槽0兵器 1护体 2灵佩 3功法
   const arts = state.arts || [];
   const slot = arts.length < 4 ? arts.length : Math.floor(Math.random() * 4);
   const tp = SLOT_TYPES[slot];
-  const bi = seg(state.realmIdx || 0).bigIdx || 0;   /* v7.1: 按大境界序号取因子 */
+  const bi = bigIndexOf(state.realmIdx);   /* v7.2b 纯函数推算 */
   const lv = (state.realmIdx || 0) + 1;
   let name = artName(tp.k, q, lv);
   const art = { name, q, mult: QUALITY[q].mult, t: Date.now(), tp: tp.k, slot, lv };
@@ -438,7 +438,7 @@ function renderEquip() {                 // v1.9.8 十字格工作台: 四正方
   /* v1.9.8c 下方面板: 角色「道身」各项总属性(裸身+装备+词条合并后的面板值), 常显不随选中变化 */
   let detail;
   {
-    const _bi = seg(state.realmIdx || 0).bigIdx || 0;   /* v7.1: 按大境界序号 */
+    const _bi = bigIndexOf(state.realmIdx);   /* v7.2b 纯函数推算 */
     const _bs = BASE_STATS[Math.min(BASE_STATS.length - 1, _bi)] || BASE_STATS[0];
     const hs = finalStats({ hp: _bs[1], atk: _bs[0], def: _bs[2] },
       { hp: eb.hp || 0, atk: eb.atk || 0, def: eb.def || 0 }, eb.agg);
