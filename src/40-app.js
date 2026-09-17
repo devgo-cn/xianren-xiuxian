@@ -378,6 +378,7 @@ function startGame() {
 
 async function boot() {
   load();                      // v1.10.0: 先读本地档(明文 JSON 同步), 再走云端门禁
+  _equipQueue.length = 0;      // 清空跨会话残留的未拾取装备掉落队列
   let passed = false;
   try { passed = await bootGate(); } catch (e) { passed = false; }
   if (!passed) { splashFail(); return; }   // 连不通 → 停在失败页, 不进入游戏
