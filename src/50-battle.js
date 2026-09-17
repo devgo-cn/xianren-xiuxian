@@ -19,11 +19,6 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     /* 占位怪 demon(妖将)/raptor(妖弓) 已移除 —— 只保留两种有真实素材的怪 */
     playerAtkRange: 75, playerAspd: 1.1, playerSpeed: 42,   /* v4.4: 基础移速 28→42 (×1.5), 走得太慢 */
     spawnInterval: 0.25, enemySpawnOffset: 40, maxAlive: 12, queueGap: 34,   /* v5.1 按频率刷怪: 0.25s/只×120只=30s刷完小怪, 然后BOSS出现; 同屏12 */
-    /* v4.6 素材过目模式(当前默认开启, 过目完把 DEFAULT_MUL 那两行删掉即恢复线上节奏):
-     *   window.__enemySpeedMul —— 怪移速倍率(0.35 = 慢慢挪, 便于逐只端详)
-     *   window.__spawnSlowMul   —— 刷怪间隔倍率(2.5 = 刷得更稀, 一只一只来)
-     *   window.__poolAll        —— true = 忽略档位限制, 79 只怪立刻全部进池
-     * 想要恢复原节奏: 把下面三行删掉, 或在控制台改这些值。 */
     enemies: {
       /* hpK/atkK/defK: 按玩家境界(lv)线性成长 —— 怪只随境界长, 玩家随境界+装备长, 换装即提速。
        * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。
@@ -112,16 +107,7 @@ import { state } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档
     eliteHp: 3,           // 精英血量倍率
   };
 
-  /* ── v4.6 素材过目模式 ──────────────────────────────────────────────
-   * 目的: 让你能一只一只看 79 只怪的素材有没有问题。
-   * 三项设置(删掉本段即完全恢复线上节奏):
-   *   ① 全量进池    —— 不再等打到 T5, 79 只怪从一开始就都可能刷出来
-   *   ② 怪走慢      —— 移速 ×0.35, 慢慢挪过来, 来得及看清
-   *   ③ 刷怪稀疏    —— 间隔 ×2.5(2.6s→6.5s), 一只一只来, 不糊成一团
-   *   ④ 同屏上限    —— 9→3 只, 场上不挤
-   * 运行时也可在控制台随时改这些值, 即时生效。 */
   if (typeof window !== 'undefined') {
-    if (window.__enemySpeedMul === undefined) window.__enemySpeedMul = 0.35;
     /* v5.0 强制解冻妖潮倒计时: 不管旧代码残留什么值, 正式游戏必须正常结算。
      * 需要调试冻结时在控制台手动设 window.__trialFreeze=true 后刷新 */
     window.__trialFreeze = false;
