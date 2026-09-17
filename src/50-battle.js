@@ -146,6 +146,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     trialT: BC.trialSecs, trialKills:0, trialTier:1, trialSettled:false, trialBossDone:false, bossT:0,
     trialSpawned:0, trialBossKilled:false,
   };
+  /* v6.9 PERF: 粒子上限。每次命中/击杀/技能都 push 一个粒子, 同屏激烈时无上限会堆积
+   * 几十个 PIXI.Sprite/Graphics, 每帧合成开销线性涨。同屏 80 个粒子已经足够特效密度。 */
+  G.pushFx = function(o) { if (this.fx.length < 80) this.fx.push(o); };
   let _hudRefreshT = 0;   /* v5.0 定期刷新HUD计时器: 打BOSS期间无击杀, 倒计时显示会卡住 */
   const _spawnEntries = [];   /* 刷怪权重池复用: 避免每次spawnWave新建数组 */
 
@@ -1383,7 +1386,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     skillCall(id === 'jifeng' ? '疾风步' : '缩地成寸');   /* 身法播报 */
     /* 身法触发特效: 玩家位置速度爆发 */
     if (G.player) {
-      G.fx.push({ kind:'speedBurst', x:G.player.x, y:G.player.y-20, color: id==='suodi' ? '#a0d8ff' : '#80ffc0', t:0, dur:0.5 });  /* v3.7.2 y带玩家车道偏移 */
+      G.pushFx({ kind:'speedBurst', x:G.player.x, y:G.player.y-20, color: id==='suodi' ? '#a0d8ff' : '#80ffc0', t:0, dur:0.5 });  /* v3.7.2 y带玩家车道偏移 */
     }
     updateHUD();
     return id;
@@ -1615,7 +1618,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     const pj = skVal('pojia');
     if (pj && Math.random()*100 < pj.chance) {
       pen = Math.min(90, pen + pj.pen); skExp('pojia', 2); skillCall('破甲击');
-      G.fx.push({ kind:'hitSpark', x:target.x, y:target.y-20, color:'#ffd76b', t:0, dur:0.3 });
+      G.pushFx({ kind:'hitSpark', x:target.x, y:target.y-20, color:'#ffd76b', t:0, dur:0.3 });
     }
     /* 斩杀: 目标残血(低于 X%)时, 这一击伤害翻倍 */
     const zs = skVal('zhansha');
@@ -1642,7 +1645,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     const hs = skVal('hengsao');
     if (hs && Math.random()*100 < hs.chance) {
       skExp('hengsao', 2); skillCall('横扫千军');
-      G.fx.push({ kind:'hengsao', x:p.x, y:p.y-30, color:'#ffc98a', t:0, dur:0.30, frame:0, startX:p.x, endX:p.x+200 });  /* v3.7.2 y带玩家车道偏移(原固定-30永远画在中道); v2.9 再提速: 0.6→0.38→0.30s, 起手即爆 */
+      G.pushFx({ kind:'hengsao', x:p.x, y:p.y-30, color:'#ffc98a', t:0, dur:0.30, frame:0, startX:p.x, endX:p.x+200 });  /* v3.7.2 y带玩家车道偏移(原固定-30永远画在中道); v2.9 再提速: 0.6→0.38→0.30s, 起手即爆 */
       playSfx('hengsao', 0.8);
       const n = Math.max(1, Math.round(hs.n || 1));
       let hit = 0;
@@ -1662,7 +1665,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     const jq = skVal('jianqi');
     if (jq && Math.random()*100 < jq.chance) {
       skExp('jianqi', 2); skillCall('剑气斩');
-      G.fx.push({ kind:'slash', x:target.x, y:target.y-24, color:'#bfe8ff', t:0, dur:0.28 });
+      G.pushFx({ kind:'slash', x:target.x, y:target.y-24, color:'#bfe8ff', t:0, dur:0.28 });
       dealDamage(target, calcDmg(PST.atk, base*(jq.dmg||0)/100, target.def, pen), '#bfe8ff', false);
       if (!target.alive) return;
     }
@@ -1765,11 +1768,11 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       }
     }
     G.dmg.push({ x:target.x,y:target.y-40, val:Math.round(amount), crit:crit||false, color:color||'#e8f2fa', t:0, vx:(Math.random()-0.5)*18 });
-    G.fx.push({ kind:'hitSpark', x:target.x,y:target.y-20, color:color||'#fff', t:0,dur:0.3 });
+    G.pushFx({ kind:'hitSpark', x:target.x,y:target.y-20, color:color||'#fff', t:0,dur:0.3 });
     if (target.hp <= 0) {
       target.hp=0; target.alive=false; target.dying=0.4;
       G.kills++;
-      G.fx.push({ kind:'death', x:target.x,y:target.y-15, color:target.color, t:0,dur:0.4 });
+      G.pushFx({ kind:'death', x:target.x,y:target.y-15, color:target.color, t:0,dur:0.4 });
       onKill(target);
       updateHUD();
     }
@@ -2006,9 +2009,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         if (pet.effectTimer >= 0.08) {
           pet.effectTimer = 0;
           if (pet.castType === 'heal') {
-            G.fx.push({ kind:'healParticle', x:p.x+(Math.random()-0.5)*30, y:p.y-30-Math.random()*40, vx:(Math.random()-0.5)*10, vy:-20-Math.random()*15, t:0, dur:0.8, color:'#7fffaa' });
+            G.pushFx({ kind:'healParticle', x:p.x+(Math.random()-0.5)*30, y:p.y-30-Math.random()*40, vx:(Math.random()-0.5)*10, vy:-20-Math.random()*15, t:0, dur:0.8, color:'#7fffaa' });
           } else if (pet.castType === 'atk') {
-            G.fx.push({ kind:'atkParticle', x:p.x+(Math.random()-0.5)*25, y:p.y-20-Math.random()*30, vx:(Math.random()-0.5)*15, vy:-15-Math.random()*10, t:0, dur:0.7, color:'#ffaa55' });
+            G.pushFx({ kind:'atkParticle', x:p.x+(Math.random()-0.5)*25, y:p.y-20-Math.random()*30, vx:(Math.random()-0.5)*15, vy:-15-Math.random()*10, t:0, dur:0.7, color:'#ffaa55' });
           }
         }
         /* 施法完成: 触发效果 */
@@ -2020,13 +2023,13 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
             const healAmt = Math.round(p.maxHp * 0.2);
             p.hp = Math.min(p.maxHp, p.hp + healAmt);
             G.dmg.push({ x:p.x, y:p.y-50, val:'+'+healAmt, crit:false, color:'#7fffaa', t:0 });
-            G.fx.push({ kind:'healBurst', x:p.x, y:p.y-30, t:0, dur:0.5 });
+            G.pushFx({ kind:'healBurst', x:p.x, y:p.y-30, t:0, dur:0.5 });
           } else if (pet.castType === 'atk') {
             /* 加攻击: +30%攻击力, 持续6秒 */
             p.atkBuff = 0.3;
             p.atkBuffTimer = 6;
             G.dmg.push({ x:p.x, y:p.y-50, val:'攻击+30%', crit:false, color:'#ffaa55', t:0 });
-            G.fx.push({ kind:'atkBurst', x:p.x, y:p.y-30, t:0, dur:0.5 });
+            G.pushFx({ kind:'atkBurst', x:p.x, y:p.y-30, t:0, dur:0.5 });
           }
           pet.castType = null;
           pet.castTimer = 8;  /* 8秒后再次施法 */
@@ -2208,7 +2211,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
           const dmg = crit ? Math.round(dmg0*1.8) : dmg0;
           p.hp -= dmg; p.hurtT = 0.25;
           G.dmg.push({ x:p.x,y:p.y-40, val:dmg, crit, color: crit ? '#ff5a3c' : '#ff8a7a', t:0 });
-          G.fx.push({ kind:'hitSpark', x:p.x,y:p.y-20, color:'#ff8a7a', t:0,dur:0.3 });
+          G.pushFx({ kind:'hitSpark', x:p.x,y:p.y-20, color:'#ff8a7a', t:0,dur:0.3 });
           if (p.hp <= 0) {
             /* v5.0 死亡判定: 玩家倒下后妖潮从头开始(清场+重置怪池+回满血) */
             p.hp = p.maxHp;
@@ -2924,7 +2927,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       a0: k.alpha, trail: k.trail, spread: k.spread, track: k.track || 0,
     });
     /* v4.9 所有技能均为 3 连发: 错开时间 + 轻微纵向散, 做出"连点"感 */
-    for (let i = 0; i < k.count; i++) SK_LIVE.push(G.fx[G.fx.push(shot(i * (k.gap || 0.08), (i - 1) * 5)) - 1]);
+    for (let i = 0; i < k.count; i++) SK_LIVE.push(G.fx[G.pushFx(shot(i * (k.gap || 0.08), (i - 1) * 5)) - 1]);
   }
   /* 回收: 弹道走完从存活表移除 */
   function reapSkillFx() {
@@ -3515,7 +3518,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   let _rafOn = false;
   let _lastPaint = 0;
   let _sleepT = 0;              /* v2.9: 限帧 setTimeout 句柄 —— 暂停/恢复时必须清掉, 否则双链跑帧 */
-  const BATTLE_FRAME_MS = 33;   // ≈30fps
+  /* v6.9 PERF: 30fps → 24fps。素材 walk/attack 都是 24fps, 30fps 每帧多画 25% 纯浪费。
+   * 降帧后 CPU 跑 update + GPU 提交几何的频率直接降 20%, 视觉无差(素材上限就在这)。 */
+  const BATTLE_FRAME_MS = 42;   // ≈24fps
   let _managed = false;         // v3.2: true = 由 60-stage 驱动
   let _pumpRuns = 0;            // v4.1.1: 独立泵实际执行帧数(诊断口)
   function loop(t) {

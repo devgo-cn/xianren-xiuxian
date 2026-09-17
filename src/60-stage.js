@@ -51,8 +51,8 @@ let _paused = false;
 /* 诊断钩子：非空时每层绘制前调用 _diag(name, dt)。验收脚本用它取证。 */
 let _diag = null;
 
-/* 与各层原先一致的限帧目标：30fps（素材 24fps，高刷屏无收益） */
-const FRAME_MS = 33;
+/* v6.9 PERF: 30fps → 24fps。素材 walk/attack 都是 24fps, 30fps 每帧多画 25% 纯浪费。 */
+const FRAME_MS = 42;   // ≈24fps
 
 /* DPR 封顶 1.5：合并前 bg/fx2d 是 1.5、战斗也是 1.5，aura 用 capDeviceDpr()。
  * 合并后统一 1.5 —— 手机肉眼无差（行业通行做法），像素量降至约 1/4。
