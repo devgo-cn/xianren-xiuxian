@@ -1875,8 +1875,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         }
       } else {
         p.animFrame = (p.animFrame + 1) % SPRITE.walkCount;
-        /* 脚步声同步: walk第18帧(源帧22) */
-        if (p.animFrame === 18 && p.moving) playSfx('footstep', 0.5);
+        /* v6.7 PERF: 主角脚步声全关。手机音频硬件频繁唤醒比持续播放还耗电,
+         * 走位是自动的, 脚步声信息价值低。攻击/受击/技能声保留, 战斗反馈不受影响。 */
       }
     }
     /* v5.0 无目标时回到中间纵深(视觉均衡)。有目标时由下方的二维追击分支
@@ -2176,15 +2176,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
           e.animFrame++;
         } else {
           e.animFrame = (e.animFrame + 1) % 32;
-          /* 脚步声: walk特定帧, 仅在移动时 */
-          if (e.moving) {
-            if (e.type === 'slime' && (e.animFrame === 4 || e.animFrame === 20)) playSfx('slime_footstep', 0.4);
-            else if (e.type === 'water' && (e.animFrame === 8 || e.animFrame === 24)) playSfx('water_footstep', 0.4);
-            /* v6.3 骨骼怪脚步: 复用主角脚步 + 按体型变速(drawH 60~132 → 1.5~0.73 倍),
-             * 大体型压低音高显得沉重。存在感本来就低, 不值得每只单独一条音。 */
-            else if (e.boneSlug && (e.animFrame === 4 || e.animFrame === 20))
-              playSfx('footstep', 0.2, Math.max(0.6, Math.min(1.5, 96 / (e.drawH || 96))));
-          }
+          /* v6.7 PERF: 所有怪物脚步声全关(含 slime/water/骨骼怪)。
+           * 场上最多 14 只怪同时走, 每秒触发 10+ 次 Audio.play(), 在手机上是音频硬件
+           * 频繁唤醒的主要来源。攻击声/受击声/技能声保留, 战斗反馈不受影响。 */
         }
       }
       const stopX = e.stopX != null ? e.stopX : p.x + e.atkRange;
@@ -2457,9 +2451,11 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     /* v4.0 WebGL: GL 战斗层 canvas 挂 body(全屏 z:1), 不依赖 #battleCanvas 尺寸;
      * 2D 画布仍保留以兼容独立模式与 resize 逻辑。 */
     if (window.BattleGL) window.BattleGL.init();
-    /* 常态调色移到 CSS 合成层(GPU, 零 canvas 开销) —— ctx.filter 会让每个 drawImage
-     * 走滤镜管线, 在 mesh 逐三角/多怪同屏时是移动端帧率杀手之一 */
-    cv.style.filter = 'saturate(0.85) brightness(0.93)';
+    /* v6.7 PERF: 2D 降级路径的 CSS filter 也关掉。
+     * 之前误以为 CSS filter 零开销, 实际上它会强制浏览器对该 canvas 做离屏合成 + 每帧
+     * GPU 后处理(亮度/饱和度), 高 DPR 屏上像素量 2.25 倍, 是移动端帧率杀手。
+     * WebGL canvas 在 v4.4 已移除滤镜, 这里同步关闭 2D 降级路径, 避免切降级时重新出现。 */
+    /* cv.style.filter = 'saturate(0.85) brightness(0.93)'; */
     resize();
     window.addEventListener('resize', resize);
     return true;
@@ -2477,44 +2473,10 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   }
   function worldToScreen(wx) { return wx - G.camX; }
 
-  function hash01(n) { return ((Math.imul(n | 0, 1103515245) + 12345) >>> 8) % 1000 / 1000; }
-  function drawCloudShape(g, x, y, s, alpha) {
-    /* 一朵云 = 4 个椭圆拼的云团(同一路径一次填充, 重叠处不会加深) */
-    g.beginFill(0xd8e4f0, alpha);
-    g.drawEllipse(x, y, 70 * s, 13 * s);
-    g.drawEllipse(x - 40 * s, y + 4 * s, 32 * s, 8 * s);
-    g.drawEllipse(x + 42 * s, y + 5 * s, 28 * s, 7 * s);
-    g.drawEllipse(x + 8 * s, y - 9 * s, 34 * s, 9 * s);
-    g.endFill();
-  }
-  function drawClouds() {
-    /* 三层视差云: 远层慢而淡、近层快而实; 随摄像机视差滚动 + 自身缓慢漂移 + 上下浮动
-     * v4.0 WebGL: 画进 bg 层共享 Graphics（每帧 clear 重画, 仅 bgImg 未就绪时走此路径） */
-    const t = G.t;
-    const g = window.BattleGL.layers.bg._clouds;
-    g.clear();
-    const layers = [
-      { par: 0.12, n: 5, gap: 540, alpha: 0.045, sc: 0.72, yBase: 0.10, spd: 3 },
-      { par: 0.28, n: 4, gap: 660, alpha: 0.062, sc: 1.0,  yBase: 0.21, spd: 6 },
-      { par: 0.52, n: 3, gap: 840, alpha: 0.08,  sc: 1.38, yBase: 0.34, spd: 10 },
-    ];
-    for (const L of layers) {
-      const total = L.n * L.gap;
-      for (let i = 0; i < L.n; i++) {
-        const wx = i * L.gap + hash01(i * 31 + L.n * 7) * 260;
-        let sx = (((wx - G.camX * L.par - t * L.spd) % total) + total) % total - 320;
-        if (sx > CW + 320) continue;
-        const r = hash01(i * 57 + L.n * 13);
-        const cy = CH * (L.yBase + r * 0.09) + Math.sin(t * 0.5 + i * 1.7) * 4;
-        drawCloudShape(g, sx, cy, L.sc * (0.8 + r * 0.45), L.alpha);
-      }
-    }
-  }
   function drawBg() {
     /* v3.7 幽夜森林背景: 随摄像机 0.5 视差滚动, 【镜像交替平铺】实现左右无限无缝拼接。
      * v4.0 WebGL: Sprite 池交替正/镜像摆位（scale.x=-1 等价原 translate+scale(-1,1)）。 */
     if (G.bgReady && G.bgImg) {
-      window.BattleGL.layers.bg._clouds.clear();   // 平铺生效时清掉云兜底
       const drawH = CH;                           /* 画满整条战斗横带(地板下方延续石板路, 无黑边) */
       const drawW = drawH * (G.bgImg.width / G.bgImg.height);
       const period = drawW * 2;
@@ -2544,9 +2506,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         else { s.x = x + drawW; s.scale.set(-drawW / G.bgImg.width, drawH / G.bgImg.height); }
       }
       for (; k < pool.length; k++) pool[k].visible = false;
-    } else {
-      drawClouds();   /* 背景图未就绪时保留旧的程序云天 */
     }
+    /* v6.8: 程序云已删除。背景图未就绪时由 webgl-battle.js 的 bgGradSprite 渐变兜底,
+     * 不在此处补云(用户要求云完全移除, 且云被战斗层盖住根本看不到)。 */
   }
 
   /* v4.3 前景遮挡层(红线以下视觉遮挡): 专用前景贴图 battle-forest-fg.webp —— 从背景

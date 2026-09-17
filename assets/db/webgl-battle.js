@@ -35,7 +35,10 @@
             width: 8, height: 8,
             transparent: true, autoStart: false,
             antialias: false, resolution: 1, autoDensity: false,
-            powerPreference: 'high-performance'
+            /* v6.7 PERF: high-performance → low-power。
+             * 手机 SoC 的 GPU 有大小核集群, high-performance 会强制锁大核, 是发烫主因之一。
+             * 2D 骨骼动画用小核完全够, 视觉无差, 功耗显著下降。 */
+            powerPreference: 'low-power'
         });
         const cv = app.view;
         cv.id = 'battleGL';
@@ -75,10 +78,8 @@
         gx.fillStyle = g; gx.fillRect(0, 0, 1, 256);
         bgGradSprite = new PIXI.Sprite(PIXI.Texture.from(gc));
         L.bg.addChild(bgGradSprite);
-        /* 背景平铺容器（镜像交替 Sprite 池）与程序云 Graphics（bgImg 未就绪时兜底） */
-        L.bg._clouds = new PIXI.Graphics();
+        /* v6.8: 程序云 Graphics 已删除(用户要求)。背景未就绪时由 bgGradSprite 渐变兜底。 */
         L.bg._tiles = new PIXI.Container();
-        L.bg.addChild(L.bg._clouds);
         L.bg.addChild(L.bg._tiles);
 
         resize();
@@ -89,7 +90,10 @@
 
     function resize() {
         if (!app) return;
-        dpr = Math.min(global.devicePixelRatio || 1, 2.0);   // v4.4: 1.5→2.0, 高DPR屏canvas不再被浏览器2倍上采样, 战斗层整体锐度提升
+        /* v6.7 PERF: DPR 封顶从 2.0 降回 1.5。
+         * 像素量 = (dpr×宽)×(dpr×高), 2.0 → 1.5 直接砍掉 44% GPU 填充率。
+         * 1.5x 在手机屏幕上肉眼无差(行业通行做法), 换来明显降温。 */
+        dpr = Math.min(global.devicePixelRatio || 1, 1.5);
         W = global.innerWidth; H = global.innerHeight;
         app.renderer.resolution = dpr;
         app.renderer.resize(W, H);
