@@ -109,7 +109,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     spiritBase: 30,       // 每杀灵石基数(v5.2: 6→30, 在线打怪灵石产出对齐聚灵阵需求)
     spiritPerLv: 5,       // 每杀灵石 · 每境界级加成(v5.2: 1.2→5)
     spiritRand: 0.4,      // 灵石浮动 ±40%
-    equipChance: 0.035,   // 掉法宝概率(装备实际生成在主游戏 makeArt)
+    equipChance: 0.035,   // ⚠️ v6: 法宝已删除, 该系数仅保留字段形状(战斗层不再产出装备)
     eliteChance: 0.06,    // 精英怪出现率
     eliteMul: 4,          // 精英产出倍率
     eliteHp: 3,           // 精英血量倍率
@@ -4169,7 +4169,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
  * 原脚本在 IIFE 末尾自行判断 DOMContentLoaded 后调用 init()，
  * 抽取时已剥离那段尾部语句，在此统一启动，避免双份 rAF 循环。
  * 加载序：game.js 垫片先载入并 bridge 全局 → 再 import 本模块 → 本模块 import
- * 00-pure/10-base/30-systems，故 init() 执行时 $ / state / makeArt 均已就绪。
+ * 00-pure/10-base/30-systems，故 init() 执行时 $ / state 等已就绪。
  */
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();

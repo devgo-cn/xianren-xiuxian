@@ -5,9 +5,9 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, ARRAY_MAX_LV, AURA_COLORS, AURA_FPS, BIGS, BTL, EQUI_CELLPOS, EQUI_SLOTI, MAIN_STORY, MS_ARRAY, MS_ART, MS_SPIRIT, MYST, PAGES_NEED, PLOT, QUALITY, REALM_DAYS, SEG4, SEG_META, SEG_SCALE, SKILL_DEFS, SLOT_TYPES, __set_eqSel, __set_lastReadyHint, __set_settling, _dsp, _eqSel, _floatPrev, _settling, arrMult, bigSub, cld, cnNum, durTxt, fin, finalStats, fmt, lastReadyHint, pulseChip, setProg, spawnFloat, state } from './00-pure.js';
-import { BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, boostMult, EQUI_SLOTN, TOTAL_SEGS, __set_auraAcc, __set_auraT, _auraAcc, _auraColor, _auraCtx, _auraP, _auraT, arrayCostNow, artMult, artName, attrAssign, buffMult, cldUI, equipBonus, hiddenUnlocked, pagesOf, pickNoRepeat, pushMsg, seg, srvNow, 段名 } from './10-base.js';
-import { _cloudSettleRun, addJournal, artScore, bigIdx, licSync, realm, renderCraftBtn, renderSkills, save, showChapter, skillVal } from './20-core.js';
+import { $, ARRAY_MAX_LV, AURA_COLORS, AURA_FPS, BIGS, BTL, MAIN_STORY, MS_ARRAY, MS_ART, MS_SPIRIT, MYST, PAGES_NEED, PLOT, REALM_DAYS, SEG4, SEG_META, SEG_SCALE, SKILL_DEFS, __set_lastReadyHint, __set_settling, _dsp, _floatPrev, _settling, arrMult, bigSub, cld, cnNum, durTxt, fin, finalStats, fmt, lastReadyHint, pulseChip, setProg, spawnFloat, state } from './00-pure.js';
+import { BASE_STATS, bigIndexOf, boostMult, __set_auraAcc, __set_auraT, _auraAcc, _auraColor, _auraCtx, _auraP, _auraT, arrayCostNow, buffMult, cldUI, hiddenUnlocked, pagesOf, pickNoRepeat, pushMsg, seg, srvNow, 段名 } from './10-base.js';
+import { _cloudSettleRun, addJournal, bigIdx, realm, renderCraftBtn, renderSkills, save, showChapter, skillVal } from './20-core.js';
 
 (function buildSegs() {
   let cum = 0;
@@ -58,34 +58,7 @@ function realmMult() { return Math.pow(bigIdx() + 1, 2.05); }
 
 function rateNow() {
   /* v5.7: boost 池(丹力/兽潮)在线也生效, 与服务端 gExp = 4*arrM*dt*pillMult*offMult 对齐 —— 在线挂机不能比离线亏 */
-  return Math.max(0, fin(4 * realmMult() * artMult() * arrMult(state.arrayLv) * buffMult() * boostMult(), 0));
-}
-
-function pickQ() {
-  /* v7.1: 品质权重按大境界走 QW_TABLE 手动表 —— 前期玄天极稀(1%), 中后期抬升,
-   * 合体之后可攒全红毕业 → 虐杀 121。装备仍境界卡死(数值=本境 EQ_POW), 不破坏平衡。 */
-  const bi = bigIndexOf(state.realmIdx);   /* v7.2b 纯函数推算 */
-  const qw = QW_TABLE[Math.min(QW_TABLE.length - 1, bi)] || QUALITY.map(r => r.w);
-  const t = qw.reduce((s, r) => s + r, 0);
-  let x = Math.random() * t;
-  for (let i = 0; i < QUALITY.length; i++) { x -= qw[i]; if (x <= 0) return i; }
-  return 0;
-}
-
-function makeArt() {          // 四部位: 槽0兵器 1护体 2灵佩 3功法
-  const q = pickQ();
-  const arts = state.arts || [];
-  const slot = arts.length < 4 ? arts.length : Math.floor(Math.random() * 4);
-  const tp = SLOT_TYPES[slot];
-  const bi = bigIndexOf(state.realmIdx);   /* v7.2b 纯函数推算 */
-  /* v7.1 FIX: lv 必须用大境界索引(bi+1), 不是 realmIdx+1。
-   * realmIdx 是小境界连续编号(炼气就13段), 直接当BIGS索引会越界→全返回凡人。 */
-  const lv = bi + 1;
-  let name = artName(tp.k, q, lv);
-  const art = { name, q, mult: QUALITY[q].mult, t: Date.now(), tp: tp.k, slot, lv };
-  /* v7.1: 数值因子用 EQ_POW[ri](×4质变), art.lv 仅作展示/境界归属 */
-  attrAssign(art, tp.k, q, EQ_POW[Math.min(EQ_POW.length - 1, bi)] || 1);
-  return art;
+  return Math.max(0, fin(4 * realmMult() * arrMult(state.arrayLv) * buffMult() * boostMult(), 0));
 }
 
 const _hud = { arrNum: null, brkNum: null, spirit: null, rateText: null, arrayLv: null, btnBreak: null };
@@ -148,13 +121,6 @@ function updateHUD() {
   if (dE > thr && _hud.btnBreak) spawnFloat(_hud.btnBreak, "+" + fmt(dE));   // v1.7.46: 进度条移除, 修为飘字改从突破按钮升起
   _floatPrev.exp = state.exp;
   refreshGlow(can);                       // v1.7.31: 可行动入口文字闪烁提醒(突破/聚灵阵/云游/丹房)
-  /* v7.2: 境界牌显示总战斗力 = 四槽装备评分之和 */
-  const pwEl = document.getElementById('realmPower');
-  if (pwEl) {
-    let pw = 0;
-    for (const a of (state.arts || [])) pw += artScore(a);
-    pwEl.textContent = fmt(pw);
-  }
 }
 
 function refreshGlow(canBreak) {
@@ -178,12 +144,9 @@ function fireMilestone(flagKey, title, text) {
 
 function checkMilestones() {
   if (state.spirit > state.peakSpirit) state.peakSpirit = state.spirit;
-  const q = state.arts.reduce((m, a) => Math.max(m, a.q), -1);
-  if (q > state.bestArtQ) state.bestArtQ = q;
   let fired = false;
   for (const [th, t, x] of MS_SPIRIT) if (state.peakSpirit >= th && fireMilestone("s" + th, t, x)) fired = true;
   for (const [L, t, x] of MS_ARRAY) if (state.arrayLv >= L && fireMilestone("r" + L, t, x)) fired = true;
-  for (let g = 1; g <= 5; g++) { const [t, x] = MS_ART[g - 1]; if (state.bestArtQ >= g && fireMilestone("a" + g, t, x)) fired = true; }
   if (fired) save();
 }
 
@@ -297,66 +260,7 @@ async function cloudSettle() {
   try { return await _cloudSettleRun(); } finally { __set_settling(false); }
 }
 
-function openEquip() {
-  const m = $("equipModal"); if (!m) return;
-  renderEquip();
-  m.classList.add("show");
-}
 
-function renderEquip() {                 // v1.9.8 十字格工作台: 四正方格上下左右 + 中央总战力, 点格显属性
-  const box = $("equipBody"); if (!box) return;
-  const eb = equipBonus();
-  const arr = (state.arts || []).slice(-6);
-  const SLOTN = EQUI_SLOTN, SLOTI = EQUI_SLOTI, CELLPOS = EQUI_CELLPOS;
-  const sc = (a) => Math.round(artScore(a));   // v1.9.9b: 抽 licCardHTML 时误删的局部定义, total 战力依赖它(缺失会 ReferenceError 致法宝窗打不开)
-  let cross = "";
-  let total = 0;
-  for (const { pos, i } of CELLPOS) {
-    const a = arr[i];
-    const slotI = SLOTI[(typeof (a && a.slot) === "number" && a.slot < 4) ? a.slot : i];
-    if (!a) {
-      cross += `<div class="gx-cell ${pos}" style="cursor:default" title="${SLOTN[i]} · 空位">
-        <span class="ico" style="opacity:.32"><img class="icoim" src="assets/modals/art-ico/${slotI}0.webp" alt="" onerror="this.remove()"></span><em>${SLOTN[i]} · 空</em></div>`;
-      continue;
-    }
-    const q = a.q;
-    total += sc(a);
-    cross += `<div class="gx-cell ${pos} qc${q}" title="${(QUALITY[q] || QUALITY[0]).name} · ${a.name}" onclick="event.stopPropagation();pickArt(${i})">
-      <span class="ico"><img class="icoim" src="assets/modals/art-ico/${slotI}${q}.webp" alt="" onerror="this.remove()"></span><em>${SLOTN[i]}</em></div>`;
-  }
-  /* v1.9.8c 下方面板: 角色「道身」各项总属性(裸身+装备+词条合并后的面板值), 常显不随选中变化 */
-  let detail;
-  {
-    const _bi = bigIndexOf(state.realmIdx);   /* v7.2b 纯函数推算 */
-    const _bs = BASE_STATS[Math.min(BASE_STATS.length - 1, _bi)] || BASE_STATS[0];
-    const hs = finalStats({ hp: _bs[1], atk: _bs[0], def: _bs[2] },
-      { hp: eb.hp || 0, atk: eb.atk || 0, def: eb.def || 0 }, eb.agg);
-    const ag = eb.agg || {};
-    const rn = ["会心", "暴击", "爆伤", "破甲", "闪避", "吸血", "攻速"];
-    const rk = ["crit", "critB", "critD", "pen", "dodge", "life", "aspd"];
-    const _detRows =
-      `<div class="sr"><span>气 血</span><b>${fmt(hs.hp)}</b></div>` +
-      `<div class="sr"><span>攻 击</span><b>${fmt(hs.atk)}</b></div>` +
-      `<div class="sr"><span>防 御</span><b>${fmt(hs.def)}</b></div>` +
-      `<div class="sr"><span>修 为</span><b class="teal">×${artMult().toFixed(2)}</b></div>` +
-      rk.map((k, i) => `<div class="sr"><span>${rn[i]}</span><b${ag[k] ? ` class="teal"` : ""}>${ag[k] ? "+" + ag[k] + "%" : "—"}</b></div>`).join("");
-    detail = `<div class="cap" style="margin:0 1px 7px">道 身 · 各项属性</div>
-      <div class="stgrid">${_detRows}</div>`;
-  }
-  box.innerHTML = `
-    <div class="pane gx-sum"><div class="gx-grid">
-      <div><em>攻</em><b>+${eb.atk}</b></div><div><em>防</em><b>+${eb.def}</b></div>
-      <div><em>血</em><b>+${eb.hp}</b></div><div><em>修为</em><b>×${artMult().toFixed(2)}</b></div>
-    </div></div>
-    <div class="gx-cross">${cross}<div class="gx-core" onclick="closeLic(event)"><b>${total}</b><em>战 力</em></div></div>
-    <div class="pane gx-detail">${detail}</div>`;
-  box.onclick = closeLic;   // v1.9.9b 点弹窗任意空白处关闭执照卡(格子已 stopPropagation 转为切换)
-  licSync();
-}
-
-function pickArt(i) { __set_eqSel(_eqSel === i ? -1 : i); licSync(); }
-
-function closeLic(e) { if (e) e.stopPropagation(); __set_eqSel(-1); licSync(); }
 
 function skillAddExpAll(n) { /* ⚠️ v6: 技能恒定无经验 —— 保留空函数只为兼容旧调用点不报错 */ }
 
@@ -379,21 +283,15 @@ export {
   auraColorNow,
   checkMilestones,
   cldPush,
-  closeLic,
   cloudPushNow,
   cloudSettle,
   fireMilestone,
   mainMoment,
-  makeArt,
-  openEquip,
   openSkills,
   openStory,
-  pickArt,
-  pickQ,
   rateNow,
   realmMult,
   refreshGlow,
-  renderEquip,
   renderStory,
   skillAddExpAll,
   tickAura,

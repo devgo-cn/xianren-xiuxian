@@ -5,7 +5,9 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, ARMOR_POOL, BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, ARRAY_COST, ART_PREFIX, ART_SPECIAL, ART_SUFFIX, AURA_COLORS, BIGS, BTL, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, EQUI_SLOTI, FX_POOL, FX_TXT, G1_TPL, GAME_VER, JRN_TAIL, MIGRATIONS, MON_ATK_SCALE, MON_FX_POOL, MON_NAMES, MYST, PAGES_NEED, PEND_POOL, PLOT, QUALITY, RK_NAMES, RK_SEGS, SAVE_KEY, SCROLL_POOL, SEARCH_MAX, SEARCH_MIN, SEG_META, SKILL_DEFS, SLOT_TYPES, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, TRACE_ACT, __set_alTipT, __set_hbFails, __set_kicked, __set_parts, __set_tracePool, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, _tracePool, alIcoCls, alTipT, autoHuntOn, capDeviceDpr, cld, cldApiBase, cnNum, durTxt, eqMult, esc, fin, finalStats, fmt, fxAgg, fxCount, fxValue, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, state } from './00-pure.js';
+import { live as NS5_live } from './05-v6.js';
+import { toNumber as N6_toNumber } from './00-num.js';
+import { $, ARRAY_COST, bigIndexOf, BASE_STATS, AURA_COLORS, BIGS, BTL, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, G1_TPL, GAME_VER, JRN_TAIL, MIGRATIONS, MON_NAMES, MYST, PAGES_NEED, PLOT, RK_NAMES, RK_SEGS, SAVE_KEY, SEARCH_MAX, SEARCH_MIN, SEG_META, SKILL_DEFS, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, TRACE_ACT, __set_alTipT, __set_hbFails, __set_kicked, __set_parts, __set_tracePool, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, _tracePool, alIcoCls, alTipT, autoHuntOn, capDeviceDpr, cld, cldApiBase, cnNum, durTxt, esc, fin, fmt, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, state } from './00-pure.js';
 
 (function () {
   const vt = document.getElementById("verTag"); if (vt) vt.textContent = GAME_VER;
@@ -166,7 +168,6 @@ function adopt(s) {
   } catch (err) {}
   if (!s.milestones || typeof s.milestones !== "object") s.milestones = {};
   s.peakSpirit = fin(s.peakSpirit, 0);
-  s.bestArtQ = fin(s.bestArtQ, -1);
   s.realmIdx = Math.max(0, Math.min(TOTAL_SEGS - 1, Math.floor(fin(s.realmIdx, 0))));
   s.exp = Math.max(0, fin(s.exp, 0));
   s.spirit = Math.max(0, fin(s.spirit, 0));
@@ -218,16 +219,6 @@ function adopt(s) {
   s.trialEq = Math.max(0, Math.round(fin(s.trialEq, 0, 100)));
   /* v1.10.0: 历史档迁移(六槽→四部位/缺属性老件确定性补全)已随旧档退役 —— adopt 只做
    * 「schema v1 结构的防御性规整」: 类型钳制 + 缺省补默认, 不再背负任何代际转换。 */
-  if (Array.isArray(s.arts)) {
-    s.arts.forEach(a => {
-      if (!a || typeof a !== "object") return;
-      a.slot = Math.min(3, Math.max(0, fin(a.slot, 0)));
-      a.q = Math.min(5, Math.max(0, fin(a.q, 0)));
-      a.lv = Math.max(1, Math.floor(fin(a.lv, 1)));
-      a.mult = fin(a.mult, (QUALITY[a.q] || QUALITY[0]).mult);   // 防 NaN 污染收益链
-      a.a = Math.max(0, fin(a.a, 0)); a.d = Math.max(0, fin(a.d, 0)); a.h = Math.max(0, fin(a.h, 0));
-    });
-  }
   if (!s.pages || typeof s.pages !== "object") s.pages = {};
   if (typeof s.name !== "string" || s.name.length > 20) s.name = "";
   s._pn = typeof s._pn === "string" ? s._pn : "";
@@ -438,9 +429,10 @@ function cloudNew() {
   location.reload();
 }
 
-function artMult() { /* v1.9.9 累乘→弱化加算: 4件玄天级(3.8)从 55x 压到 3.5x, 6件从 3011x 压到 6.9x —— 累乘乘区随装备成长指数爆炸(实测 42h 炼气→化神圆满), 需求曲线追不上; 同式已同步服务端 game-core.js rateNowOf */
-  return 1 + state.arts.reduce((m, a) => m + ((a.mult || 1) - 1), 0) * 0.12;
-}
+/* ⚠️ v6 重构: 法宝系统已删除, 这里恒为 1。
+ * 保留函数名是因为 rateNow() 仍在乘法链上 —— 整条 rateNow 链路属【阶段5】
+ * 的清理范围（届时随旧打坐体系一起下线），此处只摘掉法宝这一项。 */
+function artMult() { return 1; }
 
 let _buffCache = null;
 let _buffCacheT = 0;
@@ -872,140 +864,6 @@ function renderAutoHunt() {
 
 renderAutoHunt();
 
-function artCtx() {
-  const lv = (state.realmIdx || 0) + 1;
-  let fa = 0, fd = 0, fh = 0;
-  const _eb = equipBonus();
-  fa = _eb.atk || 0; fd = _eb.def || 0; fh = _eb.hp || 0;
-  const _bi = bigIndexOf(state.realmIdx);   /* v7.2b 同上 */
-  const _bs = BASE_STATS[Math.min(BASE_STATS.length - 1, _bi)] || BASE_STATS[0];
-  return {
-    atkRef: Math.max(220, _bs[0] + fa),
-    defRef: Math.max(90, _bs[2] + fd),
-    hpRef: Math.max(320, _bs[1] + fh),
-  };
-}
-
-function equipBonus() {                 // 装备数值加总 + 词条聚合(v1.7.13)
-  let atk = 0, def = 0, hp = 0;
-  const arts = state.arts || [];
-  for (const a of arts) {
-    if (typeof a.a === "number") atk += a.a;
-    if (typeof a.d === "number") def += a.d;
-    if (typeof a.h === "number") hp += a.h;
-  }
-  return { atk, def, hp, agg: fxAgg(arts) };
-}
-
-function ensureScrollFx() {
-  if (!Array.isArray(state.arts)) return false;
-  let changed = false;
-  for (const a of state.arts) {
-    if (a && a.slot === 3 && !(a.fx || []).some(f => f.k === "aspd")) {
-      (a.fx = a.fx || []).push({ k: "aspd", v: fxValue("aspd", a.q) });
-      changed = true;
-    }
-  }
-  if (changed) { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} }
-  return changed;
-}
-
-function closeEquip() { const m = $("equipModal"); if (m) m.classList.remove("show"); }
-
-function licBuild(cross, arr) {
-  const lic = document.createElement("div");
-  lic.className = "gx-lic";
-  const faces = arr.map((a, idx) => {
-    const slotIdx = (typeof (a && a.slot) === "number" && a.slot < 4) ? a.slot : idx;
-    const si = EQUI_SLOTI[slotIdx] || "w";
-    return `<img class="icoim" data-idx="${idx}" src="assets/modals/art-ico/${si}${a.q || 0}.webp" alt="" onerror="this.classList.remove('on')">`;
-  }).join("");
-  lic.innerHTML = `
-    <div class="lclose" onclick="closeLic(event)">✕</div>
-    <div class="lh"><span class="ico licface" style="width:38px;height:38px;flex:none">${faces}</span><b></b><i></i></div>
-    <div class="lr" data-k="a"><span>攻</span><b></b></div>
-    <div class="lr" data-k="d"><span>防</span><b></b></div>
-    <div class="lr" data-k="h"><span>血</span><b></b></div>
-    <div class="lfx"></div>
-    <div class="lseal"><em></em></div>`;
-  cross.appendChild(lic);
-  return lic;
-}
-
-const EQUI_SLOTN = SLOT_TYPES.map(t => t.n);
-
-function artName(kind, q, lv) {
-  /* v5.0 境界装: 名称带境界前缀(炼气·玄天斩灵剑), 装备 = 境界(lv) × 品级(q) 双维度 */
-  const bigName = (BIGS[Math.max(0, (lv || 1) - 1)] || BIGS[0]).n;
-  const sp = ART_SPECIAL.filter(s => q >= s[0]);
-  if (sp.length && Math.random() < 0.35) return bigName + "·" + sp[Math.floor(Math.random() * sp.length)][1];
-  if (kind === "w") return bigName + "·" + ART_PREFIX[Math.floor(Math.random() * ART_PREFIX.length)] + ART_SUFFIX[Math.floor(Math.random() * ART_SUFFIX.length)];
-  const P = kind === "a" ? ARMOR_POOL : kind === "p" ? PEND_POOL : SCROLL_POOL;
-  return bigName + "·" + P[Math.floor(Math.random() * P.length)];
-}
-
-function rollFx(kind, q) {                          // 装备词条(同槽不重复)
-  const pool = (FX_POOL[kind] || FX_POOL.w).slice();
-  const n = fxCount(q);
-  const f = [];
-  /* v5.0 极品词条: 每条有概率升级为极品(数值×2.4, 带legendary标记)。
-   * 概率随品质递增: q0=3% → q5=20.5%。极品=带极品词条的装备, 不单独成品级。 */
-  const legChance = 0.04 + q * 0.052;   /* v7.2b 极品概率上调: q0=4% → q5玄天=30% */
-  /* v2.5 功法(s)必带攻速词条: 数值随品质分档(低品 3~5% / 高品 5~7%), 其余词条照常 roll;
-   * 其他部位(兵/护/佩)不出攻速 */
-  if (kind === "s") {
-    const v = fxValue("aspd", q);
-    const leg = Math.random() < legChance;
-    f.push({ k: "aspd", v: leg ? Math.round(v * 2.4) : v, legendary: leg });
-  }
-  for (let i = f.length; i < n && pool.length; i++) {
-    const key = pool.splice((Math.random() * pool.length) | 0, 1)[0];
-    const v = fxValue(key, q);
-    const leg = Math.random() < legChance;
-    f.push({ k: key, v: leg ? Math.round(v * 2.4) : v, legendary: leg });
-  }
-  return f;
-}
-
-function rollMonFx(big) {                           // 词缀妖兽: ~12% 带 1~2 条(同前轴, 数值随境略抬)
-  if (Math.random() >= 0.12) return [];
-  const pool = MON_FX_POOL.slice();
-  const n = Math.random() < 0.4 ? 2 : 1;
-  const f = [];
-  for (let i = 0; i < n && pool.length; i++) {
-    const key = pool.splice((Math.random() * pool.length) | 0, 1)[0];
-    f.push({ k: key, v: fxValue(key, Math.min(5, big)) });
-  }
-  return f;
-}
-
-function fmtFxTag(f) { return `${f.legendary ? "【极】" : ""}${FX_TXT[f.k]}+${f.v}%`; }
-
-function attrAssign(art, kind, q, pow) {        // 装备数值(境界因子×品质乘子) + 词条
-  /* v7.1: 第四参从境界级 lv 改为 EQ_POW[realmIdx] —— 装备数值跟怪物毛坯同走 ×4 质变 */
-  const M = eqMult(q);
-  const r1 = Math.random(), r2 = Math.random(), r3 = Math.random();
-  if (kind === "w") { art.a = Math.max(1, Math.round((4 + r1 * 15) * pow * M)); art.h = 0; art.d = 0; }
-  else if (kind === "a") { art.h = Math.round((38 + r1 * 114) * pow * M); art.d = Math.max(1, Math.round((2 + r2 * 15) * pow * M)); art.a = 0; }
-  else if (kind === "p") { art.h = Math.round((15 + r1 * 46) * pow * M); art.d = Math.max(1, Math.round((2 + r2 * 6) * pow * M)); art.a = Math.round((1.5 + r3 * 4.5) * pow * M); }
-  else { art.a = Math.round((2.3 + r1 * 6.7) * pow * M); art.d = Math.max(1, Math.round((2 + r2 * 5) * pow * M)); art.h = 0; }
-  art.fx = rollFx(kind, q);
-}
-
-function genMonster(big, lv) {                   // 妖兽: 基础线性 + 词缀(属性乘区/判定词条)
-  const names = MON_NAMES[big] || MON_NAMES[0];
-  const k = MON_ATK_SCALE[big] || 1;
-  const m = {
-    n: names[Math.floor(Math.random() * names.length)],
-    hp: Math.round((250 + Math.random() * 400) * lv),
-    atk: Math.round((60 + Math.random() * 105) * lv * k),
-    def: Math.max(1, Math.round((1 + Math.random() * 14) * lv)),
-  };
-  const fx = rollMonFx(big);
-  if (fx.length) { m.fx = fx; }
-  return m;
-}
-
 function skillDef(id) { for (const d of SKILL_DEFS) if (d.id === id) return d; return null; }
 
 /* ⚠️ v6: 技能恒定无等级。
@@ -1018,17 +876,35 @@ function skillVal(id) {
   return d || null;
 }
 
+/**
+ * 把当前面板推给战斗层。
+ *
+ * ⚠️ v6 重构后：面板唯一来源是 v6 的 live() ——
+ *   基础三围由境界 baseStat 给，装备四槽给乘区，攻速进 aspd。
+ *   旧法宝(state.arts)那条路已随法宝系统一并删除。
+ *
+ * 大数 → 原生 Number：战斗层是 PixiJS 渲染，数值只用于画面与掉血，
+ *   不需要 e300 级别的精度。v6 已把上限卡在 54 层/10.86 倍乘区，
+ *   toNumber 不会溢出到 Infinity。
+ */
 function pushBattleStats() {
   const api = window.BattleAPI;
   if (!api || !api.setStats) return;
-  const lv = (state.realmIdx || 0) + 1, eb = equipBonus();
-  /* v7.1: 基础三围改手动表 BASE_STATS —— 围绕怪物毛坯(境界间×4质变), 旧线性 10+46*lv 退役 */
-  const bi = bigIndexOf(state.realmIdx);   /* v7.2b 纯函数推算, 修复启动期 SEG_META 未填充卡导入 */
-  const bs = BASE_STATS[Math.min(BASE_STATS.length - 1, bi)] || BASE_STATS[0];
-  const s = finalStats({ hp: bs[1], atk: bs[0], def: bs[2] },
-    { hp: eb.hp || 0, atk: eb.atk || 0, def: eb.def || 0 }, eb.agg);
-  s.lv = lv;                                  // 怪物成长按境界缩放
-  api.setStats(s);
+  if (!window.V6 || !window.V6.state) return;      // v6 未就绪: 不推, 让战斗层用默认值
+  try {
+    const st = window.V6.state();
+    const L = NS5_live(st);
+    const s = {
+      atk: N6_toNumber(L.atk),
+      hp:  N6_toNumber(L.hp),
+      def: N6_toNumber(L.def),
+      aspd: N6_toNumber(L.aspd),
+      lv: (st.realm || 0) + 1,                       // 怪物成长按境界缩放
+    };
+    if (!isFinite(s.atk) || !isFinite(s.hp) || !isFinite(s.def)) return;
+    if (s.hp <= 0) return;
+    api.setStats(s);
+  } catch (e) { /* v6 异常时静默, 战斗层保留上一帧面板 */ }
 }
 
 function closeSkills() { const m = $("skillModal"); if (m) m.classList.remove("show"); }
@@ -1038,9 +914,6 @@ window.closeSkills = closeSkills;
 export {
   BASE_STATS,
   CLD_API,
-  EQ_POW,
-  EQUI_SLOTN,
-  QW_TABLE,
   SND,
   bigIndexOf,
   TOTAL_SEGS,
@@ -1053,10 +926,7 @@ export {
   adopt,
   apiRoot,
   arrayCostNow,
-  artCtx,
   artMult,
-  artName,
-  attrAssign,
   bctx,
   bcv,
   buffAtCap,
@@ -1070,7 +940,6 @@ export {
   cldFlash,
   cldId,
   cldUI,
-  closeEquip,
   closeOffline,
   closeRank,
   closeRename,
@@ -1083,14 +952,10 @@ export {
   cloudTogglePanel,
   deviceId,
   dimRender,
-  ensureScrollFx,
   enterDim,
-  equipBonus,
   exitDim,
-  fmtFxTag,
   g1Pack,
   g1Unpack,
-  genMonster,
   handleKicked,
   hbFail,
   hiddenUnlocked,
@@ -1101,7 +966,6 @@ export {
   initBg2D,
   initFxLayer,
   journalHasKey,
-  licBuild,
   migrate,
   openRename,
   pagesOf,
@@ -1116,8 +980,6 @@ export {
   renderSettings,
   resetDimKnob,
   rkSegLabel,
-  rollFx,
-  rollMonFx,
   searchMs,
   seg,
   setRealmSub,

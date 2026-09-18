@@ -753,7 +753,6 @@
           <!-- v7.6: 补 realmSubB 元素 —— 此前该 id 在 HTML 中缺失, 导致 setRealmSub 第二行(大境界法门说明)
                一直被静默丢弃(console 无报错, 只是看不到)。小境界段位在 rb-c1 的 #realmSubA。 -->
           <tr><td class="rb-c4" colspan="2"><span class="sub-b" id="realmSubB"></span></td></tr>
-        <tr><td class="rb-c2"><span class="rb-power" id="realmPower"></span><span class="rb-rank">榜</span></td></tr>
         <!-- v5.14: 道号入口迁至打坐角色头顶(#cultPname), 顶栏按钮删除 -->
         </table>
       </div>
@@ -770,7 +769,6 @@
 <div class="trace" id="traceArea" onclick="traceTap()"></div>
 </div>
 
-<div class="artifacts" style="display:none"><div class="art-row" id="artRow"></div></div>
 
 <!-- 战斗区（无尽边界式横向推进战斗） -->
 <div class="battle-stage" id="battleStage">
@@ -805,7 +803,6 @@
     <div class="rate"><span class="rl">修为</span><b id="rateText">0</b><span class="rl">/秒</span></div>
   </div>
   <div class="big-icons">
-    <div class="icon-btn" id="equipChip" onclick="openEquip()" title="法宝·装备"><img src="assets/ui_icons/icon_treasure.webp" alt="宝物"></div>
   </div>
 
   <!-- v6.0 关卡推进条（战斗带内，紧贴 HUD 下方） -->
@@ -971,13 +968,6 @@
 </div>
 
 
-
-<div class="modal" id="equipModal">
-  <div class="card story-card" style="--bgart:url(assets/modals/bg-equip.webp)">
-    <div class="mhead"><h3>法 宝<i>ARTIFACTS</i></h3><button class="xbtn" onclick="closeEquip()">✕</button></div>
-    <div id="equipBody"></div>
-  </div>
-</div>
 
 <div class="modal" id="skillModal">
   <div class="card story-card">

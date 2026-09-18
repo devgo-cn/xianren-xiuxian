@@ -5,8 +5,8 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, BIGS, DROP_CFG, EQUI_CELLPOS, FX_TXT, JRN_CAP, LIC_QCOL, QUALITY, SAVE_KEY, SKILL_DEFS, SLOT_TYPES, STORY_BY_KEY, STORY_PAGE, __set_rate, __set_rkAt, __set_srvOffset, __set_state, __set_storyChap, __set_traceT, _eqRecycle, _eqSel, _pred, _rkAt, _storyChap, _traceT, cld, cnNum, esc, fmt, rnOk, state } from './00-pure.js';
-import { CLD_API, EQUI_SLOTN, SND, adopt, apiRoot, artCtx, cldFlash, cldId, cldUI, closeRename, cloudSnap, cloudSoon, deviceId, ensureScrollFx, exitDim, g1Pack, g1Unpack, handleKicked, licBuild, migrate, pushBattleStats, pushMsg, renderPName, renderSettings, resetDimKnob, rkSegLabel, seg, setRealmSub, sizeBurst, skillDef, skillVal, storyItemHtml, trimJournal } from './10-base.js';
+import { $, BIGS, DROP_CFG, JRN_CAP, LIC_QCOL, SAVE_KEY, SKILL_DEFS, STORY_BY_KEY, STORY_PAGE, __set_rate, __set_rkAt, __set_srvOffset, __set_state, __set_storyChap, __set_traceT, _pred, _rkAt, _storyChap, _traceT, cld, cnNum, esc, fmt, rnOk, state } from './00-pure.js';
+import { CLD_API, SND, adopt, apiRoot, cldFlash, cldId, cldUI, closeRename, cloudSnap, cloudSoon, deviceId, exitDim, g1Pack, g1Unpack, handleKicked, migrate, pushBattleStats, pushMsg, renderPName, renderSettings, resetDimKnob, rkSegLabel, seg, setRealmSub, sizeBurst, skillDef, skillVal, storyItemHtml, trimJournal } from './10-base.js';
 
 function realm() { return seg(state.realmIdx); }
 
@@ -104,7 +104,6 @@ function load() {
       __set_state(c); trimJournal();
       /* 载入时先把存档里的原始 lastTs 存进 _lastTs0, 离线结算以它为基准 */
       state._lastTs0 = (s && s.lastTs) || c.lastTs || 0;
-      ensureScrollFx();         // v2.5: 旧档功法补攻速词条
       /* v6: 读档后恢复 v6 状态（loadV6 内部会把 lastTick 重置为此刻，
        *     否则会把"关掉页面的这段时间"误当成在线 tick） */
       if (_v6Load) { try { _v6Load(); } catch (e) { console.warn('[load] v6 恢复失败:', e); } }
@@ -218,38 +217,9 @@ function showChapter(bigName) {
   storyLoadMore(true);
 }
 
-function updateArts(highlight) {
-  const row = $("artRow");
-  const last6 = state.arts.slice(-6);
-  row.innerHTML = last6.map((a, i) => {
-    const isNew = !!(highlight && i === last6.length - 1);
-    return `<span class="art${isNew ? " new" : ""}"><span class="q ${QUALITY[a.q].cls}">${QUALITY[a.q].name}</span>${a.name}</span>`;
-  }).join("");
-  while (state.arts.length > 4) {
-    const old = state.arts.shift();
-    state.spirit += Math.round(60 * Math.pow(1.6, old.q));
-  }
-  pushBattleStats();        // 装备变动 → 战斗里的攻防血立刻跟上
-}
-
 sizeBurst();
 
 addEventListener("resize", sizeBurst);
-
-function keepArtQuiet(a) {          // 静默版 smartEquip: 批量结算不发消息、不存档(同槽综合分择优, 同品质可替换)
-  if (!state.arts || !Array.isArray(state.arts)) state.arts = [];
-  const arts = state.arts;
-  const idx = (typeof a.slot === "number" && a.slot < 4) ? a.slot : arts.length;
-  if (idx >= arts.length) { arts.push(a); return true; }
-  const w = arts[idx];
-  if (!w) { arts[idx] = a; return true; }
-  if (artScore(a) > artScore(w)) {
-    state.spirit += Math.round(50 * Math.pow(1.6, w.q));
-    arts[idx] = a; return true;
-  }
-  state.spirit += Math.round(40 * Math.pow(1.5, a.q));
-  return false;
-}
 
 function renderCraftBtn() {
   const b = $("craftBtn"); if (!b) return;
@@ -352,123 +322,6 @@ function toggleSfx() { SND.setSfx(!SND.sfxOn); renderSettings(); }
   document.addEventListener("touchend", up);
 })();
 
-function artScore(a) {
-  /* v7.2 重写: 去掉anchor+cap, 改成属性加权×品质乘数。
-   * 旧公式 anchor+min(lv*STEP, ...*0.32) 导致同品质装备分全一样(cap死了)。
-   * 新公式: 基础属性按实战权重加权 + 词条按战斗公式换算 → 乘品质乘数。
-   * 同品质内 roll 好坏直接体现在分差, 跨品质靠乘数拉开。 */
-  const c = artCtx();
-  /* 基础属性权重: 防权重高(防血乘算), 血量大量级小权重 */
-  const base = (a.a || 0) * 1.0 + (a.d || 0) * 2.5 + (a.h || 0) * 0.05;
-  /* 词条换算: 百分比词条按当前面板参考值换算成等效战力 */
-  let fx = 0;
-  for (const f of (a.fx || [])) {
-    const p = f.v / 100;
-    let val = 0;
-    if (f.k === "atk") val = p * c.atkRef;
-    else if (f.k === "hp") val = p * c.hpRef * 0.05;
-    else if (f.k === "dfn") val = p * c.defRef * 2.5;
-    else if (f.k === "crit") val = p * c.atkRef * 0.55;
-    else if (f.k === "critB") val = p * c.atkRef * 1.0;
-    else if (f.k === "critD") val = p * c.atkRef * 0.15;
-    else if (f.k === "pen") val = p * c.atkRef * 0.35;
-    else if (f.k === "dodge") val = p * c.defRef * 2.5;
-    else if (f.k === "life") val = p * c.atkRef * 0.5;
-    else if (f.k === "aspd") val = p * c.atkRef * 0.8;
-    fx += val * (f.legendary ? 1.3 : 1);
-  }
-  /* 品质乘数: 白1.0 / 蓝1.4 / 绿1.8 / 金2.5 / 紫3.5 / 红5.0 */
-  const QMUL = [1.0, 1.4, 1.8, 2.5, 3.5, 5.0];
-  const q = Math.max(0, Math.min(5, a.q | 0));
-  return Math.round((base + fx) * QMUL[q]);
-}
-
-function smartEquip(a) {
-  const arts = state.arts || [];
-  const idx = (typeof a.slot === "number" && a.slot < 4) ? a.slot : arts.length;
-  const q0 = QUALITY[a.q];
-  if (idx >= arts.length) {
-    arts.push(a); state.arts = arts;
-    pushMsg("avatar", `阿青把 ${a.name}（${q0.name}·${SLOT_TYPES[idx].n}）放进藏宝阁 —— 已替穿戴。`);
-    updateArts(true); save(); cloudSoon(); return;
-  }
-  const w = arts[idx];
-  if (!w) { arts[idx] = a; updateArts(true); save(); cloudSoon(); return; }
-  if (artScore(a) > artScore(w)) {
-    const g = Math.round(50 * Math.pow(1.6, w.q));
-    state.spirit += g;
-    arts[idx] = a;
-    _eqRecycle.unshift(`熔回 ${w.name}(${QUALITY[w.q].name}) +${fmt(g)}`);
-    if (_eqRecycle.length > 3) _eqRecycle.pop();
-    pushMsg("avatar", `阿青见 ${a.name}(${q0.name}·${SLOT_TYPES[idx].n}) 胜过旧佩，把那 ${w.name} 熔回灵石 +${fmt(g)}，新宝自动换上。`);
-    updateArts(true); save(); cloudSoon();
-  } else {
-    const g = Math.round(40 * Math.pow(1.5, a.q));
-    state.spirit += g;
-    pushMsg("avatar", `${a.name}(${q0.name}) 不及身上同槽所佩，阿青炼作灵石 +${fmt(g)}。`);
-    updateArts(false); save(); cloudSoon();
-  }
-}
-
-let _licCross = null;   // 缓存 .gx-cross 根节点；renderEquip 重建 innerHTML 后旧节点脱离文档，isConnected 触发重查
-
-function licSync() {
-  const cross = (_licCross && _licCross.isConnected) ? _licCross : (_licCross = document.querySelector(".gx-cross"));
-  if (!cross) return;
-  const arr = (state.arts || []).slice(-6);
-  const cells = cross.querySelectorAll(".gx-cell");
-  EQUI_CELLPOS.forEach(({ i }, idx) => { if (cells[idx]) cells[idx].classList.toggle("sel", _eqSel === i); });
-  let lic = cross.querySelector(".gx-lic");
-  const a = _eqSel >= 0 ? arr[_eqSel] : null;
-  if (!a) { cross.classList.remove("licOn"); return; }   // 骨架常驻, licOn 类显隐
-  if (!lic) {
-    lic = licBuild(cross, arr);
-    requestAnimationFrame(() => licSync());   // 新骨架下一帧再 licOn → 首次入场也走 transition
-    return;
-  }
-  cross.classList.add("licOn");
-  const slotIdx = (typeof a.slot === "number" && a.slot < 4) ? a.slot : _eqSel;
-  const qn = (QUALITY[a.q] || QUALITY[0]).name;
-  if (!lic.__els) {   // 骨架只建一次，子元素引用缓存到 lic 上，后续 sync 不再逐次 querySelector
-    lic.__els = {
-      nb: lic.querySelector(".lh b"),
-      lhI: lic.querySelector(".lh i"),
-      icoims: lic.querySelectorAll(".licface .icoim"),
-      aB: lic.querySelector('.lr[data-k="a"] b'),
-      dB: lic.querySelector('.lr[data-k="d"] b'),
-      hB: lic.querySelector('.lr[data-k="h"] b'),
-      lfx: lic.querySelector(".lfx"),
-      lsealEm: lic.querySelector(".lseal em"),
-    };
-  }
-  const E = lic.__els;
-  /* v7.1 FIX: 旧存档装备 lv=realmIdx+1(大境界越界), licSync 里也越界返回凡人。
-   * 用当前大境界名显示, 并把 a.name 里存的旧"凡人·"前缀替换掉。 */
-  const _bi = Math.max(0, Math.min(BIGS.length - 1, Math.floor((state.realmIdx || 0) / 1)));
-  /* bigIndexOf 纯函数: 累加 BIGS[i].segs */
-  let bigIdx = 0, _acc = 0;
-  for (let i = 0; i < BIGS.length; i++) { _acc += BIGS[i].segs; if ((state.realmIdx || 0) < _acc) { bigIdx = i; break; } }
-  const bigName = BIGS[bigIdx].n;
-  let dispName = a.name || "无名法宝";
-  /* 旧装备 name 里存了错误的"凡人·"前缀, 替换成当前大境界 */
-  dispName = dispName.replace(/^凡人·/, bigName + "·");
-  E.nb.textContent = dispName;
-  E.nb.style.color = LIC_QCOL[a.q] || "#e9e2d0";
-  E.lhI.textContent = `${bigName}·${qn}·${EQUI_SLOTN[slotIdx] || ""} ★${a.q + 1}`;
-  E.icoims.forEach(im => im.classList.toggle("on", +im.dataset.idx === _eqSel));
-  E.aB.textContent = "+" + (a.a || 0);
-  E.dB.textContent = "+" + (a.d || 0);
-  E.hB.textContent = "+" + (a.h || 0);
-  E.lfx.innerHTML = (a.fx || []).map(f => `<div class="lr"><span>${FX_TXT[f.k] || f.k}</span><b class="teal">+${f.v}%</b></div>`).join("");
-  E.lsealEm.textContent = "战力 " + Math.round(artScore(a));
-}
-
-/* ⚠️ v6: 技能恒定 —— skillVal 已下沉到 10-base.js（直接返回 SKILL_DEFS 里的常量）。
- *   旧版的 skillAddExp / skillTotalLv / skillExpNeed 升级链【整条删除】：
- *   技能不再有等级与经验，也就没有"升级落档"这回事，技能彻底不入存档。 */
-
-window.pushBattleStats = pushBattleStats;
-
 function applyDropRates(r) {                  // 服务端下发"每击杀产出"系数(拿不到就用内置默认)
   if (!r || typeof r !== "object") return;
   if (r.equipChance != null) DROP_CFG.equipChance = +r.equipChance;
@@ -505,13 +358,10 @@ export {
   addJournal,
   adoptKeep,
   applyDropRates,
-  artScore,
   bigIdx,
   cldFail,
   cloudCopyId,
   fallbackCopy,
-  keepArtQuiet,
-  licSync,
   load,
   loadRank,
   openRank,
@@ -524,10 +374,8 @@ export {
   showChapter,
   skillVal,
   state,
-  smartEquip,
   storyLoadMore,
   toggleBgm,
   toggleSfx,
-  updateArts,
   updateRealmUI,
 };

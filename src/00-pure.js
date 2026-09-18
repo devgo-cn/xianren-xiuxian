@@ -60,25 +60,9 @@ function bigSub(bi) {
   ][bi] || "";
 }
 
-const QUALITY = [ // 名/权重/倍率/颜色(符器→玄天)
-  { name: "粗制", w: 50, mult: 1.10, cls: "q1" },
-  { name: "法器", w: 20, mult: 1.30, cls: "q2" },
-  { name: "灵器", w: 15, mult: 1.58, cls: "q3" },
-  { name: "古宝", w: 9,  mult: 2.00, cls: "q4" },
-  { name: "灵宝", w: 5,  mult: 2.70, cls: "q5" },
-  { name: "玄天", w: 1,  mult: 3.80, cls: "q6" },
-];
 
-const ART_PREFIX = ["青竹", "金雷", "墨蛟", "噬金", "太阴", "离火", "九幽", "乾蓝", "天外", "血凝", "碧磷", "玄冰", "紫檀", "五色", "遁地", "化血"];
 
-const ART_SUFFIX = ["飞剑", "古印", "小幡", "玄镜", "宝珠", "仙鼎", "葫芦", "玉尺", "金锁", "飞针", "法螺", "神灯"];
 
-const ART_SPECIAL = [ // 稀有致敬掉落: [品质下限, 名字]
-  [3, "青竹蜂云剑"], [4, "七十二口蜂云剑阵"], [3, "金雷竹符"],
-  [3, "噬金虫母卵"], [4, "掌天瓶·灵液"], [5, "大衍决·残页"],
-  [4, "血凝阴魔幡"], [5, "乾蓝冰焰"], [5, "墨蛟内丹"],
-  [6, "玄天斩灵剑"], [6, "神秘小瓶(绿光)"],
-];
 
 const EVENTS = [
   // 凡人期(凡俗起步)
@@ -517,8 +501,8 @@ const MAIN_STORY = [
  ]
 ];
 
-let state = { ver: 1, realmIdx: 0, exp: 0, spirit: 0, arrayLv: 1, arts: [], journal: [],
-  milestones: {}, peakSpirit: 0, bestArtQ: -1, lastTs: Date.now(),
+let state = { ver: 1, realmIdx: 0, exp: 0, spirit: 0,
+  milestones: {}, peakSpirit: 0,
   buffs: [], offPills: [], offlineBoostUntil: 0,
   trialBest: 0, trialBoost: 0, trialBoostUntil: 0 };
   /* ⚠️ v6: 旧 state 已不再承载技能 —— 技能恒定无等级, 不入存档（见 SKILL_DEFS 注释）。
@@ -565,8 +549,8 @@ const RK_NAMES = ["凡人", "炼气", "筑基", "结丹", "元婴", "化神", "�
 
 let _rkAt = 0;
 
-const G1_TPL = { realmIdx: 0, exp: 0, spirit: 0, arrayLv: 1, arts: [], journal: [], milestones: {},
-  peakSpirit: 0, bestArtQ: -1, lastTs: 0, buffs: [], offPills: [],
+const G1_TPL = { realmIdx: 0, exp: 0, spirit: 0,
+  peakSpirit: 0, offPills: [],
   offlineBoostUntil: 0, trialBest: 0, trialBoost: 0, trialBoostUntil: 0, trialSp: 0, trialEq: 0,
   pages: {}, name: "", _pn: "", _named: 0, _settledAt: 0, ver: 2 };
 
@@ -2085,16 +2069,7 @@ function seekHide() {
   /* 战斗系统已移除，新战斗动画后续接入 */
 }
 
-let _eqRecycle = [];
-
-const EQUI_SLOTI = ["w", "a", "p", "s"];
-
-const EQUI_CELLPOS = [{ pos: "left", i: 0 }, { pos: "up", i: 1 }, { pos: "right", i: 3 }, { pos: "down", i: 2 }];
-
-
 const LIC_QCOL = { 0: "#aab2c0", 1: "#6b9df5", 2: "#3fc9a2", 3: "#e0b45a", 4: "#c08af0", 5: "#ff5257" };
-
-let _eqSel = -1;
 
 function eqMult(q) { return [1.15, 1.35, 1.6, 1.9, 2.25, 3.4][q] || 1.15; }   /* v7.2b 玄天 2.7→3.4: 红装价值提升, 全红毕业≈达标×1.25 */
 
@@ -2107,32 +2082,9 @@ function bigIndexOf(realmIdx) {
   return BIGS.length - 1;
 }
 
-const MON_ATK_SCALE = [0.85, 1.34, 1.52, 1.6727, 1.9816, 2.025, 2.0636, 2.07, 2.12, 2.0743, 2.05, 2.0413];
 
-const SLOT_TYPES = [                                        // 四部位(参考): 兵/护/佩/诀
-  { n: "兵器", k: "w" }, { n: "护体", k: "a" },
-  { n: "灵佩", k: "p" }, { n: "功法", k: "s" },
-];
 
-const ARMOR_POOL = ["云纹软甲", "玄铁道衣", "天蚕宝衣", "碧鳞内甲", "朱雀羽衣", "金刚袈裟", "鲛绡冰纱", "紫绶仙衣", "龙鳞软铠", "九曜战衣"];
 
-const PEND_POOL = ["避尘佩", "养神玉", "锁魂珠", "聚灵环", "玄冰坠", "火灵佩", "护心古镜", "九宫清铃", "碧玉如意", "血珀珠"];
-
-const SCROLL_POOL = ["太清剑诀", "青元剑经", "大衍残篇", "庚金真解", "紫电玄功", "御风诀", "五行遁法", "斩灵诀", "御剑心经", "长春化生功"];
-
-const FX_TXT = {
-  atk: "攻击", hp: "生命", dfn: "防御", crit: "会心", critB: "暴击",
-  critD: "爆伤", pen: "破甲", dodge: "闪避", life: "吸血", aspd: "攻速",
-};
-
-const FX_POOL = {
-  w: ["atk", "crit", "critB", "critD", "pen", "life"],
-  s: ["atk", "crit", "critB", "critD", "pen", "life"],
-  a: ["hp", "dfn", "dodge", "crit", "critD", "life"],
-  p: ["hp", "dfn", "dodge", "crit", "critD", "life"],
-};
-
-const MON_FX_POOL = ["atk", "hp", "dfn", "crit", "critB", "critD", "pen", "dodge", "life"];
 
 function fxCount(q) { let n = ([1, 1, 2, 2, 3, 3][q] || 1); if (q >= 2 && Math.random() < 0.35) n++; return Math.min(4, n); }
 
@@ -2254,10 +2206,6 @@ const DROP_CFG = {
 };
 
 let _dropSaveT = 0;
-
-const _equipQueue = [];
-
-let _equipId = 0;
 
 /* v7.0 正规怪物池(自动生成初稿, 策划手调) —— 每大境界 12 种怪 × 各10只(顺序分波, 非随机) + 1 BOSS(30s限时)
  * 数值为策划手填定值: 运行时零公式, 调平衡直接改数字。波次=杀数段: 前10只波1怪, 之后依次波2..波12。
@@ -2545,41 +2493,18 @@ const BASE_STATS = [ // [atk, hp, def] 按大境界(凡人→天仙)
 
 /* 装备数值因子(替代 attrAssign 里的境界级 lv) —— 境界间 ×4 质变。
  * 锚: 结丹(ri3) 全红 w 槽 atk ≈ 25.9×400×2.25 ≈ 2.3万, 四槽+基础 ≈ 达标dps×1.2。 */
-const EQ_POW = [
-  6, 25, 100, 400, 1600, 6400, 26000, 100000, 410000, 1600000, 6600000, 26000000,
-];
 
 /* 各大境界品质掉落权重[粗制,法器,灵器,古宝,灵宝,玄天] —— 中后期玄天概率抬升,
  * 配合 3.5% 掉率+熔炼保留, 合体之后可攒出全红(玄天)毕业 → 虐杀 121。 */
-const QW_TABLE = [
-  [50, 20, 15, 9, 5, 1],    // 凡人: 玄天 1%
-  [50, 20, 15, 9, 5, 1],    // 炼气
-  [40, 22, 16, 10, 8, 4],   // 筑基
-  [40, 22, 16, 10, 8, 4],   // 结丹
-  [30, 20, 18, 14, 12, 6],  // 元婴
-  [30, 20, 18, 14, 12, 6],  // 化神
-  [20, 18, 18, 16, 16, 12], // 炼虚
-  [20, 18, 18, 16, 16, 12], // 合体
-  [12, 14, 16, 18, 20, 20], // 大乘
-  [12, 14, 16, 18, 20, 20], // 渡劫
-  [6, 10, 14, 18, 24, 28],  // 真仙
-  [6, 10, 14, 18, 24, 28],  // 天仙
-];
 
 
 export {
   BASE_STATS,
   bigIndexOf,
-  EQ_POW,
   MOB_BENCHMARK,
-  QW_TABLE,
   $,
-  ARMOR_POOL,
   ARRAY_COST,
   ARRAY_MAX_LV,
-  ART_PREFIX,
-  ART_SPECIAL,
-  ART_SUFFIX,
   AURA_COLORS,
   AURA_FPS,
   BIGS,
@@ -2593,11 +2518,7 @@ export {
   DEV_KEY,
   DIMSTAT,
   DROP_CFG,
-  EQUI_CELLPOS,
-  EQUI_SLOTI,
   EVENTS,
-  FX_POOL,
-  FX_TXT,
   G1_TPL,
   GAME_VER,
   JRN_CAP,
@@ -2605,8 +2526,6 @@ export {
   LIC_QCOL,
   MAIN_STORY,
   MIGRATIONS,
-  MON_ATK_SCALE,
-  MON_FX_POOL,
   MON_NAMES,
   MS_ARRAY,
   MS_ART,
@@ -2614,26 +2533,22 @@ export {
   MYST,
   OFFLINE_CAP,
   PAGES_NEED,
-  PEND_POOL,
   PET,
   PET_BONUS,
   PET_COIN,
   PET_FORGE,
   PET_STILL,
   PLOT,
-  QUALITY,
   REALM_DAYS,
   RK_NAMES,
   RK_SEGS,
   SAVE_KEY,
-  SCROLL_POOL,
   SEARCH_MAX,
   SEARCH_MIN,
   SEG4,
   SEG_META,
   SEG_SCALE,
   SKILL_DEFS,
-  SLOT_TYPES,
   SPIRIT_RATE,
   STORY_BY_KEY,
   STORY_BY_SID,
@@ -2642,10 +2557,6 @@ export {
   _dropSaveT,
   _dsp,
   _encNext,
-  _eqRecycle,
-  _eqSel,
-  _equipId,
-  _equipQueue,
   _floatPrev,
   _hbFails,
   _hiddenAt,
@@ -2715,8 +2626,6 @@ export function __set_alTipT(v) { alTipT = v; return v; }
 export function __set_breaking(v) { breaking = v; return v; }
 export function __set_dropSaveT(v) { _dropSaveT = v; return v; }
 export function __set_encNext(v) { _encNext = v; return v; }
-export function __set_eqSel(v) { _eqSel = v; return v; }
-export function __set_equipId(v) { _equipId = v; return v; }
 export function __set_hbFails(v) { _hbFails = v; return v; }
 export function __set_hiddenAt(v) { _hiddenAt = v; return v; }
 export function __set_hudAcc(v) { _hudAcc = v; return v; }

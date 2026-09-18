@@ -3,10 +3,10 @@
  *
  * 拓扑层 L8~L14，31 个顶层声明。
  */
-import { $, ARRAY_MAX_LV, BIGS, CACHE_VER, CLD_KEY, DIMSTAT, DROP_CFG, EVENTS, MAIN_STORY, PET_BONUS, PET_COIN, PET_FORGE, PET_STILL, PLOT, QUALITY, SAVE_KEY, SLOT_TYPES, __set_breaking, __set_dropSaveT, __set_encNext, __set_equipId, __set_hiddenAt, __set_hudAcc, __set_state, _dropSaveT, _dsp, _equipId, _equipQueue, _floatPrev, _hiddenAt, _hudAcc, _pred, _rate, _settling, _srvOffset, _syncAt, autoHuntOn, breaking, cld, cnNum, esc, fmt, hbOk, initFxDiag, state } from './00-pure.js';
-import { CLD_API, TOTAL_SEGS, adopt, arrayCostNow, buffAtCap, buffHintOf, burstBoom, cldApi, cldFlash, cldId, cldUI, cloudSnap, cloudSoon, createFxLayer, dimRender, ensureScrollFx, g1Pack, g1Unpack, hbFail, hiddenUnlocked, journalHasKey, pickNoRepeat, pushBattleStats, pushBoost, pushBuff, pushMsg, renderAutoHunt, renderPName, searchMs, seg, settleBlocked, spiritRate, srvNow, tickDsp } from './10-base.js';
-import { addJournal, adoptKeep, bigIdx, cldFail, keepArtQuiet, load, realm, save, smartEquip, updateArts, updateRealmUI } from './20-core.js';
-import { checkMilestones, cldPush, cloudPushNow, cloudSettle, mainMoment, makeArt, openStory, rateNow, updateHUD } from './30-systems.js';
+import { $, ARRAY_MAX_LV, BIGS, CACHE_VER, CLD_KEY, DIMSTAT, DROP_CFG, EVENTS, MAIN_STORY, PET_BONUS, PET_COIN, PET_FORGE, PET_STILL, PLOT, SAVE_KEY, __set_breaking, __set_dropSaveT, __set_encNext, __set_hiddenAt, __set_hudAcc, __set_state, _dropSaveT, _dsp, _floatPrev, _hiddenAt, _hudAcc, _pred, _rate, _settling, _srvOffset, _syncAt, autoHuntOn, breaking, cld, cnNum, esc, fmt, hbOk, initFxDiag, state } from './00-pure.js';
+import { CLD_API, adopt, arrayCostNow, buffAtCap, buffHintOf, burstBoom, cldApi, cldFlash, cldId, cldUI, cloudSnap, cloudSoon, createFxLayer, dimRender, g1Pack, g1Unpack, hbFail, hiddenUnlocked, journalHasKey, pickNoRepeat, pushBattleStats, pushBoost, pushBuff, pushMsg, renderAutoHunt, renderPName, searchMs, seg, settleBlocked, spiritRate, srvNow, tickDsp } from './10-base.js';
+import { addJournal, adoptKeep, bigIdx, cldFail, load, realm, save, updateRealmUI } from './20-core.js';
+import { checkMilestones, cldPush, cloudPushNow, cloudSettle, mainMoment, openStory, rateNow, updateHUD } from './30-systems.js';
 
 let __dimT = 0;   /* 黑屏挂机面板刷新计时器 */
 
@@ -25,8 +25,7 @@ function cldAdoptCloud(s) {
   if (!c) return false;
   __set_state(c);
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { console.warn('[app] 本地存档写入失败:', e); }
-  ensureScrollFx();             // v2.5: 云端旧档的功法可能没有攻速词条 → 补齐
-  updateRealmUI(); updateHUD(); updateArts(); realmPlot();
+  updateRealmUI(); updateHUD(); realmPlot();
   /* v1.5.0: 云端档可能没有 autoHunt 字段(老档), 采纳后按钮要跟着重绘,
      否则会出现"state 已变、开关还停在旧态"的错看 */
   renderAutoHunt();
@@ -128,7 +127,7 @@ async function bootCloud() {
   if (!sr) return false;                       // 门禁不通过
   if (sr.settled && sr.gains && sr.gains.mode === "away") presentSettle(sr);
   cloudFlush();                                // 启动结算后尽快把建档/离线收益上云
-  updateRealmUI(); updateHUD(); updateArts(); realmPlot();
+  updateRealmUI(); updateHUD(); realmPlot();
   return true;
 }
 
@@ -247,15 +246,7 @@ function adventure() {
   const roll = Math.random();
   const bi = Math.min(bigIdx(), EVENTS.length - 1);
   const petTag = `<span class="pet">阿青</span>`;
-  const artChance = 0.05 + bi * 0.005;
-  if (roll < artChance) {
-    const a = makeArt();
-    const r = QUALITY[a.q];
-    pushMsg("avatar", `${petTag}${pickNoRepeat(PET_FORGE, "petF")}，一件<span class="r">${a.name}</span>(<span class="${r.cls}">${r.name}</span>)出炉`);
-    smartEquip(a);
-  } else {
-    pushMsg("avatar", `${petTag}${pickNoRepeat(PET_STILL, "petS")}`);
-  }
+  pushMsg("avatar", `${petTag}${pickNoRepeat(PET_STILL, "petS")}`);
   state.spirit += spiritRate();
   updateHUD();
 }
@@ -301,7 +292,6 @@ function startGame() {
   _dsp.spirit = state.spirit; _dsp.exp = state.exp;
   _floatPrev.spirit = state.spirit; _floatPrev.exp = state.exp;
   updateHUD();
-  updateArts();
   bindBattleHooks();        // 战斗系统: 挂上掉落回流 + 首次注入玩家三围
   realmPlot(); // 按当前境界推进已及剧情
   {
@@ -381,7 +371,6 @@ function startGame() {
 
 async function boot() {
   load();                      // v1.10.0: 先读本地档(明文 JSON 同步), 再走云端门禁
-  _equipQueue.length = 0;      // 清空跨会话残留的未拾取装备掉落队列
   let passed = false;
   try { passed = await bootGate(); } catch (e) { console.warn('[app] boot 门禁异常:', e); passed = false; }
   if (!passed) { splashFail(); return; }   // 连不通 → 停在失败页, 不进入游戏
@@ -407,8 +396,6 @@ window.__game = {
   giveSpirit: n => { state.spirit += n; updateHUD(); },
   adventure: () => adventure(),
   mainMoment: () => mainMoment(),
-  makeArt: () => makeArt(),
-  updateArts: h => updateArts(h),
   realmPlot: () => realmPlot(),
   openStory, pushMsg, save, load,
 };
@@ -493,38 +480,14 @@ function onBattleDrop(info) {
   if (info.spirit > 0) { state.spirit += info.spirit; updateHUD(); }
 }
 
-function requestEquipDrop(info) {
-  if (!state || !info) return null;
-  /* v2.5 BOSS(info.boss)必掉一件; 普通怪/精英按概率 roll。品质一律照常 pickQ——
-   * BOSS 刷新频繁(bossSpawnEvery=10), 品质保底会让金装泛滥 */
-  if (!info.boss && Math.random() >= DROP_CFG.equipChance * (info.elite ? DROP_CFG.eliteEquipMul : 1)) return null;
-  const a = makeArt();
-  const id = __set_equipId(_equipId + 1);
-  _equipQueue.push({ id, a, elite: !!info.elite });
-  const tp = SLOT_TYPES[a.slot];
-  return { id, slot: a.slot, q: a.q, name: a.name, icon: 'assets/modals/art-ico/' + tp.k + a.q + '.webp' };
-}
+/* ⚠️ v6: 法宝掉落已随法宝系统删除。战斗层仍会请求掉落, 这里恒返回 null
+ * （不返回 undefined, 因为调用方按 null 判定"本怪无掉落"）。
+ * 掉落相关旧状态(_equipId/_equipQueue)属阶段5清理范围。 */
+function requestEquipDrop(info) { return null; }
 
-function applyEquipDrop(id) {
-  if (!state) return { kept:false, spirit:0, name:'', q:0 };
-  const i = _equipQueue.findIndex(e => e.id === id);
-  if (i < 0) return { kept:false, spirit:0, name:'', q:0 };  // 幂等
-  const { a, elite } = _equipQueue.splice(i, 1)[0];
-  /* v6.16 FIX: 不自己算灵石——keepArtQuiet内部直接改state.spirit, 口径以它为准。
-   * 用 spiritBefore/after diff 拿到实际熔了多少灵石, 避免两套口径对不上。 */
-  const spiritBefore = state.spirit;
-  const kept = keepArtQuiet(a);
-  const spiritGain = state.spirit - spiritBefore;
-  if (kept && a.q > (state.bestArtQ || -1)) state.bestArtQ = a.q;
-  if (elite || a.q >= 3) {
-    pushMsg("avatar", `${elite ? "斩一精英" : "斩妖"}得宝 <b style="color:#f0c98a">${a.name}</b>`
-      + (kept ? "（已入囊）" : "（不入眼，熔作灵石）"));
-  }
-  updateHUD();
-  if (kept) updateArts();
-  if (Date.now() - _dropSaveT > 15000) { __set_dropSaveT(Date.now()); save(); cloudSoon(); }
-  return { kept, spirit: spiritGain, name: a.name, q: a.q || 0 };
-}
+/* ⚠️ v6: 法宝掉落已删除, 战斗层的掉落回流一律按「本怪无掉落」处理。
+ * 掉落实体(_equipQueue/_equipId)属阶段5清理范围。 */
+function applyEquipDrop(id) { return { kept:false, spirit:0, name:'', q:0 }; }
 
 let _bindPoll = 0;
 function bindBattleHooks() {                    // 战斗 IIFE 是内联脚本, 载入序不定 → 轮询挂接
