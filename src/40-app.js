@@ -21,8 +21,6 @@ function startHeartbeat() {
 }
 
 function cldAdoptCloud(s) {
-  /* v2.5 技能存档保护: 云端旧档(神通系统上线前)不带 skills → 不让旧档回滚本地技能等级 */
-  if (s && !s.skills && state && state.skills && Object.keys(state.skills).length) s.skills = state.skills;
   const c = adopt(s);
   if (!c) return false;
   __set_state(c);

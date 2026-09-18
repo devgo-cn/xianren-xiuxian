@@ -639,27 +639,23 @@
   .eq-empty{text-align:center;color:#8b94a8;font-size:12.5px;padding:24px 8px;line-height:2.1}
   .eq-rec{font-size:10px;color:#5f6980;text-align:center;margin-top:10px;line-height:1.7}
 
-/* ============ 神通面板(技能) —— v2.6.1 紧凑重排: 8 门一屏放下 ============ */
+/* ============ 神通面板(技能) —— v6: 恒定数值, 砍掉等级/经验条 ============ */
   .sk-sum{font-size:10.5px;color:#8b94a8;letter-spacing:.04em;line-height:1.7;margin:0 0 2px}
   .sk-sum b{color:#a98a5a}
   .sk-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
-  .sk-row{display:flex;gap:9px;align-items:center;padding:6px 10px;
+  .sk-row{display:flex;gap:9px;align-items:center;padding:7px 10px;
     background:rgba(18,24,40,.55);border:1px solid rgba(201,168,106,.14)}
-  .sk-row.maxed{border-color:rgba(240,201,138,.42)}
   .sk-ic{flex:none;width:26px;display:flex;align-items:center;justify-content:center;
     font-size:17px;color:#f0c98a;text-shadow:0 0 10px rgba(240,200,140,.45)}
   .sk-main{flex:1;min-width:0}
-  .sk-top{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:#e6ecf5}
-  .sk-lv{font-size:10.5px;color:#f0c98a;font-weight:600}
-  .sk-lv i{font-style:normal;color:#7f92ad;font-size:9.5px;font-weight:400}
-  .sk-eff{font-size:10.5px;color:#9fd8ff;margin-top:1px;line-height:1.5;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sk-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12.5px;color:#e6ecf5}
+  /* v6 触发方式徽标: 伤害类=攻击概率触发(暖色) / buff类=冷却触发(冷色) */
+  .sk-kind{flex:none;font-size:9.5px;font-weight:600;letter-spacing:.03em;
+    padding:1px 6px;border:1px solid;white-space:nowrap}
+  .sk-kind.dmg{color:#f0c98a;border-color:rgba(240,201,138,.42);background:rgba(240,201,138,.08)}
+  .sk-kind.buff{color:#9fd8ff;border-color:rgba(159,216,255,.42);background:rgba(159,216,255,.08)}
+  .sk-eff{font-size:10.5px;color:#9fd8ff;margin-top:3px;line-height:1.5}
   .sk-eff b{color:#dff0ff;font-weight:600}
-  .sk-meta{display:flex;align-items:center;gap:8px;margin-top:4px}
-  .sk-bar{flex:1;height:3px;background:rgba(255,255,255,.08);overflow:hidden}
-  .sk-bar i{display:block;height:100%;background:linear-gradient(90deg,#6fe0a8,#3ab878);transition:width .3s ease}
-  .sk-row.maxed .sk-bar i{background:linear-gradient(90deg,#f0c98a,#d8a838)}
-  .sk-exp{flex:none;font-size:9.5px;color:#7f92ad;font-family:ui-monospace,SFMono-Regular,monospace}
 
 
 /* ============ v0.9.5 法宝大钮 + 六格面板 ============ */
