@@ -350,7 +350,7 @@
     font-size:9.5px;font-family:ui-monospace,SFMono-Regular,monospace;letter-spacing:.02em;
     color:rgba(232,197,107,.66);pointer-events:none;z-index:3;text-shadow:0 1px 2px rgba(0,0,0,.6)}
   .btn.primary .pnum{color:rgba(255,200,180,.70)}
-  .btn{pointer-events:auto;border:0;background:transparent;color:var(--gold);border-radius:0;padding:13px 24px;
+  .btn{pointer-events:auto;border:0;background:transparent;color:var(--gold);border-radius:10px;padding:13px 24px;
     font-size:14px;font-weight:600;letter-spacing:.06em;cursor:pointer;transition:transform .12s;
     box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;-webkit-appearance:none;appearance:none;outline:none}
   /* v4.4: 底部三按钮专用样式(不污染全局 .btn) —— 3:1比例锁尺寸, 12px字体, padding:0 */
@@ -361,8 +361,6 @@
   .btn:active{transform:scale(.94)}
   .btn.primary{background:transparent;color:inherit}
   .btn:disabled{opacity:.62}   /* v1.7.46: 进度已移入按钮, 禁用态保留可读性 */
-  .btn.ready{}
-  @keyframes btnPulse{0%,100%{box-shadow:0 0 12px rgba(240,205,120,.35)}50%{box-shadow:0 0 28px rgba(240,205,120,.95)}}
 
   /* 双栏叙事流: 左=分身经历(低对比·渐隐·不抢视觉)  右=主角主线探险游历 */
   .feed{position:fixed;bottom:114px;z-index:9;display:flex;flex-direction:column-reverse;gap:7px;
@@ -523,8 +521,6 @@
   /* v1.7.35: 光晕改 drop-shadow 跟随墨形/圆钮自身轮廓(不再出现直角矩形光) */
   /* v4.4 增强:  drop-shadow 范围×1.6、不透明度拉满，暗态也保留可见底光，
      避免图标透明度调高后脉冲高低对比不足。 */
-  @keyframes glowGoldInk{0%,100%{filter:drop-shadow(0 0 3px rgba(232,197,107,.5))}50%{filter:drop-shadow(0 0 10px rgba(255,220,140,1)) drop-shadow(0 0 22px rgba(255,200,110,.75)) drop-shadow(0 0 6px rgba(255,215,130,.4))}}
-  .glow-gold .ink{animation:glowGoldInk .9s ease-in-out infinite}
   /* v1.7.41 装备品质辉光(呼吸) */
   @keyframes eqBoxGlow{0%,100%{box-shadow:0 0 2px var(--qcglow),0 0 7px var(--qcglow)}50%{box-shadow:0 0 7px var(--qcglow),0 0 19px var(--qcglow)}}
   .eq-card{animation:eqBoxGlow 4.2s ease-in-out infinite}
@@ -588,7 +584,7 @@
     box-shadow:0 2px 10px rgba(0,0,0,.55);cursor:grab;touch-action:none}
   .dim-knob svg{width:20px;height:20px;display:block}
 </style>
-<link rel="stylesheet" href="dt-theme.css?v=5.37">
+<link rel="stylesheet" href="dt-theme.css?v=5.38">
 </head>
 <body>
 <!-- v1.7.58 开屏页: 品牌 + 进度 + 健康游戏忠告(load 完成或点击后淡出) -->

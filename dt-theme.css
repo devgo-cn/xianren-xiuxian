@@ -31,40 +31,26 @@
   /* 旧金 → 旧金（微调，去荧光感） */
   .realm-badge .big,.card h3,.story-body h4,.j-card h5{font-family:var(--font-brush)}
   .realm-badge .big{color:#d4b06a;text-shadow:0 0 14px rgba(212,176,106,.35)}
-  /* ===== 按钮 = SVG 手绘墨块（2D 矢量 path，真·S 曲线）=====
-     每颗按钮内嵌 <svg class="skin"><path class="ink">：轮廓由贝塞尔曲线(C/Q)构成，
-     波浪起伏、绝无直线边。文字由 .label 叠加。gradGold/gradCin 渐变在 index.html <defs> 中。
-     ---- */
+  /* ===== 按钮：正式实底按钮（v5.16 墨形全退役）=====
+     无皮肤 .btn 由文件尾「模态按钮补皮」给金棕渐变实底+描边+圆角;
+     带 webp 皮肤(.skin)的底部三钮走 .btn .skin 图片底。 ---- */
   .btn{
     position:relative;display:inline-flex;align-items:center;justify-content:center;
     border:none;background:transparent;padding:13px 24px;
     font-family:var(--font-brush);font-size:14px;font-weight:600;letter-spacing:.2em;
     color:#e8d6a4;text-shadow:0 1px 3px rgba(0,0,0,.5);
     cursor:pointer;-webkit-tap-highlight-color:transparent;
-    filter:drop-shadow(0 4px 8px rgba(0,0,0,.35));
+    box-shadow:0 4px 8px rgba(0,0,0,.35);
     transition:transform .14s;
     vertical-align:middle;
   }
   .btn .skin{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
-  .btn .ink{fill:url(#gradGold);stroke:rgba(235,205,140,.55);stroke-width:1.3;
-    vector-effect:non-scaling-stroke}
   .btn .label{position:relative;z-index:2;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:20px;white-space:nowrap}   /* v4.4: 恢复全局label样式, 底部按钮label的绝对定位已移到index.html的ID选择器 */
-  /* 镜像/倾斜：让每颗按钮轮廓各不同向 */
-  /* v4.4: 移除 #btnArray .skin scaleX(-1) 镜像——意义不明, 三按钮图案统一在左侧, 文字统一右移到空白区 */
-  #btnBreak{--tilt:-.8deg}
-  #btnArray{--tilt:.6deg}
   /* v1.9.9f: hover/active 不再动 filter —— 状态切换重算 drop-shadow 高斯是 WebView 点按卡顿元凶; 反馈交给 transform(合成器) */
   .btn:hover{transform:translateY(-1px)}
-  .btn:active{transform:rotate(var(--tilt,0deg)) scale(.95)}
-  .btn:disabled{opacity:.3;filter:saturate(.25) grayscale(.3)}
+  .btn:active{transform:scale(.95)}
   /* 朱砂主按钮（渡劫/确认）—— 唯一高饱和 */
   .btn.primary{color:#f9edda;text-shadow:0 1px 3px rgba(70,10,0,.55)}
-  .btn.primary .ink{fill:url(#gradCin);stroke:rgba(255,205,175,.6);stroke-width:1.4}
-  /* 渡劫可点时：印泥脉动 */
-  .btn.ready .ink{animation:inkBeat 1.5s ease-in-out infinite}
-  @keyframes inkBeat{0%,100%{opacity:.62}50%{opacity:1}}   /* v1.9.9f: filter 模糊脉动降为 opacity 脉动 */
-
-    50%{box-shadow:inset 0 1px 0 rgba(255,220,200,.35),0 0 30px rgba(200,70,50,.6),0 6px 18px rgba(0,0,0,.45)}}
   /* 文本浮签里的高亮色：去荧光，转旧金/黛青 */
   .fmsg .r{color:#c9a86a}.fmsg .g{color:#7fb3a0}.fmsg .b{color:#9db4d9}
   .feed-avatar .fmsg .r{color:#8f7a4d}
@@ -78,8 +64,7 @@
     filter:drop-shadow(0 1px 3px rgba(0,0,0,.6))}
   .rate b{color:#b9c6dd;font-weight:700}
   #cloudChip{position:relative;display:flex;align-items:center;gap:4px;max-width:128px;white-space:nowrap;overflow:hidden;padding:2px 9px;font-size:10.5px;color:#cdd9e8;cursor:pointer;user-select:none;line-height:1.2;height:20px;
-    background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 40%22 preserveAspectRatio=%22none%22><path d=%22M12 8 C42 -2 88 16 138 2 C172 -4 198 6 200 18 C202 30 188 38 174 36 C136 44 88 30 48 38 C18 40 2 36 0 24 C-2 14 6 8 12 8 Z%22 fill=%22rgba(12,18,34,.9)%22 stroke=%22rgba(201,168,106,.28)%22 stroke-width=%221.2%22 vector-effect=%22non-scaling-stroke%22/></svg>');
-    background-size:100% 100%;background-repeat:no-repeat}
+    background:rgba(12,18,34,.85);border:1px solid rgba(201,168,106,.28);border-radius:999px}
   .spirit.cloud #cloudChip.dot{width:7px;height:7px;border-radius:50%;background:#7a8694;flex:none}
   /* 卡片：宣纸晕染感 + 墨线双框 */
   .card{position:relative;padding:26px 24px;text-align:center;
@@ -99,31 +84,19 @@
   /* v1.9.9d: SVG feTurbulence 换预生成 PNG 噪声 —— WebView 上 SVG 滤镜 CPU 逐像素光栅化, 弹窗开合触发重光栅化致卡顿闪屏 */
   body::after{content:"";position:fixed;inset:0;z-index:3;pointer-events:none;opacity:.55;
     background-image:var(--noise);}
-/* ================= v0.4.2 按钮三态显式配色 =================
-   熄墨(disabled,灰蓝) / 可点(墨金/朱砂) / 激活ready(亮朱砂+脉动) */
-  .btn .ink{fill:#96733a;stroke:rgba(235,205,140,.5);stroke-width:1.3}
-  .btn.primary .ink{fill:#a93828;stroke:rgba(255,205,175,.6)}
-  .btn.ready .ink{fill:#c74a30}
-  .btn.ready{color:#ffe6cd}
-  /* 非激活=熄墨：灰蓝墨块+去饱和文字，不透明但明显"灭着" */
-  .btn:disabled .ink{fill:#232c46;stroke:rgba(150,175,220,.35)}
-  .btn:disabled{opacity:.9;color:#64718c;filter:grayscale(.65);text-shadow:none;cursor:not-allowed}
-  .btn.primary:disabled{color:#8a7a88}
 
 /* ================= v0.4.2 全界面清洗：墨形统一 =================
-   统一"小墨条"轮廓(200x44)，用于日志/道具/筛选chip/离线奇遇等所有曾圆角矩形的小件 */
-  .fmsg,.art,.chip,.story-btn,.off-tale,.cp-btn{
+   v5.16: 按钮/筛选chip已回归正式样式, 墨条底仅保留给非交互件(日志/道具/离线奇遇) */
+  .fmsg,.art,.off-tale{
     border:0 !important;border-radius:0 !important;backdrop-filter:none !important;
     background-color:transparent !important;
     background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 44%22 preserveAspectRatio=%22none%22><path d=%22M12 6 C60 -2 120 10 170 3 C188 2 198 8 196 16 C198 26 190 36 172 36 C130 42 80 30 34 36 C16 38 4 34 2 24 C0 16 6 8 12 6 Z%22 fill=%22rgba(12,17,31,.78)%22 stroke=%22rgba(201,168,106,.26)%22 stroke-width=%221.1%22 vector-effect=%22non-scaling-stroke%22/></svg>') !important;
     background-size:100% 100% !important;background-repeat:no-repeat !important;
   }
-  /* 各自内边距微调，文字不贴边 */
+  /* 各自内边距微调，文字不贴边（.chip/.story-btn/.cp-btn 已回归正式按钮样式, v5.16） */
   .fmsg{padding:8px 14px !important}
   .art{padding:4px 12px !important;background-blend-mode:normal}
-  .chip,.story-btn{padding:4px 13px !important}
   .off-tale{padding:10px 14px !important}
-  .cp-btn{padding:4px 12px !important;color:#cfe3fb !important}
   /* 修行录条目 j-card：弃圆角底，改"左侧朱墨竖线+透明" */
   .j-card{background:transparent !important;border-radius:0 !important;box-shadow:none !important;
     border:0 !important;padding:2px 0 2px 14px !important;position:relative}
@@ -166,32 +139,22 @@
   .card-content-wrap{min-width:0}
   /* 卡片文字不溢出墨形：内部元素限制宽度 */
   .card h3,.card p,.card .off-tale{max-width:100%;overflow-wrap:break-word;word-break:break-word}
-  /* ---- ③ 按钮三态：熄墨可见，朱砂鲜亮 ---- */
-  .btn .ink{fill:#8f6f38;stroke:rgba(235,205,140,.55)}
+  /* ---- ③ 按钮三态：熄墨可见，朱砂鲜亮（v5.16: .ink 死规则清除） ---- */
   .btn{color:#e8d6a4}
-  .btn.primary .ink{fill:#b9342a;stroke:rgba(255,205,175,.62)}
   .btn.primary{color:#fff3e4;text-shadow:0 1px 3px rgba(70,10,0,.6)}
-  .btn.ready .ink{fill:#cf4a30}
   .btn.ready{color:#fff0da}
   .btn.ready{animation:none}
-  .btn.ready .ink{animation:inkBeat 1.4s ease-in-out infinite}
   /* 熄墨：非透明隐藏，而是“灭掉”的可见钮 */
   .btn:disabled{opacity:1;filter:none;color:#9aa6c0;cursor:not-allowed;text-shadow:none}
-  .btn:disabled .ink{fill:#3a4365;stroke:rgba(170,190,235,.4);filter:none}
   .btn.primary:disabled{color:#cbb4c4}
-  .btn.primary:disabled .ink{fill:#52405a;stroke:rgba(220,160,190,.4)}
   .btn .label{white-space:normal;line-height:1.35}
 
 /* ============ v0.4.4 ============
    ① 突破按钮彻底不透明：全状态 opacity:1，熄灭态也提亮可读
    ② 左右日志浮签：加内边距与断词，字不再跑出墨形 */
   .btn,.btn:disabled,.btn.primary,.btn.primary:disabled{opacity:1 !important;filter:none !important}
-  .btn .ink,.btn.primary .ink,.btn:disabled .ink{fill-opacity:1;opacity:1}
-  .btn.primary .ink{fill:#c03d2c;stroke:rgba(255,215,185,.7)}
   .btn.primary{color:#fff6e8;text-shadow:0 1px 2px rgba(80,12,0,.7)}
-  .btn:disabled .ink{fill:#47517c;stroke:rgba(185,205,255,.55);stroke-width:1.5}
   .btn:disabled{color:#bcc6de}
-  .btn.primary:disabled .ink{fill:#6b5262;stroke:rgba(235,175,195,.6)}
   .btn.primary:disabled{color:#e2cfda}
   /* 日志浮签：安全边距 + 断词约束 */
   .feed{width:min(224px,46vw)}
@@ -203,16 +166,9 @@
 /* ============ v0.4.5 ============
    ① 墨块改为 50% 半透明（透出星空又保留形状），文字实亮、描边清楚
    ② 日志浮签框随字自适应：容器不拉伸、墨条贴内容宽 */
-  /* —— 皮肤填充 50% alpha —— */
-  .btn .ink{fill:rgba(143,111,56,.5);stroke:rgba(235,205,140,.8);stroke-width:1.5}
   .btn{color:#ecd9a8;text-shadow:0 1px 2px rgba(0,0,0,.65)}
-  .btn.primary .ink{fill:rgba(200,62,44,.5);stroke:rgba(255,215,185,.85);stroke-width:1.6}
   .btn.primary{color:#fff3e0}
-  .btn.ready .ink{fill:rgba(214,80,50,.55);stroke:rgba(255,230,200,.9)}
-  /* 熄灭态：灰蓝墨 50% + 亮描边 + 文字仍清楚 */
-  .btn:disabled .ink{fill:rgba(71,81,124,.5);stroke:rgba(185,205,255,.75);stroke-width:1.6}
   .btn:disabled{color:#c6d0e8;text-shadow:none}
-  .btn.primary:disabled .ink{fill:rgba(107,82,98,.5);stroke:rgba(235,175,195,.75)}
   .btn.primary:disabled{color:#e6d2dd}
   .btn:disabled{opacity:1 !important;filter:none !important}
   /* —— 日志浮签：墨条宽度贴合内容 —— */
@@ -225,10 +181,7 @@
 /* ============ v0.4.6 ============
    ① 熄灭态按钮提亮（立即突破平时 disabled，之前暗得像全透明）
    ② 左右日志改成"整块半透明播报墙"：无外框线、高度更高、字统一在墙内播报 */
-  /* —— 熄灭态：亮灰蓝 50% 底 + 清晰文字，绝不是隐形 —— */
-  .btn:disabled .ink{fill:rgba(110,125,175,.55);stroke:rgba(200,220,255,.85);stroke-width:1.6}
   .btn:disabled{color:#dfe6f5}
-  .btn.primary:disabled .ink{fill:rgba(168,120,150,.55);stroke:rgba(245,200,215,.85);stroke-width:1.6}
   .btn.primary:disabled{color:#f2e3ec}
   /* —— 播报墙：整块半透明纵向渐隐面板，无边框线 —— */
   .feed{
@@ -283,10 +236,8 @@
   /* 三钮并排不溢出 */
   .actions{gap:6px;padding:0 8px}
   .actions .btn{padding:12px 14px;font-size:13px}
-  /* 云游中按钮=人在外(蓝墨)，非熄灭 */
-  #btnTravel.traveling .ink{fill:rgba(96,132,190,.5);stroke:rgba(200,220,255,.8)}
+  /* 云游中按钮=人在外，非熄灭 */
   #btnTravel.traveling{color:#dce7f8}
-  #btnTravel .ink{fill:rgba(86,148,128,.5);stroke:rgba(150,230,205,.75)}
   #btnTravel{color:#cdeeda}
   /* v2.6.1: 丹力提示改独立定层 —— 固定在右上角小图标(两行, 底≈66px)正下方, 不再压图标 */
   #pillHints{position:fixed;top:72px;right:10px;z-index:99;min-height:0;font-size:10px;color:#9aa5ba;
@@ -301,24 +252,11 @@
     text-shadow:0 0 6px rgba(120,215,180,.4)}
   .feed.feed-main .fmsg .pet{color:#9fdcc4}
 
-/* ============ v0.8.1 鸿雁信匣 ============ */
-  .mail-chip{position:relative;width:40px;height:40px;flex:none;cursor:pointer;
-    filter:drop-shadow(0 3px 10px rgba(0,0,0,.45));-webkit-tap-highlight-color:transparent}
-  .mail-chip .m-bg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-  .mail-chip .m-bg .ink{fill:rgba(22,30,50,.58);stroke:rgba(201,168,106,.68);stroke-width:1.7}
-  .mail-chip .m-ico{position:absolute;inset:10px;width:22px;height:22px;pointer-events:none}
-  .mail-chip .m-ico .env{fill:rgba(232,214,164,.12);stroke:rgba(232,214,164,.94);stroke-width:1.5;stroke-linejoin:round}
-  .mail-chip .m-ico .fold{fill:none;stroke:rgba(232,214,164,.94);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
-  .mail-chip:active{transform:scale(.92)}
-  .mail-chip.has-mail{filter:drop-shadow(0 0 10px rgba(208,80,60,.5)) drop-shadow(0 3px 10px rgba(0,0,0,.4))}
-  .mail-chip.has-mail .m-ico{animation:mailBob 2.6s ease-in-out infinite}
-  .mail-chip.has-mail .env{stroke:#f2c9a8}
-  .mail-chip.has-mail .fold{stroke:#f2c9a8}
+/* ============ v0.8.1 鸿雁信匣（v5.16: 入口 chip 已随内联 SVG 退役, 样式清除） ============ */
   .mail-dot{display:none;position:absolute;top:-2px;right:-2px;width:12px;height:12px;border-radius:50%;
     background:radial-gradient(circle at 35% 30%,#ff9078,#c03a28 70%);
     box-shadow:0 0 9px rgba(220,70,50,.95),inset 0 -1px 2px rgba(120,10,0,.5);
     animation:dotPulse 1.5s ease-in-out infinite;z-index:3;pointer-events:none}
-  @keyframes mailBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.8px)}}
   @keyframes dotPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.85)}}
   #mailBody{padding:2px 4px 8px}
   .mail-item{position:relative;padding:13px 6px 11px}
@@ -438,12 +376,14 @@
   @keyframes logPulse{0%{filter:brightness(2.4)}100%{filter:brightness(1)}}
   .btl-acts{display:flex;justify-content:center;gap:9px;margin-top:8px;flex-wrap:wrap}
   .btl-acts .btn{flex:0 1 auto;padding:8px 14px;font-size:13px;letter-spacing:.1em;color:#e8d6a4;
-    background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 44%22 preserveAspectRatio=%22none%22><path d=%22M12 6 C60 -2 120 10 170 3 C188 2 198 8 196 16 C198 26 190 36 172 36 C130 42 80 30 34 36 C16 38 4 34 2 24 C0 16 6 8 12 6 Z%22 fill=%22rgba(24,32,52,.5)%22 stroke=%22rgba(201,168,106,.5)%22 stroke-width=%221.1%22 vector-effect=%22non-scaling-stroke%22/></svg>');
-    background-size:100% 100%;background-repeat:no-repeat;border:none;border-radius:0}
+    background:linear-gradient(180deg,rgba(24,32,52,.55),rgba(16,22,38,.5));
+    border:1px solid rgba(201,168,106,.5);border-radius:10px}
   .btl-acts .btn.acc{color:#ffe2c8;
-    background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 44%22 preserveAspectRatio=%22none%22><path d=%22M12 6 C60 -2 120 10 170 3 C188 2 198 8 196 16 C198 26 190 36 172 36 C130 42 80 30 34 36 C16 38 4 34 2 24 C0 16 6 8 12 6 Z%22 fill=%22rgba(178,50,35,.5)%22 stroke=%22rgba(255,180,150,.6)%22 stroke-width=%221.1%22 vector-effect=%22non-scaling-stroke%22/></svg>')}
+    background:linear-gradient(180deg,rgba(178,50,35,.55),rgba(120,32,20,.5));
+    border-color:rgba(255,180,150,.6)}
   .btl-acts .btn.flee{color:#aab6cc;
-    background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 44%22 preserveAspectRatio=%22none%22><path d=%22M12 6 C60 -2 120 10 170 3 C188 2 198 8 196 16 C198 26 190 36 172 36 C130 42 80 30 34 36 C16 38 4 34 2 24 C0 16 6 8 12 6 Z%22 fill=%22rgba(60,74,108,.5)%22 stroke=%22rgba(170,190,235,.45)%22 stroke-width=%221.1%22 vector-effect=%22non-scaling-stroke%22/></svg>')}
+    background:linear-gradient(180deg,rgba(60,74,108,.55),rgba(40,50,78,.5));
+    border-color:rgba(170,190,235,.45)}
   .btl-acts .btn:disabled{opacity:.35;filter:grayscale(.7)}
   .btl-hint{font-size:9.5px;color:#5f6980;text-align:center;margin-top:10px;letter-spacing:.1em}
 
@@ -724,9 +664,9 @@
 
 /* ============ v0.9.5 法宝大钮 + 六格面板 ============ */
   .equip-chip{position:relative;width:40px;height:40px;flex:none;cursor:pointer;z-index:9;
-    background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22 preserveAspectRatio=%22none%22><path d=%22M100 8 C146 2 190 32 195 80 C200 130 172 188 126 195 C78 203 18 178 9 124 C1 74 28 16 78 8 C85 7 93 8 100 8 Z%22 fill=%22rgba(22,30,50,.62)%22 stroke=%22rgba(201,168,106,.75)%22 stroke-width=%221.7%22 vector-effect=%22non-scaling-stroke%22/></svg>');
-    background-size:100% 100%;background-repeat:no-repeat;
-    filter:drop-shadow(0 3px 12px rgba(0,0,0,.5));-webkit-tap-highlight-color:transparent}
+    background:linear-gradient(180deg,rgba(22,30,50,.85),rgba(12,18,34,.85));
+    border:1.5px solid rgba(201,168,106,.55);border-radius:50%;
+    box-shadow:0 3px 12px rgba(0,0,0,.5);-webkit-tap-highlight-color:transparent}
   .equip-chip .lg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     font-family:var(--font-brush);font-size:18px;color:#f0c98a;letter-spacing:0;text-shadow:0 0 10px rgba(240,200,140,.45)}
   .equip-chip:active{transform:scale(.92)}
@@ -1034,8 +974,6 @@
 
 
 /* ==================== v1.7.35 墨形轮廓光(drop-shadow 跟墨形路径/圆钮, 非直角盒光) ==================== */
-@keyframes glowGoldInk{0%,100%{filter:drop-shadow(0 0 1.5px rgba(232,197,107,.28))}50%{filter:drop-shadow(0 0 7px rgba(255,215,130,.95)) drop-shadow(0 0 16px rgba(255,200,110,.5))}}
-.glow-gold .ink{animation:glowGoldInk .9s ease-in-out infinite}
 @keyframes glowEmberInk{0%,100%{filter:drop-shadow(0 0 1px rgba(255,150,110,.2))}50%{filter:drop-shadow(0 0 6px rgba(255,150,110,.95)) drop-shadow(0 0 13px rgba(255,120,80,.5))}}
 .glow-ember{animation:glowEmberInk .75s ease-in-out infinite}
 
@@ -1194,28 +1132,26 @@
   background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 44%22 preserveAspectRatio=%22none%22><path d=%22M12 6 C60 -2 120 10 170 3 C188 2 198 8 196 16 C198 26 190 36 172 36 C130 42 80 30 34 36 C16 38 4 34 2 24 C0 16 6 8 12 6 Z%22 fill=%22rgba(34,28,16,.5)%22 stroke=%22rgba(201,168,106,.38)%22 stroke-width=%221%22 vector-effect=%22non-scaling-stroke%22/></svg>') !important;
   background-size:100% 100% !important;background-repeat:no-repeat !important;
   padding:2.5px 11px !important}
-/* 开炉钮: 手绘墨块按钮 —— 可开=朱砂(唯一高饱和) / 材料不足=可见熄墨 */
-.al-craft{border-radius:0 !important;border:0 !important;
-  background:transparent !important;box-shadow:none;
-  background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 60%22 preserveAspectRatio=%22none%22><path d=%22M14 7 C30 2 40 12 56 6 C72 1 84 9 100 6 C118 3 132 8 150 5 C166 3 184 6 194 12 C199 20 196 28 197 36 C198 44 194 50 180 52 C166 54 150 49 136 53 C120 57 104 50 90 54 C76 58 62 52 48 55 C34 57 20 52 10 53 C2 52 3 44 4 36 C5 27 3 19 6 14 C7 11 10 9 14 7 Z%22 fill=%22rgba(71,81,124,.45)%22 stroke=%22rgba(170,190,235,.4)%22 stroke-width=%221.2%22 vector-effect=%22non-scaling-stroke%22/></svg>') !important;
-  background-size:100% 100% !important;background-repeat:no-repeat !important;
+/* 开炉钮: 正式实底按钮 —— 可开=朱砂(唯一高饱和) / 材料不足=灰蓝熄墨 */
+.al-craft{border:1px solid rgba(170,190,235,.4) !important;border-radius:10px !important;
+  background:linear-gradient(180deg,rgba(71,81,124,.45),rgba(50,58,92,.4)) !important;
   color:#bcc6de !important;padding:8px 16px 9px !important;
-  filter:drop-shadow(0 2px 5px rgba(0,0,0,.35))}
+  box-shadow:0 2px 5px rgba(0,0,0,.35)}
 .al-craft.on{color:#fff0e2 !important;
-  background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 60%22 preserveAspectRatio=%22none%22><path d=%22M14 7 C30 2 40 12 56 6 C72 1 84 9 100 6 C118 3 132 8 150 5 C166 3 184 6 194 12 C199 20 196 28 197 36 C198 44 194 50 180 52 C166 54 150 49 136 53 C120 57 104 50 90 54 C76 58 62 52 48 55 C34 57 20 52 10 53 C2 52 3 44 4 36 C5 27 3 19 6 14 C7 11 10 9 14 7 Z%22 fill=%22rgba(178,50,35,.55)%22 stroke=%22rgba(255,190,160,.65)%22 stroke-width=%221.3%22 vector-effect=%22non-scaling-stroke%22/></svg>') !important;
+  background:linear-gradient(180deg,rgba(178,50,35,.6),rgba(122,32,18,.55)) !important;
+  border-color:rgba(255,190,160,.65) !important;
   animation:craftEmber 2.2s ease-in-out infinite}
-@keyframes craftEmber{0%,100%{filter:drop-shadow(0 2px 5px rgba(0,0,0,.35)) drop-shadow(0 0 1px rgba(217,88,63,0))}
-  50%{filter:drop-shadow(0 2px 5px rgba(0,0,0,.35)) drop-shadow(0 0 7px rgba(217,88,63,.6))}}
-.al-craft.on:active{transform:rotate(-.6deg) scale(.93)}
+@keyframes craftEmber{0%,100%{box-shadow:0 2px 5px rgba(0,0,0,.35),0 0 1px rgba(217,88,63,0)}
+  50%{box-shadow:0 2px 5px rgba(0,0,0,.35),0 0 9px rgba(217,88,63,.55)}}
+.al-craft.on:active{transform:scale(.93)}
 /* 丹药匣: 金墨条 + 朱砂服丹小钮 */
 .al-pill{border-radius:0 !important;border:0 !important;background:transparent !important;
   background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 44%22 preserveAspectRatio=%22none%22><path d=%22M12 6 C60 -2 120 10 170 3 C188 2 198 8 196 16 C198 26 190 36 172 36 C130 42 80 30 34 36 C16 38 4 34 2 24 C0 16 6 8 12 6 Z%22 fill=%22rgba(34,28,16,.55)%22 stroke=%22rgba(201,168,106,.42)%22 stroke-width=%221.1%22 vector-effect=%22non-scaling-stroke%22/></svg>') !important;
   background-size:100% 100% !important;background-repeat:no-repeat !important;
   padding:3.5px 7px 3.5px 13px !important}
-.al-pill .take{border-radius:0 !important;border:0 !important;
-  background:transparent !important;color:#ffd9c4 !important;
-  background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 44%22 preserveAspectRatio=%22none%22><path d=%22M12 6 C60 -2 120 10 170 3 C188 2 198 8 196 16 C198 26 190 36 172 36 C130 42 80 30 34 36 C16 38 4 34 2 24 C0 16 6 8 12 6 Z%22 fill=%22rgba(178,50,35,.45)%22 stroke=%22rgba(255,170,140,.5)%22 stroke-width=%221%22 vector-effect=%22non-scaling-stroke%22/></svg>') !important;
-  background-size:100% 100% !important;background-repeat:no-repeat !important;
+.al-pill .take{border:1px solid rgba(255,170,140,.5) !important;
+  background:linear-gradient(180deg,rgba(178,50,35,.5),rgba(122,32,18,.42)) !important;
+  border-radius:8px !important;color:#ffd9c4 !important;
   padding:2px 11px !important;font-family:var(--font-brush)}
 .al-pill .take:active{transform:scale(.9)}
 /* 残卷卡: 冷墨虚笺(紫系归位为灰墨) */
@@ -1286,16 +1222,13 @@
 .realm-badge::after{display:none !important}
 .res-bar{flex-wrap:nowrap !important}
 
-/* ---------- 模态按钮补皮: 无 inline skin 的 .btn 统一给手绘墨形底 ----------
-   v1.9.9g: :not(.seal) —— .btn.seal(信匣收取/一键收取)是正经 CSS 实底按钮,
-   绝不允许任何 SVG 墨形(内联或本条 data-URI 背景)叠上来。
-   此前本条靠源顺序压过 .btn.seal 的 background 简写, 朱砂墨形盖回按钮, 已修正。 ---------- */
-.btn:not(:has(> .skin)):not(.seal){background-color:transparent;
-  background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 60%22 preserveAspectRatio=%22none%22><path d=%22M14 7 C30 2 40 12 56 6 C72 1 84 9 100 6 C118 3 132 8 150 5 C166 3 184 6 194 12 C199 20 196 28 197 36 C198 44 194 50 180 52 C166 54 150 49 136 53 C120 57 104 50 90 54 C76 58 62 52 48 55 C34 57 20 52 10 53 C2 52 3 44 4 36 C5 27 3 19 6 14 C7 11 10 9 14 7 Z%22 fill=%22rgba(143,111,56,.5)%22 stroke=%22rgba(235,205,140,.8)%22 stroke-width=%221.4%22 vector-effect=%22non-scaling-stroke%22/></svg>');
-  background-size:100% 100%;background-repeat:no-repeat}
-.btn.primary:not(:has(> .skin)):not(.seal){color:#fff3e0;
-  background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 60%22 preserveAspectRatio=%22none%22><path d=%22M14 7 C30 2 40 12 56 6 C72 1 84 9 100 6 C118 3 132 8 150 5 C166 3 184 6 194 12 C199 20 196 28 197 36 C198 44 194 50 180 52 C166 54 150 49 136 53 C120 57 104 50 90 54 C76 58 62 52 48 55 C34 57 20 52 10 53 C2 52 3 44 4 36 C5 27 3 19 6 14 C7 11 10 9 14 7 Z%22 fill=%22rgba(178,50,35,.5)%22 stroke=%22rgba(255,190,160,.62)%22 stroke-width=%221.5%22 vector-effect=%22non-scaling-stroke%22/></svg>')}
-.btn:not(:has(> .skin)):active{transform:rotate(-.6deg) scale(.95)}
+/* ---------- 模态按钮补皮: 无 inline skin 的 .btn 统一正式实底按钮 ----------
+   v5.16: 手绘墨形(data-URI SVG)全面退役, 对齐 .btn.seal(v1.9.9e)的正式按钮语言:
+   金棕渐变实底+描边+圆角。primary=金棕实底, 与信匣收取钮一致; 朱砂保留给战斗强调(.acc/开炉/服丹)。 ---------- */
+.btn:not(:has(> .skin)):not(.seal){background:linear-gradient(180deg,rgba(201,168,106,.16),rgba(201,168,106,.06));
+  border:1px solid rgba(201,168,106,.5);border-radius:10px;color:#e9d5a0;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.btn.primary:not(:has(> .skin)):not(.seal){color:#ffe9b8;
+  background:linear-gradient(180deg,#8a5a2b,#614021);border-color:rgba(255,222,150,.55)}
 /* v1.9.9g: seal 按钮自收缩 —— 内容宽自适应; 覆盖 index.html 内联 .card .btn 的
    min-width:176px/padding 38px/margin-top:16px(诊断实测两字按钮被撑到 176px 宽的元凶) */
 .btn.seal{width:-moz-fit-content;width:fit-content;flex:none;min-width:0;max-width:none;margin-top:0}
