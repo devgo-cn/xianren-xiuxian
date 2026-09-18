@@ -3318,11 +3318,14 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     /* 起点: 怪身前一点(不是身内, 否则弹道从怪身上"长"出来), 高度由 alt 决定(胸口附近) */
     const ox = e.x + dir * dh * 0.16;
     const oy = e.y - dh * k.alt;
-    /* 2 维瞄准: 从发射点朝玩家当前位置算归一化方向向量; 玩家不存在时退化为水平朝向 */
+    /* 2 维瞄准: 从发射点朝玩家当前位置算归一化方向向量; 玩家不存在时退化为水平朝向。
+     * v5.11 FIX: 目标点取玩家【胸口】(脚底减半身高) 而非脚底 —— 旧代码发射点在怪胸口
+     * (oy = e.y - dh*alt, 高于地面), 目标却是玩家脚底(车道偏移), tdy 恒为正 ≈ dh*alt,
+     * 弹道永远向下倾斜(近距时低达 30~40°), 表现为"远程怪往下攻击"。两侧同高后弹道水平。 */
     let dx = dir, dy = 0;
     if (G.player) {
       const tdx = G.player.x - ox;
-      const tdy = G.player.y - oy;          /* 均为地板相对坐标, 可直接相减 */
+      const tdy = (G.player.y - PLAYER_H * 0.5) - oy;   /* 均为地板相对坐标, 可直接相减 */
       const dist = Math.sqrt(tdx * tdx + tdy * tdy) || 1;
       dx = tdx / dist; dy = tdy / dist;
     }
@@ -3587,12 +3590,13 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         const adv = f.travel ? f.travel * Math.min(1, kx / 0.8) : 0;
         let px = sx + (f.dx || f.dir) * adv;
         let py = fy + (f.dy || 0) * adv;
-        /* v4.9 弹道追踪: 朝玩家当前位置偏移, 前20%不追踪(避免刚发射就拐弯), 后面逐渐追踪到 track 强度 */
+        /* v4.9 弹道追踪: 朝玩家当前位置偏移, 前20%不追踪(避免刚发射就拐弯), 后面逐渐追踪到 track 强度。
+         * v5.11 FIX: 追踪目标同步改玩家胸口(与发射瞄准一致, 旧口径追脚底会把弹道越追越往下)。 */
         if (f.track && G.player) {
           const trackAmt = f.track * Math.max(0, (kx - 0.2) / 0.8);
           if (trackAmt > 0) {
             const targetX = G.player.x;
-            const targetY = fy + (G.player.y - (f.y || 0));
+            const targetY = fy + (G.player.y - PLAYER_H * 0.5) - (f.y || 0);
             px += (targetX - px) * trackAmt;
             py += (targetY - py) * trackAmt;
           }
