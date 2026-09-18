@@ -542,8 +542,11 @@ function presentSettle(r) {
     if (f.mult > 1) {
       trialRow += `<div class="off-row"><span class="o-ico">${icoExp}</span><span class="ol">${f.tag === "trial" ? "兽潮加成" : "丹药加持" + nm}</span><b class="ov">×${Number(f.mult).toFixed(2)}</b></div>`;
     } else if (f.boost > 0) {
-      if (f.tag === "trial") trialRow += `<div class="off-row"><span class="o-ico">${icoExp}</span><span class="ol">兽潮加成${nm}</span><b class="ov" style="color:#e0b45a">×${(1 + f.boost).toFixed(2)}</b></div>`;
-      else trialRow += `<div class="off-row"><span class="o-ico">${icoSpi}</span><span class="ol">丹力加成${nm}</span><b class="ov jade">+${Math.round(f.boost * 100)}%·庇佑 ${Math.max(1, Math.round((f.covered || 0) / 3.6e6))} 时</b></div>`;
+      /* v5.7: boost 在线也生效 → 结算区间可能是几分钟(心跳段), 庇佑时长智能显示 时/分 */
+      const cvr = Math.max(1, Math.round((f.covered || 0) / 60000));
+      const cvrTxt = cvr >= 60 ? `庇佑 ${Math.round(cvr / 60)} 时` : `庇佑 ${cvr} 分`;
+      if (f.tag === "trial") trialRow += `<div class="off-row"><span class="o-ico">${icoExp}</span><span class="ol">兽潮加成${nm}</span><b class="ov" style="color:#e0b45a">×${(1 + f.boost).toFixed(2)}·${cvrTxt}</b></div>`;
+      else trialRow += `<div class="off-row"><span class="o-ico">${icoSpi}</span><span class="ol">丹力加成${nm}</span><b class="ov jade">+${Math.round(f.boost * 100)}%·${cvrTxt}</b></div>`;
     }
   }
   /* v1.9.8: 连破境 → 横幅右上朱印; 闭关时长 → 横幅标题带(各一行小字) */
