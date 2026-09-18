@@ -5,8 +5,8 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, BIGS, DROP_CFG, EQUI_CELLPOS, FX_TXT, JRN_CAP, LIC_QCOL, MATS, QUALITY, SAVE_KEY, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, STORY_BY_KEY, STORY_PAGE, __set_rate, __set_rkAt, __set_skillSaveT, __set_srvOffset, __set_state, __set_storyChap, __set_traceT, __set_travelReturned, _eqRecycle, _eqSel, _pred, _rkAt, _skillSaveT, _storyChap, _traceT, _travelReturned, cld, cnNum, esc, fmt, rnOk, selRecipe, skillExpNeed, state } from './00-pure.js';
-import { CLD_API, EQUI_SLOTN, SND, adopt, apiRoot, artCtx, cldFlash, cldId, cldUI, closeRename, cloudSnap, cloudSoon, debugEncounter, deviceId, ensureScrollFx, exitDim, fitsRecipe, g1Pack, g1Unpack, handleKicked, licBuild, locById, mailDot, mailLine, migrate, pushBattleStats, pushMsg, renderPName, renderPillHints, renderSettings, resetDimKnob, rkSegLabel, seg, setRealmSub, sizeBurst, skillDef, skillGet, skillLv, storyItemHtml, traceRefresh, travelBtnLbl, trimJournal } from './10-base.js';
+import { $, BIGS, DROP_CFG, EQUI_CELLPOS, FX_TXT, JRN_CAP, LIC_QCOL, MATS, QUALITY, SAVE_KEY, SKILL_DEFS, SLOT_TYPES, STORY_BY_KEY, STORY_PAGE, __set_rate, __set_rkAt, __set_srvOffset, __set_state, __set_storyChap, __set_traceT, __set_travelReturned, _eqRecycle, _eqSel, _pred, _rkAt, _storyChap, _traceT, _travelReturned, cld, cnNum, esc, fmt, rnOk, selRecipe, state } from './00-pure.js';
+import { CLD_API, EQUI_SLOTN, SND, adopt, apiRoot, artCtx, cldFlash, cldId, cldUI, closeRename, cloudSnap, cloudSoon, debugEncounter, deviceId, ensureScrollFx, exitDim, fitsRecipe, g1Pack, g1Unpack, handleKicked, licBuild, locById, mailDot, mailLine, migrate, pushBattleStats, pushMsg, renderPName, renderPillHints, renderSettings, resetDimKnob, rkSegLabel, seg, setRealmSub, sizeBurst, skillDef, skillVal, storyItemHtml, traceRefresh, travelBtnLbl, trimJournal } from './10-base.js';
 
 function realm() { return seg(state.realmIdx); }
 
@@ -237,11 +237,8 @@ renderPillHints();
 function adoptKeep(st) {          // 采用结算后的存档, 但本地叙事(非云端净化)不回退
   const keep = (state.journal || []).slice();
   const hadTravel = state.travel;          // 采纳前的本地云游状态
-  /* v2.5 技能存档保护: 服务端旧档(神通系统上线前入库)不带 skills —— 不得用它回滚本地技能等级 */
-  const keepSkills = (state.skills && Object.keys(state.skills).length) ? state.skills : null;
   const c = adopt(st);
   if (!c) return false;
-  if (!c.skills && keepSkills) c.skills = keepSkills;
   c.journal = keep.length >= (c.journal || []).length ? keep : c.journal;
   /* v1.8.1 派发竞态保护(沿用): 心跳的普通 settle 不该把刚派发的云游抹掉。
    * 只有当服务端明确给出「化身归来」事件(gains.travel)时才认可清空。
@@ -537,30 +534,9 @@ function licSync() {
   E.lsealEm.textContent = "战力 " + Math.round(artScore(a));
 }
 
-function skillVal(id) {
-  const d = skillDef(id); if (!d) return null;
-  const t = (skillLv(id) - 1) / (SKILL_MAX - 1), o = {};
-  for (const k in d.from) o[k] = d.from[k] + (d.to[k] - d.from[k]) * t;
-  return o;
-}
-
-function skillAddExp(id, n) {
-  if (!(n > 0)) return;
-  const s = skillGet(id);
-  if (s.lv >= SKILL_MAX) { s.exp = 0; return; }
-  s.exp += n;
-  s.exp = Math.round(s.exp * 100) / 100;   // 浮点累加收敛到两位小数，避免 0.1+0.2 类误差累积
-  let up = 0;
-  while (s.lv < SKILL_MAX && s.exp >= skillExpNeed(s.lv)) { s.exp -= skillExpNeed(s.lv); s.lv++; up++; }
-  if (up) {
-    const d = skillDef(id);
-    pushMsg("main", `<b style="color:#f0c98a">${d ? d.name : id}</b> 精进至 <b>Lv.${s.lv}</b>`);
-    __set_skillSaveT(0);                                   // 升级立刻落档, 不节流
-  }
-  if (Date.now() - _skillSaveT > 15000) { __set_skillSaveT(Date.now()); save(); cloudSoon(); }
-}
-
-function skillTotalLv() { let t = 0; for (const d of SKILL_DEFS) t += skillLv(d.id); return t; }
+/* ⚠️ v6: 技能恒定 —— skillVal 已下沉到 10-base.js（直接返回 SKILL_DEFS 里的常量）。
+ *   旧版的 skillAddExp / skillTotalLv / skillExpNeed 升级链【整条删除】：
+ *   技能不再有等级与经验，也就没有"升级落档"这回事，技能彻底不入存档。 */
 
 window.pushBattleStats = pushBattleStats;
 
@@ -576,22 +552,22 @@ window.applyDropRates = applyDropRates;
 
 function renderSkills() {
   const box = $("skillBody"); if (!box) return;
+  /* v6: 技能恒定无等级 —— 卡片只剩「名字 + 恒定数值 + 触发方式」，没有经验条 */
+  const badge = k => k === "buff"
+    ? `<span class="sk-kind buff">状态 · 冷却触发</span>`
+    : `<span class="sk-kind dmg">攻击 · 概率触发</span>`;
   const rows = SKILL_DEFS.map(d => {
-    const s = skillGet(d.id), lv = skillLv(d.id), maxed = lv >= SKILL_MAX;
-    const need = skillExpNeed(lv), pct = maxed ? 100 : Math.min(100, (s.exp / need) * 100);
     const v = skillVal(d.id);
-    /* v2.6.1: 单行紧凑卡 —— 触发时机并入 fmt, 砍说明行, 经验并入进度条同行 → 8 门一屏放下 */
-    return `<div class="sk-row${maxed ? " maxed" : ""}">
+    return `<div class="sk-row">
       <div class="sk-ic">${d.ico}</div>
       <div class="sk-main">
-        <div class="sk-top"><b>${d.name}</b><span class="sk-lv">Lv.${lv}<i>/${SKILL_MAX}</i></span></div>
+        <div class="sk-top"><b>${d.name}</b>${badge(d.kind)}</div>
         <div class="sk-eff">${d.fmt(v)}</div>
-        <div class="sk-meta"><div class="sk-bar"><i style="width:${pct.toFixed(1)}%"></i></div><span class="sk-exp">${maxed ? "已臻化境" : `${Math.floor(s.exp)} / ${need}`}</span></div>
       </div>
     </div>`;
   }).join("");
-  const total = skillTotalLv();
-  box.innerHTML = `<p class="sk-sum">神通战斗中自行触发精进，不增益攻防血<br>共习 <b>${SKILL_DEFS.length}</b> 门 · 累计 <b>${total}</b> / ${SKILL_MAX * SKILL_DEFS.length} 阶</p>`
+  const nBuff = SKILL_DEFS.filter(d => d.kind === "buff").length;
+  box.innerHTML = `<p class="sk-sum">神通数值恒定，不随战斗精进<br>共习 <b>${SKILL_DEFS.length}</b> 门 · 攻伐 <b>${SKILL_DEFS.length - nBuff}</b> · 身法 <b>${nBuff}</b></p>`
     + `<div class="sk-list">${rows}</div>`;
 }
 
@@ -620,9 +596,8 @@ export {
   saveRename,
   showChapter,
   showTravelMail,
-  skillAddExp,
-  skillTotalLv,
   skillVal,
+  state,
   smartEquip,
   storyLoadMore,
   toggleBgm,

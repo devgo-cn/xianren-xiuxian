@@ -520,7 +520,9 @@ const MAIN_STORY = [
 let state = { ver: 1, realmIdx: 0, exp: 0, spirit: 0, arrayLv: 1, arts: [], journal: [],
   milestones: {}, peakSpirit: 0, bestArtQ: -1, lastTs: Date.now(),
   mats: {}, pills: {}, buffs: [], offPills: [], travel: null, mails: [], offlineBoostUntil: 0,
-  trialBest: 0, trialBoost: 0, trialBoostUntil: 0, skills: {} };
+  trialBest: 0, trialBoost: 0, trialBoostUntil: 0 };
+  /* ⚠️ v6: 旧 state 已不再承载技能 —— 技能恒定无等级, 不入存档（见 SKILL_DEFS 注释）。
+   *    本对象整体属于旧系统，待 §9 清理时删除；此处只保留字段不再新增。 */
 
 let breaking = false;
 
@@ -1065,7 +1067,7 @@ let _rkAt = 0;
 const G1_TPL = { realmIdx: 0, exp: 0, spirit: 0, arrayLv: 1, arts: [], journal: [], milestones: {},
   peakSpirit: 0, bestArtQ: -1, lastTs: 0, mats: {}, pills: {}, buffs: [], offPills: [], travel: null, mails: [],
   offlineBoostUntil: 0, trialBest: 0, trialBoost: 0, trialBoostUntil: 0, trialSp: 0, trialEq: 0,
-  pages: {}, name: "", _pn: "", _named: 0, _settledAt: 0, ver: 2, skills: {} };
+  pages: {}, name: "", _pn: "", _named: 0, _settledAt: 0, ver: 2 };
 
 function g1prune(v, tpl) {
   if (v === null || typeof v !== "object" || tpl === null || typeof tpl !== "object" || Array.isArray(tpl)) {
@@ -2683,46 +2685,84 @@ function finalStats(base, flat, agg) {
   };
 }
 
-const SKILL_MAX = 20;
+/* ══════════════════════════════════════════════════════════════════
+ *  技能表（v6 定稿：恒定数值，无等级）
+ * ══════════════════════════════════════════════════════════════════
+ *
+ * ── 为什么去掉等级 ──────────────────────────────────────────────
+ *  v5.x 的技能是「1 级 → 20 级」插值成长，要攒技能经验升级。
+ *  v6 是挂机玩法，挂机游戏里「技能还要单独养」只会让玩家分心去点，
+ *  与「推关 → 转生 → 突破」的主循环抢注意力。
+ *  所以改成【恒定数值】：进游戏就拿到完全体，技能只是战斗表现的调味。
+ *
+ * ── 取满级值 ────────────────────────────────────────────────────
+ *  下表数值 = 旧表 20 级（满级）那一端，直接从 from/to 的 to 取值。
+ *
+ * ── 两类技能、两种触发（关键区别）──────────────────────────────
+ *   1. damage 类：攻击时按概率触发（playerStrike 里掷骰）
+ *      —— 概率低、单发收益高，打起来有惊喜感
+ *   2. buff 类：走【冷却 CD】触发，不是攻击触发
+ *      —— 因为 Buff 是「状态」不是「一击」，靠攻击概率触发会导致
+ *         攻速越快 Buff 覆盖越满，收益被攻速二次放大（攻速本来就已经
+ *         在推关速率里了），数值会失控。
+ *         改成 CD 后，Buff 覆盖率是固定的，攻速不再影响它。
+ *
+ * ── 倍速归属（文档 §一 #16）──────────────────────────────────────
+ *   游戏倍速由【宠物】提供，上限 3.5。
+ *   所以「疾风步 / 缩地成寸」不再给倍速，改为加闪避/减伤等状态。
+ *
+ * ⚠️ 技能【不入存档】—— 恒定的东西没有存的价值。
+ *    存档只存 4 样：离线/境界/灵石/装备（见 server_save.py）。
+ */
 
 const SKILL_DEFS = [
-  { id: "jianqi",  name: "剑气斩", ico: "✦",
-    from: { chance: 5, dmg: 60 },          to: { chance: 30, dmg: 160 },
-    fmt: v => `命中 ${v.chance.toFixed(0)}% 斩出剑气 · 该击 <b>×${v.dmg.toFixed(0)}% 攻</b>` },
-  { id: "sanlian", name: "三连斩", ico: "❊",
-    from: { chance: 4, dmg: 50 },          to: { chance: 25, dmg: 130 },
-    fmt: v => `二段后 ${v.chance.toFixed(0)}% 补刀 · <b>×${v.dmg.toFixed(0)}% 攻</b> 必会心` },
-  { id: "hengsao", name: "横扫千军", ico: "◠",
-    from: { chance: 8, n: 2, dmg: 40 },     to: { chance: 26, n: 5, dmg: 80 },
-    fmt: v => `触发概率 ${v.chance.toFixed(0)}% · 波及身周 ${v.n.toFixed(0)} 个 · <b>×${v.dmg.toFixed(0)}% 攻</b>` },
-  { id: "zhansha", name: "斩杀", ico: "✖",
-    from: { threshold: 5 },                to: { threshold: 25 },
-    fmt: v => `目标残血 <b>${v.threshold.toFixed(0)}%</b> 以下 · 该击伤害翻倍` },
-  { id: "jifeng",  name: "疾风步", ico: "≫",
-    from: { chance: 6, dur: 8, mult: 2.5, dodge: 4 },   to: { chance: 30, dur: 8, mult: 2.5, dodge: 25 },
-    /* v8.1 基础倍速 2→1.5, 技能 mult 同步 -1(疾风步 3→2.5), HUD 显示公式 (mult-1) 不变, 仍是"×2 倍速"
-     * v5.1 触发方式从击杀后改为攻击时(playerStrike), 文案"击杀"→"命中"; 时长固定8秒只成长概率
-     * v8.1 概率下调: 15~85 → 12~60 (满级触发率砍掉约 1/3, 缓解"全程不停"的观感)
-     * v5.9 概率再砍半: 12~60 → 6~30 (用户要求"再调低一倍") */
-    fmt: v => `命中 ${v.chance.toFixed(0)}% 入 2 倍速 8 秒 · <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
-  { id: "suodi",   name: "缩地成寸", ico: "⋙",
-    from: { chance: 1.5, dur: 8, mult: 3.5, dodge: 8 },    to: { chance: 11, dur: 8, mult: 3.5, dodge: 40 },
-    /* v8.1 基础倍速 2→1.5, 技能 mult 同步 -1(缩地 4→3.5), HUD 显示公式 (mult-1) 不变, 仍是"×3 倍速"
-     * v5.1 触发方式从击杀后改为攻击时(playerStrike), 文案"击杀"→"命中"; 时长固定8秒只成长概率
-     * v8.1 概率下调: 3~35 → 3~22 (满级触发率 35%→22%, 三连斩一轮至少出一次的概率 72.5%→51.2%)
-     * v5.9 概率再砍半: 3~22 → 1.5~11 (用户要求"再调低一倍") */
-    fmt: v => `命中 ${v.chance.toFixed(1)}% 入 3 倍速 8 秒 · <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
-  { id: "pojia",   name: "破甲击", ico: "◆",
-    from: { chance: 5, pen: 30 },          to: { chance: 25, pen: 70 },
-    fmt: v => `命中 ${v.chance.toFixed(0)}% 无视目标 <b>${v.pen.toFixed(0)}% 防御</b>` },
-  { id: "zhuilie", name: "追猎", ico: "➤",
-    from: { chance: 5, crit: 20 },         to: { chance: 30, crit: 100 },
-    fmt: v => `击杀 ${v.chance.toFixed(0)}% 衔尾再击一次 · 该击 <b>暴击 +${v.crit.toFixed(0)}%</b>` },
+  /* ── damage 类：攻击时按 chance 概率触发 ────────────────────── */
+  { id: "jianqi",  name: "剑气斩", ico: "✦", kind: "damage",
+    chance: 30, dmg: 160,
+    fmt: v => `命中 ${v.chance}% 斩出剑气 · 该击 <b>×${v.dmg}% 攻</b>` },
+
+  { id: "sanlian", name: "三连斩", ico: "❊", kind: "damage",
+    chance: 25, dmg: 130,
+    fmt: v => `二段后 ${v.chance}% 补刀 · <b>×${v.dmg}% 攻</b> 必会心` },
+
+  { id: "hengsao", name: "横扫千军", ico: "◠", kind: "damage",
+    chance: 26, n: 5, dmg: 80,
+    fmt: v => `触发 ${v.chance}% · 波及身周 ${v.n} 个 · <b>×${v.dmg}% 攻</b>` },
+
+  { id: "zhansha", name: "斩杀", ico: "✖", kind: "damage",
+    threshold: 25,
+    fmt: v => `目标残血 <b>${v.threshold}%</b> 以下 · 该击伤害翻倍` },
+
+  { id: "pojia",   name: "破甲击", ico: "◆", kind: "damage",
+    chance: 25, pen: 70,
+    fmt: v => `命中 ${v.chance}% 无视目标 <b>${v.pen}% 防御</b>` },
+
+  { id: "zhuilie", name: "追猎", ico: "➤", kind: "damage",
+    chance: 30, crit: 100,
+    fmt: v => `击杀 ${v.chance}% 衔尾再击一次 · 该击 <b>暴击 +${v.crit}%</b>` },
+
+  /* ── buff 类：按 CD 触发（不是攻击触发，见文件头说明）──────────
+   * cd 单位：秒。dur 单位：秒。
+   * 旧版这两个技能给游戏倍速，v6 改由宠物提供倍速，
+   * 所以这里改为纯增益状态（闪避 / 攻击）。 */
+  { id: "jifeng",  name: "疾风步", ico: "≫", kind: "buff",
+    cd: 12, dur: 8, dodge: 25, hasted: 1.5,
+    fmt: v => `每 ${v.cd} 秒入定一步 · ${v.dur} 秒内 <b>闪避 +${v.dodge}%</b> · 攻速 ×${v.hasted}` },
+
+  { id: "suodi",   name: "缩地成寸", ico: "⋙", kind: "buff",
+    cd: 20, dur: 8, dodge: 40, hasted: 2.0,
+    fmt: v => `每 ${v.cd} 秒踏虚而行 · ${v.dur} 秒内 <b>闪避 +${v.dodge}%</b> · 攻速 ×${v.hasted}` },
 ];
 
-function skillExpNeed(lv) { return Math.round(120 * Math.pow(Math.max(1, lv), 1.9)); }
-
-let _skillSaveT = 0;
+/**
+ * 取技能定义（恒定，无等级）。
+ * v6 只有一个取值入口：返回 SKILL_DEFS 里的常量对象本身，不做任何插值。
+ * @param {string} id 技能 id
+ * @returns {object|null}
+ */
+function skillAt(id) {
+  return SKILL_DEFS.find(s => s.id === id) || null;
+}
 
 const DROP_CFG = {
   equipChance: 0.035,      // 每杀掉法宝概率
@@ -3113,7 +3153,6 @@ export {
   SEG_META,
   SEG_SCALE,
   SKILL_DEFS,
-  SKILL_MAX,
   SLOT_TYPES,
   SPIRIT_RATE,
   STORY_BY_KEY,
@@ -3143,7 +3182,6 @@ export {
   _rate,
   _rkAt,
   _settling,
-  _skillSaveT,
   _srvOffset,
   _stayLast,
   _storyChap,
@@ -3185,7 +3223,7 @@ export {
   seekHide,
   selRecipe,
   setProg,
-  skillExpNeed,
+  skillAt,
   spawnFloat,
   state,
   MOB_POOLS,
@@ -3219,7 +3257,6 @@ export function __set_rate(v) { _rate = v; return v; }
 export function __set_rkAt(v) { _rkAt = v; return v; }
 export function __set_selRecipe(v) { selRecipe = v; return v; }
 export function __set_settling(v) { _settling = v; return v; }
-export function __set_skillSaveT(v) { _skillSaveT = v; return v; }
 export function __set_srvOffset(v) { _srvOffset = v; return v; }
 export function __set_state(v) { state = v; return v; }
 export function __set_stayLast(v) { _stayLast = v; return v; }

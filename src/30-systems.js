@@ -5,9 +5,9 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, ARRAY_MAX_LV, AURA_COLORS, AURA_FPS, BIGS, BTL, DAN_ZONE, EQUI_CELLPOS, EQUI_SLOTI, MAIL_CAP, MAIN_STORY, MATS, MS_ARRAY, MS_ART, MS_SPIRIT, MYST, PAGES_NEED, PLOT, QUALITY, REALM_DAYS, RECIPES, SEG4, SEG_META, SEG_SCALE, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, TRAVEL_FIRST_WINDOW, TRAVEL_SPAN, __set_cauldron, __set_eqSel, __set_lastReadyHint, __set_selRecipe, __set_settling, _dsp, _eqSel, _floatPrev, _settling, arrMult, bigSub, cauldron, cld, cnNum, durTxt, fin, finalStats, fmt, lastReadyHint, pulseChip, selRecipe, setProg, skillExpNeed, spawnFloat, state } from './00-pure.js';
-import { BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, boostMult, EQUI_SLOTN, TOTAL_SEGS, __set_auraAcc, __set_auraT, _auraAcc, _auraColor, _auraCtx, _auraP, _auraT, alHave, alInFurn, alTip, arrayCostNow, artMult, artName, attrAssign, buffMult, cldUI, equipBonus, fitsRecipe, hiddenUnlocked, locById, pagesOf, pickNoRepeat, pushMsg, recipeCan, recipeCardHTML, renderBag, renderCabinet, renderFurn, seg, skillGet, skillLv, srvNow, travelBtnLbl, travelMailCount, travelNextMailIn, travelSent, zoneOfBig, 段名 } from './10-base.js';
-import { _cloudSettleRun, addJournal, artScore, bigIdx, licSync, realm, renderCraftBtn, renderSkills, save, showChapter, skillAddExp, skillTotalLv, skillVal } from './20-core.js';
+import { $, ARRAY_MAX_LV, AURA_COLORS, AURA_FPS, BIGS, BTL, DAN_ZONE, EQUI_CELLPOS, EQUI_SLOTI, MAIL_CAP, MAIN_STORY, MATS, MS_ARRAY, MS_ART, MS_SPIRIT, MYST, PAGES_NEED, PLOT, QUALITY, REALM_DAYS, RECIPES, SEG4, SEG_META, SEG_SCALE, SKILL_DEFS, SLOT_TYPES, TRAVEL_FIRST_WINDOW, TRAVEL_SPAN, __set_cauldron, __set_eqSel, __set_lastReadyHint, __set_selRecipe, __set_settling, _dsp, _eqSel, _floatPrev, _settling, arrMult, bigSub, cauldron, cld, cnNum, durTxt, fin, finalStats, fmt, lastReadyHint, pulseChip, selRecipe, setProg, spawnFloat, state } from './00-pure.js';
+import { BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, boostMult, EQUI_SLOTN, TOTAL_SEGS, __set_auraAcc, __set_auraT, _auraAcc, _auraColor, _auraCtx, _auraP, _auraT, alHave, alInFurn, alTip, arrayCostNow, artMult, artName, attrAssign, buffMult, cldUI, equipBonus, fitsRecipe, hiddenUnlocked, locById, pagesOf, pickNoRepeat, pushMsg, recipeCan, recipeCardHTML, renderBag, renderCabinet, renderFurn, seg, srvNow, travelBtnLbl, travelMailCount, travelNextMailIn, travelSent, zoneOfBig, 段名 } from './10-base.js';
+import { _cloudSettleRun, addJournal, artScore, bigIdx, licSync, realm, renderCraftBtn, renderSkills, save, showChapter, skillVal } from './20-core.js';
 
 (function buildSegs() {
   let cum = 0;
@@ -91,32 +91,49 @@ function makeArt() {          // 四部位: 槽0兵器 1护体 2灵佩 3功法
 const _hud = { arrNum: null, brkNum: null, spirit: null, rateText: null, arrayLv: null, btnBreak: null };
 
 function updateHUD() {
-  if (!_hud.arrNum) { _hud.arrNum = $("arrNum"); _hud.brkNum = $("brkNum"); _hud.spirit = $("spirit"); _hud.rateText = $("rateText"); _hud.arrayLv = $("arrayLv"); _hud.btnBreak = $("btnBreak"); }
+  /* ⚠️ v6 关键修复（勿回退）：
+   *   旧系统的 HUD 元素（#arrNum / #brkNum / #arrayLv / #btnBreak 及其 .actions 容器）
+   *   已在 a70db3e 的 §9 清理中从 index.html 删除（聚灵阵/突破/云游按钮整块移除）。
+   *   但 updateHUD() 仍在无条件写这些已不存在的节点 →
+   *   `Cannot set properties of null (setting 'textContent')` →
+   *   bootGate 抛异常返回 false → startGame() 不执行 → mountStage() 不执行 →
+   *   战斗层从未挂上舞台 → 表现为「战斗 update() 完全不跑、kills 恒 0、技能 CD 不动」。
+   *   所以这里把所有旧元素的访问改成【存在才写】。这些分支在 §9 收尾时随元素一起删。 */
+  if (!_hud.spirit) {
+    _hud.arrNum = $("arrNum"); _hud.brkNum = $("brkNum");
+    _hud.spirit = $("spirit"); _hud.rateText = $("rateText");
+    _hud.arrayLv = $("arrayLv"); _hud.btnBreak = $("btnBreak");
+  }
   const r = realm();
   const _rate = rateNow();
-  /* 聚灵阵: 灵石 / 下一级所需(满级满格); 突破: 修为 / 所需(need=∞ 视为满格) */
-  setProg("arrFill", state.arrayLv >= ARRAY_MAX_LV ? 1 : (arrayCostNow() > 0 ? state.spirit / arrayCostNow() : 0));
-  setProg("brkFill", (r.need === Infinity || !r.need) ? 1 : state.exp / r.need);   // 用真实修为(非缓动值), 进度与"能否渡劫"严格一致
-  /* v1.7.52 按钮下方数字进度 */
-  if (_hud.arrNum) _hud.arrNum.textContent = state.arrayLv >= ARRAY_MAX_LV ? "已圆满" : fmt(state.spirit) + "/" + fmt(arrayCostNow());
-  if (_hud.brkNum) _hud.brkNum.textContent = (r.need === Infinity || !r.need) ? "∞" : fmt(state.exp) + "/" + fmt(r.need);
-  _hud.spirit.textContent = fmt(_dsp.spirit);
-  _hud.rateText.textContent = fmt(_rate);
-  _hud.arrayLv.textContent = state.arrayLv;
+  const legacy = !!_hud.btnBreak;          // 旧 UI 还在才走旧分支
+  if (legacy) {
+    /* 聚灵阵: 灵石 / 下一级所需(满级满格); 突破: 修为 / 所需(need=∞ 视为满格) */
+    setProg("arrFill", state.arrayLv >= ARRAY_MAX_LV ? 1 : (arrayCostNow() > 0 ? state.spirit / arrayCostNow() : 0));
+    setProg("brkFill", (r.need === Infinity || !r.need) ? 1 : state.exp / r.need);   // 用真实修为(非缓动值), 进度与"能否渡劫"严格一致
+    /* v1.7.52 按钮下方数字进度 */
+    if (_hud.arrNum) _hud.arrNum.textContent = state.arrayLv >= ARRAY_MAX_LV ? "已圆满" : fmt(state.spirit) + "/" + fmt(arrayCostNow());
+    if (_hud.brkNum) _hud.brkNum.textContent = (r.need === Infinity || !r.need) ? "∞" : fmt(state.exp) + "/" + fmt(r.need);
+    _hud.arrayLv.textContent = state.arrayLv;
+  }
+  if (_hud.spirit) _hud.spirit.textContent = fmt(_dsp.spirit);
+  if (_hud.rateText) _hud.rateText.textContent = fmt(_rate);
   // v2.5: 所有境界突破均手动 —— 修为圆满即可点突破(小境简版/大境天劫)
   const can = state.exp >= r.need && state.realmIdx < TOTAL_SEGS - 1;
   const btn = _hud.btnBreak;
-  if (btn) btn.disabled = !can;
-  // 注意：绝不能 btn.textContent=...（会删除按钮内嵌的 SVG 墨块皮肤）→ 只更新文字标签
-  const bt = btn.querySelector(".label");
-  if (bt) { if (bt.textContent !== "突破") bt.textContent = "突破"; }   /* v4.4: 统一"突破"二字, 去掉☯和"修为未圆满"——可突破状态已由 glow-gold 闪光+hint-gold 文字提亮提醒, 文字无需区分状态 */
-  btn.classList.toggle("ready", can);
+  if (btn) {
+    btn.disabled = !can;
+    // 注意：绝不能 btn.textContent=...（会删除按钮内嵌的 SVG 墨块皮肤）→ 只更新文字标签
+    const bt = btn.querySelector(".label");
+    if (bt) { if (bt.textContent !== "突破") bt.textContent = "突破"; }   /* v4.4: 统一"突破"二字, 去掉☯和"修为未圆满"——可突破状态已由 glow-gold 闪光+hint-gold 文字提亮提醒, 文字无需区分状态 */
+    btn.classList.toggle("ready", can);
+  }
   if (can && !lastReadyHint) {
     __set_lastReadyHint(true);
     if (r.isBigEnd) {
       const nextBig = seg(state.realmIdx + 1).big;
       pushMsg("main", `<span class="r">${r.big}·${段名(r)}已圆满</span>——你随时可亲手渡劫，踏入<span class="g">${nextBig}</span>`);
-    } else {
+    } else if (legacy) {
       pushMsg("main", `<span class="g">${r.label} 修为圆满</span>——点击「突破」更进一层`);
     }
   }
@@ -124,11 +141,11 @@ function updateHUD() {
   /* v1.6.0-A: 离散增益飘字 — 单帧变化远超平滑增速阈值才视为一次获得/花费, 自动覆盖所有获得点(adventure/邮件/离线/精进) */
   const thr = Math.max(6, _rate * 0.6);
   const dS = state.spirit - _floatPrev.spirit;
-  if (dS > thr) { spawnFloat(_hud.spirit.parentElement, "+" + fmt(dS)); pulseChip(_hud.spirit.parentElement); }
-  else if (dS < -thr) { spawnFloat(_hud.spirit.parentElement, fmt(dS), true); }
+  if (dS > thr && _hud.spirit) { spawnFloat(_hud.spirit.parentElement, "+" + fmt(dS)); pulseChip(_hud.spirit.parentElement); }
+  else if (dS < -thr && _hud.spirit) { spawnFloat(_hud.spirit.parentElement, fmt(dS), true); }
   _floatPrev.spirit = state.spirit;
   const dE = state.exp - _floatPrev.exp;
-  if (dE > thr) spawnFloat(_hud.btnBreak, "+" + fmt(dE));   // v1.7.46: 进度条移除, 修为飘字改从突破按钮升起
+  if (dE > thr && _hud.btnBreak) spawnFloat(_hud.btnBreak, "+" + fmt(dE));   // v1.7.46: 进度条移除, 修为飘字改从突破按钮升起
   _floatPrev.exp = state.exp;
   refreshGlow(can);                       // v1.7.31: 可行动入口文字闪烁提醒(突破/聚灵阵/云游/丹房)
   /* v7.2: 境界牌显示总战斗力 = 四槽装备评分之和 */
@@ -481,13 +498,15 @@ function pickArt(i) { __set_eqSel(_eqSel === i ? -1 : i); licSync(); }
 
 function closeLic(e) { if (e) e.stopPropagation(); __set_eqSel(-1); licSync(); }
 
-function skillAddExpAll(n) { for (const d of SKILL_DEFS) skillAddExp(d.id, n); }
+function skillAddExpAll(n) { /* ⚠️ v6: 技能恒定无经验 —— 保留空函数只为兼容旧调用点不报错 */ }
 
-window.SkillAPI = {
-  defs: SKILL_DEFS, max: SKILL_MAX, need: skillExpNeed,
-  lv: skillLv, val: skillVal, exp: id => skillGet(id).exp,
-  addExp: skillAddExp, addExpAll: skillAddExpAll, total: skillTotalLv,
-};
+/* ⚠️ v6 契约变更（战斗层 50-battle.js 直接消费）：
+ *   · 技能【无等级】—— 删掉 max / lv / exp / addExp / addExpAll / total，因为恒定值没有成长轴。
+ *   · val(id) 返回 SKILL_DEFS 里的常量对象，字段随 kind 而异：
+ *       kind:"damage" → { chance, dmg[, pen|n|crit|threshold] }  —— 攻击时按概率触发
+ *       kind:"buff"   → { cd, dur, dodge, hasted }               —— 按 CD 独立触发（不是攻击触发）
+ *   · 技能不入存档：恒定值没有存的必要。 */
+window.SkillAPI = { defs: SKILL_DEFS, val: skillVal };
 
 function openSkills() {
   renderSkills();

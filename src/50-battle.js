@@ -141,10 +141,14 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
    * HUD 公式 (mult - 1) 不变, 所以玩家看到的"2倍速/3倍速"说法完全没变,
    * 变的只是底层真实速度 —— 相当于整体降速 25%, 战斗节奏更从容。 */
   const BASE_SPEED_MULT = 1.5;
+  /* v6 设计文档 §1 #16：游戏倍速上限 3.5，由 Buff 宠物提供（技能不再给倍速） */
+  const BUFF_SPEED_CAP = 3.5;
   const G = {    t:0, kills:0, spirit:0, speedMult:BASE_SPEED_MULT, speedMultTimer:0, state:'walk', camX:0, paused:false,
     player:null, pets:[], enemies:[], fx:[], dmg:[], drops:[], spawnT: 0,
     sprite:null, bgImg:null, spriteReady:false, bgReady:false, extraStrike:false,
-    speedDodge:0, nextStrikeCrit:0,
+    speedDodge:0, nextStrikeCrit:0,   /* speedDodge 恒 0：v6 身法闪避走 buffStats()，字段保留仅为旧引用兜底 */
+    /* v6 身法 Buff：各自独立 CD 计时器（不是攻击触发）。key=技能id → { cdLeft, durLeft } */
+    skillBuff: {},
     petFoxSprite:null, petFoxReady:false, petEagleSprite:null, petEagleReady:false, petEagleBoltSprite:null, petEagleBoltReady:false, petEagleAtkSprite:null, petEagleAtkReady:false,
     eagleBolts: [],  /* 灵鹰弹幕 */
     skillSprite:null, skillReady:false,
@@ -692,8 +696,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     return String(n);
   }
   /* ---------- 技能读取: 等级与数值的唯一来源是主游戏 SkillAPI ---------- */
-  function skVal(id)  { const api = window.SkillAPI; return api ? api.val(id) : null; }   // {chance, dmg, ...} 已按等级插值
-  function skExp(id,n){ const api = window.SkillAPI; if (api) api.addExp(id, n); }
+  function skVal(id)  { const api = window.SkillAPI; return api ? api.val(id) : null; }   // v6: 返回 SKILL_DEFS 常量，非插值
   /* ---------- 技能名播报: 战斗画布中央书法大字, 弹入→停→快淡出(~0.75s 即隐) ----------
    * 覆盖式单槽不叠字; 同名 0.9s 冷却防高频 proc 连刷拖长显示 */
   const _callCd = {};
@@ -703,7 +706,6 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     _callCd[name] = now;
     G.skillCall = { name, t: 0, dur: 0.68 };   /* v2.9: 0.75→0.68s, 末 18% 淡出 → 实际"看得清"约 0.56s 后瞬间消失 */
   }
-  function skExpAll(n){ const api = window.SkillAPI; if (api) api.addExpAll(n); }
 
   /* ══════════ 标定台专用：静态仿真模式（不影响正式游戏，全部由 window.RANGE_LAB 开关控制）══════════ */
   let LAB = null;   /* { slug, anim, opts } */
@@ -1037,18 +1039,22 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     createStageLayer: () => { _managed = true; _rafOn = false; trialRestart(); return battleLayer(); },  /* v5.0 FIX: 每次进入战斗重置妖潮状态, 否则上一场结算后trialSettled=true残留, 新一场不倒计时不结算 */
     getKills: () => G.kills,
     resetKills: () => { G.kills = 0; },
-    /* v3.4: 统一走 applySpeedBuff 的叠加规则（取 max 倍率 + 重置时长），
-     * 不能再无条件赋值 —— 否则 ×3 期间被一个 ×2 直接顶掉，违反用户规则。 */
-    triggerSpeedSkill: (mult, duration) => { if (mult<=1) return true; applySpeedBuff(mult, duration||5, 0); return true; },
+    /* ⚠️ v6: 游戏倍速的唯一来源改为【Buff 宠物】（上限 3.5，见设计文档 §1 #16）。
+     *   疾风步/缩地成寸已改为纯身法 buff（闪避+攻速），不再授予倍速，
+     *   所以这里删掉了 triggerSpeedSkill / trySpeedSkill / getSpeedMult 三个技能入口。
+     *   主游戏把宠物倍速注入进来即可，本层只做 max 收敛，不做叠加。 */
+    setSpeedMult: (mult, duration) => {
+      const m = Math.max(BASE_SPEED_MULT, Math.min(BUFF_SPEED_CAP, mult || BASE_SPEED_MULT));
+      G.speedMult = m;
+      G.speedMultTimer = m > BASE_SPEED_MULT ? (duration || 30) : 0;
+      updateHUD();
+      return G.speedMult;
+    },
     /* 倍速状态快照：给验收脚本读剩余时长用 */
     getSpeedState: () => ({ mult: G.speedMult, timer: G.speedMultTimer, dodge: G.speedDodge || 0 }),
-    /* 兼容旧接口: 加速现在由「疾风步/缩地成寸」两个技能驱动 */
-    trySpeedSkill: () => {
-      const a = rollSpeedSkill('jifeng'), b = rollSpeedSkill('suodi');
-      const hit = a || b;
-      return hit ? { name: hit, mult: G.speedMult, duration: G.speedMultTimer } : null;
-    },
-    getSpeedMult: () => G.speedMult,
+    /* v6 身法 buff 快照：{ 技能id: { name, cd, dur, cdLeft, durLeft, active } }
+     * 验收脚本据此断言「buff 是 CD 触发、冷却期自动释放」。 */
+    getSkillBuffs: () => getBuffState(),
     /* v4.1.1 诊断口: 抖动取证 —— managed=true 且 pumpRuns 增长 = 双泵实锤 */
     __glDiag: () => ({ managed: _managed, rafOn: _rafOn, pumpRuns: _pumpRuns, paused: G.paused, gl: window.BattleGL ? window.BattleGL.diag : null }),
     /* v4.4 诊断口: 程序化行走自检 —— 列出每只骨骼怪的归一化动画名、是否自带真 walk、
@@ -1088,15 +1094,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       return { rangedCount: ranged.length, meleeCount: melee.length, ranged, melee, live,
                hand: Object.entries(BC.enemies).map(([k, d]) => ({ key:k, name:d.name, role:d.role, atkRange:d.atkRange })) };
     },
-    /* v3.2 验收用：直接设定倍速（跳过技能随机 proc），让 A/B 对照可复现。
-     * 传 1 即清除加速。 */
-    __setSpeedMultForTest: (m, dur) => {
-      G.speedMult = Math.max(BASE_SPEED_MULT, m || BASE_SPEED_MULT);
-      G.speedMultTimer = G.speedMult > 1 ? (dur || 30) : 0;
-      if (G.speedMult <= 1) { G.speedDodge = 0; }
-      updateHUD();
-      return G.speedMult;
-    },
+    /* 验收用：直接设定倍速（跳过宠物 proc），让 A/B 对照可复现。传 1 即清除加速。 */
+    __setSpeedMultForTest: (m, dur) => window.BattleAPI.setSpeedMult(m, dur),
     /* 主游戏注入玩家三围(境界+装备汇总后的面板值)
      * 注意: 必须同步进 p.atk / p.maxHp —— 战斗逻辑读的是 player 身上的字段,
      * 只更新 PST 会导致"面板数字涨了、打出去还是建号那把剑"(v2.5 回归修复)。 */
@@ -1486,57 +1485,85 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     const cmul = kind === 2 ? 2 : kind === 1 ? 1.5 : 1;
     return { kind, cmul, crit: kind > 0, mult: kind ? cmul * (1 + (PST.critD || 0)/100) : 1 };
   }
-  /* ---------- 倍速叠加唯一入口（v3.4）----------------------------------
-   * 用户规则原文：
-   *   「二倍速、三倍速持续期间也可以获得 buff，只不过会把时间重置。
-   *     二倍速期间也可以获得三倍速 buff，但不要叠加成 5 倍。
-   *     三倍速同样道理，也可以获得后重置。」
+  /* ---------- 身法 Buff（疾风步 / 缩地成寸）：独立 CD 计时，不再由攻击触发 ----------
+   * ⚠️ v6 契约变更（用户明确要求）：
+   *   「加 Buff 类的，Buff 类的要搞 CD，不能攻击触发。」
+   *   旧版这两个技能挂在 playerStrike 里按 chance 概率 proc —— 那是"攻击触发族"，
+   *   与破甲击/斩杀同类。v6 把 buff 类彻底拆出来：每门身法各有一条独立时间轴，
+   *   CD 一到自动释放，与玩家是否出手、是否命中、是否被闪避【完全无关】。
+   *   这样斩掉了旧版最恶心的两个 bug（一击必杀时不触发、高档把低档盖掉时长归零）。
    *
-   * 提炼成两条不变量，所有授予倍速的路径都必须走这里：
-   *   1) 倍率 = max(当前, 新的)   —— 单调不减，永远不存在 ×5（2×3 是乘法的错）
-   *   2) 时长 = 本次技能满时长     —— "重置"而非"延长"，不吃 max 叠加
+   * 模型（每帧推进一步）：
+   *   cdLeft -= dt
+   *   durLeft -= dt
+   *   cdLeft <= 0 → 释放：durLeft = dur, cdLeft = cd
+   * 生效条件：durLeft > 0。多门身法【可同时生效】，闪避相加、攻速取乘。
    *
-   * 为什么把 dodge 也收进来：身法是"倍率+闪避"一体的，闪避同样只取高者，
-   * 免得出现"倍率被 ×3 盖住、闪避却按 ×2 挂着"的精神分裂状态。 */
-  function applySpeedBuff(mult, dur, dodge) {
-    G.speedMult = Math.max(G.speedMult, Math.max(BASE_SPEED_MULT, mult || BASE_SPEED_MULT));
-    G.speedDodge = Math.max(G.speedDodge || 0, dodge || 0);
-    G.speedMultTimer = dur;        /* 重置时间轴，不做 max 延长 */
-    return G.speedMult;
-  }
+   * ⚠️ 身法【不再改 G.speedMult】—— 游戏倍速由 Buff 宠物提供（上限 3.5，见设计文档 §1 #16）。
+   *    旧版疾风步 mult=2.5 / 缩地 mult=3.5 是历史遗留，与宠物倍速重复授予，必须删掉。 */
 
-  /* ---------- 身法技能(疾风步 2x / 缩地成寸 3x): 独立 roll, 取高者, 时长可刷新 ----------
-   * 身法不是光环: 只在生效的那几秒里加闪避(身形飘忽), 时效一到即散, 不进面板属性
-   *
-   * ⚠️ v7.7 FIX (勿回退) —— 为什么玩家"只看得到 3 倍速, 2 倍速永不触发":
-   *   playerStrike 里两个 rollSpeedSkill 是背靠背执行的, 同一击内各自独立 roll。
-   *   疾风步 mult=3(HUD×2)、缩地 mult=4(HUD×3), applySpeedBuff 用 Math.max 取高者 ——
-   *   于是只要缩地也中了, 疾风刚写进去的 3 会立刻被 4 盖掉, ×2 状态【存在时间为零】,
-   *   HUD 永远只闪 ×3。实测纯疾风概率 16.1%, 但肉眼看到的 ×2 = 0%。
-   * 修法(干净数值, 不加机制): 同一击内高档命中时, 只让本击的低档让位 ——
-   *   即缩地先 roll, 中了则本击疾风不参与, 两档各自独立生效, 谁中了谁上 HUD。 */
-  function rollSpeedSkill(id, suppressLower) {
-    if (suppressLower) return null;
-    const s = skVal(id);
-    if (!s || Math.random()*100 >= s.chance) return null;
-    skExp(id, 3);
-    applySpeedBuff(s.mult, s.dur, s.dodge);
-    /* v3.4 倍速叠加规则（用户明确要求）：
-     *   · ×2 生效期间【也能】触发 ×2 → 时长重置（回满 dur），倍率不变，不会变成 ×4
-     *   · ×2 生效期间【也能】触发 ×3 → 取高者，直接升到 ×3，但【绝不叠成 ×5】
-     *   · ×3 期间触发 ×2 → 已被更高的盖住，倍率保持 ×3，但时长照样重置
-     *   · ×3 期间触发 ×3 → 时长重置
-     * 一句话：倍率永远取 max(旧, 新)，时长永远重置为本次技能满时长。
-     * 旧代码用 `s.mult >= G.speedMult || G.speedMultTimer <= 0` 做门槛，会导致
-     * ×2 期间再触发 ×2 被静默丢弃（buff 白放）；现在改为无条件取 max。 */
-    skillCall(id === 'jifeng' ? '疾风步' : '缩地成寸');   /* 身法播报 */
-    /* 身法触发特效: 玩家位置速度爆发 */
+  /** 释放一次身法 buff（写时间轴 + 播报 + 特效 + 刷新 HUD） */
+  function fireSkillBuff(id) {
+    const d = skVal(id);
+    if (!d || d.kind !== 'buff') return null;
+    const st = G.skillBuff[id] || (G.skillBuff[id] = { cdLeft: 0, durLeft: 0 });
+    st.durLeft = d.dur || 0;
+    st.cdLeft  = d.cd  || 0;
+    skillCall(d.name);
     if (G.player) {
-      G.pushFx({ kind:'speedBurst', x:G.player.x, y:G.player.y-20, color: id==='suodi' ? '#a0d8ff' : '#80ffc0', t:0, dur:0.5 });  /* v3.7.2 y带玩家车道偏移 */
+      G.pushFx({ kind:'speedBurst', x:G.player.x, y:G.player.y-20,
+                 color: id === 'suodi' ? '#a0d8ff' : '#80ffc0', t:0, dur:0.5 });
     }
     updateHUD();
     return id;
   }
+
+  /** 推进所有 buff 类身法的时间轴（由战斗主循环按【原始 dt】调用，
+   *  绝不能用 sdt —— 否则倍速会反过来把 CD 也加速，形成正反馈。 */
+  function tickSkillBuffs(dt) {
+    const api = window.SkillAPI;
+    if (!api || !api.defs) return;
+    for (const d of api.defs) {
+      if (d.kind !== 'buff') continue;
+      const st = G.skillBuff[d.id] || (G.skillBuff[d.id] = { cdLeft: d.cd || 0, durLeft: 0 });
+      if (st.durLeft > 0) st.durLeft = Math.max(0, st.durLeft - dt);
+      if (st.cdLeft  > 0) st.cdLeft  = Math.max(0, st.cdLeft  - dt);
+      if (st.cdLeft <= 0) fireSkillBuff(d.id);
+    }
+  }
+
+  /** 当前生效的身法增益汇总：闪避相加（同为减伤维度），攻速相乘（倍率维度） */
+  function buffStats() {
+    let dodge = 0, haste = 1, any = false;
+    const api = window.SkillAPI;
+    if (api && api.defs) {
+      for (const d of api.defs) {
+        if (d.kind !== 'buff') continue;
+        const st = G.skillBuff[d.id];
+        if (!st || st.durLeft <= 0) continue;
+        dodge += d.dodge || 0;
+        haste *= (d.hasted || 1);
+        any = true;
+      }
+    }
+    return { dodge, haste, any };
+  }
+
+  /** 供 HUD / 验收脚本读的实时快照 */
+  function getBuffState() {
+    const out = {};
+    const api = window.SkillAPI;
+    if (api && api.defs) {
+      for (const d of api.defs) {
+        if (d.kind !== 'buff') continue;
+        const st = G.skillBuff[d.id] || { cdLeft: 0, durLeft: 0 };
+        out[d.id] = { name: d.name, cd: d.cd, dur: d.dur,
+                      cdLeft: st.cdLeft, durLeft: st.durLeft, active: st.durLeft > 0 };
+      }
+    }
+    return out;
+  }
+
   /* ---------- 击杀结算: 灵石 + (装备由主游戏 roll) + 技能经验 + 追猎/加速 ---------- */
   function onKill(e) {
     const isBoss = e.type === 'boss';
@@ -1585,10 +1612,10 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         if (eq) spawnEquipDrop(e, eq);
       } catch (err) {}
     }
-    skExpAll(isBoss ? 30 : 2);         // 每杀全体技能+2; BOSS 击杀全体+30
+ // 每杀全体技能+2; BOSS 击杀全体+30
     const zl = skVal('zhuilie');       // 追猎: 击杀后立刻再出手一次, 衔尾一击暴击率大增
     if (zl && Math.random()*100 < zl.chance) {
-      skExp('zhuilie', 3); G.extraStrike = true; G.nextStrikeCrit = zl.crit || 0;
+ G.extraStrike = true; G.nextStrikeCrit = zl.crit || 0;
       skillCall('追猎');
     }
   }
@@ -1766,14 +1793,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       G.pushDmg({ x:target.x, y:target.y-30, val:'闪', crit:false, color:'#cfd8e3', t:0 });
       return;
     }
-    /* ⚠️ v7.7 FIX (勿回退): 身法 roll 必须放在所有 early return 之前。
-     * 身法是「攻击命中时概率触发」(与破甲击/斩杀同一触发族), 挂在命中的那一下上,
-     * 与这一击是否击杀目标无关 —— 打死了也该照常 roll。
-     * 原实现放在函数末尾, 但中间有 3 处 `if (!target.alive) return;`(主段/横扫/剑气斩),
-     * 低境界怪血少、一击必杀占绝大多数回合 → 判定整段被跳过, 表现为"倍速一直不触发"。
-     * 顺序: 先 roll 高档(缩地×3), 中了让低档(疾风×2)本击让位, 避免 4 把 3 盖掉。 */
-    const _hi = rollSpeedSkill('suodi');
-    rollSpeedSkill('jifeng', !!_hi);
+    /* ⚠️ v6: 身法 buff 已从本函数【整个移除】——它改由 tickSkillBuffs 按 CD 触发，
+     * 与玩家是否出手、这一击是否命中/是否击杀目标完全无关。
+     * 旧版在这里背靠背 roll('suodi')/roll('jifeng') 是"攻击触发"，已被用户明确否掉。 */
     /* v2.8 普攻单段: 主段(seg1)一次全额; 三连斩的 seg2/seg3 是同一轮攻击内的补刀,
      * 各按自己的节奏给倍率, 不再出现"两段各全额"把普攻 DPS 顶到技能之上 */
     let base = seg === 3 ? 1 : seg === 2 ? (0.5 + Math.random()*0.15) : (1.0 + Math.random()*0.25);
@@ -1781,12 +1803,12 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     /* 破甲击: 这一击无视目标 Y% 防御 */
     const pj = skVal('pojia');
     if (pj && Math.random()*100 < pj.chance) {
-      pen = Math.min(90, pen + pj.pen); skExp('pojia', 2); skillCall('破甲击');
+      pen = Math.min(90, pen + pj.pen); skillCall('破甲击');
       G.pushFx({ kind:'hitSpark', x:target.x, y:target.y-20, color:'#ffd76b', t:0, dur:0.3 });
     }
     /* 斩杀: 目标残血(低于 X%)时, 这一击伤害翻倍 */
     const zs = skVal('zhansha');
-    if (zs && target.hp / target.maxHp * 100 < zs.threshold) { base *= 2; skExp('zhansha', 2); skillCall('斩杀'); }
+    if (zs && target.hp / target.maxHp * 100 < zs.threshold) { base *= 2; skillCall('斩杀'); }
     /* 会心(×1.5) / 暴击(×2.0) / 爆伤增幅(critD%); 追猎的衔尾一击额外加暴击率 */
     const critBonus = G.nextStrikeCrit; G.nextStrikeCrit = 0;
     let kind = 0;
@@ -1808,7 +1830,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
      * 单轮总伤冲到 12x 攻击力(实测), 反超技能单发, 这才是"技能没普攻伤害高"的真凶。 */
     const hs = skVal('hengsao');
     if (hs && Math.random()*100 < hs.chance) {
-      skExp('hengsao', 2); skillCall('横扫千军');
+ skillCall('横扫千军');
       G.pushFx({ kind:'hengsao', x:p.x, y:p.y-30, color:'#ffc98a', t:0, dur:0.30, frame:0, startX:p.x, endX:p.x+200 });  /* v3.7.2 y带玩家车道偏移(原固定-30永远画在中道); v2.9 再提速: 0.6→0.38→0.30s, 起手即爆 */
       playSfx('hengsao', 0.8);
       const n = Math.max(1, Math.round(hs.n || 1));
@@ -1828,13 +1850,11 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     /* 剑气斩: 追加一段自带攻击力加成的剑气(同样只吃本段基础倍率) */
     const jq = skVal('jianqi');
     if (jq && Math.random()*100 < jq.chance) {
-      skExp('jianqi', 2); skillCall('剑气斩');
+ skillCall('剑气斩');
       G.pushFx({ kind:'slash', x:target.x, y:target.y-24, color:'#bfe8ff', t:0, dur:0.28 });
       dealDamage(target, calcDmg(PST.atk, base*(jq.dmg||0)/100, target.def, pen), '#bfe8ff', false);
       if (!target.alive) return;
     }
-    /* v7.7: 身法 roll 已前移到本函数开头(见上方 FIX 注), 此处不再重复调用 ——
-     * 放这里会被上面的 `if (!target.alive) return;` 拦掉, 是一击必杀不触发的根因。 */
   }
   /* ═══════════════ v6.0 战斗距离: 统一为"边缘到边缘" ═══════════════
    *
@@ -2008,14 +2028,13 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
             const sl = skVal('sanlian');
             if (sl && p.attackTarget.alive && Math.random()*100 < sl.chance) {
               p.sanlianTriggered = true;
-              skExp('sanlian', 2);
               skillCall('三连斩');
             }
             /* 主段刺死就收招, 不再补刀 */
             if (!p.attackTarget.alive) {
               p.attackAnim = false; p.animFrame = 0; p.attackTarget = null; p.hit1 = false; p.hit2 = false; p.hit3 = false; p.sanlianTriggered = false;
               /* v2.5 基础攻速: 秒杀中断也吃满攻击间隔 —— 否则高攻秒怪时只剩 ~0.5s/杀的连环速攻 */
-              p.atkT = Math.max(p.atkT, 1 / p.aspd);
+              p.atkT = Math.max(p.atkT, 1 / (p.aspd * (buffStats().haste || 1)));   /* v6 身法攻速乘区 */
               if (G.extraStrike) { G.extraStrike = false; p.atkT = 0; }   // 追猎: 立刻再出手(技能特性保留)
             }
           }
@@ -2075,7 +2094,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
           p.attackAnim = false; p.animFrame = 0;
           skillCall(SKILL.name);          /* 大技能播报 */
         } else {
-          p.anim = 1; p.atkT = 1/p.aspd; p.attackAnim = true; p.animFrame = 0; p.animTimer = 0; p.attackTarget = near; p.hit1 = false; p.hit2 = false; p.hit3 = false; p.sanlianTriggered = false;
+          p.anim = 1; p.atkT = 1/(p.aspd * (buffStats().haste || 1)); p.attackAnim = true;   /* v6: 出手间隔吃身法攻速乘区 */ p.animFrame = 0; p.animTimer = 0; p.attackTarget = near; p.hit1 = false; p.hit2 = false; p.hit3 = false; p.sanlianTriggered = false;
         }
       }
     } else if (near) {
@@ -2551,8 +2570,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         e.anim = 1; e.atkT = 1/(0.8+Math.random()*0.5); e.animFrame = 0;
         /* 攻击音效: 攻击开始时 —— 骨骼怪走各自专属音, 见 MON_ATK */
         if (!wasAttacking) monAttackSfx(e);
-        /* 闪避判定(装备词条 + 身法技能时效加成) —— 落空则不进伤害 */
-        if (Math.random()*100 < ((PST.dodge || 0) + G.speedDodge)) {
+        /* 闪避判定(装备词条 + 身法 buff 时效加成) —— 落空则不进伤害。
+         * v6: 闪避改从 buffStats() 实时取，不再依赖 G.speedDodge（那是旧倍速技能字段）。 */
+        if (Math.random()*100 < ((PST.dodge || 0) + G.speedDodge + buffStats().dodge)) {
           G.pushDmg({ x:p.x,y:p.y-40, val:'闪', crit:false, color:'#9fd8ff', t:0 });
         } else {
           /* v4.8 技能怪: 按 skills5.json 映射发一条程序化弹道。
@@ -2710,12 +2730,16 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   }
   function realmName() { try { return (typeof window.realm === 'function' && window.realm().big) || ''; } catch (err) { return ''; } }
   function update(dt) {
+    /* v6 倍速来源 = Buff 宠物（外部注入，见 BattleAPI.setSpeedMult），到点回落基础值 */
     if (G.speedMultTimer > 0) {
       G.speedMultTimer -= dt;
-      if (G.speedMultTimer <= 0) { G.speedMult = BASE_SPEED_MULT; G.speedMultTimer = 0; G.speedDodge = 0; }   // 身法时效到点, 退回基础1.5倍速, 闪避加成一并散去
+      if (G.speedMultTimer <= 0) { G.speedMult = BASE_SPEED_MULT; G.speedMultTimer = 0; }
     }
     const nowSpeedBuff = G.speedMultTimer > 0;
     if (nowSpeedBuff !== _wasSpeedBuff) { _wasSpeedBuff = nowSpeedBuff; updateHUD(); }
+    /* ⚠️ v6 身法 Buff 推进必须用【原始 dt】，不能用下面的 sdt ——
+     *   否则游戏倍速会反过来把技能 CD 一起加速，形成"倍速越快 CD 越短"的正反馈。 */
+    tickSkillBuffs(dt);
     const sdt = dt * G.speedMult;
     G.t += sdt;
     /* v6.10 PERF: 动态帧率。v5.13 扩成三档:
@@ -4001,12 +4025,18 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     if (killsEl && killsEl.textContent !== _ks) killsEl.textContent = _ks;
     if (spEl) { const s = fmtNum(G.spirit); if (spEl.textContent !== s) spEl.textContent = s; }
     if (speedEl) {
-      /* v5.0 基础2倍速为常态隐藏不显示, 技能加速中显示玩家感知的加成倍速(实际mult-1): 疾风步×2, 缩地×3 */
-      /* v8.1 HUD 口径: 基础倍速已是 1.5(而非 2), 所以旧公式 (mult-1) 会显示成
-       * ×1.5(疾风步) / ×2.5(缩地) —— 玩家看不懂。改为按"技能档位"显示:
-       * 疾风步 2.5 → ×2, 缩地 3.5 → ×3, 与技能文案("入 2 倍速 / 入 3 倍速")完全一致。
-       * 判据用 mult >= 3.5 区分高档, 阈值取两档中点 3.0。 */
-      if (G.speedMultTimer > 0) { speedEl.style.display = ''; speedEl.textContent = '×'+(G.speedMult >= 3 ? 3 : 2)+' 倍速 ('+G.speedMultTimer.toFixed(1)+'s)'; }
+      /* v6: 这个位置改显示【游戏倍速】与【身法 buff】两条信息。
+       * 倍速来源只剩 Buff 宠物（上限 3.5），技能不再授予倍速，所以不再有"档位"概念，
+       * 直接读 G.speedMult 原值。身法 buff 生效时并列显示其剩余秒数。 */
+      const parts = [];
+      if (G.speedMultTimer > 0) parts.push('×' + G.speedMult.toFixed(2).replace(/\.?0+$/, '') + ' 倍速');
+      const bs = buffStats();
+      if (bs.any) {
+        let left = 0;
+        for (const k in G.skillBuff) { const b = G.skillBuff[k]; if (b.durLeft > left) left = b.durLeft; }
+        parts.push('身法 ' + left.toFixed(1) + 's');
+      }
+      if (parts.length) { speedEl.style.display = ''; speedEl.textContent = parts.join(' · '); }
       else speedEl.style.display = 'none';
     }
     /* v3.9 试炼 HUD: 倒计时+档位; 有离线加成时点亮 */

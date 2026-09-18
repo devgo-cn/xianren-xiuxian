@@ -330,8 +330,7 @@ export function newState() {
     maxStage: 0,
     totalPoints: N.ZERO,
     rebirths: 0,
-    /* 保留系统（转生不清零，待实现） */
-    skills: {},
+    /* 保留系统（转生不清零） */
     recipes: {},
     pets: {},
   };

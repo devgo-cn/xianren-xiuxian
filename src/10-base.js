@@ -5,7 +5,7 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, ARMOR_POOL, BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, ARRAY_COST, ART_PREFIX, ART_SPECIAL, ART_SUFFIX, AURA_COLORS, BIGS, BTL, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, EQUI_SLOTI, FX_POOL, FX_TXT, G1_TPL, GAME_VER, JRN_TAIL, MATS, MIGRATIONS, MON_ATK_SCALE, MON_FX_POOL, MON_NAMES, MYST, PAGES_NEED, PEND_POOL, PLOT, QUALITY, RECIPES, RK_NAMES, RK_SEGS, SAVE_KEY, SCROLL_POOL, SEARCH_MAX, SEARCH_MIN, SEG_META, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, TRACE_ACT, TRAVEL_FIRST_MAX, TRAVEL_FIRST_STEP, TRAVEL_FIRST_WINDOW, TRAVEL_LATE_STEP, TRAVEL_SPAN, ZONES, __set_alTipT, __set_hbFails, __set_kicked, __set_parts, __set_tracePool, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, _tracePool, alIcoCls, alTipT, autoHuntOn, capDeviceDpr, cauldron, cld, cldApiBase, cnNum, durTxt, eqMult, esc, fin, finalStats, fmt, fxAgg, fxCount, fxValue, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, selRecipe, state } from './00-pure.js';
+import { $, ARMOR_POOL, BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, ARRAY_COST, ART_PREFIX, ART_SPECIAL, ART_SUFFIX, AURA_COLORS, BIGS, BTL, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, EQUI_SLOTI, FX_POOL, FX_TXT, G1_TPL, GAME_VER, JRN_TAIL, MATS, MIGRATIONS, MON_ATK_SCALE, MON_FX_POOL, MON_NAMES, MYST, PAGES_NEED, PEND_POOL, PLOT, QUALITY, RECIPES, RK_NAMES, RK_SEGS, SAVE_KEY, SCROLL_POOL, SEARCH_MAX, SEARCH_MIN, SEG_META, SKILL_DEFS, SLOT_TYPES, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, TRACE_ACT, TRAVEL_FIRST_MAX, TRAVEL_FIRST_STEP, TRAVEL_FIRST_WINDOW, TRAVEL_LATE_STEP, TRAVEL_SPAN, ZONES, __set_alTipT, __set_hbFails, __set_kicked, __set_parts, __set_tracePool, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, _tracePool, alIcoCls, alTipT, autoHuntOn, capDeviceDpr, cauldron, cld, cldApiBase, cnNum, durTxt, eqMult, esc, fin, finalStats, fmt, fxAgg, fxCount, fxValue, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, selRecipe, state } from './00-pure.js';
 
 (function () {
   const vt = document.getElementById("verTag"); if (vt) vt.textContent = GAME_VER;
@@ -1208,16 +1208,15 @@ function genMonster(big, lv) {                   // 妖兽: 基础线性 + 词�
 
 function skillDef(id) { for (const d of SKILL_DEFS) if (d.id === id) return d; return null; }
 
-function skillGet(id) {                       // 惰性初始化: 老档没有 skills 字段也照常跑
-  if (!state.skills || typeof state.skills !== "object") state.skills = {};
-  const s = state.skills[id];
-  if (!s || typeof s !== "object") { state.skills[id] = { lv: 1, exp: 0 }; return state.skills[id]; }
-  if (!(s.lv >= 1)) s.lv = 1;
-  if (!(s.exp >= 0)) s.exp = 0;
-  return s;
+/* ⚠️ v6: 技能恒定无等级。
+ *   旧版 skillGet/skillLv 会惰性初始化 state.skills[id] = {lv, exp} 并参与存档 —— 已彻底移除。
+ *   v6 的技能数值唯一来源是 SKILL_DEFS 里的常量（伤害类读 chance/dmg/pen，
+ *   Buff 类读 cd/dur），战斗与面板都直接读表，不存在"等级"这一层。
+ *   技能也不入存档：恒定的东西没有存的价值。 */
+function skillVal(id) {
+  const d = skillDef(id);
+  return d || null;
 }
-
-function skillLv(id) { return Math.min(SKILL_MAX, Math.max(1, skillGet(id).lv | 0)); }
 
 function pushBattleStats() {
   const api = window.BattleAPI;
@@ -1345,8 +1344,7 @@ export {
   settleBlocked,
   sizeBurst,
   skillDef,
-  skillGet,
-  skillLv,
+  skillVal,
   spiritRate,
   srvNow,
   storyItemHtml,
