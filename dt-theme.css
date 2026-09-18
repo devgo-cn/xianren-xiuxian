@@ -1571,3 +1571,20 @@
     overflow:hidden;text-overflow:ellipsis}
   .gx-detail .stgrid .sr b{font-size:10.5px;color:#e9e2d0;font-weight:normal;white-space:nowrap}
   .gx-detail .stgrid .sr b.teal{color:#86b5a2}
+
+/* ── v5.13 PERF: 手机端全量关闭 backdrop-filter 毛玻璃 ─────────────────
+ * WebGL 战斗横带每帧变化, 叠在其上的毛玻璃元素会强制合成器每帧对下层做
+ * 实时高斯模糊(读取下层纹理+卷积), 是 WebView 端仅次于渲染本身的发热大户。
+ * 深色场景下"毛玻璃"与"半透明深底"视觉几乎无差 —— 高频元素(fmsg/war-banner)
+ * 的底色同步加深补偿透明感。pointer:coarse 命中触屏设备, 桌面端保留毛玻璃。 */
+@media (pointer: coarse) {
+  .atk-toggle, .snd-btn, .pname-btn, .aura-tooltip, .story-btn,
+  .war-banner, .modal, .trial-toast .tt-card, .art, .artifacts, #cloudPanel {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .fmsg { backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+    background: rgba(10,16,30,.78) !important; }
+  .war-banner { backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+    background: rgba(15,21,34,.85) !important; }
+}

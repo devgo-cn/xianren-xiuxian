@@ -2388,7 +2388,18 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     else if (!e.moving) want = an.idle;
     if (!want || !A.hasAnimation(want)) want = an.idle || an.walk;
     if (want && e.boneAnim !== want) { e.boneAnim = want; A.fadeIn(want, 0.12, (want === 'walk' || want === 'idle') ? 0 : -1); }   /* playTimes=0 强制循环: megapack1 数据自带播1次, -1 会冻结在末帧 */
-    e.armature.advanceTime(dt);
+    /* v5.13 PERF: 骨骼待机跳帧 —— DragonBones 全骨骼 FK+插值解算是战斗 CPU 最大
+     * 单项(每怪每帧一次)。站定待机(idle)是慢循环呼吸动画, 累积 2 帧(≈12fps)解算
+     * 一次、动画时间照推不丢进度, 肉眼无差; 走路/攻击/受击/死亡/BOSS 保持全帧率,
+     * 手感不动。切态瞬间走全帧分支, 积压时间一次补齐, 动画无跳变。 */
+    if (!dead && e.anim <= 0 && e.hurtT <= 0 && !e.moving && e.type !== 'boss') {
+      e.__boneAcc = (e.__boneAcc || 0) + dt;
+      if (e.__boneAcc >= 0.084) { e.armature.advanceTime(e.__boneAcc); e.__boneAcc = 0; }
+    } else if (e.__boneAcc) {
+      e.armature.advanceTime(e.__boneAcc + dt); e.__boneAcc = 0;
+    } else {
+      e.armature.advanceTime(dt);
+    }
     /* v4.4 程序化行走: 该怪没有 walk 动画(素材缺), 但骨架绑了腿 —— 移动时现场摆腿。
      * 只在"走路态"(非攻击/非受击/非死亡)且确实在移动时驱动, 避免打架: 攻击时腿该
      * 保持攻击姿势, 受击/死亡同理。
@@ -2690,11 +2701,14 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     if (nowSpeedBuff !== _wasSpeedBuff) { _wasSpeedBuff = nowSpeedBuff; updateHUD(); }
     const sdt = dt * G.speedMult;
     G.t += sdt;
-    /* v6.10 PERF: 动态帧率。场上怪少(alive<5)且无BOSS/倍速 → 20fps(50ms), 激烈时 24fps(42ms)。
-     * 挂机推图时怪一波一波来, 间隙期降到 20fps 省 CPU/GPU。 */
+    /* v6.10 PERF: 动态帧率。v5.13 扩成三档:
+     * 空场(0怪,非BOSS) 66ms≈15fps —— 推图走路段, 画面变化最小(仅玩家走路+背景滚动);
+     * 怪少(<5只,无BOSS/倍速) 50ms≈20fps; 激烈(≥5怪/BOSS/倍速中) 42ms≈24fps。
+     * 挂机时间大头在低档位区间, CPU/GPU 双降直接换发热下降。 */
     let _aliveCount = 0;
     for (const e of G.enemies) if (e.alive) _aliveCount++;
-    G.targetFrameMs = (_aliveCount < 5 && !G.bossActive && G.speedMultTimer <= 0) ? 50 : 42;
+    G.targetFrameMs = (_aliveCount === 0 && !G.bossActive) ? 66
+      : (_aliveCount < 5 && !G.bossActive && G.speedMultTimer <= 0) ? 50 : 42;
     /* v5.0 FIX: 结算面板已关闭但trialSettled仍为true(玩家关面板没走trialRestart) → 自动重置,
      * 否则新一场妖潮不倒计时不结算。杀BOSS提前结算与120秒结算都设trialSettled=true, 这是冲突根因。 */
     if (G.trialSettled) {
@@ -3722,21 +3736,28 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       const pop = d.crit ? 1 + 0.6*Math.max(0, 1-k*2.2) : 1 + 0.35*Math.max(0, 1-k*3);
       let o = d.__gl;
       if (!o) {
-        const style = new PIXI.TextStyle({
-          fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
-          fontSize: d.crit ? 19 : 12,
-          fontWeight: 'bold',
-          fill: d.color || '#eaf2fb',
-          stroke: 'rgba(6,10,18,0.95)',
-          strokeThickness: d.crit ? 4 : 3,
-          lineJoin: 'round'
-        });
-        if (d.crit) {
-          style.dropShadow = true;
-          style.dropShadowColor = 'rgba(255,196,80,0.9)';
-          style.dropShadowBlur = 10;
-          style.dropShadowDistance = 0;
-          style.dropShadowAlpha = 0.9;
+        /* v5.13 PERF: TextStyle 按组合缓存共享 —— 每条新飘字 new 一个 TextStyle
+         * 纯浪费, 颜色×暴击组合总数 ≤ 10。Text.destroy 不销毁共享 style, 安全。 */
+        const key = (d.crit ? 'c|' : 'n|') + (d.color || '#eaf2fb');
+        let style = drawDmg._st && drawDmg._st.get(key);
+        if (!style) {
+          style = new PIXI.TextStyle({
+            fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+            fontSize: d.crit ? 19 : 12,
+            fontWeight: 'bold',
+            fill: d.color || '#eaf2fb',
+            stroke: 'rgba(6,10,18,0.95)',
+            strokeThickness: d.crit ? 4 : 3,
+            lineJoin: 'round'
+          });
+          if (d.crit) {
+            style.dropShadow = true;
+            style.dropShadowColor = 'rgba(255,196,80,0.9)';
+            style.dropShadowBlur = 10;
+            style.dropShadowDistance = 0;
+            style.dropShadowAlpha = 0.9;
+          }
+          (drawDmg._st || (drawDmg._st = new Map())).set(key, style);
         }
         const t = new PIXI.Text(String(d.val), style);
         t.anchor.set(0.5);   // textAlign center + textBaseline middle
@@ -3922,8 +3943,13 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     const stateEl = document.getElementById('battleState');
     const spEl = document.getElementById('battleSpirit');
     const trEl = document.getElementById('battleTrial');
-    if (killsEl) killsEl.textContent = G.kills;
-    if (spEl) spEl.textContent = fmtNum(G.spirit);
+    const _st = G.state === 'fight' ? '战斗中' : '推进中';
+    if (stateEl && stateEl.textContent !== _st) stateEl.textContent = _st;
+    /* v5.13 PERF: 同值跳写 —— textContent 赋值即使值相同也会走失效检查, 挂机期
+     * kills/spirit/state 大多帧不变, 同值判断直接省掉无效 DOM 写。 */
+    const _ks = String(G.kills);
+    if (killsEl && killsEl.textContent !== _ks) killsEl.textContent = _ks;
+    if (spEl) { const s = fmtNum(G.spirit); if (spEl.textContent !== s) spEl.textContent = s; }
     if (speedEl) {
       /* v5.0 基础2倍速为常态隐藏不显示, 技能加速中显示玩家感知的加成倍速(实际mult-1): 疾风步×2, 缩地×3 */
       /* v8.1 HUD 口径: 基础倍速已是 1.5(而非 2), 所以旧公式 (mult-1) 会显示成
@@ -3933,7 +3959,6 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       if (G.speedMultTimer > 0) { speedEl.style.display = ''; speedEl.textContent = '×'+(G.speedMult >= 3 ? 3 : 2)+' 倍速 ('+G.speedMultTimer.toFixed(1)+'s)'; }
       else speedEl.style.display = 'none';
     }
-    if (stateEl) stateEl.textContent = G.state === 'fight' ? '战斗中' : '推进中';
     /* v3.9 试炼 HUD: 倒计时+档位; 有离线加成时点亮 */
     if (trEl) {
       const td = BC.tier[G.trialTier] || BC.tier[1];
