@@ -519,7 +519,7 @@ const MAIN_STORY = [
 
 let state = { ver: 1, realmIdx: 0, exp: 0, spirit: 0, arrayLv: 1, arts: [], journal: [],
   milestones: {}, peakSpirit: 0, bestArtQ: -1, lastTs: Date.now(),
-  mats: {}, pills: {}, buffs: [], travel: null, mails: [], offlineBoostUntil: 0,
+  mats: {}, pills: {}, buffs: [], offPills: [], travel: null, mails: [], offlineBoostUntil: 0,
   trialBest: 0, trialBoost: 0, trialBoostUntil: 0, skills: {} };
 
 let breaking = false;
@@ -1063,7 +1063,7 @@ const RK_NAMES = ["凡人", "炼气", "筑基", "结丹", "元婴", "化神", "�
 let _rkAt = 0;
 
 const G1_TPL = { realmIdx: 0, exp: 0, spirit: 0, arrayLv: 1, arts: [], journal: [], milestones: {},
-  peakSpirit: 0, bestArtQ: -1, lastTs: 0, mats: {}, pills: {}, buffs: [], travel: null, mails: [],
+  peakSpirit: 0, bestArtQ: -1, lastTs: 0, mats: {}, pills: {}, buffs: [], offPills: [], travel: null, mails: [],
   offlineBoostUntil: 0, trialBest: 0, trialBoost: 0, trialBoostUntil: 0, pages: {}, name: "", _pn: "", _named: 0, _settledAt: 0, ver: 1, skills: {} };
 
 function g1prune(v, tpl) {

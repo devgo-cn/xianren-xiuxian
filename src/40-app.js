@@ -3,8 +3,8 @@
  *
  * 拓扑层 L8~L14，31 个顶层声明。
  */
-import { $, ARRAY_MAX_LV, BIGS, CACHE_VER, CLD_KEY, DIMSTAT, DROP_CFG, EVENTS, MAIL_CAP, MAIN_STORY, MATS, PET_BONUS, PET_COIN, PET_FORGE, PET_STILL, PLOT, QUALITY, RECIPES, SAVE_KEY, SLOT_TYPES, __set_breaking, __set_cauldron, __set_dropSaveT, __set_encNext, __set_equipId, __set_hiddenAt, __set_hudAcc, __set_selRecipe, __set_state, __set_stayLast, _dropSaveT, _dsp, _equipId, _equipQueue, _floatPrev, _hiddenAt, _hudAcc, _pred, _rate, _settling, _srvOffset, _stayLast, _syncAt, autoHuntOn, breaking, cld, cnNum, fmt, hbOk, initFxDiag, selRecipe, state } from './00-pure.js';
-import { CLD_API, TOTAL_SEGS, adopt, arrayCostNow, buffAtCap, buffHintOf, burstBoom, cldApi, cldFlash, cldId, cldUI, closeTravel, cloudSnap, cloudSoon, createFxLayer, dimRender, ensureScrollFx, fitsRecipe, g1Pack, g1Unpack, hbFail, hiddenUnlocked, journalHasKey, locById, mailDot, pickNoRepeat, pushBattleStats, pushBuff, pushMsg, renderAutoHunt, renderPName, renderPillHints, searchMs, seg, settleBlocked, spiritRate, srvNow, tickDsp, traceRefresh, travelBtnLbl, zoneOfLoc } from './10-base.js';
+import { $, ARRAY_MAX_LV, BIGS, CACHE_VER, CLD_KEY, DIMSTAT, DROP_CFG, EVENTS, MAIL_CAP, MAIN_STORY, MATS, PET_BONUS, PET_COIN, PET_FORGE, PET_STILL, PLOT, QUALITY, RECIPES, SAVE_KEY, SLOT_TYPES, __set_breaking, __set_cauldron, __set_dropSaveT, __set_encNext, __set_equipId, __set_hiddenAt, __set_hudAcc, __set_selRecipe, __set_state, __set_stayLast, _dropSaveT, _dsp, _equipId, _equipQueue, _floatPrev, _hiddenAt, _hudAcc, _pred, _rate, _settling, _srvOffset, _stayLast, _syncAt, autoHuntOn, breaking, cld, cnNum, esc, fmt, hbOk, initFxDiag, selRecipe, state } from './00-pure.js';
+import { CLD_API, TOTAL_SEGS, adopt, arrayCostNow, buffAtCap, buffHintOf, burstBoom, cldApi, cldFlash, cldId, cldUI, closeTravel, cloudSnap, cloudSoon, createFxLayer, dimRender, ensureScrollFx, fitsRecipe, g1Pack, g1Unpack, hbFail, hiddenUnlocked, journalHasKey, locById, mailDot, pickNoRepeat, pushBattleStats, pushBoost, pushBuff, pushMsg, renderAutoHunt, renderPName, renderPillHints, searchMs, seg, settleBlocked, spiritRate, srvNow, tickDsp, traceRefresh, travelBtnLbl, zoneOfLoc } from './10-base.js';
 import { addJournal, adoptKeep, bigIdx, cldFail, keepArtQuiet, load, realm, renderMailBox, save, showTravelMail, smartEquip, updateArts, updateRealmUI } from './20-core.js';
 import { checkMilestones, cldPush, cloudPushNow, cloudSettle, mainMoment, makeArt, openAlchemy, openStory, openTravel, pickLoc, rateNow, updateHUD } from './30-systems.js';
 
@@ -146,10 +146,14 @@ function doBreak() {
   const finishBreak = () => {
     state.realmIdx++;
     state.exp = isBigBreak ? 0 : Math.max(0, state.exp - r.need);  // 大境清零, 小境扣需
-    /* v7.2 跨大境重校: 兽潮离线加成(trialBoost)与大境界绑定 —— 怪池换了, 效率必须
+    /* v7.2 跨大境重校: 兽潮离线加成与大境界绑定 —— 怪池换了, 效率必须
      * 重新校对, 否则低境刷满 121 的 180% 常驻档案吃到天荒地老。trialBest 保留作
-     * 全程炫耀纪录, 小境界突破(同池)不清。 */
-    if (isBigBreak) { state.trialBoost = 0; state.trialBoostUntil = 0; }
+     * 全程炫耀纪录, 小境界突破(同池)不清。
+     * v5.6: 加成已迁入 buffs 表(tag:"trial") → 按条目清除。 */
+    if (isBigBreak) {
+      state.trialBoost = 0; state.trialBoostUntil = 0;   /* 兼容旧字段 */
+      state.buffs = (state.buffs || []).filter(b => b.tag !== "trial");
+    }
     __set_breaking(false);
     /* 黑屏挂机: 记录突破 */
     if (DIMSTAT.on) { DIMSTAT.breaks.push(next.label); try { dimRender(); } catch(e) {} }
@@ -447,10 +451,15 @@ function consumePill(id) {
   state.pills[id]--;
   if (state.pills[id] <= 0) delete state.pills[id];
   /* v1.8.4: buff 记 start ✅ —— 服务端按"有效时段"计 */
-  if (e.k === "buff") { pushBuff(e.mult, e.dur); pushMsg("main", `药力化开，周天运转如飞${buffHintOf(e.mult)}`); }
+  /* v5.5: 丹药 buff 记丹名(name) —— 服务端验算后随 gains.pill.names 回传, 结算面板按名展示 */
+  if (e.k === "buff") { pushBuff(e.mult, e.dur, rp.n); pushMsg("main", `药力化开，周天运转如飞${buffHintOf(e.mult)}`); }
   else if (e.k === "inst") { const gg = rateNow() * e.sec; state.exp += gg; pushMsg("main", `药力化开，修为<span class="g">+${fmt(gg)}</span>`); }
-  else if (e.k === "grand") { const gg = rateNow() * e.sec; state.exp += gg; pushBuff(e.mult, e.dur); pushMsg("main", `感悟天劫真意，修为<span class="g">+${fmt(gg)}</span>，道韵萦绕${buffHintOf(e.mult)}`); }
-  else if (e.k === "offline") { state.offlineBoostUntil = Math.max(state.offlineBoostUntil || 0, now + e.dur * 1000); pushMsg("main", "洗髓伐脉，此后离线游历更有所得"); }
+  else if (e.k === "grand") { const gg = rateNow() * e.sec; state.exp += gg; pushBuff(e.mult, e.dur, rp.n); pushMsg("main", `感悟天劫真意，修为<span class="g">+${fmt(gg)}</span>，道韵萦绕${buffHintOf(e.mult)}`); }
+  /* v5.6: 离线加成走通用 Buff 协议(pushBoost) —— 兽潮余威/丹药离线加成同一张表, 后端零知识验算 */
+  else if (e.k === "offline") {
+    pushBoost(e.boost || 0, e.dur || 0, rp.n, "pill");
+    pushMsg("main", `洗髓伐脉，此后离线游历更有所得（+${Math.round((e.boost || 0) * 100)}%·庇佑 ${Math.max(1, Math.round(e.dur / 3600))} 小时）`);
+  }
   updateHUD(); save(); cloudSoon(); refreshOpenPanel(); renderPillHints();
 }
 
@@ -523,6 +532,20 @@ function presentSettle(r) {
     equipRow = `<div class="off-row"><span class="o-ico">${icoHunt}</span><span class="ol">阿青择优佩戴</span><b class="ov" style="color:#e0b45a">${Eq.kept} 件</b></div>`;
     if (Eq.melted > 0) huntExtra = `<div class="off-hunt">另有 ${Eq.melted} 件不入眼，阿青投炉熔作灵石 +${fmt(Eq.meltSp || 0)}。</div>`;
   }
+  /* v5.6 通用 Buff 协议回传: gains.fx = 参与本次结算的加成条目(已由服务端按区间加权验算),
+   * 前端结构化循环渲染 —— 以后新增任何丹方/加成源, 面板零改动。 */
+  let trialRow = "";
+  const T = gg.trial;
+  if (T && T.waves > 0) trialRow = `<div class="off-row"><span class="o-ico">${icoHunt}</span><span class="ol">兽潮·化身代守</span><b class="ov">${T.waves} 波 · 斩妖 ${fmt(T.kills)}</b></div>`;
+  for (const f of (gg.fx || [])) {
+    const nm = f.name ? "·" + esc(f.name) : "";
+    if (f.mult > 1) {
+      trialRow += `<div class="off-row"><span class="o-ico">${icoExp}</span><span class="ol">${f.tag === "trial" ? "兽潮加成" : "丹药加持" + nm}</span><b class="ov">×${Number(f.mult).toFixed(2)}</b></div>`;
+    } else if (f.boost > 0) {
+      if (f.tag === "trial") trialRow += `<div class="off-row"><span class="o-ico">${icoExp}</span><span class="ol">兽潮加成${nm}</span><b class="ov" style="color:#e0b45a">×${(1 + f.boost).toFixed(2)}</b></div>`;
+      else trialRow += `<div class="off-row"><span class="o-ico">${icoSpi}</span><span class="ol">离线丹力${nm}</span><b class="ov jade">+${Math.round(f.boost * 100)}%·庇佑 ${Math.max(1, Math.round((f.covered || 0) / 3.6e6))} 时</b></div>`;
+    }
+  }
   /* v1.9.8: 连破境 → 横幅右上朱印; 闭关时长 → 横幅标题带(各一行小字) */
   const sealEl = $("offSeal");
   if (sealEl) {
@@ -539,7 +562,7 @@ function presentSettle(r) {
     `<div class="off-rows">` +
     `<div class="off-row"><span class="o-ico">${icoExp}</span><span class="ol">周天运转 · 修为</span><b class="ov">+${fmt(gg.exp)}</b></div>` +
     `<div class="off-row"><span class="o-ico">${icoSpi}</span><span class="ol">聚灵阵 · 灵石</span><b class="ov jade">+${fmt(totalSpirit)}</b></div>` +
-    equipRow +
+    trialRow + equipRow +
     `</div>` + huntExtra + bagTip;
   // 离线际遇叙事(每满 1 小时一段, 至多 3 段; 纯叙事)
   const bi = Math.min(bigIdx(), MAIN_STORY.length - 1);

@@ -11,7 +11,7 @@
  * ⚠️ 本文件由工具生成，手改会在下次重建时丢失。
  */
 
-import { SND } from './10-base.js';
+import { SND, pushBoost } from './10-base.js';
 import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档; 黑屏挂机统计; v7.0: 正规怪物池 */
 
 
@@ -2618,8 +2618,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         /* v5.0 累计制: 击杀数×1% + BOSS 60%, 封顶180% */
         boost = Math.min(BC.trialPool.boostCap, kills * BC.trialPool.boostPerKill + (bossKilled ? BC.trialPool.boostPerBoss : 0));
         if (boost > 0) {
-          st.trialBoost = Math.max(st.trialBoost || 0, boost);
-          st.trialBoostUntil = Math.max(st.trialBoostUntil || 0, Date.now() + 48*3600*1000);
+          /* v5.6 兽潮加成走通用 Buff 协议: 与丹药同一张 buffs 表(tag:"trial"),
+           * 后端按区间加权验算, 面板由 gains.fx 结构化回显 —— 不再写 trialBoost/trialBoostUntil 旧字段。 */
+          pushBoost(boost, 48 * 3600, "兽潮余威", "trial");
         }
       }
     } catch (err) { console.warn('[battle] 试炼结算写档失败', err); }
@@ -3906,7 +3907,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       const frozen = (typeof window !== 'undefined' && window.__trialFreeze) ? '⏸ ' : '';
       trEl.textContent = `${frozen}妖潮·${td.name} ${m}:${s < 10 ? '0' : ''}${s}`;
       try {
-        if (state && state.trialBoost > 0 && (state.trialBoostUntil || 0) > Date.now()) trEl.classList.add('boosted');
+        /* v5.6: 兽潮加成读通用 buffs 表(tag:"trial") —— 旧字段已废弃 */
+        if (state && (state.buffs || []).some(b => b.tag === "trial" && (b.boost || 0) > 0 && (b.until || 0) > Date.now())) trEl.classList.add('boosted');
         else trEl.classList.remove('boosted');
       } catch (err) {}
     }

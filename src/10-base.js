@@ -153,6 +153,32 @@ function adopt(s) {
   if (!s.mats || typeof s.mats !== "object") s.mats = {};
   if (!s.pills || typeof s.pills !== "object") s.pills = {};
   if (!Array.isArray(s.buffs)) s.buffs = [];
+  /* v5.6 旧结构迁移(幂等): offPills / offlineBoostUntil / trialBoost+Until → 统一 buffs 条目,
+   * 转完旧字段清零 —— buffs 从此是加成的唯一来源, 后端只认这一张表。 */
+  if (!Array.isArray(s.offPills)) s.offPills = [];
+  for (const p of s.offPills) {
+    if (p && typeof p === "object" && (p.boost || 0) > 0 && (p.until || 0) > Date.now())
+      s.buffs.push({ tag: "pill", mult: 1, boost: Math.min(1, Math.max(0, fin(p.boost, 0))),
+        name: (typeof p.name === "string" ? p.name : "").slice(0, 12),
+        start: Math.max(0, fin(p.start, 0)), until: Math.max(0, fin(p.until, 0)) });
+  }
+  s.offPills = [];
+  if ((s.offlineBoostUntil || 0) > Date.now()) {
+    s.buffs.push({ tag: "pill", mult: 1, boost: bigIndexOf(s.realmIdx || 0) >= 11 ? 0.5 : 0.3, name: "洗髓丹",
+      start: Date.now(), until: s.offlineBoostUntil });
+    s.offlineBoostUntil = 0;
+  }
+  if ((s.trialBoostUntil || 0) > Date.now() && (s.trialBoost || 0) > 0) {
+    s.buffs.push({ tag: "trial", mult: 1, boost: Math.min(1.8, Math.max(0, fin(s.trialBoost, 0))), name: "兽潮余威",
+      start: Date.now(), until: s.trialBoostUntil });
+    s.trialBoost = 0; s.trialBoostUntil = 0;
+  }
+  s.buffs = s.buffs.filter(b => b && typeof b === "object").map(b => ({
+    tag: b.tag === "trial" ? "trial" : "pill", mult: Math.min(10, Math.max(1, fin(b.mult, 1))),
+    boost: b.boost ? Math.min(2, Math.max(0, fin(b.boost, 0))) : 0,
+    name: (typeof b.name === "string" ? b.name : "").slice(0, 12),
+    start: Math.max(0, fin(b.start, 0)), until: Math.max(0, fin(b.until, 0)),
+  })).filter(b => b.mult > 1 || b.boost > 0);
   s.offlineBoostUntil = Math.max(0, fin(s.offlineBoostUntil, 0));
     /* v3.9 妖潮试炼: 纪录 + 离线收益加成(120s 击杀纪录 → 补偿档位) */
   s.trialBest = Math.max(0, Math.floor(fin(s.trialBest, 0)));
@@ -390,24 +416,16 @@ function buffMult() {
   const t = now;
   /* v1.9.0: 清理只丢"已过期"的; 累加出来的多段同 mult 药力一律保留 ——
    * 它们共同构成 24 小时的总时长, 提前合并会丢掉时长信息。 */
-  state.buffs = (state.buffs || []).filter(b => b.until > t);
-  if (!state.buffs.length) { _buffCache = 1; _buffCacheT = now; return 1; }
-  /* 整理: 同 mult 的相邻/重叠段合并成一段, 让增长期长度可控(每服一道最多 +1 段) */
-  const by = {};
+  state.buffs = (state.buffs || []).filter(b => (b.until || 0) > t);
+  /* v5.6: 每条按 24h 上限裁切(与服务端 sanitize 同口径)。不再按 mult 合并重组 ——
+   * 重组会把 boost/tag/name 等通用 Buff 协议字段压掉(离线丹力/兽潮余威依赖它们)。 */
   for (const b of state.buffs) {
-    const k = fin(b.mult, 1);
-    const s0 = Math.max(t, b.start || t), e0 = b.until;
-    if (e0 <= s0) continue;
-    if (!by[k]) by[k] = { mult: k, start: s0, until: e0 };
-    else { by[k].start = Math.min(by[k].start, s0); by[k].until = Math.max(by[k].until, e0); }
+    if (b.start && b.until - b.start > BUFF_CAP_MS) b.until = b.start + BUFF_CAP_MS;
+    if (typeof b.mult !== "number" || !isFinite(b.mult)) b.mult = 1;
   }
-  const merged = Object.keys(by).map(k => by[k]);
-  /* 合并后按 24h 上限裁切(与服务端 sanitize 同口径): 保证 rateNow 用的总时长不超顶 */
-  for (const m of merged) if (m.until - m.start > BUFF_CAP_MS) m.until = m.start + BUFF_CAP_MS;
-  state.buffs = merged;
-  // 药力相冲，只取当前最强的一道（防 buff 叠乘指数爆炸）
+  // 药力相冲，只取当前最强的一道（防 buff 叠乘指数爆炸）; boost 条目 mult=1 不参与
   if (!state.buffs.length) { _buffCache = 1; _buffCacheT = now; return 1; }
-  const result = Math.max(...state.buffs.map(b => fin(b.mult, 1)));
+  const result = Math.max(1, ...state.buffs.map(b => fin(b.mult, 1)));
   _buffCache = result;
   _buffCacheT = now;
   return result;
@@ -760,13 +778,24 @@ function buffSpanMs(mult) {
 
 function buffAtCap(mult) { return buffSpanMs(mult) >= BUFF_CAP_MS - 1000; }
 
-function pushBuff(mult, durSec) {
+function pushBuff(mult, durSec, name) {
   const now = Date.now();
   let end = now;
   for (const b of (state.buffs || [])) if (b.mult === mult && (b.until || 0) > end) end = b.until;
   const until = Math.min(end + durSec * 1000, now + BUFF_CAP_MS);
   if (until <= now) return false;
-  state.buffs.push({ mult, start: now, until });
+  state.buffs.push({ mult, start: now, until, name: (typeof name === "string" ? name : "").slice(0, 12) });
+  _buffCache = null;
+  return true;
+}
+
+/* v5.6 通用 Buff 协议: 离线收益加成条目(boost>0, 仅离线段生效, 不吃 24h 修为丹封顶)。
+ * 兽潮余威也走这里(tag:"trial") —— 前端新增任何加成源只需 push 一条, 后端零改动。 */
+function pushBoost(boost, durSec, name, tag) {
+  const now = Date.now();
+  if (!((boost || 0) > 0) || !((durSec || 0) > 0)) return false;
+  state.buffs.push({ tag: tag === "trial" ? "trial" : "pill", mult: 1, boost,
+    name: (typeof name === "string" ? name : "").slice(0, 12), start: now, until: now + durSec * 1000 });
   _buffCache = null;
   return true;
 }
@@ -779,18 +808,21 @@ function buffHintOf(mult) {
 
 function renderPillHints() {
   const now = Date.now();
-  const n = (state.buffs || []).length;
-  const o = (state.offlineBoostUntil || 0) > now;
+  /* v5.6: 修为丹与离线加成都在 buffs 一张表 —— 按字段分列展示 */
+  const multN = (state.buffs || []).filter(b => (b.mult || 0) > 1).length;
+  const boosts = (state.buffs || []).filter(b => (b.boost || 0) > 0);
   const el = $("pillHints");
   /* v1.9.0: 附一句药力剩余时长, 让"累加到 24 小时封顶"这件事可见 */
   let spanTxt = "";
-  if (n) {
+  if (multN) {
     const mm = buffMult();
     const left = BUFF_CAP_MS - buffSpanMs(mm);
     spanTxt = left <= 60000 ? "·已满" : "·余" + durTxt(Math.round(left / 1000));
   }
-  if (el) el.innerHTML = (n ? `<span style="color:#f0c98a">丹力正盛 ×${buffMult().toFixed(1)}${spanTxt}</span>` : "") +
-    (o ? (n ? " · " : "") + `<span style="color:#8fd8bd">洗髓·离线+30%</span>` : "");
+  const bTxt = boosts.length ? boosts.map(b => `${b.name || "离线加成"}+${Math.round(b.boost * 100)}%`).join("/")
+    : "";
+  if (el) el.innerHTML = (multN ? `<span style="color:#f0c98a">丹力正盛 ×${buffMult().toFixed(1)}${spanTxt}</span>` : "") +
+    (boosts.length ? (multN ? " · " : "") + `<span style="color:#8fd8bd">${bTxt}</span>` : "");
 }
 
 mailDot();
@@ -1223,6 +1255,7 @@ export {
   pillCabinetHTML,
   pillIco,
   pushBattleStats,
+  pushBoost,
   pushBuff,
   pushMsg,
   recipeCan,
