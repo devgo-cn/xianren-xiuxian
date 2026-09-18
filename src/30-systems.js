@@ -6,7 +6,7 @@
  * 重建: node tools/split2.js <repo> <out>
  */
 import { $, ARRAY_MAX_LV, AURA_COLORS, AURA_FPS, BIGS, BTL, DAN_ZONE, EQUI_CELLPOS, EQUI_ICON, EQUI_SLOTI, MAIL_CAP, MAIN_STORY, MATS, MS_ARRAY, MS_ART, MS_SPIRIT, MYST, PAGES_NEED, PLOT, QUALITY, REALM_DAYS, RECIPES, SEG4, SEG_META, SEG_SCALE, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, TRAVEL_FIRST_WINDOW, TRAVEL_SPAN, __set_cauldron, __set_eqSel, __set_lastReadyHint, __set_selRecipe, __set_settling, _dsp, _eqSel, _floatPrev, _settling, arrMult, bigSub, cauldron, cld, cnNum, durTxt, fin, finalStats, fmt, lastReadyHint, pulseChip, selRecipe, setProg, skillExpNeed, spawnFloat, state } from './00-pure.js';
-import { BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, EQUI_SLOTN, TOTAL_SEGS, __set_auraAcc, __set_auraT, _auraAcc, _auraColor, _auraCtx, _auraP, _auraT, alHave, alInFurn, alTip, arrayCostNow, artMult, artName, attrAssign, buffMult, cldUI, equipBonus, fitsRecipe, hiddenUnlocked, locById, pagesOf, pickNoRepeat, pushMsg, recipeCan, recipeCardHTML, renderBag, renderCabinet, renderFurn, seg, skillGet, skillLv, srvNow, travelBtnLbl, travelMailCount, travelNextMailIn, travelSent, zoneOfBig, 段名 } from './10-base.js';
+import { BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, boostMult, EQUI_SLOTN, TOTAL_SEGS, __set_auraAcc, __set_auraT, _auraAcc, _auraColor, _auraCtx, _auraP, _auraT, alHave, alInFurn, alTip, arrayCostNow, artMult, artName, attrAssign, buffMult, cldUI, equipBonus, fitsRecipe, hiddenUnlocked, locById, pagesOf, pickNoRepeat, pushMsg, recipeCan, recipeCardHTML, renderBag, renderCabinet, renderFurn, seg, skillGet, skillLv, srvNow, travelBtnLbl, travelMailCount, travelNextMailIn, travelSent, zoneOfBig, 段名 } from './10-base.js';
 import { _cloudSettleRun, addJournal, artScore, bigIdx, licSync, realm, renderCraftBtn, renderSkills, save, showChapter, skillAddExp, skillTotalLv, skillVal } from './20-core.js';
 
 (function buildSegs() {
@@ -56,7 +56,10 @@ function cloudPushNow() {
 
 function realmMult() { return Math.pow(bigIdx() + 1, 2.05); }
 
-function rateNow() { return Math.max(0, fin(4 * realmMult() * artMult() * arrMult(state.arrayLv) * buffMult(), 0)); }
+function rateNow() {
+  /* v5.7: boost 池(丹力/兽潮)在线也生效, 与服务端 gExp = 4*arrM*dt*pillMult*offMult 对齐 —— 在线挂机不能比离线亏 */
+  return Math.max(0, fin(4 * realmMult() * artMult() * arrMult(state.arrayLv) * buffMult() * boostMult(), 0));
+}
 
 function pickQ() {
   /* v7.1: 品质权重按大境界走 QW_TABLE 手动表 —— 前期玄天极稀(1%), 中后期抬升,

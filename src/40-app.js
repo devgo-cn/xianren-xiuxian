@@ -458,7 +458,7 @@ function consumePill(id) {
   /* v5.6: 离线加成走通用 Buff 协议(pushBoost) —— 兽潮余威/丹药离线加成同一张表, 后端零知识验算 */
   else if (e.k === "offline") {
     pushBoost(e.boost || 0, e.dur || 0, rp.n, "pill");
-    pushMsg("main", `洗髓伐脉，此后离线游历更有所得（+${Math.round((e.boost || 0) * 100)}%·庇佑 ${Math.max(1, Math.round(e.dur / 3600))} 小时）`);
+    pushMsg("main", `洗髓伐脉，此后游历修炼更有所得（+${Math.round((e.boost || 0) * 100)}%·庇佑 ${Math.max(1, Math.round(e.dur / 3600))} 小时）`);
   }
   updateHUD(); save(); cloudSoon(); refreshOpenPanel(); renderPillHints();
 }
@@ -543,7 +543,7 @@ function presentSettle(r) {
       trialRow += `<div class="off-row"><span class="o-ico">${icoExp}</span><span class="ol">${f.tag === "trial" ? "兽潮加成" : "丹药加持" + nm}</span><b class="ov">×${Number(f.mult).toFixed(2)}</b></div>`;
     } else if (f.boost > 0) {
       if (f.tag === "trial") trialRow += `<div class="off-row"><span class="o-ico">${icoExp}</span><span class="ol">兽潮加成${nm}</span><b class="ov" style="color:#e0b45a">×${(1 + f.boost).toFixed(2)}</b></div>`;
-      else trialRow += `<div class="off-row"><span class="o-ico">${icoSpi}</span><span class="ol">离线丹力${nm}</span><b class="ov jade">+${Math.round(f.boost * 100)}%·庇佑 ${Math.max(1, Math.round((f.covered || 0) / 3.6e6))} 时</b></div>`;
+      else trialRow += `<div class="off-row"><span class="o-ico">${icoSpi}</span><span class="ol">丹力加成${nm}</span><b class="ov jade">+${Math.round(f.boost * 100)}%·庇佑 ${Math.max(1, Math.round((f.covered || 0) / 3.6e6))} 时</b></div>`;
     }
   }
   /* v1.9.8: 连破境 → 横幅右上朱印; 闭关时长 → 横幅标题带(各一行小字) */

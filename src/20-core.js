@@ -144,6 +144,17 @@ function addJournal(entry) {
   } else {                          // 动态事件(离线游历/纪事等): 仍存文本
     entry.ts = Date.now();
     state.journal.push(entry);
+    /* v5.7 叙事本地化: 叙事不进云端存档(cloudSnap 只传 sid 主线), 另存本地 journalLocal,
+     * 换设备/瘦身档载入时由 adopt 合并回显。上限 60 条, 超出裁最旧。 */
+    try {
+      const loc = JSON.parse(localStorage.getItem("dt_jrn_local") || "[]");
+      if (Array.isArray(loc)) {
+        loc.push({ key: entry.key || "", big: entry.big || "", kind: entry.kind || "",
+          title: entry.title || "", text: entry.text || "", ts: entry.ts });
+        while (loc.length > 60) loc.shift();
+        localStorage.setItem("dt_jrn_local", JSON.stringify(loc));
+      }
+    } catch (err) {}
   }
   if (state.journal.length > JRN_CAP) trimJournal();   // v1.9.2: 分流裁剪, 不再 shift 挤掉主线
   save();

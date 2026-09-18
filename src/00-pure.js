@@ -962,7 +962,7 @@ const RECIPES = {   // 丹方 v4 (v1.9.0) —— 覆盖 12 大境(0凡→11天�
   zhuji: { big: 1, n: "筑基丹", d: "炼气圆满的叩门砖：立获约三小时修为，此后两小时修为翻倍",
             need: { shexian: 12, huangjing: 8, lingru: 3, yaodan: 2 }, eff: { k: "grand", sec: 10800, mult: 1.8, dur: 7200 } },
   /* ---- 筑基(海外丹道：紫猴为主，灵血/灵乳辅) ---- */
-  xisui: { big: 2, n: "洗髓丹", d: "洗髓伐脉：十二小时内离线收益 +30%",
+  xisui: { big: 2, n: "洗髓丹", d: "洗髓伐脉：十二小时内修炼收益 +30%",
             need: { zihou: 8, shexian: 5, lingxue: 3 }, eff: { k: "offline", dur: 43200, boost: .3 } },
   yuqing:{ big: 2, n: "玉清丹", d: "筑基培元：立时回复约两小时修为",
             need: { zihou: 9, shexian: 5, lingxue: 4 }, eff: { k: "inst", sec: 7200 } },
@@ -1029,7 +1029,7 @@ const RECIPES = {   // 丹方 v4 (v1.9.0) —— 覆盖 12 大境(0凡→11天�
             need: { hongmeng: 9, hanpo: 5, qiongjing: 6 }, eff: { k: "inst", sec: 43200 } },
   taichu: { big: 11, n: "太初丹", d: "六小时内修为 +220%，一点太初之气",
             need: { hongmeng: 11, hanpo: 5, qiongjing: 7, taiqing: 8 }, eff: { k: "buff", mult: 3.2, dur: 21600 } },
-  bianhua: { big: 11, n: "天仙蜕变丹", d: "脱胎换骨：三十六小时内离线收益 +50%",
+  bianhua: { big: 11, n: "天仙蜕变丹", d: "脱胎换骨：三十六小时内修炼收益 +50%",
             need: { hongmeng: 16, qiongjing: 8, taiqing: 9, lingru: 9 }, eff: { k: "offline", dur: 129600, boost: .5 } },
 }
 
@@ -1064,7 +1064,7 @@ let _rkAt = 0;
 
 const G1_TPL = { realmIdx: 0, exp: 0, spirit: 0, arrayLv: 1, arts: [], journal: [], milestones: {},
   peakSpirit: 0, bestArtQ: -1, lastTs: 0, mats: {}, pills: {}, buffs: [], offPills: [], travel: null, mails: [],
-  offlineBoostUntil: 0, trialBest: 0, trialBoost: 0, trialBoostUntil: 0, pages: {}, name: "", _pn: "", _named: 0, _settledAt: 0, ver: 1, skills: {} };
+  offlineBoostUntil: 0, trialBest: 0, trialBoost: 0, trialBoostUntil: 0, pages: {}, name: "", _pn: "", _named: 0, _settledAt: 0, ver: 2, skills: {} };
 
 function g1prune(v, tpl) {
   if (v === null || typeof v !== "object" || tpl === null || typeof tpl !== "object" || Array.isArray(tpl)) {
@@ -1102,9 +1102,13 @@ const JRN_CAP = 300;
 
 const JRN_TAIL = 30;
 
-const CUR_VER = 1;
+/* v5.7: 版本号启用 —— 本次无字段转换(叙事本地化/新读取均向后兼容), 但把迁移链跑通,
+ * 之后任何破坏性存档改动都从这里加 MIGRATIONS[n], 老档永远可升。 */
+const CUR_VER = 2;
 
-const MIGRATIONS = { /* 2: s => { s.newField = s.newField || 0; return s; } */ };
+const MIGRATIONS = {
+  2: s => s,   // v5.7 叙事本地化: 老档 journal 里已有的叙事条目保留可读, 下次上传自然瘦身
+};
 
 function cldApiBase() {
   // 沙箱本地开发走本地结算后端；线上走 ECS(dongtian-save)

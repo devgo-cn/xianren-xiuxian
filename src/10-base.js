@@ -142,6 +142,20 @@ function seg(i) { return SEG_META[Math.min(i, TOTAL_SEGS - 1)]; }
 function adopt(s) {
   if (!s || !Array.isArray(s.arts)) return null;
   if (!Array.isArray(s.journal)) s.journal = [];
+  /* v5.7 叙事本地化: 云端/瘦身档只含主线 sid 条目, 动态叙事从本地 dt_jrn_local 合并回显。
+   * key+ts 去重(本地全量档路径叙事已在 journal, 不重复); 按 ts 归位保序。 */
+  try {
+    const loc = JSON.parse(localStorage.getItem("dt_jrn_local") || "[]");
+    if (Array.isArray(loc) && loc.length) {
+      const seen = new Set(s.journal.map(j => (j && j.key || "") + "@" + ((j && j.ts) || 0)));
+      for (const e of loc) {
+        if (!e || typeof e !== "object" || e.sid) continue;
+        const k = (e.key || "") + "@" + (e.ts || 0);
+        if (!seen.has(k)) { s.journal.push(e); seen.add(k); }
+      }
+      s.journal.sort((a, b) => (a && a.ts || 0) - (b && b.ts || 0));
+    }
+  } catch (err) {}
   if (!s.milestones || typeof s.milestones !== "object") s.milestones = {};
   s.peakSpirit = fin(s.peakSpirit, 0);
   s.bestArtQ = fin(s.bestArtQ, -1);
@@ -260,7 +274,8 @@ async function g1Pack(o) {
 async function g1Unpack(s) {
   const ds = new DecompressionStream("gzip");
   const stream = new Blob([g1unb64(s.slice(3))]).stream().pipeThrough(ds);
-  return g1merge(JSON.parse(await new Response(stream).text()), G1_TPL);
+  /* v5.7: 云端档也走版本迁移链 —— 本地 load() 已挂, 此处补齐换设备/寻档路径 */
+  return migrate(g1merge(JSON.parse(await new Response(stream).text()), G1_TPL));
 }
 
 function trimJr(list) {
@@ -432,6 +447,15 @@ function buffMult() {
 }
 
 function spiritRate() { return SPIRIT_RATE(state.arrayLv); }
+
+function boostMult() {
+  /* v5.7: boost 池(丹力/兽潮)在线收益乘区 —— 对称 buffMult, 药力相冲取最强一道;
+   * 与服务端 offMult(buffMultWeighted) 在线短区间内同值, 保证 _pred 不漂移。只读, 不改 state。 */
+  if (!Array.isArray(state.buffs) || !state.buffs.length) return 1;
+  let m = 1;
+  for (const b of state.buffs) if (b && (b.boost || 0) > 0) m = Math.max(m, 1 + fin(b.boost, 0, 2));
+  return m;
+}
 
 function setRealmSub(a, b) {            // v1.7.28: 小字段位/说明 分行(不挤压截断)
   const A = $("realmSubA"), B = $("realmSubB");
@@ -789,7 +813,7 @@ function pushBuff(mult, durSec, name) {
   return true;
 }
 
-/* v5.6 通用 Buff 协议: 离线收益加成条目(boost>0, 仅离线段生效, 不吃 24h 修为丹封顶)。
+/* v5.6 通用 Buff 协议: 收益加成条目(boost>0, v5.7 起在线离线都生效, 不吃 24h 修为丹封顶)。
  * 兽潮余威也走这里(tag:"trial") —— 前端新增任何加成源只需 push 一条, 后端零改动。 */
 function pushBoost(boost, durSec, name, tag) {
   const now = Date.now();
@@ -819,7 +843,7 @@ function renderPillHints() {
     const left = BUFF_CAP_MS - buffSpanMs(mm);
     spanTxt = left <= 60000 ? "·已满" : "·余" + durTxt(Math.round(left / 1000));
   }
-  const bTxt = boosts.length ? boosts.map(b => `${b.name || "离线加成"}+${Math.round(b.boost * 100)}%`).join("/")
+  const bTxt = boosts.length ? boosts.map(b => `${b.name || "丹力"}+${Math.round(b.boost * 100)}%`).join("/")
     : "";
   if (el) el.innerHTML = (multN ? `<span style="color:#f0c98a">丹力正盛 ×${buffMult().toFixed(1)}${spanTxt}</span>` : "") +
     (boosts.length ? (multN ? " · " : "") + `<span style="color:#8fd8bd">${bTxt}</span>` : "");
@@ -851,7 +875,9 @@ function recipeCardHTML(id) {
 function cloudSnap(src) {
   const s = src || state;
   const out = Object.assign({}, s);
-  out.journal = trimJr((s.journal || []).filter(j => !(j && !j.sid && j.kind === "游历")));
+  /* v5.7 存档瘦身: 云端只传主线(sid)条目 —— 动态叙事(纪事/际遇/游历/试炼)是氛围文本,
+   * 占存档 55~73%, 改存本地 dt_jrn_local, 载入时 adopt 合并回显。换设备丢近期叙事, 主线故事完整。 */
+  out.journal = (s.journal || []).filter(j => j && j.sid);
   /* v1.7.26: 未定道号(_named=0)不上传名字与本地临时名 → 服务器/风云榜只见定名者 */
   if (!out._named) { delete out.name; delete out._pn; }
   /* v1.8.0: 上传「账本值」而不是「预测值」—— 本地预测只是显示, 若把预测一起传上去,
@@ -1200,6 +1226,7 @@ export {
   buffAtCap,
   buffHintOf,
   buffMult,
+  boostMult,
   buffSpanMs,
   burstBoom,
   cldApi,
