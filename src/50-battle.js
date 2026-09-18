@@ -526,8 +526,12 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     const pool = SFX_POOL[name] || (SFX_POOL[name] = []);
     let a = null;
     for (const x of pool) { if (x.paused || x.ended) { a = x; break; } }
-    if (!a && pool.length < 3) { a = sfx[name].cloneNode(); pool.push(a); }
-    return a;   // 池满且全部在播 → 丢弃本次(可接受, 密集音效本就会叠一起)
+    if (!a) {
+      /* v5.12: 池满不再丢弃, 抢占最旧实例重播(同 playMonSfx 修法) */
+      if (pool.length >= 3) a = pool[0];
+      else { a = sfx[name].cloneNode(); pool.push(a); }
+    }
+    return a;
   }
   function playSfx(name, vol, rate) {
     if (!sfx.ready || !sfx[name]) return;
@@ -581,10 +585,14 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     let a = null;
     for (const x of pool) { if (x.paused || x.ended) { a = x; break; } }
     if (!a) {
-      if (pool.length >= 3) return;                          /* 池满且全在播 → 丢弃本次 */
-      const src = MON_SRC[file]
-        || (MON_SRC[file] = new Audio('assets/sfx/monster/' + file + '.ogg'));
-      a = src.cloneNode(); pool.push(a);
+      /* v5.12: 池满不再丢弃 —— 单怪节奏下每次攻击/受击都是独立事件, 丢了就是"没声"。
+       * 改抢占最旧实例重播(SND.play 会重置 currentTime), 兽潮时也只是旧音被顶掉。 */
+      if (pool.length >= 3) a = pool[0];
+      else {
+        const src = MON_SRC[file]
+          || (MON_SRC[file] = new Audio('assets/sfx/monster/' + file + '.ogg'));
+        a = src.cloneNode(); pool.push(a);
+      }
     }
     /* v6.10: 走 SND 统一播放层 */
     if (typeof SND !== 'undefined') SND.play(a, vol, rate);
@@ -3317,7 +3325,11 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     const dh = def.drawH || 84;
     /* 起点: 怪身前一点(不是身内, 否则弹道从怪身上"长"出来), 高度由 alt 决定(胸口附近) */
     const ox = e.x + dir * dh * 0.16;
-    const oy = e.y - dh * k.alt;
+    /* v5.12 FIX: 发射口不高于玩家胸口 —— 敌方全是地面单位, dh*alt 对高个怪/BOSS 会算到
+     * 60~88px(玩家胸口=46px), 同车道时 tdy 恒 +6~+42px, 弹道永久俯射(BOSS 实测 ~19°)。
+     * clamp 后 tdy≤0: 只平射或微仰, 与"地面互射"观感一致; 矮怪(dh*alt<46)不受影响,
+     * 保留自然仰射。弹道纯表现层(伤害发射帧已结算), 数值零影响。 */
+    const oy = e.y - Math.min(dh * k.alt, PLAYER_H * 0.5);
     /* 2 维瞄准: 从发射点朝玩家当前位置算归一化方向向量; 玩家不存在时退化为水平朝向。
      * v5.11 FIX: 目标点取玩家【胸口】(脚底减半身高) 而非脚底 —— 旧代码发射点在怪胸口
      * (oy = e.y - dh*alt, 高于地面), 目标却是玩家脚底(车道偏移), tdy 恒为正 ≈ dh*alt,
@@ -3586,7 +3598,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         o.spr.blendMode = f.blend === 'NORMAL' ? PIXI.BLEND_MODES.NORMAL : PIXI.BLEND_MODES.ADD;
         /* v5.11 弹道修正(对齐鹰弹 v8.7 先例): spike 素材原弹头朝【左下 27°】(PCA 实测),
          * 已在素材侧预旋转掰正为"默认朝左"(轴水平、弹头在左端中线), 代码不再需要角度偏置。
-         * 这里只按飞行方向做纯旋转: 小怪平飞 dy≈0 → 无旋转; BOSS 高空俯射/追踪时弹头跟随。
+         * 这里只按飞行方向做纯旋转: v5.12 发射口已 clamp 到玩家胸口, 弹道基本水平
+         * (dy≈0 → 无旋转), 仅跨车道透视与追踪时弹头小幅跟随。
          * orb 光球各向同性, 不旋转。 */
         const isSpike = f.tex === 'spike';
         o.spr.anchor.set(f.dir < 0 ? 1 : 0, 0.5);

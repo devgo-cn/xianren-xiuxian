@@ -76,7 +76,9 @@ const SND = (function () {
    * BGM 不经过这里(它是长循环, 单独管)。 */
   let _sfxActive = 0;
   const _sfxLast = new Map();
-  const SFX_MAX = 4;
+  /* v5.12: 4→8。原值按"14 只怪同屏"定; 现在单怪节奏下 攻击+受击+技能+掉落 的并发
+   * 就能摸到 4, 音效被静默丢弃。8 上限兽潮也不会击穿音频硬件(实例仍复用)。 */
+  const SFX_MAX = 8;
   const SFX_GAP = 50;
   function playSfxAudio(a, vol, rate) {
     if (!a) return;
@@ -88,10 +90,16 @@ const SND = (function () {
     if (now - (_sfxLast.get(key) || 0) < SFX_GAP) return;
     _sfxLast.set(key, now);
     _sfxActive++;
+    /* v5.12 防泄漏: 回收只押在 play() 的 promise 上不可靠 —— 部分 WebView 在自动播放
+     * 限制/音频焦点被打断时 promise 永不 settle, _sfxActive 只涨不落, 涨满 SFX_MAX 后
+     * 全局哑火(表现即"打着打着没声了")。加 ended 事件 + 3s 超时双兜底, settled 防重复回收。 */
+    let settled = false;
+    const done = () => { if (settled) return; settled = true; _sfxActive = Math.max(0, _sfxActive - 1); };
+    try { a.addEventListener('ended', done, { once: true }); } catch (e) {}
+    setTimeout(done, 3000);
     a.volume = vol || 0.6;
     if (rate) { try { a.playbackRate = rate; } catch (e) {} }
     try { a.currentTime = 0; } catch (e) {}
-    const done = () => { _sfxActive = Math.max(0, _sfxActive - 1); };
     const p = a.play();
     if (p && p.then) p.then(done).catch(done); else done();
   }
