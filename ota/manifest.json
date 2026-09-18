@@ -463,14 +463,14 @@
     "fx2d.js": "ab4794f036fc4e9976392e336e004bcef13d83976e78d719415da6c7bc10ad0d",
     "index.html": "80f1200b46656918f7104cd1e8038db239e2f98ae974b984117fc1d037055f16",
     "src/00-pure.js": "52d4fcec99c08192ad83ea5537df301be86a86d6991475f56491ba46dc315620",
-    "src/10-base.js": "fb50502e593893bde039bc55e8d2b3109bf3c95228dbcccad7eaf0e5c4e9c405",
+    "src/10-base.js": "c5b9d699f8160829ab2ac739377fa173f26fa6c0c23648c85208eed0e92c00e8",
     "src/20-core.js": "6fb5c1f4a3753215233b71ac35ae8a57f3876ffea1bee6fd3bee9df4178dc120",
     "src/30-systems.js": "9123df30778cf52bfacf9892217e80a495eba6fe62605c5b3fd868b9cda3b4f6",
     "src/40-app.js": "d47bf6db5bda7c3efe114e51c1d9835e51f5971be3cc415985bedb7a33acb83a",
-    "src/50-battle.js": "88d98bf5206dc2788f8f2fb4f0053f1c4761ecfb6362a5b674f2a49aa6d9a530",
+    "src/50-battle.js": "4ce6888248f14fcbbc05a8ca64ca42bf7e93ad454f2b5d0ce2e027d56b783af9",
     "src/60-stage.js": "a098e6f38e898ff3fee4c6a1f79e652373f15cf791e344813fa3d76ddd521c5b",
     "src/main.js": "161f10c02a3aa4095b257cd77f5bf1834e85d1359e85555deb8e48dfd2bd9fba"
   },
-  "rev": "e07956b22790ab24",
+  "rev": "5072d71e70b885ce",
   "version": "5.37"
 }
