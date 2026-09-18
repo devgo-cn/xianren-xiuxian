@@ -459,9 +459,9 @@
     "assets/ui_icons/icon_skill.webp": "9f4120ba7855ce3ed6012766534ff8f068521508f4814b763463337447d9ccd6",
     "assets/ui_icons/icon_story.webp": "92ff84146f80a3d7f9a6479c477113caf2e4017ffe10767dd866be4ea378c003",
     "assets/ui_icons/icon_treasure.webp": "fe0b83d8ece23ab09b23a013e18299de7335ba1917666a7970726e00b7eb7e17",
-    "dt-theme.css": "64d83445a0ee645cbea6b5b44cb06ed506b1d2a108818afe8409462796f719ec",
+    "dt-theme.css": "d074fdd13e5aa303bf49c9fc237de8673be78d1b1903697d7eea73c3acd8cbd4",
     "fx2d.js": "ab4794f036fc4e9976392e336e004bcef13d83976e78d719415da6c7bc10ad0d",
-    "index.html": "7d27d08a2f8bacf902ce2cd8f90ac1e70e73d904a21fc6c61a53fd7552daf05d",
+    "index.html": "af1d1e5f1463555a141188a220c88f010d560f45f56e7f0b6d02a0e02079d2fe",
     "src/00-pure.js": "f38d4b6386b16465ca826a7cb8c2c97723305c3719b5ae1f839038869480d910",
     "src/10-base.js": "d2712a39d9b569526a5223911a5041be59e66047cb997b51a5f51dcf48bb3b6b",
     "src/20-core.js": "50c815d4fec2ead555770dbc2cca2e79d33c873d927b027082017b1ebf402c80",
@@ -471,6 +471,6 @@
     "src/60-stage.js": "a098e6f38e898ff3fee4c6a1f79e652373f15cf791e344813fa3d76ddd521c5b",
     "src/main.js": "161f10c02a3aa4095b257cd77f5bf1834e85d1359e85555deb8e48dfd2bd9fba"
   },
-  "rev": "63d344d344a01c1b",
+  "rev": "184a15d15733bd1e",
   "version": "5.37"
 }
