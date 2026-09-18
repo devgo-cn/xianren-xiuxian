@@ -19,6 +19,13 @@ import * as NS_src_20_core_js from './20-core.js';
 import * as NS_src_30_systems_js from './30-systems.js';
 import * as NS_src_40_app_js from './40-app.js';
 import * as NS_src_60_stage_js from './60-stage.js';
+/* v6 挂机重构：核心数值层 + 整合层 + DOM 层 */
+import * as NS_src_00_num_js from './00-num.js';
+import * as NS_src_00_stage_js from './00-stage.js';
+import * as NS_src_00_equip_js from './00-equip.js';
+import * as NS_src_00_rebirth_js from './00-rebirth.js';
+import * as NS_src_05_v6_js from './05-v6.js';
+import * as NS_src_06_v6ui_js from './06-v6ui.js';
 
 /* 把模块内声明桥接到 window（只补缺失的，不覆盖已有全局）*/
 const BRIDGE = {
@@ -381,6 +388,34 @@ const BRIDGE = {
   "initStage": function () { return NS_src_60_stage_js["initStage"]; },
   "battleBand": function () { return NS_src_60_stage_js["battleBand"]; },
   "$": function () { return NS_src_00_pure_js["$"]; },
+
+  /* ── v6 挂机重构 ────────────────────────────────────────────────
+   * 只有【被 index.html 的 onclick 调用】的名字才需要桥接。
+   * 纯数学层（00-num/00-stage/00-equip/00-rebirth）不桥 —— 它们只在模块间
+   * 用 import 引用，泄漏到 window 只会让全局名字变脏，没有收益。 */
+  "upEquip": function () { return NS_src_06_v6ui_js["upEquip"]; },
+  "setStep": function () { return NS_src_06_v6ui_js["setStep"]; },
+  "doRebirthUI": function () { return NS_src_06_v6ui_js["doRebirthUI"]; },
+  "closeRebirth": function () { return NS_src_06_v6ui_js["closeRebirth"]; },
+  "confirmRebirth": function () { return NS_src_06_v6ui_js["confirmRebirth"]; },
+  /* 调试入口：window.V6 可查状态与手动结算 */
+  "V6": function () {
+    return {
+      init: NS_src_06_v6ui_js["initV6"],
+      tick: NS_src_06_v6ui_js["tick6"],
+      render: NS_src_06_v6ui_js["render6"],
+      state: NS_src_06_v6ui_js["state6"],
+      load: NS_src_06_v6ui_js["loadV6"],
+      save: NS_src_06_v6ui_js["saveV6"],
+      offline: NS_src_06_v6ui_js["settleOffline6"],
+      step: NS_src_06_v6ui_js["getStep"],
+      num: NS_src_00_num_js,
+      stage: NS_src_00_stage_js,
+      equip: NS_src_00_equip_js,
+      rebirth: NS_src_00_rebirth_js,
+      core: NS_src_05_v6_js,
+    };
+  },
 };
 for (const k in BRIDGE) {
   if (Object.prototype.hasOwnProperty.call(window, k)) continue;
@@ -397,3 +432,20 @@ for (const k in BRIDGE) {
  *    同一文件被实例化两遍，SND/state 分裂（v3.0 的坑）。缓存由 HTTP 层负责。
  */
 import('./50-battle.js');
+
+/* ── v6 挂机重构：初始化 ─────────────────────────────────────────────────
+ * 放在 50-battle 动态 import 之后。50-battle 的 init() 会读 window.state 建战斗
+ * 实体；v6 的初始化只建自己的子状态与 DOM，不依赖战斗实体，故延后一档最安全。
+ *
+ * 为什么用 setTimeout 0 而不是直接调用：
+ *   40-app 的 boot()/startGame() 是异步的（要先过云存档门禁），window.state 在
+ *   那之后才可信。这里等一个宏任务，让启动链路先把 state 铺好；initV6 内部对
+ *   state 缺失有完整容错（退化成全新 v6 状态），因此即使启动失败也不会白屏。
+ */
+setTimeout(function () {
+  try {
+    NS_src_06_v6ui_js.initV6(typeof window !== 'undefined' ? window.state : null);
+  } catch (e) {
+    console.warn('[v6] 初始化失败:', e);
+  }
+}, 0);

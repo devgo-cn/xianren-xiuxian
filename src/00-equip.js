@@ -29,7 +29,21 @@ export const EQ_CFG = {
   STEPS: [1, 10, 100, 1000, 10000],   // 升级步长档位
 
   /* 灵石消耗：cost(L) = BASE × GROWTH^L
-   * 指数增长，让后期升级需要海量灵石，避免 33000 级被瞬间点满。 */
+   *
+   * ── ⚠️ COST_GROWTH 是全游戏最关键的一个数字 ────────────────────
+   * 它不只是「成本涨多快」，灵石【产出】的底数也由它派生：
+   *   01-v6 的 SPIRIT_GROWTH = COST_GROWTH^0.95 = 1.0474（刻意错开 5%）
+   *
+   * 两个底数都指数量级但不相等，由此得到
+   *     G^L ≈ Gi^s  ⟹  装备等级 L ≈ 0.95 × 关卡 s
+   * 即「等级是关卡的一个比例」，玩家推 1000 关能到约 950 级。
+   *
+   * 若把 Gi 改成等于 G（同底数），L 会精确等于 s，关卡与等级 1:1 咬死，
+   * 一眼看出是公式算的（需求方已明确否掉该版本）。
+   * 若把 Gi 改成远小于 G（如怪血底数 1.006），则推关收益追不上成本，
+   * 玩家「刷」和「推」双输陷入死水（已实测复现）。
+   *
+   * 改这个值时务必同步检查 01-v6 的 SPIRIT_GROWTH。 */
   COST_BASE: 10,
   COST_GROWTH: 1.05,
 };
@@ -72,19 +86,37 @@ export function normEquip(eq) {
  * ───────────────────────────────────────────────────────────── */
 
 /**
- * 单格加成倍率：1 + C × L
- * @returns {number} 原生 Number（最大 10.9，安全）
+ * 单格加成倍率：(1 + C)^L
+ *
+ * ── ⚠️ 为什么是指数而不是线性 (1 + C·L) ─────────────────────────
+ * 线性加成会封顶在 1 + 0.0003×33000 = 10.9 倍，而境界加成是 2.2^R 无上限。
+ * 两者量级完全不匹配，实测后果：
+ *   装备拉满 33000 级 → maxReach 384→1183 关（+799）
+ *   境界才升到 10 级  → maxReach → 1703 关（+1319）
+ * ⇒ 装备点满还不如境界升 10 级，玩家【没有任何理由】去点那 4 个按钮。
+ *   而 4 格装备恰恰是本玩法的核心手操内容，这等于把玩法做废了。
+ *
+ * 改成 (1+C)^L 后（满级 = 1.0003^33000 ≈ 1.99e4 倍）：
+ *   装备满级 → maxReach 3694 关，成为推关主力；境界转为「抬地基、破墙」
+ *   两者的分工因此清晰：
+ *     · 装备 = 本轮内推关的主力（转生清零，所以每轮都要重新点）
+ *     · 境界 = 跨轮的地基（永久保留，决定下轮起点与 maxReach 的底座）
+ *
+ * 用大数计算：满级时 1.0003^33000 ≈ 2e4，虽在 Number 范围内，
+ * 但 4 格相乘再乘境界基数会放大，统一走大数更稳。
+ *
+ * @returns {object} 大数
  */
 export function slotMult(lv) {
   let L = lv | 0;
   if (L < 0) L = 0;
   if (L > EQ_CFG.MAX_LV) L = EQ_CFG.MAX_LV;
-  return 1 + EQ_CFG.C * L;
+  return N.pow(N.from(1 + EQ_CFG.C), L);
 }
 
 /**
- * 四格加成倍率表
- * @returns {{atk:number, hp:number, def:number, aspd:number}}
+ * 四格加成倍率表（大数）
+ * @returns {{atk:object, hp:object, def:object, aspd:object}}
  */
 export function equipBonus(eq) {
   const e = normEquip(eq);
@@ -95,6 +127,15 @@ export function equipBonus(eq) {
     aspd: slotMult(e.aspd),
   };
 }
+
+/**
+ * 单槽满级倍率（原生 Number）—— 用于「一轮内装备能点到多满」的上界估算。
+ *
+ * 展开：slotMult(L) = (1+C)^L，L = MAX_LV 时 = 10.86。
+ * ⚠️ 因为 C·MAX_LV = 9.9 远小于 1，这里 (1+C)^MAX_LV 与
+ *    线性近似 1 + C·MAX_LV 只差 0.2%，所以直接给常数即可。
+ */
+export const EQUIP_MAX_BONUS = Math.pow(1 + EQ_CFG.C, EQ_CFG.MAX_LV);   // ≈ 10.86
 
 /* ─────────────────────────────────────────────────────────────
  *  灵石消耗
@@ -115,6 +156,30 @@ function sumFactor(n) {
   if (n <= 0) return N.ZERO;
   const gn = N.pow(N.from(g), n);           // 大数 g^n
   return N.divNum(N.sub(gn, N.ONE), g - 1);
+}
+
+/**
+ * 从 0 级升到 L 级的累计成本，**允许 L 为浮点数**。
+ *
+ *   cost(L) = BASE × G × (G^L − 1) / (G − 1)
+ *
+ * ── 为什么需要浮点版本 ────────────────────────────────────────────
+ * upgradeCost 的 steps 是「整数级数」（玩家只能一级一级买），
+ * 但 00-anchor 的锚点表给的是【连续】等级曲线（插值出来是 203.7 这种）。
+ * 若强行取整成 204，相邻关会落进同一个整数，差分为 0 →
+ * 灵石产出出现「多关为 0，然后突然一大笔」的锯齿。
+ *
+ * 指数运算 G^L 对浮点 L 天然良定义，不存在取整的必要。
+ *
+ * @param {number} L 目标等级（可为小数）
+ * @returns {object} 大数
+ */
+export function costToLevel(L) {
+  const lv = Math.max(0, Math.min(EQ_CFG.MAX_LV, +L || 0));
+  if (lv <= 0) return N.ZERO;
+  const g = EQ_CFG.COST_GROWTH;
+  const gl = N.pow(N.from(g), lv);                    // 大数 g^L
+  return N.mulNum(N.divNum(N.sub(gl, N.ONE), g - 1), EQ_CFG.COST_BASE * g);
 }
 
 /**

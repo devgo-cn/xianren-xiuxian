@@ -30,6 +30,7 @@
 import * as N from './00-num.js';
 import * as S from './00-stage.js';
 import * as E from './00-equip.js';
+import * as RM from './00-realm.js';
 
 /* ─────────────────────────────────────────────────────────────
  *  参数（唯一权威）
@@ -39,18 +40,25 @@ export const REBIRTH_CFG = {
   PTS_DIV: 10,
   PTS_EXP: 1.5,
 
-  /* 境界成本：突破到第 R 境需累计 (COST_BASE × K) × R^QC 点 */
-  K_COST: 5,
-  QC: 1.0,              // ⚠️ 必须 < 1.5（约束1）
+  /* 每突破 1 境，基础属性 ×Q_REALM。
+   *
+   * ⚠️ 28.3 是【反解出来的】，不是拍的：
+   *   怪 H(s) = H0·g^(s-1)，第 30000 关怪强度 ≈ 1e78；
+   *   玩家面板 = BASE0 × Q^R，54 层要够到 1e78 就得
+   *       Q^53 ≈ 1e77  ⟹  Q ≈ 28.3
+   *   低于这个值 → 关卡早就推满 30000，境界却还差几十层，
+   *                后期玩家会在关卡顶上空转。
+   *   高于这个值 → 关卡还没推完就天仙了。
+   *
+   *   改这个值必须同步改 00-realm.js 的 Q_REALM_REF，
+   *   并重跑 tests/test_realm.mjs（有断言检查两者一致）。 */
+  Q_REALM: 28.3,
 
-  /* 每突破 1 境，基础属性 ×Q_REALM */
-  Q_REALM: 2.2,
-
-  /* 玩家初始基础面板（第 1 境，装备为 0 时） */
+  /* 玩家初始基础面板（凡人，装备为 0 时） */
   BASE0: 10,
 
-  /* 转生后保留：技能 / 配方 / 宠物（设计文档 §1 第 18 条）
-   * 清零：境界（不，境界保留）/ 装备 / 灵石 / 关数 */
+  /* 转生后保留：境界、技能、配方、宠物（设计文档 §1 第 18 条）
+   * 清零：装备 / 灵石 / 关数 */
 };
 
 /* ─────────────────────────────────────────────────────────────
@@ -58,8 +66,13 @@ export const REBIRTH_CFG = {
  * ───────────────────────────────────────────────────────────── */
 
 /**
- * 由最高关数计算本次转生获得的转生点
+ * 由最高关数计算本次转生获得的转生点（= 修为）
  *   r = (最高关 / 10)^1.5
+ *
+ * ⚠️ 每轮只结算一次，取本轮推到的最深关卡。
+ *    推 350 关给 207，推 351 关给 208 —— 推得越远给得越多，
+ *    所以「再推几关看看」是有收益的，但推到最后必然推不动，
+ *    那就转生。
  *
  * @param {number} maxStage 本次轮回推到的最高关
  * @returns {object} 大数
@@ -71,70 +84,33 @@ export function rebirthPoints(maxStage) {
 }
 
 /* ─────────────────────────────────────────────────────────────
- *  境界成本与突破
+ *  境界成本与突破（已移交 00-realm.js）
  * ───────────────────────────────────────────────────────────── */
 
 /**
- * 从第 R 境突破到第 R+1 境所需的【单次】点数
- *   cost(R) = (COST_BASE × K) × (R+1)^QC
- *
- * @param {number} R 当前境界（0 起）
- * @returns {object} 大数
+ * 从第 R-1 层突破到第 R 层的单层修为需求。
+ * @deprecated 直接调 RM.levelCost(R)；保留此转发仅为兼容旧调用点。
  */
 export function realmCost(R) {
   const r = Math.max(0, Math.floor(R));
-  const base = REBIRTH_CFG.PTS_DIV * REBIRTH_CFG.K_COST;   // 10 × 5 = 50
-  return N.mulNum(N.pow(N.from(r + 1), REBIRTH_CFG.QC), base);
+  if (r <= 0) return RM.levelCost(1);
+  return RM.levelCost(r + 1);
 }
 
 /**
- * 消耗累计点数能突破到第几境（从 0 起算）
- *
- * 用二分搜索而非累加循环 —— 境界数可达数百，逐级累加在 UI 中可接受，
- * 但二分更稳健（不会因为大数比较变慢）。
- *
- * @param {object} totalPoints 累计转生点（大数）
- * @returns {number} 可达到的境界序号
+ * 消耗累计修为能突破到第几层（0 = 凡人）。
+ * @deprecated 直接用 RM.levelFrom(total)。
  */
 export function realmsFrom(totalPoints) {
-  if (N.isZero(totalPoints)) return 0;
-  /* 上界估算：cost(R) = 50·R^1.0，则累计 ≈ 25·R^2
-   * → R ≈ sqrt(total / 25)，放宽 4 倍作为搜索上界 */
-  const est = Math.sqrt(Math.max(1, N.toNumber(N.mulNum(totalPoints, 1)))) * 4;
-  let hi = Math.max(10, Math.min(100000, Math.ceil(est) + 10));
-  let lo = 0;
-  while (lo < hi) {
-    const mid = Math.floor((lo + hi + 1) / 2);
-    if (N.lte(cumulativeCost(mid), totalPoints)) lo = mid;
-    else hi = mid - 1;
-  }
-  return lo;
+  return RM.levelFrom(totalPoints);
 }
 
 /**
- * 从 0 境升到 R 境所需的【累计】点数
- *   Σ_{i=1..R} 50 × i^QC
- *
- * 用积分近似 + 修正：Σ i^q ≈ R^(q+1)/(q+1)（对 q=1 是精确的 R(R+1)/2）
- * 本函数对 q=1.0 走精确公式，其它 q 走大数积分近似。
- *
- * @param {number} R 目标境界
- * @returns {object} 大数
+ * 从 0 层升到 R 层所需的累计修为。
+ * @deprecated 直接用 RM.cumCultivation(R)。
  */
 export function cumulativeCost(R) {
-  const r = Math.max(0, Math.floor(R));
-  if (r === 0) return N.ZERO;
-  const base = REBIRTH_CFG.PTS_DIV * REBIRTH_CFG.K_COST;
-  const q = REBIRTH_CFG.QC;
-
-  if (Math.abs(q - 1.0) < 1e-12) {
-    /* Σ 50·i = 50 · R(R+1)/2 —— 精确 */
-    return N.mulNum(N.from(r * (r + 1) / 2), base);
-  }
-  /* 一般情况：Σ i^q ≈ R^(q+1)/(q+1) + R^q/2（欧拉-麦克劳林一阶修正） */
-  const a = N.divNum(N.pow(N.from(r), q + 1), q + 1);
-  const b = N.divNum(N.pow(N.from(r), q), 2);
-  return N.mulNum(N.add(a, b), base);
+  return RM.cumCultivation(R);
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -142,10 +118,10 @@ export function cumulativeCost(R) {
  * ───────────────────────────────────────────────────────────── */
 
 /**
- * 第 R 境的基础面板
- *   base(R) = BASE0 × q^R
+ * 第 R 层的基础面板
+ *   base(R) = BASE0 × Q_REALM^R
  *
- * @param {number} R 境界
+ * @param {number} R 层数（0 = 凡人）
  * @returns {object} 大数
  */
 export function baseStat(R) {
@@ -160,9 +136,16 @@ export function baseStat(R) {
 export const RATE_CFG = {
   V_BASE: 1.0,        // 基准推关速率（关/秒）@ 倍速=1, 攻速=1
   SPD_CAP: 3.5,       // 游戏倍速上限（宠物提供，转生保留）
-  /* 攻速上限 = 装备满级加成 = 1 + 0.0003 × 33000 = 10.9
-   * 由装备系统实际上限决定，勿硬编码 3.0 */
-  ASPD_CAP: 1 + E.EQ_CFG.C * E.EQ_CFG.MAX_LV,
+
+  /* 攻速上限 = 装备满级加成 = 1.0003^33000 ≈ 1.99e4
+   *
+   * ⚠️ 必须走大数。装备加成已从线性 (1+C·L) 改为指数 (1+C)^L
+   *   （原因见 00-equip.slotMult 的注释：线性封顶 10.9 倍，
+   *     远小于境界 2.2^R，会导致玩家没有理由点装备按钮）。
+   * 1.0003^33000 ≈ 2e4 尚在 Number 范围内，但攻速还要与倍速、基准速率
+   * 连乘，统一用大数避免后续改参数时无声溢出。
+   * 由装备系统实际上限派生，勿硬编码「3.0」（旧版设计要求）。 */
+  ASPD_CAP: N.pow(N.from(1 + E.EQ_CFG.C), E.EQ_CFG.MAX_LV),
 };
 
 /**
@@ -172,25 +155,39 @@ export const RATE_CFG = {
  *    游戏倍速 = 永久资产（宠物保留）→ 长期底速
  *    攻速     = 每轮资产（装备清零）→ 每轮爬升动力
  *
- * ⚠️ 攻速封顶：
- *   游戏倍速封顶 SPD_CAP = 3.5（需求方设定）
- *   攻速封顶为「装备满级加成」= 1 + C × MAX_LV = 10.9
- *   （这是装备系统的硬上限，不是「3.0」——3.0 是旧设计要求，
- *     现按「4 装备格子 + 33000 级」的实际数学上限执行）
+ * ⚠️ 返回值是【大数】。因为攻速上限已从 10.9 变成 ~1.99e4，
+ *   不能再假设结果能用原生 Number 表示。
  *
  * @param {number} gameSpeed 游戏倍速 [1, 3.5]
- * @param {number} aspdMult 装备攻速倍率 [1, 10.9]
- * @returns {number} 推关速率（原生 Number）
+ * @param {object} aspdMult 装备攻速倍率（大数，[1, 1.99e4]）
+ * @returns {object} 推关速率（大数）
  */
 export function pushRate(gameSpeed, aspdMult) {
   const gs = clamp(gameSpeed, 1, RATE_CFG.SPD_CAP);
-  const as = clamp(aspdMult, 1, RATE_CFG.ASPD_CAP);
-  return RATE_CFG.V_BASE * gs * as;
+  const as = clampBig(aspdMult);
+  return N.mulNum(N.mulNum(as, RATE_CFG.V_BASE), gs);
 }
 
 function clamp(v, lo, hi) {
   v = +v || 0;
   return v < lo ? lo : (v > hi ? hi : v);
+}
+
+/**
+ * 大数版 clamp(a, 1, ASPD_CAP)。
+ *
+ * 攻速倍率的来源是装备（已是大数），下限 1、上限 ASPD_CAP 都是常量，
+ * 越界时直接返回常量而不是原值 —— 返回常量才是【真的封顶】，
+ * 原样返回会让越界值（比如外部写脏的状态）继续放大速率。
+ *
+ * @param {object} a 大数
+ * @returns {object} 大数
+ */
+function clampBig(a) {
+  if (N.isZero(a) || N.isNeg(a)) return N.ONE;
+  if (N.lt(a, N.ONE)) return N.ONE;
+  if (N.gt(a, RATE_CFG.ASPD_CAP)) return RATE_CFG.ASPD_CAP;
+  return a;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -199,23 +196,27 @@ function clamp(v, lo, hi) {
 
 /**
  * 玩家完整面板
- *   P = 基础(境界) × (1 + EQ_C × L)
+ *   P = 基础(境界) × (1 + EQ_C)^L
+ *
+ * ⚠️ 装备加成自 v6 起为指数 (1+C)^L，量级可达 1.99e4 倍，
+ *   因此 4 格加成与综合战力全部走大数乘法（N.mul），
+ *   不能再用 N.mulNum(base, eb.atk) —— 那样要求乘数是原生 Number。
  *
  * @param {number} realm 境界
  * @param {object} equip 装备等级表
- * @returns {{atk:object, hp:object, def:object, aspd:number, power:object}}
- *          atk/hp/def 为大数；aspd 是倍率（原生）；power 是综合战力（大数）
+ * @returns {{atk:object, hp:object, def:object, aspd:object, power:object}}
+ *          atk/hp/def/power 为大数；aspd 是倍率（大数）
  */
 export function playerStats(realm, equip) {
   const base = baseStat(realm);
   const eb = E.equipBonus(equip);
   return {
-    atk: N.mulNum(base, eb.atk),
-    hp: N.mulNum(base, eb.hp),
-    def: N.mulNum(base, eb.def),
+    atk: N.mul(base, eb.atk),
+    hp: N.mul(base, eb.hp),
+    def: N.mul(base, eb.def),
     aspd: eb.aspd,
     /* 综合战力：攻×攻速（决定推关能力，对齐设计文档「面板」定义） */
-    power: N.mulNum(base, eb.atk * eb.aspd),
+    power: N.mul(base, N.mul(eb.atk, eb.aspd)),
   };
 }
 
@@ -224,22 +225,39 @@ export function playerStats(realm, equip) {
  * ───────────────────────────────────────────────────────────── */
 
 /**
- * 模拟一轮：从 startStage 开始推，直到被卡住。
+ * 模拟一轮：从 startStage 开始推，边推边用灵石升装备，直到被卡住。
  *
- * 卡关判据（需求方设定 #5）：推不动就让怪打死。
- * 数学形式：玩家面板 P < 第 s 关怪血量 H(s) → 打不过。
+ * ── 一轮的完整生命周期（需求方口述）───────────────────────────
+ *   转生后：装备清零，境界保留 → 面板只有 baseStat(realm)
+ *   推图：打怪掉灵石 → 升装备 → 面板变强 → 推得更远
+ *   直到：灵石也不够升装备了，推不动了 → 玩家点转生
+ *
+ * ── 关键简化：单轮装备能点到多少级 ─────────────────────────────
+ * 灵石产出随关卡指数增长（怪血量 ≈ 1.006^s），所以装备等级
+ * 在一轮内会被"推得很满"——实测单轮跨度 ≈ log(EQ_MULT)/log(G)，
+ * 几乎与境界无关。这里直接按【装备满级】估算本轮终点，
+ * 与 00-realm.js 的 ROUND_SPAN 注释保持同一口径。
+ *
+ * ⚠️ 这是【上界估算】（假设装备能点满）。真实值受灵石掉落曲线
+ *    影响会略低，上线后需按实测回调 00-realm.js 的 ROUNDS_BASE。
  *
  * @param {object} state {realm, equip, spirit, stage}
  * @returns {{reached:number, diedAt:number, spiritEarned:object, equip:object}}
  */
 export function runOneLife(state) {
-  const P = playerStats(state.realm, state.equip).power;
-  let s = Math.max(1, Math.floor(state.stage || 1));
-  const maxS = Math.floor(S.maxStageFor(P));
+  const base = baseStat(state.realm);
+  const eb = E.equipBonus(state.equip);
+
+  /* 本轮能点到满装备 → 面板上界
+   * ⚠️ 两个大数相乘必须用 N.mul（mulNum 只接受「大数 × 原生数」） */
+  const fullEquip = E.EQUIP_MAX_BONUS;
+  const Pfull = N.mulNum(N.mul(base, N.mul(eb.atk, eb.aspd)), fullEquip);
+
+  const sStart = Math.max(1, Math.floor(state.stage || 1));
+  const maxS = Math.floor(S.maxStageFor(Pfull));
   const reachedRaw = Math.min(maxS, S.STAGE_CFG.S_MAX);
 
-  /* 灵石产出：与关卡挂钩。简化为「每关基础产出 × 关卡量级」 */
-  const spirit = spiritIncome(s, reachedRaw, P);
+  const spirit = spiritIncome(sStart, reachedRaw, Pfull);
 
   return {
     reached: reachedRaw,

@@ -70,6 +70,131 @@
     .hud-icons-slot{width:52px}
     .hud-row{gap:6px 5px}
   }
+
+  /* ══ v6.0 挂机重构: 关卡条 / 四装备升级 / 档位 / 转生 ══════════════════ */
+
+  /* ── 关卡推进条: 位于 .battle-ui(战斗带) 顶部, 紧贴 HUD 下方 ── */
+  .stage-bar{position:absolute;left:10px;right:10px;top:22px;z-index:2;pointer-events:none;
+    display:flex;flex-direction:column;gap:3px}
+  .stage-bar .sb-main{display:flex;align-items:baseline;gap:9px;font-size:12px;color:#c2c9d6;
+    text-shadow:0 1px 3px rgba(0,0,0,.85)}
+  .stage-bar .sb-stage{white-space:nowrap}
+  .stage-bar .sb-stage b{color:#ffd98a;font-size:15px;font-weight:800}
+  .stage-bar .sb-mob{color:#a9b4c6;font-size:11.5px;flex:1;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .stage-bar .sb-rec{color:#8d97a9;font-size:11px;white-space:nowrap}
+  .stage-bar .sb-rec b{color:#9ed7b8}
+  /* v6.1 境界行: 左边境界名(按大境着色), 右边"距下一境 X 修为" */
+  .stage-bar .sb-realm-row{display:flex;align-items:baseline;gap:8px;
+    font-size:11.5px;text-shadow:0 1px 3px rgba(0,0,0,.85)}
+  .stage-bar .sb-realm{color:#e8c56b;font-weight:700;white-space:nowrap}
+  .stage-bar .sb-tonext{color:#8d97a9;margin-left:auto;white-space:nowrap}
+  .stage-bar .sb-tonext b{color:#ffd98a}
+  .stage-bar .sb-prog{height:3px;border-radius:2px;background:rgba(255,255,255,.10);overflow:hidden}
+  .stage-bar .sb-prog i{display:block;height:100%;width:0%;border-radius:2px;
+    background:linear-gradient(90deg,#67c9ab,#ffd98a);transition:width .18s linear}
+
+  /* ── v6 操作面板: 独立 fixed 底部面板 ──
+     背景必须足够不透明: 下方是深色立绘区, 若用半透明渐隐,
+     立绘会从按钮缝隙里透出来, 数字与图标糊成一片(实测截图复现)。
+     故整块给实心底, 只在最顶部留一条 18px 的渐隐过渡带做视觉衔接。 */
+  .v6-panel{position:fixed;left:0;right:0;bottom:0;z-index:5;
+    padding:8px 10px calc(7px + env(safe-area-inset-bottom, 0px));
+    display:flex;flex-direction:column;gap:6px;
+    background:#0a0d14;
+    box-shadow:0 -1px 0 rgba(232,197,107,.14), 0 -10px 24px rgba(0,0,0,.55)}
+  /* 顶部渐隐过渡带: 盖在面板上沿之外, 让面板与上方场景自然地连起来 */
+  .v6-panel::before{content:"";position:absolute;left:0;right:0;top:-18px;height:18px;
+    background:linear-gradient(180deg, rgba(10,13,20,0) 0%, rgba(10,13,20,.92) 100%);
+    pointer-events:none}
+
+  /* 4 槽升级按钮 */
+  .v6-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .up-btn{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:1px;padding:7px 2px 6px;cursor:pointer;overflow:hidden;font-family:inherit;
+    border-radius:7px;border:1px solid rgba(232,197,107,.28);
+    background:linear-gradient(180deg,rgba(30,35,46,.94),rgba(16,19,26,.97));
+    color:#d8dee8;transition:transform .12s,border-color .2s,box-shadow .2s}
+  .up-btn:active{transform:scale(.93)}
+  .up-btn .uico{font-size:16px;line-height:1;filter:saturate(.9)}
+  .up-btn .ulbl{font-size:10.5px;color:#a9b4c6;letter-spacing:.5px}
+  .up-btn .ulv{font-size:13px;font-weight:800;color:#ffd98a;line-height:1.15}
+  .up-btn .ucost{font-size:10.5px;color:#9ed7b8;font-weight:700}
+  /* 灵石不足 → 熄墨压暗; 可升 → 朱砂呼吸; 满级 → 青玉 */
+  .up-btn.no{opacity:.45;border-color:rgba(120,130,150,.25)}
+  .up-btn.no .ucost{color:#8d97a9}
+  .up-btn.ready{border-color:rgba(255,140,80,.6);box-shadow:0 0 10px rgba(255,140,80,.22)}
+  .up-btn.max{opacity:.62;border-color:rgba(150,220,180,.35)}
+  .up-btn.max .ulv{color:#9ed7b8}
+
+  /* 档位行 */
+  .v6-row{display:flex;align-items:center;gap:6px}
+  .v6-row .step-lbl{font-size:10.5px;color:#8d97a9;flex:none}
+  .step-row{display:flex;align-items:center;gap:5px;flex:1}
+  .step-btn{flex:1;padding:4px 0;cursor:pointer;font-family:inherit;font-size:11px;
+    border-radius:4px;border:1px solid rgba(232,197,107,.22);
+    background:rgba(20,24,32,.9);color:#a9b4c6;transition:all .15s}
+  .step-btn:active{transform:scale(.93)}
+  .step-btn.on{border-color:rgba(255,217,138,.78);background:rgba(62,49,26,.95);
+    color:#ffd98a;font-weight:800;box-shadow:0 0 8px rgba(255,217,138,.28)}
+
+  /* 转生按钮 */
+  .rb-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;
+    padding:8px 0;cursor:pointer;font-family:inherit;border-radius:6px;
+    border:1px solid rgba(200,110,255,.38);
+    background:linear-gradient(180deg,rgba(50,32,70,.94),rgba(24,16,34,.97));
+    color:#dcc4ff;transition:all .16s}
+  .rb-btn:active{transform:scale(.975)}
+  .rb-btn .rbl{font-size:12.5px;font-weight:800;letter-spacing:2px}
+  .rb-btn .rbs{font-size:10.5px;color:#bda6e6}
+  .rb-btn.off{opacity:.45;border-color:rgba(120,130,150,.25);color:#8d97a9}
+  .rb-btn.off .rbs{color:#8d97a9}
+  .rb-btn.hot{border-color:rgba(255,180,255,.85);
+    animation:rbPulse 1.6s ease-in-out infinite}
+  @keyframes rbPulse{
+    0%,100%{box-shadow:0 0 10px rgba(200,110,255,.25)}
+    50%{box-shadow:0 0 20px rgba(230,150,255,.55)}
+  }
+
+  /* 转生结算弹窗 */
+  #rbPanel{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+    background:rgba(6,8,12,.82);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+  #rbPanel.on{display:flex}
+  #rbPanel .rb-card{width:min(86vw,340px);padding:20px 18px;border-radius:10px;
+    border:1px solid rgba(200,110,255,.4);
+    background:linear-gradient(180deg,rgba(30,24,44,.99),rgba(14,12,20,.99));
+    box-shadow:0 12px 40px rgba(0,0,0,.7);color:#d8dee8;text-align:center}
+  #rbPanel .rb-t{font-size:16px;font-weight:800;color:#dcc4ff;letter-spacing:3px;margin-bottom:14px}
+  #rbPanel .rb-line{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;
+    border-bottom:1px solid rgba(255,255,255,.06)}
+  #rbPanel .rb-line span:first-child{color:#8d97a9}
+  #rbPanel .rb-line span:last-child{color:#ffd98a;font-weight:800}
+  #rbPanel .rb-line.gain span:last-child{color:#9ed7b8;font-size:14px}
+  #rbPanel .rb-btns{display:flex;gap:8px;margin-top:18px}
+  #rbPanel .rb-btns button{flex:1;padding:9px 0;cursor:pointer;font-family:inherit;font-size:13px;
+    font-weight:800;border-radius:5px;letter-spacing:1px;transition:all .15s}
+  #rbPanel .rb-btns button:active{transform:scale(.96)}
+  #rbPanel #rbCancel{border:1px solid rgba(140,150,170,.35);background:rgba(24,28,36,.9);color:#a9b4c6}
+  #rbPanel #rbOk{border:1px solid rgba(200,110,255,.6);
+    background:linear-gradient(180deg,rgba(78,46,110,.95),rgba(40,24,60,.98));color:#e8d6ff}
+
+  @media (max-width:375px){
+    .up-btn{padding:6px 1px 5px}
+    .up-btn .ulv{font-size:12px}
+    .up-btn .ucost{font-size:9.5px}
+    .up-btn .ulbl{font-size:9.5px}
+    .up-btn .uico{font-size:14px}
+    .stage-bar .sb-mob{font-size:10.5px}
+    .step-btn{font-size:10px;padding:3px 0}
+    .rb-btn .rbl{font-size:11.5px}
+    .v6-panel{padding-left:8px;padding-right:8px}
+  }
+  /* 矮屏(横屏/小机): 压缩按钮高度, 避免面板吃掉太多可视区 */
+  @media (max-height:640px){
+    .up-btn{padding:4px 1px 3px}
+    .up-btn .uico{display:none}
+    .rb-btn{padding:6px 0}
+  }
   /* hud-row 第二行: 境界卡(左) + 按钮组(中) + hud-icons(右), grid 三列; 段位允许换行不截断 */
     .realm-left{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
   .realm-left .realm-badge{flex:none}
@@ -687,8 +812,54 @@
     <div class="icon-btn" id="alchemyChip" onclick="openAlchemy()" title="丹房·炼丹"><img src="assets/ui_icons/icon_alchemy.webp" alt="丹房"><span class="lg"></span></div>
     <div class="icon-btn" id="skillChip" onclick="openSkills()" title="神通·技能"><img src="assets/ui_icons/icon_skill.webp" alt="技能"></div>
   </div>
+
+  <!-- v6.0 关卡推进条（战斗带内，紧贴 HUD 下方） -->
+  <div class="stage-bar" id="stageBar">
+    <div class="sb-main">
+      <span class="sb-stage">第 <b id="sbStage">1</b> 关</span>
+      <span class="sb-mob" id="sbMob">—</span>
+      <span class="sb-rec">最高 <b id="sbBest">0</b></span>
+    </div>
+    <!-- v6.1: 境界 + 离下一境还差多少修为。
+         显式展示「攒修为」的过程 —— 转生 ≠ 突破，多数轮次只涨修为不跨境。 -->
+    <div class="sb-realm-row">
+      <span class="sb-realm" id="sbRealm">凡人</span>
+      <span class="sb-tonext">距下一境 <b id="sbToNext">0</b></span>
+    </div>
+    <div class="sb-prog"><i id="sbFill"></i></div>
+  </div>
 </div>
 
+<!-- ══ v6.0 操作面板：4 装备槽升级 + 档位 + 转生 ══════════════════════
+     独立于 .battle-ui 的固定底部面板。
+     为什么不放进 .battle-ui 里：.battle-ui 是「视口顶部往下、到 44vh 处截止」
+     的一条固定带（bottom:calc(44vh + 84px)），在里面用 bottom:5x px 定位会
+     相对那条带算，结果按钮浮在屏幕中部、压住灵石与修为数字（实测截图复现）。
+     这里改用 .battle-ui 之外的独立 fixed 面板，锚在视口底部，
+     并把背景做成不透明渐隐，保证压过下方的立绘区。 -->
+<div class="v6-panel" id="v6Panel">
+  <div class="v6-grid" id="upGrid">
+    <button class="up-btn" id="upAtk"  onclick="upEquip('atk')"><span class="uico">⚔</span><span class="ulbl">攻击</span><span class="ulv" id="lvAtk">Lv 0</span><span class="ucost" id="costAtk">10</span></button>
+    <button class="up-btn" id="upHp"   onclick="upEquip('hp')"><span class="uico">❤</span><span class="ulbl">血量</span><span class="ulv" id="lvHp">Lv 0</span><span class="ucost" id="costHp">10</span></button>
+    <button class="up-btn" id="upDef"  onclick="upEquip('def')"><span class="uico">🛡</span><span class="ulbl">防御</span><span class="ulv" id="lvDef">Lv 0</span><span class="ucost" id="costDef">10</span></button>
+    <button class="up-btn" id="upAspd" onclick="upEquip('aspd')"><span class="uico">⚡</span><span class="ulbl">攻速</span><span class="ulv" id="lvAspd">Lv 0</span><span class="ucost" id="costAspd">10</span></button>
+  </div>
+  <div class="v6-row">
+    <span class="step-lbl">档位</span>
+    <div class="step-row" id="stepRow">
+      <button class="step-btn" data-step="1" onclick="setStep(1)">×1</button>
+      <button class="step-btn" data-step="10" onclick="setStep(10)">×10</button>
+      <button class="step-btn" data-step="100" onclick="setStep(100)">×100</button>
+      <button class="step-btn" data-step="1000" onclick="setStep(1000)">×1000</button>
+      <button class="step-btn" data-step="10000" onclick="setStep(10000)">×1万</button>
+    </div>
+  </div>
+  <button class="rb-btn" id="btnRebirth" onclick="doRebirthUI()">
+    <span class="rbl">转 世 重 开</span><span class="rbs" id="rbGain">+0 修为点</span>
+  </button>
+</div>
+
+<!-- v6.0 修行者立绘(纯装饰, 交互已全部移入战斗页 4 按钮) -->
 <div class="stage">
   <div class="cult" id="cult">
     <div class="cult-pname" id="cultPname" onclick="event.stopPropagation();openRename()" title="点此改道号"></div>
@@ -697,7 +868,6 @@
     <img class="hair-low" src="assets/cultivator_hair.webp" alt="">
     <img class="hair-top" src="assets/cultivator_hair.webp" alt="">
   </div>
-  <!-- v5.0 阿青(青丘灵狐)占位: 打坐角色左下方蒲团边, 模型做好后替换img src -->
   <div class="pet-ahqing" id="petAhqing">
     <img src="assets/pet_ahqing.webp" alt="阿青" onerror="this.style.display='none'">
   </div>
@@ -706,17 +876,30 @@
 <!-- 左:分身经历(渐隐低存在感)  右:主角主线游历 -->
 <div class="feed feed-avatar" id="avatarFeed"></div>
 <div class="feed feed-main" id="mainFeed"></div>
-<div class="actions">
-  <button class="btn" id="btnArray" onclick="tapArray()"><img class="skin" src="assets/ui_icons/btn_array.webp" alt=""><i class="prog" aria-hidden="true"><i id="arrFill"></i></i><span class="label">聚灵阵 <span id="arrayLv">1</span></span><i class="pnum" id="arrNum"></i></button>
-  <button class="btn primary" id="btnBreak" onclick="manualBreak()"><img class="skin" src="assets/ui_icons/btn_break.webp" alt=""><i class="prog" aria-hidden="true"><i id="brkFill"></i></i><span class="label">突 破</span><i class="pnum" id="brkNum"></i></button>
-  <button class="btn" id="btnTravel" onclick="openTravel()"><img class="skin" src="assets/ui_icons/btn_travel.webp" alt=""><span class="label">云游</span></button>
-</div>
 
 <div class="ver-float"><span class="ver-tag" id="verTag"></span></div>
 
 <!-- v3.2: 爆发粒子层已并入 #stage -->
 <div class="flash" id="flash"></div>
 <div class="trib" id="trib"></div>
+
+<!-- v6.0 转世重开结算面板 -->
+<div id="rbPanel">
+  <div class="rb-card">
+    <div class="rb-t">转 世 重 开</div>
+    <div class="rb-line"><span>本轮最高关</span><span id="rbMax">0</span></div>
+    <div class="rb-line"><span>修为点</span><span id="rbPts">0</span></div>
+    <div class="rb-line gain"><span>可得修为点</span><span id="rbNew">+0</span></div>
+    <div class="rb-line"><span>境界</span><span id="rbRealm">1</span></div>
+    <div class="rb-line"><span>突破至</span><span id="rbRealmN">1</span></div>
+    <div class="rb-line"><span>4 装备槽</span><span id="rbReset">清零</span></div>
+    <div class="rb-line"><span>灵石</span><span id="rbSpirit">清零</span></div>
+    <div class="rb-btns">
+      <button id="rbCancel" onclick="closeRebirth()">再 想 想</button>
+      <button id="rbOk" onclick="confirmRebirth()">转 世</button>
+    </div>
+  </div>
+</div>
 
 <div id="cloudPanel">
   <div class="cp-title"><img src="assets/ui_icons/icon_cloud.webp" style="width:14px;height:14px;vertical-align:-2px" alt=""> 云存档</div>

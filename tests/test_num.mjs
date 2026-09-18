@@ -48,8 +48,18 @@ t('fmt(0)', N.fmt(N.ZERO) === '0');
 var small = N.add(N.from(3), N.from(4));
 t('3+4=7', Math.abs(N.toNumber(small)-7)<1e-9);
 
-var bonus = N.add(N.ONE, N.mulNum(N.from(0.0003), 33000));
-t('装备满级加成 10.9', Math.abs(N.toNumber(bonus)-10.9)<1e-6, 'got '+N.toNumber(bonus));
+/* ⚠️ 装备加成是【指数】(1+0.0003)^33000 ≈ 1.99e4，不是线性 1+0.0003×33000 = 10.9。
+ * 这里验证大数层能正确承载指数运算，具体数值由 test_equip.mjs 断言。 */
+var lin = N.add(N.ONE, N.mulNum(N.from(0.0003), 33000));
+t('线性公式算得 10.9（已被淘汰，仅作对照）', Math.abs(N.toNumber(lin) - 10.9) < 1e-6, 'got ' + N.toNumber(lin));
+
+var bonus = N.pow(N.from(1.0003), 33000);
+console.log('  装备满级加成（指数）= ' + N.sci(bonus) + '；旧线性版 = 10.9');
+t('指数加成 ≈ 1.99e4', Math.abs(N.log10(bonus) - Math.log10(Math.pow(1.0003, 33000))) < 1e-9,
+  'got ' + N.sci(bonus));
+t('指数加成 > 1000（远大于线性上限）', N.gt(bonus, N.from(1000)), 'got ' + N.sci(bonus));
+t('大数 pow 不溢出（有限且量级正确）', isFinite(N.log10(bonus)) && Math.abs(N.log10(bonus) - 4.299) < 0.01,
+  'log10=' + N.log10(bonus).toFixed(3));
 
 console.log('');
 console.log('通过 ' + pass + ' / ' + (pass+fail));
