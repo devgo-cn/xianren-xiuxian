@@ -249,17 +249,27 @@ function adopt(s) {
 }
 
 function renderPName() {
-  const el = $("pName"); if (!el) return;
-  const nm = (state.name || "").trim();
-  el.textContent = nm || "定道号";
-  el.classList.toggle("named", !!nm);
-  el.title = nm ? "道号 · " + nm + "（点此改）" : "尚未定道号 · 点此起名（全服唯一；换设备寻档仍用玩家码）";
-  /* v5.14: 道号同步悬到打坐角色头顶 —— 未定名隐藏, 定名后金光大字 */
+  /* v5.14b: 顶栏按钮(#pName)已删, 道号入口唯一在打坐角色头顶(#cultPname)。
+   * 未定名 → 头顶显示淡色"✎ 定道号"虚线引导(仍可点击改名), 定名 → 金光大字。 */
   const cp = document.getElementById("cultPname");
   if (cp) {
-    if (nm) { cp.textContent = nm; cp.classList.add("show"); }
-    else { cp.textContent = ""; cp.classList.remove("show"); }
+    const nm = (state.name || "").trim();
+    if (nm) {
+      cp.textContent = nm;
+      cp.classList.remove("unnamed");
+      cp.title = "道号 · " + nm + "（点此改）";
+    } else {
+      cp.textContent = "✎ 定道号";
+      cp.classList.add("unnamed");
+      cp.title = "点此起道号（全服唯一；换设备寻档仍用玩家码）";
+    }
   }
+  const el = $("pName");
+  if (!el) return;                          /* 顶栏按钮已移除, 兼容旧布局残留 */
+  const nm2 = (state.name || "").trim();
+  el.textContent = nm2 || "定道号";
+  el.classList.toggle("named", !!nm2);
+  el.title = nm2 ? "道号 · " + nm2 + "（点此改）" : "尚未定道号 · 点此起名（全服唯一；换设备寻档仍用玩家码）";
 }
 
 function apiRoot() { try { return CLD_API.replace(/\/api\/save$/, ""); } catch (e) { return "https://save.devgo.cn"; } }

@@ -234,13 +234,16 @@
   /* 主角（略微缩小以腾出战斗区空间） */
   .stage{position:fixed;inset:0;z-index:5;display:flex;align-items:flex-end;justify-content:center;pointer-events:none}
   .cult{position:relative;height:min(44vh,350px);aspect-ratio:825/835}
-  /* v5.14: 道号悬于打坐角色头顶 —— 书法大字+金描边+柔光呼吸; 未定名不显示 */
-  .cult-pname{position:absolute;left:50%;top:-2%;transform:translateX(-50%);z-index:3;
-    font-family:var(--font-brush);font-size:19px;letter-spacing:.16em;color:#f0d898;
+  /* v5.14: 道号悬于打坐角色头顶 —— 书法字+金描边+柔光呼吸。
+   * v5.14b: 上移离头皮 38px, 字号 19→16; 未定名时显示淡色"✎ 定道号"引导(顶栏按钮已删, 此处是唯一入口) */
+  .cult-pname{position:absolute;left:50%;top:-38px;transform:translateX(-50%);z-index:3;
+    font-family:var(--font-brush);font-size:16px;letter-spacing:.14em;color:#f0d898;
     text-shadow:0 0 12px rgba(232,197,107,.5),0 1px 2px rgba(0,0,0,.85);
-    pointer-events:auto;cursor:pointer;white-space:nowrap;display:none;
+    pointer-events:auto;cursor:pointer;white-space:nowrap;
     animation:pnameGlow 3.6s ease-in-out infinite}
-  .cult-pname.show{display:block}
+  .cult-pname.unnamed{color:#8d96a8;font-size:13px;letter-spacing:.1em;animation:none;
+    border:1.5px dashed rgba(150,165,200,.4);border-radius:999px;padding:3px 12px;
+    background:rgba(12,18,34,.55);text-shadow:none}
   @keyframes pnameGlow{0%,100%{text-shadow:0 0 9px rgba(232,197,107,.35),0 1px 2px rgba(0,0,0,.85)}
     50%{text-shadow:0 0 20px rgba(244,214,140,.85),0 0 3px rgba(120,80,20,.9),0 1px 2px rgba(0,0,0,.85)}}
   .cult img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;transform-origin:50% 88%}
@@ -631,8 +634,8 @@
           <!-- v7.6: 补 realmSubB 元素 —— 此前该 id 在 HTML 中缺失, 导致 setRealmSub 第二行(大境界法门说明)
                一直被静默丢弃(console 无报错, 只是看不到)。小境界段位在 rb-c1 的 #realmSubA。 -->
           <tr><td class="rb-c4" colspan="2"><span class="sub-b" id="realmSubB"></span></td></tr>
-          <tr><td class="rb-c2"><span class="rb-power" id="realmPower"></span><span class="rb-rank">榜</span></td></tr>
-          <tr><td class="rb-c3" colspan="2"><button class="pname-btn" id="pName" onclick="event.stopPropagation();openRename()" title="点此定道号"></button></td></tr>
+        <tr><td class="rb-c2"><span class="rb-power" id="realmPower"></span><span class="rb-rank">榜</span></td></tr>
+        <!-- v5.14: 道号入口迁至打坐角色头顶(#cultPname), 顶栏按钮删除 -->
         </table>
       </div>
     </div>
