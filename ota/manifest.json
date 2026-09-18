@@ -468,10 +468,10 @@
     "src/20-core.js": "6fb5c1f4a3753215233b71ac35ae8a57f3876ffea1bee6fd3bee9df4178dc120",
     "src/30-systems.js": "9123df30778cf52bfacf9892217e80a495eba6fe62605c5b3fd868b9cda3b4f6",
     "src/40-app.js": "d47bf6db5bda7c3efe114e51c1d9835e51f5971be3cc415985bedb7a33acb83a",
-    "src/50-battle.js": "59343eddcee409482751ac60aa8bc0df88af04f7ed170008b572368ed6be4df6",
+    "src/50-battle.js": "c7ddbbb374927bbb078b6b3f35a8dcb5057505b9807f8273d17624cce70ffbfe",
     "src/60-stage.js": "a098e6f38e898ff3fee4c6a1f79e652373f15cf791e344813fa3d76ddd521c5b",
     "src/main.js": "161f10c02a3aa4095b257cd77f5bf1834e85d1359e85555deb8e48dfd2bd9fba"
   },
-  "rev": "5c9710d4ff213680",
+  "rev": "e517ba4b005fc4a1",
   "version": "5.37"
 }
