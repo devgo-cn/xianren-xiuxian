@@ -145,7 +145,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     player:null, pets:[], enemies:[], fx:[], dmg:[], drops:[], spawnT: 0,
     sprite:null, bgImg:null, spriteReady:false, bgReady:false, extraStrike:false,
     speedDodge:0, nextStrikeCrit:0,
-    petFoxSprite:null, petFoxReady:false, petEagleSprite:null, petEagleReady:false, petEagleBoltSprite:null, petEagleBoltReady:false,
+    petFoxSprite:null, petFoxReady:false, petEagleSprite:null, petEagleReady:false, petEagleBoltSprite:null, petEagleBoltReady:false, petEagleAtkSprite:null, petEagleAtkReady:false,
     eagleBolts: [],  /* 灵鹰弹幕 */
     skillSprite:null, skillReady:false,
     bossActive:false,   /* v3.8.2 打满100只小怪才刷BOSS(原10) */
@@ -197,6 +197,10 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   const petEagleBolt = new Image();
   petEagleBolt.onload = function() { G.petEagleBoltSprite = solidify(petEagleBolt); G.petEagleBoltReady = true; };
   petEagleBolt.src = 'assets/pet_eagle_bolt.png';
+  /* 灵鹰攻击帧 */
+  const petEagleAtk = new Image();
+  petEagleAtk.onload = function() { G.petEagleAtkSprite = solidify(petEagleAtk); G.petEagleAtkReady = true; };
+  petEagleAtk.src = 'assets/pet_eagle_atk.png';
   /* 技能素材: 剑气月牙 */
   const skillImg = new Image();
   skillImg.onload = function() { G.skillSprite = skillImg; G.skillReady = true; };
@@ -2291,6 +2295,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     const baseY = floorY() - CH * EAGLE.hoverH - eagleH * 0.5;
     pet.y += (baseY - pet.y) * Math.min(1, dt * 3.5);
     pet.face = 1;                             /* 素材默认朝右, 不摆头 */
+    pet.boltAnim = Math.max(0, (pet.boltAnim || 0) - dt);
 
     /* ── 攻击: 定时朝最近的怪发射追踪弹幕 ── */
     pet.boltTimer = (pet.boltTimer == null ? EAGLE.atkInterval : pet.boltTimer) - dt;
@@ -2317,6 +2322,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       tx: worldToScreen(target.x), ty: floorY() + target.y,
       speed: EAGLE.boltSpeed, t: 0, target,
     });
+    pet.boltAnim = 1.2;  /* 播攻击动画 */
   }
 
   /* 灵鹰弹幕更新(不在宠物循环里, 只执行一次) */
@@ -2926,13 +2932,21 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       /* 灵鹰 sprite 渲染 */
       else if (G.petEagleReady && G.petEagleSprite && pet.type === 'eagle') {
         const EAGLE_SPRITE = { cols: 10, fw: 704, fh: 580 };
-        const frameIdx = pet.flyFrame % 30;
-        /* v8.5: 灵鹰是独立的攻击宠, 画得比灵狐略大(战场上的"单位"而非挂件) */
+        const EAGLE_ATK = { cols: 8, fw: 719, fh: 505 };
+        /* 发射弹幕时播攻击帧, 否则飞行动画 */
+        const isAttacking = pet.boltAnim > 0;
+        const frameIdx = isAttacking
+          ? (16 - Math.ceil(pet.boltAnim / 0.075))  /* 攻击16帧, 0.075秒/帧 */
+          : pet.flyFrame % 30;
         const drawH = Math.min(CH * 0.40, 64);
-        const drawW = drawH * (EAGLE_SPRITE.fw / EAGLE_SPRITE.fh);
+        const drawW = isAttacking
+          ? drawH * (EAGLE_ATK.fw / EAGLE_ATK.fh)
+          : drawH * (EAGLE_SPRITE.fw / EAGLE_SPRITE.fh);
         S.main.visible = true;
-        S.main.texture = frameTex(G.petEagleSprite, EAGLE_SPRITE.cols, EAGLE_SPRITE.fw, EAGLE_SPRITE.fh, frameIdx);
-        S.main.scale.set((drawW / EAGLE_SPRITE.fw) * (pet.face === -1 ? -1 : 1), drawH / EAGLE_SPRITE.fh);
+        S.main.texture = isAttacking
+          ? frameTex(G.petEagleAtkSprite, EAGLE_ATK.cols, EAGLE_ATK.fw, EAGLE_ATK.fh, frameIdx)
+          : frameTex(G.petEagleSprite, EAGLE_SPRITE.cols, EAGLE_SPRITE.fw, EAGLE_SPRITE.fh, frameIdx);
+        S.main.scale.set((drawW / (isAttacking ? EAGLE_ATK.fw : EAGLE_SPRITE.fw)) * (pet.face === -1 ? -1 : 1), drawH / (isAttacking ? EAGLE_ATK.fh : EAGLE_SPRITE.fh));
         S.main.position.set(sx, sy);
         /* ⚠️ v8.5 移除(勿加回): 这里原本是"施法特效光环"(pet.casting → heal/atk 柔光)。
          * 那是灵狐的施法系统, 灵鹰继承了它才冒出一圈光环。灵鹰只攻击, 不施法。 */
