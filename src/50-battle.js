@@ -2319,7 +2319,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
      * 这里要补 floorY() 才是屏幕 y; x 也要转屏幕。 */
     G.eagleBolts.push({
       x: worldToScreen(pet.x), y: pet.y + 10,
-      tx: worldToScreen(target.x) - 20, ty: floorY() + target.y - 35,
+      tx: worldToScreen(target.x) + 20, ty: floorY() + target.y - 35,
       speed: EAGLE.boltSpeed, t: 0, target,
     });
     pet.boltAnim = 1.2;  /* 播攻击动画 */
