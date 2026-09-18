@@ -438,7 +438,20 @@ import('./50-battle.js');
  */
 setTimeout(function () {
   try {
+    /* ── 先接存档钩子，再初始化 ────────────────────────────────────────
+     * 顺序很重要：load() 在 boot() 里就跑了（早于这里的 setTimeout），
+     * 那时钩子还没注上，读档时 v6 状态尚未恢复 —— 所以下面 initV6 之后
+     * 必须再手动 loadV6() 一次，把存档里的 v6 状态补回来。
+     * 详见 20-core.js 的 bindV6Save 注释（为什么用回调而不是直接 import）。 */
+    NS_src_20_core_js.bindV6Save(
+      NS_src_06_v6ui_js.saveV6,
+      NS_src_06_v6ui_js.loadV6
+    );
+    /* initV6 内部：S6 = fromLegacy(window.state) —— 若存档里有 v6 数据，
+     * fromLegacy 会直接读出来，所以这里无需再调 loadV6。 */
     NS_src_06_v6ui_js.initV6(typeof window !== 'undefined' ? window.state : null);
+    /* 立刻落一次盘，把 v6 状态写进 state.v6，保证首帧之后存档就是完整的 */
+    NS_src_20_core_js.save();
   } catch (e) {
     console.warn('[v6] 初始化失败:', e);
   }

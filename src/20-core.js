@@ -58,6 +58,27 @@ async function loadRank(force) {
   } catch (e) { body.innerHTML = '<div class="al-empty">云端未连接，榜单待命……</div>'; }
 }
 
+/* ══════════════════════════════════════════════════════════════════
+ *  v6 存档钩子
+ * ──────────────────────────────────────────────────────────────────
+ *  为什么用"注册回调"而不是直接 import 06-v6ui：
+ *    06-v6ui 位于依赖图最下游（它 import 05-v6），20-core 在它上游。
+ *    上游 import 下游 = 循环依赖，模块会炸。
+ *  所以这里只留两个可注入的槽位，由 main.js（唯一能看到全图的入口）
+ *  在启动时把 06-v6ui 的 saveV6/loadV6 注进来 —— 依赖方向始终单向。
+ *
+ *  v6 存档只存 4 样：离线 / 境界 / 灵石 / 装备（见 05-v6.js packV6）。
+ *  技能不在其中（恒定数值，无等级，没有存的必要）。
+ */
+let _v6Save = null;   // () => void        把 v6 状态写进 state
+let _v6Load = null;   // () => void        从 state 读回 v6 状态
+
+/** 由 main.js 注入 v6 的存取实现 */
+export function bindV6Save(saveV6, loadV6) {
+  _v6Save = typeof saveV6 === 'function' ? saveV6 : null;
+  _v6Load = typeof loadV6 === 'function' ? loadV6 : null;
+}
+
 function save() {
   /* ⚠️ v8.4: "新建存档"正在 reload 时必须跳过落盘。
    * cloudNew() 先删本地档再 location.reload(), 而 reload 会触发 pagehide →
@@ -66,6 +87,8 @@ function save() {
   if (typeof window !== "undefined" && window.__reloading) return;
   state.lastTs = Date.now();
   trimJournal();
+  /* v6: 落盘前先把 v6 状态同步进 state.v6（离线/境界/灵石/装备四项） */
+  if (_v6Save) { try { _v6Save(); } catch (e) { console.warn('[save] v6 同步失败:', e); } }
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { console.warn('[save] 存档写入失败:', e); }   // 明文同步写: pagehide 可靠
 }
 
@@ -82,6 +105,9 @@ function load() {
       /* 载入时先把存档里的原始 lastTs 存进 _lastTs0, 离线结算以它为基准 */
       state._lastTs0 = (s && s.lastTs) || c.lastTs || 0;
       ensureScrollFx();         // v2.5: 旧档功法补攻速词条
+      /* v6: 读档后恢复 v6 状态（loadV6 内部会把 lastTick 重置为此刻，
+       *     否则会把"关掉页面的这段时间"误当成在线 tick） */
+      if (_v6Load) { try { _v6Load(); } catch (e) { console.warn('[load] v6 恢复失败:', e); } }
     }
   } catch (e) {
     console.warn('[load] 存档读取/解析失败:', e);
