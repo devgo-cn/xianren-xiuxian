@@ -2704,16 +2704,18 @@ const SKILL_DEFS = [
     from: { threshold: 5 },                to: { threshold: 25 },
     fmt: v => `目标残血 <b>${v.threshold.toFixed(0)}%</b> 以下 · 该击伤害翻倍` },
   { id: "jifeng",  name: "疾风步", ico: "≫",
-    from: { chance: 12, dur: 8, mult: 2.5, dodge: 4 },   to: { chance: 60, dur: 8, mult: 2.5, dodge: 25 },
+    from: { chance: 6, dur: 8, mult: 2.5, dodge: 4 },   to: { chance: 30, dur: 8, mult: 2.5, dodge: 25 },
     /* v8.1 基础倍速 2→1.5, 技能 mult 同步 -1(疾风步 3→2.5), HUD 显示公式 (mult-1) 不变, 仍是"×2 倍速"
      * v5.1 触发方式从击杀后改为攻击时(playerStrike), 文案"击杀"→"命中"; 时长固定8秒只成长概率
-     * v8.1 概率下调: 15~85 → 12~60 (满级触发率砍掉约 1/3, 缓解"全程不停"的观感) */
+     * v8.1 概率下调: 15~85 → 12~60 (满级触发率砍掉约 1/3, 缓解"全程不停"的观感)
+     * v5.9 概率再砍半: 12~60 → 6~30 (用户要求"再调低一倍") */
     fmt: v => `命中 ${v.chance.toFixed(0)}% 入 2 倍速 8 秒 · <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
   { id: "suodi",   name: "缩地成寸", ico: "⋙",
-    from: { chance: 3, dur: 8, mult: 3.5, dodge: 8 },    to: { chance: 22, dur: 8, mult: 3.5, dodge: 40 },
+    from: { chance: 1.5, dur: 8, mult: 3.5, dodge: 8 },    to: { chance: 11, dur: 8, mult: 3.5, dodge: 40 },
     /* v8.1 基础倍速 2→1.5, 技能 mult 同步 -1(缩地 4→3.5), HUD 显示公式 (mult-1) 不变, 仍是"×3 倍速"
      * v5.1 触发方式从击杀后改为攻击时(playerStrike), 文案"击杀"→"命中"; 时长固定8秒只成长概率
-     * v8.1 概率下调: 3~35 → 3~22 (满级触发率 35%→22%, 三连斩一轮至少出一次的概率 72.5%→51.2%) */
+     * v8.1 概率下调: 3~35 → 3~22 (满级触发率 35%→22%, 三连斩一轮至少出一次的概率 72.5%→51.2%)
+     * v5.9 概率再砍半: 3~22 → 1.5~11 (用户要求"再调低一倍") */
     fmt: v => `命中 ${v.chance.toFixed(1)}% 入 3 倍速 8 秒 · <b>闪避 +${v.dodge.toFixed(0)}%</b>` },
   { id: "pojia",   name: "破甲击", ico: "◆",
     from: { chance: 5, pen: 30 },          to: { chance: 25, pen: 70 },
