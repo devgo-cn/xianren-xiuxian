@@ -1105,18 +1105,10 @@ const JRN_TAIL = 30;
 
 /* v5.7: 版本号启用 —— 本次无字段转换(叙事本地化/新读取均向后兼容), 但把迁移链跑通,
  * 之后任何破坏性存档改动都从这里加 MIGRATIONS[n], 老档永远可升。 */
-const CUR_VER = 3;
+const CUR_VER = 2;
 
 const MIGRATIONS = {
   2: s => s,   // v5.7 叙事本地化: 老档 journal 里已有的叙事条目保留可读, 下次上传自然瘦身
-  3: s => {    // v5.17 装备三围定值化: 旧(随机×品质乘子)统一重算为境界固定值; 品级/词条保留
-    if (Array.isArray(s.arts)) for (const a of s.arts) {
-      if (!a) continue;
-      const pow = EQ_POW[Math.min(EQ_POW.length - 1, Math.max(0, (a.lv || 1) - 1))] || 1;
-      eqStatsAssign(a, a.tp || "w", pow);
-    }
-    return s;
-  },
 };
 
 function cldApiBase() {
@@ -2618,7 +2610,7 @@ const LIC_QCOL = { 0: "#aab2c0", 1: "#6b9df5", 2: "#3fc9a2", 3: "#e0b45a", 4: "#
 
 let _eqSel = -1;
 
-/* v5.17: eqMult(品质三围乘子)随三围定值化退役 —— 品质价值全部走词条 */
+function eqMult(q) { return [1.15, 1.35, 1.6, 1.9, 2.25, 3.4][q] || 1.15; }   /* v7.2b 玄天 2.7→3.4: 红装价值提升, 全红毕业≈达标×1.25 */
 
 /* v7.2b 大境界序号: 由静态 BIGS 段数推算 —— 零运行时依赖(SEG_META 由 30-systems
  * 运行时填充, pushBattleStats 启动早期调用时会踩空导致卡导入, 禁止再走 seg().bigIdx) */
@@ -2656,28 +2648,18 @@ const FX_POOL = {
 
 const MON_FX_POOL = ["atk", "hp", "dfn", "crit", "critB", "critD", "pen", "dodge", "life"];
 
-/* v5.17 装备三围定值: 同境界同部位三围恒定(基准×EQ_POW), 品质不放大三围 ——
- * 品质价值全部走词条(fxCount 条数 / fxValue 数值 / 极品概率)。基准≈旧公式中高品质掉落水平。 */
-function eqStatsAssign(art, kind, pow) {
-  if (kind === "w") { art.a = Math.round(46 * pow); art.d = 0; art.h = 0; }
-  else if (kind === "a") { art.h = Math.round(230 * pow); art.d = Math.round(22 * pow); art.a = 0; }
-  else if (kind === "p") { art.h = Math.round(92 * pow); art.d = Math.round(13 * pow); art.a = Math.round(10 * pow); }
-  else { art.a = Math.round(15 * pow); art.d = Math.round(11 * pow); art.h = 0; }
-}
+function fxCount(q) { let n = ([1, 1, 2, 2, 3, 3][q] || 1); if (q >= 2 && Math.random() < 0.35) n++; return Math.min(4, n); }
 
-function fxCount(q) { return [1, 2, 2, 3, 3, 4][q] || 1; }   /* v5.17 品质定死词条数: 符器1 → 玄天4 */
-
-/* v5.17 词条数值随品质线性抬升(低品略降/高品显著增强), 品质差距由词条承载 */
 function fxValue(key, q) {
-  const r = Math.random, h = Math.ceil(q / 2);
-  if (key === "atk" || key === "hp" || key === "dfn") return 2 + q + ((r() * 3) | 0);          // 2~4% → 7~9%
-  if (key === "crit") return 1 + h + ((r() * 2) | 0);                                          // 1~2 → 4~5
-  if (key === "critB") return 2 + q + ((r() * 3) | 0);                                         // 2~4 → 7~9
-  if (key === "critD") return 4 + q * 2 + ((r() * 5) | 0);                                     // 4~8% → 14~18%
-  if (key === "pen") return 1 + q + ((r() * 3) | 0);                                           // 1~3% → 6~8%
-  if (key === "dodge") return 1 + h + ((r() * 2) | 0);                                         // 1~2 → 4~5
-  if (key === "aspd") return 2 + h + ((r() * 2) | 0);                                          // 功法攻速: 2~3% → 5~6%
-  return 1 + h + (r() < 0.5 ? 1 : 0);                                                          // life: 1~2 → 4~5
+  const t = q >= 3, r = Math.random;
+  if (key === "atk" || key === "hp" || key === "dfn") return 3 + ((r() * 3) | 0) + (t ? 2 : 0);  // 3~7%
+  if (key === "crit") return (t ? 2 : 1) + ((r() * 2) | 0);                                    // 1~3
+  if (key === "critB") return (t ? 5 : 3) + ((r() * 3) | 0);                                   // 3~7
+  if (key === "critD") return (t ? 10 : 6) + ((r() * 5) | 0);                                  // 6~14%
+  if (key === "pen") return (t ? 4 : 2) + ((r() * 3) | 0);                                     // 2~6%
+  if (key === "dodge") return (t ? 2 : 1) + ((r() * 2) | 0);                                   // 1~3
+  if (key === "aspd") return (t ? 5 : 3) + ((r() * 3) | 0);                                    // 功法攻速: 低品 3~5% · 高品 5~7%
+  return (t ? 2 : 1) + (r() < 0.5 ? 1 : 0);                                                    // 1~2
 }
 
 function fxAgg(fxs) {                               // 汇总多条装备(或怪物)词条为总属性增量
@@ -2793,207 +2775,207 @@ let _equipId = 0;
 const MOB_POOLS = {
   1: { /* 凡人 */
     waves: [
-      { slug:'bee', hp:200, atk:80, def:4, crit:1, dodge:0, pen:0, critRes:5 },
-      { slug:'slime_flynn', hp:231, atk:104, def:5, crit:1, dodge:0.5, pen:3, critRes:9 },
-      { slug:'mimic', hp:262, atk:128, def:5, crit:1, dodge:1.1, pen:5, critRes:13 },
-      { slug:'scorpion', hp:293, atk:148, def:6, crit:2, dodge:1.6, pen:8, critRes:17 },
-      { slug:'ghost', hp:324, atk:172, def:6, crit:2, dodge:2.2, pen:11, critRes:21 },
-      { slug:'jiangshi', hp:355, atk:196, def:7, crit:2, dodge:2.7, pen:14, critRes:25 },
-      { slug:'dagger_goblin', hp:385, atk:220, def:7, crit:2, dodge:3.3, pen:16, critRes:30 },
-      { slug:'fox', hp:416, atk:240, def:8, crit:2, dodge:3.8, pen:19, critRes:34 },
-      { slug:'forest_turtle', hp:447, atk:264, def:8, crit:2, dodge:4.4, pen:22, critRes:38 },
-      { slug:'mageshroom', hp:478, atk:288, def:9, crit:3, dodge:4.9, pen:25, critRes:42 },
-      { slug:'axe_goblin', hp:509, atk:312, def:9, crit:3, dodge:5.5, pen:27, critRes:46 },
-      { slug:'spirit_fighter', hp:540, atk:332, def:10, crit:3, dodge:6, pen:30, critRes:50 },
+      { slug:'bee', hp:200, atk:20, def:4, crit:1, dodge:0, pen:0, critRes:5 },
+      { slug:'slime_flynn', hp:231, atk:26, def:5, crit:1, dodge:0.5, pen:3, critRes:9 },
+      { slug:'mimic', hp:262, atk:32, def:5, crit:1, dodge:1.1, pen:5, critRes:13 },
+      { slug:'scorpion', hp:293, atk:37, def:6, crit:2, dodge:1.6, pen:8, critRes:17 },
+      { slug:'ghost', hp:324, atk:43, def:6, crit:2, dodge:2.2, pen:11, critRes:21 },
+      { slug:'jiangshi', hp:355, atk:49, def:7, crit:2, dodge:2.7, pen:14, critRes:25 },
+      { slug:'dagger_goblin', hp:385, atk:55, def:7, crit:2, dodge:3.3, pen:16, critRes:30 },
+      { slug:'fox', hp:416, atk:60, def:8, crit:2, dodge:3.8, pen:19, critRes:34 },
+      { slug:'forest_turtle', hp:447, atk:66, def:8, crit:2, dodge:4.4, pen:22, critRes:38 },
+      { slug:'mageshroom', hp:478, atk:72, def:9, crit:3, dodge:4.9, pen:25, critRes:42 },
+      { slug:'axe_goblin', hp:509, atk:78, def:9, crit:3, dodge:5.5, pen:27, critRes:46 },
+      { slug:'spirit_fighter', hp:540, atk:83, def:10, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'giant_kitsune', hp:42480, atk:183, def:20, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'giant_kitsune', hp:70800, atk:183, def:20, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   2: { /* 炼气 */
     waves: [
-      { slug:'bee', hp:800, atk:320, def:16, crit:1, dodge:0, pen:0, critRes:5 },
-      { slug:'ghost', hp:924, atk:412, def:18, crit:1, dodge:0.5, pen:3, critRes:9 },
-      { slug:'mimic', hp:1050, atk:504, def:20, crit:1, dodge:1.1, pen:5, critRes:13 },
-      { slug:'fox', hp:1170, atk:596, def:23, crit:2, dodge:1.6, pen:8, critRes:17 },
-      { slug:'wolf', hp:1290, atk:688, def:25, crit:2, dodge:2.2, pen:11, critRes:21 },
-      { slug:'unicorn', hp:1420, atk:780, def:27, crit:2, dodge:2.7, pen:14, critRes:25 },
-      { slug:'zodiac_cancer', hp:1540, atk:872, def:29, crit:2, dodge:3.3, pen:16, critRes:30 },
-      { slug:'mermaid_warrior_undeen', hp:1670, atk:964, def:31, crit:2, dodge:3.8, pen:19, critRes:34 },
-      { slug:'sword_goblin', hp:1790, atk:1056, def:33, crit:2, dodge:4.4, pen:22, critRes:38 },
-      { slug:'magical_girl_goblin', hp:1910, atk:1148, def:36, crit:3, dodge:4.9, pen:25, critRes:42 },
-      { slug:'witch_baba', hp:2040, atk:1240, def:38, crit:3, dodge:5.5, pen:27, critRes:46 },
-      { slug:'cultist_mage', hp:2160, atk:1332, def:40, crit:3, dodge:6, pen:30, critRes:50 },
+      { slug:'bee', hp:800, atk:80, def:16, crit:1, dodge:0, pen:0, critRes:5 },
+      { slug:'ghost', hp:924, atk:103, def:18, crit:1, dodge:0.5, pen:3, critRes:9 },
+      { slug:'mimic', hp:1050, atk:126, def:20, crit:1, dodge:1.1, pen:5, critRes:13 },
+      { slug:'fox', hp:1170, atk:149, def:23, crit:2, dodge:1.6, pen:8, critRes:17 },
+      { slug:'wolf', hp:1290, atk:172, def:25, crit:2, dodge:2.2, pen:11, critRes:21 },
+      { slug:'unicorn', hp:1420, atk:195, def:27, crit:2, dodge:2.7, pen:14, critRes:25 },
+      { slug:'zodiac_cancer', hp:1540, atk:218, def:29, crit:2, dodge:3.3, pen:16, critRes:30 },
+      { slug:'mermaid_warrior_undeen', hp:1670, atk:241, def:31, crit:2, dodge:3.8, pen:19, critRes:34 },
+      { slug:'sword_goblin', hp:1790, atk:264, def:33, crit:2, dodge:4.4, pen:22, critRes:38 },
+      { slug:'magical_girl_goblin', hp:1910, atk:287, def:36, crit:3, dodge:4.9, pen:25, critRes:42 },
+      { slug:'witch_baba', hp:2040, atk:310, def:38, crit:3, dodge:5.5, pen:27, critRes:46 },
+      { slug:'cultist_mage', hp:2160, atk:333, def:40, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'jubokko', hp:219000, atk:733, def:80, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'jubokko', hp:365000, atk:733, def:80, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   15: { /* 筑基 */
     waves: [
-      { slug:'wolf', hp:3200, atk:1280, def:64, crit:1, dodge:0, pen:0, critRes:5 },
-      { slug:'spirit_fighter', hp:3690, atk:1648, def:73, crit:1, dodge:0.5, pen:3, critRes:9 },
-      { slug:'unicorn', hp:4190, atk:2016, def:81, crit:1, dodge:1.1, pen:5, critRes:13 },
-      { slug:'sword_goblin', hp:4680, atk:2384, def:90, crit:2, dodge:1.6, pen:8, critRes:17 },
-      { slug:'zodiac_cancer', hp:5180, atk:2752, def:99, crit:2, dodge:2.2, pen:11, critRes:21 },
-      { slug:'bonemask_shadow_creature', hp:5670, atk:3124, def:108, crit:2, dodge:2.7, pen:14, critRes:25 },
-      { slug:'mermaid_warrior_undeen', hp:6170, atk:3492, def:116, crit:2, dodge:3.3, pen:16, critRes:30 },
-      { slug:'cultist_mage', hp:6660, atk:3860, def:125, crit:2, dodge:3.8, pen:19, critRes:34 },
-      { slug:'witch_baba', hp:7160, atk:4240, def:134, crit:2, dodge:4.4, pen:22, critRes:38 },
-      { slug:'dryad_yggdrasil', hp:7650, atk:4600, def:143, crit:3, dodge:4.9, pen:25, critRes:42 },
-      { slug:'magical_girl_goblin', hp:8150, atk:4960, def:151, crit:3, dodge:5.5, pen:27, critRes:46 },
-      { slug:'mageshroom', hp:8640, atk:5320, def:160, crit:3, dodge:6, pen:30, critRes:50 },
+      { slug:'wolf', hp:3200, atk:320, def:64, crit:1, dodge:0, pen:0, critRes:5 },
+      { slug:'spirit_fighter', hp:3690, atk:412, def:73, crit:1, dodge:0.5, pen:3, critRes:9 },
+      { slug:'unicorn', hp:4190, atk:504, def:81, crit:1, dodge:1.1, pen:5, critRes:13 },
+      { slug:'sword_goblin', hp:4680, atk:596, def:90, crit:2, dodge:1.6, pen:8, critRes:17 },
+      { slug:'zodiac_cancer', hp:5180, atk:688, def:99, crit:2, dodge:2.2, pen:11, critRes:21 },
+      { slug:'bonemask_shadow_creature', hp:5670, atk:781, def:108, crit:2, dodge:2.7, pen:14, critRes:25 },
+      { slug:'mermaid_warrior_undeen', hp:6170, atk:873, def:116, crit:2, dodge:3.3, pen:16, critRes:30 },
+      { slug:'cultist_mage', hp:6660, atk:965, def:125, crit:2, dodge:3.8, pen:19, critRes:34 },
+      { slug:'witch_baba', hp:7160, atk:1060, def:134, crit:2, dodge:4.4, pen:22, critRes:38 },
+      { slug:'dryad_yggdrasil', hp:7650, atk:1150, def:143, crit:3, dodge:4.9, pen:25, critRes:42 },
+      { slug:'magical_girl_goblin', hp:8150, atk:1240, def:151, crit:3, dodge:5.5, pen:27, critRes:46 },
+      { slug:'mageshroom', hp:8640, atk:1330, def:160, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'ancient_automaton', hp:906000, atk:2930, def:320, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'ancient_automaton', hp:1510000, atk:2930, def:320, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   19: { /* 结丹 */
     waves: [
-      { slug:'sword_goblin', hp:12800, atk:5120, def:256, crit:1, dodge:0, pen:0, critRes:5 },
-      { slug:'cultist_mage', hp:14800, atk:6600, def:291, crit:1, dodge:0.5, pen:3, critRes:9 },
-      { slug:'wolf', hp:16800, atk:8080, def:326, crit:1, dodge:1.1, pen:5, critRes:13 },
-      { slug:'bonemask_shadow_creature', hp:18700, atk:9560, def:361, crit:2, dodge:1.6, pen:8, critRes:17 },
-      { slug:'witch_baba', hp:20700, atk:11000, def:396, crit:2, dodge:2.2, pen:11, critRes:21 },
-      { slug:'dryad_yggdrasil', hp:22700, atk:12480, def:431, crit:2, dodge:2.7, pen:14, critRes:25 },
-      { slug:'clockwork_skull', hp:24700, atk:13960, def:465, crit:2, dodge:3.3, pen:16, critRes:30 },
-      { slug:'living_armor', hp:26600, atk:15440, def:500, crit:2, dodge:3.8, pen:19, critRes:34 },
-      { slug:'animated_drill_dwarf', hp:28600, atk:16920, def:535, crit:2, dodge:4.4, pen:22, critRes:38 },
-      { slug:'goblin_machine_gun', hp:30600, atk:18400, def:570, crit:3, dodge:4.9, pen:25, critRes:42 },
-      { slug:'living_hoard_midas', hp:32600, atk:19840, def:605, crit:3, dodge:5.5, pen:27, critRes:46 },
-      { slug:'gun_mimic', hp:34600, atk:21320, def:640, crit:3, dodge:6, pen:30, critRes:50 },
+      { slug:'sword_goblin', hp:12800, atk:1280, def:256, crit:1, dodge:0, pen:0, critRes:5 },
+      { slug:'cultist_mage', hp:14800, atk:1650, def:291, crit:1, dodge:0.5, pen:3, critRes:9 },
+      { slug:'wolf', hp:16800, atk:2020, def:326, crit:1, dodge:1.1, pen:5, critRes:13 },
+      { slug:'bonemask_shadow_creature', hp:18700, atk:2390, def:361, crit:2, dodge:1.6, pen:8, critRes:17 },
+      { slug:'witch_baba', hp:20700, atk:2750, def:396, crit:2, dodge:2.2, pen:11, critRes:21 },
+      { slug:'dryad_yggdrasil', hp:22700, atk:3120, def:431, crit:2, dodge:2.7, pen:14, critRes:25 },
+      { slug:'clockwork_skull', hp:24700, atk:3490, def:465, crit:2, dodge:3.3, pen:16, critRes:30 },
+      { slug:'living_armor', hp:26600, atk:3860, def:500, crit:2, dodge:3.8, pen:19, critRes:34 },
+      { slug:'animated_drill_dwarf', hp:28600, atk:4230, def:535, crit:2, dodge:4.4, pen:22, critRes:38 },
+      { slug:'goblin_machine_gun', hp:30600, atk:4600, def:570, crit:3, dodge:4.9, pen:25, critRes:42 },
+      { slug:'living_hoard_midas', hp:32600, atk:4960, def:605, crit:3, dodge:5.5, pen:27, critRes:46 },
+      { slug:'gun_mimic', hp:34600, atk:5330, def:640, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'king_archial', hp:5076000, atk:11700, def:1280, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'king_archial', hp:8460000, atk:11700, def:1280, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   23: { /* 元婴 */
     waves: [
-      { slug:'clockwork_skull', hp:51200, atk:20480, def:1020, crit:1, dodge:0, pen:0, critRes:5 },
-      { slug:'living_armor', hp:59100, atk:26360, def:1160, crit:1, dodge:0.5, pen:3, critRes:9 },
-      { slug:'animated_drill_dwarf', hp:67000, atk:32280, def:1300, crit:1, dodge:1.1, pen:5, critRes:13 },
-      { slug:'hellhound_garm', hp:74900, atk:38160, def:1440, crit:2, dodge:1.6, pen:8, critRes:17 },
-      { slug:'mecha_rattlesnake', hp:82900, atk:44000, def:1580, crit:2, dodge:2.2, pen:11, critRes:21 },
-      { slug:'goblin_machine_gun', hp:90800, atk:50000, def:1720, crit:2, dodge:2.7, pen:14, critRes:25 },
-      { slug:'living_hoard_midas', hp:98700, atk:56000, def:1860, crit:2, dodge:3.3, pen:16, critRes:30 },
-      { slug:'gun_mimic', hp:107000, atk:61600, def:2000, crit:2, dodge:3.8, pen:19, critRes:34 },
-      { slug:'daidarabotchi', hp:115000, atk:67600, def:2140, crit:2, dodge:4.4, pen:22, critRes:38 },
-      { slug:'mechascorpion', hp:122000, atk:73600, def:2280, crit:3, dodge:4.9, pen:25, critRes:42 },
-      { slug:'tantalus', hp:130000, atk:79600, def:2420, crit:3, dodge:5.5, pen:27, critRes:46 },
-      { slug:'runic_stone_golem_goliath', hp:138000, atk:85200, def:2560, crit:3, dodge:6, pen:30, critRes:50 },
+      { slug:'clockwork_skull', hp:51200, atk:5120, def:1020, crit:1, dodge:0, pen:0, critRes:5 },
+      { slug:'living_armor', hp:59100, atk:6590, def:1160, crit:1, dodge:0.5, pen:3, critRes:9 },
+      { slug:'animated_drill_dwarf', hp:67000, atk:8070, def:1300, crit:1, dodge:1.1, pen:5, critRes:13 },
+      { slug:'hellhound_garm', hp:74900, atk:9540, def:1440, crit:2, dodge:1.6, pen:8, critRes:17 },
+      { slug:'mecha_rattlesnake', hp:82900, atk:11000, def:1580, crit:2, dodge:2.2, pen:11, critRes:21 },
+      { slug:'goblin_machine_gun', hp:90800, atk:12500, def:1720, crit:2, dodge:2.7, pen:14, critRes:25 },
+      { slug:'living_hoard_midas', hp:98700, atk:14000, def:1860, crit:2, dodge:3.3, pen:16, critRes:30 },
+      { slug:'gun_mimic', hp:107000, atk:15400, def:2000, crit:2, dodge:3.8, pen:19, critRes:34 },
+      { slug:'daidarabotchi', hp:115000, atk:16900, def:2140, crit:2, dodge:4.4, pen:22, critRes:38 },
+      { slug:'mechascorpion', hp:122000, atk:18400, def:2280, crit:3, dodge:4.9, pen:25, critRes:42 },
+      { slug:'tantalus', hp:130000, atk:19900, def:2420, crit:3, dodge:5.5, pen:27, critRes:46 },
+      { slug:'runic_stone_golem_goliath', hp:138000, atk:21300, def:2560, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'radulac_the_voidvod', hp:14460000, atk:46900, def:5120, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'radulac_the_voidvod', hp:24100000, atk:46900, def:5120, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   27: { /* 化神 */
     waves: [
-      { slug:'living_armor', hp:205000, atk:82000, def:4100, crit:1, dodge:0, pen:0, critRes:5 },
-      { slug:'clockwork_skull', hp:236000, atk:105600, def:4650, crit:1, dodge:0.5, pen:3, critRes:9 },
-      { slug:'hellhound_garm', hp:268000, atk:129200, def:5210, crit:1, dodge:1.1, pen:5, critRes:13 },
-      { slug:'animated_drill_dwarf', hp:300000, atk:152800, def:5770, crit:2, dodge:1.6, pen:8, critRes:17 },
-      { slug:'mecha_rattlesnake', hp:331000, atk:176400, def:6330, crit:2, dodge:2.2, pen:11, critRes:21 },
-      { slug:'daidarabotchi', hp:363000, atk:200000, def:6890, crit:2, dodge:2.7, pen:14, critRes:25 },
-      { slug:'mechascorpion', hp:395000, atk:223600, def:7450, crit:2, dodge:3.3, pen:16, critRes:30 },
-      { slug:'arcane_golem', hp:426000, atk:247200, def:8010, crit:2, dodge:3.8, pen:19, critRes:34 },
-      { slug:'shaccadyoggoth', hp:458000, atk:270400, def:8560, crit:2, dodge:4.4, pen:22, critRes:38 },
-      { slug:'living_hoard_midas', hp:490000, atk:294000, def:9120, crit:3, dodge:4.9, pen:25, critRes:42 },
-      { slug:'tantalus', hp:521000, atk:317600, def:9680, crit:3, dodge:5.5, pen:27, critRes:46 },
-      { slug:'runic_stone_golem_goliath', hp:553000, atk:341200, def:10200, crit:3, dodge:6, pen:30, critRes:50 },
+      { slug:'living_armor', hp:205000, atk:20500, def:4100, crit:1, dodge:0, pen:0, critRes:5 },
+      { slug:'clockwork_skull', hp:236000, atk:26400, def:4650, crit:1, dodge:0.5, pen:3, critRes:9 },
+      { slug:'hellhound_garm', hp:268000, atk:32300, def:5210, crit:1, dodge:1.1, pen:5, critRes:13 },
+      { slug:'animated_drill_dwarf', hp:300000, atk:38200, def:5770, crit:2, dodge:1.6, pen:8, critRes:17 },
+      { slug:'mecha_rattlesnake', hp:331000, atk:44100, def:6330, crit:2, dodge:2.2, pen:11, critRes:21 },
+      { slug:'daidarabotchi', hp:363000, atk:50000, def:6890, crit:2, dodge:2.7, pen:14, critRes:25 },
+      { slug:'mechascorpion', hp:395000, atk:55900, def:7450, crit:2, dodge:3.3, pen:16, critRes:30 },
+      { slug:'arcane_golem', hp:426000, atk:61800, def:8010, crit:2, dodge:3.8, pen:19, critRes:34 },
+      { slug:'shaccadyoggoth', hp:458000, atk:67600, def:8560, crit:2, dodge:4.4, pen:22, critRes:38 },
+      { slug:'living_hoard_midas', hp:490000, atk:73500, def:9120, crit:3, dodge:4.9, pen:25, critRes:42 },
+      { slug:'tantalus', hp:521000, atk:79400, def:9680, crit:3, dodge:5.5, pen:27, critRes:46 },
+      { slug:'runic_stone_golem_goliath', hp:553000, atk:85300, def:10200, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'god_warrior_dagon', hp:52260000, atk:188000, def:20400, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'god_warrior_dagon', hp:87100000, atk:188000, def:20400, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   31: { /* 炼虚 */
     waves: [
-      { slug:'hellhound_garm', hp:819000, atk:327600, def:16400, crit:1, dodge:0, pen:0, critRes:5 },
-      { slug:'mecha_rattlesnake', hp:946000, atk:424000, def:18600, crit:1, dodge:0.5, pen:3, critRes:9 },
-      { slug:'daidarabotchi', hp:1070000, atk:516000, def:20900, crit:1, dodge:1.1, pen:5, critRes:13 },
-      { slug:'mechascorpion', hp:1200000, atk:612000, def:23100, crit:2, dodge:1.6, pen:8, critRes:17 },
-      { slug:'arcane_golem', hp:1330000, atk:704000, def:25300, crit:2, dodge:2.2, pen:11, critRes:21 },
-      { slug:'tantalus', hp:1450000, atk:800000, def:27600, crit:2, dodge:2.7, pen:14, critRes:25 },
-      { slug:'runic_stone_golem_goliath', hp:1580000, atk:892000, def:29800, crit:2, dodge:3.3, pen:16, critRes:30 },
-      { slug:'shaccadyoggoth', hp:1710000, atk:988000, def:32000, crit:2, dodge:3.8, pen:19, critRes:34 },
-      { slug:'clockwork_king', hp:1830000, atk:1084000, def:34300, crit:2, dodge:4.4, pen:22, critRes:38 },
-      { slug:'black_ant_queen', hp:1960000, atk:1176000, def:36500, crit:3, dodge:4.9, pen:25, critRes:42 },
-      { slug:'crab_king_karkinos', hp:2090000, atk:1272000, def:38700, crit:3, dodge:5.5, pen:27, critRes:46 },
-      { slug:'dryad_queen_rafflesia', hp:2210000, atk:1364000, def:41000, crit:3, dodge:6, pen:30, critRes:50 },
+      { slug:'hellhound_garm', hp:819000, atk:81900, def:16400, crit:1, dodge:0, pen:0, critRes:5 },
+      { slug:'mecha_rattlesnake', hp:946000, atk:106000, def:18600, crit:1, dodge:0.5, pen:3, critRes:9 },
+      { slug:'daidarabotchi', hp:1070000, atk:129000, def:20900, crit:1, dodge:1.1, pen:5, critRes:13 },
+      { slug:'mechascorpion', hp:1200000, atk:153000, def:23100, crit:2, dodge:1.6, pen:8, critRes:17 },
+      { slug:'arcane_golem', hp:1330000, atk:176000, def:25300, crit:2, dodge:2.2, pen:11, critRes:21 },
+      { slug:'tantalus', hp:1450000, atk:200000, def:27600, crit:2, dodge:2.7, pen:14, critRes:25 },
+      { slug:'runic_stone_golem_goliath', hp:1580000, atk:223000, def:29800, crit:2, dodge:3.3, pen:16, critRes:30 },
+      { slug:'shaccadyoggoth', hp:1710000, atk:247000, def:32000, crit:2, dodge:3.8, pen:19, critRes:34 },
+      { slug:'clockwork_king', hp:1830000, atk:271000, def:34300, crit:2, dodge:4.4, pen:22, critRes:38 },
+      { slug:'black_ant_queen', hp:1960000, atk:294000, def:36500, crit:3, dodge:4.9, pen:25, critRes:42 },
+      { slug:'crab_king_karkinos', hp:2090000, atk:318000, def:38700, crit:3, dodge:5.5, pen:27, critRes:46 },
+      { slug:'dryad_queen_rafflesia', hp:2210000, atk:341000, def:41000, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'god_warrior_osiris', hp:251400000, atk:750000, def:82000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'god_warrior_osiris', hp:419000000, atk:750000, def:82000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   35: { /* 合体 */
     waves: [
-      { slug:'arcane_golem', hp:3280000, atk:1312000, def:65500, crit:1, dodge:0, pen:0, critRes:5 },
-      { slug:'mechascorpion', hp:3780000, atk:1688000, def:74500, crit:1, dodge:0.5, pen:3, critRes:9 },
-      { slug:'tantalus', hp:4290000, atk:2064000, def:83400, crit:1, dodge:1.1, pen:5, critRes:13 },
-      { slug:'runic_stone_golem_goliath', hp:4800000, atk:2444000, def:92300, crit:2, dodge:1.6, pen:8, critRes:17 },
-      { slug:'shaccadyoggoth', hp:5300000, atk:2820000, def:101000, crit:2, dodge:2.2, pen:11, critRes:21 },
-      { slug:'clockwork_king', hp:5810000, atk:3196000, def:110000, crit:2, dodge:2.7, pen:14, critRes:25 },
-      { slug:'black_ant_queen', hp:6320000, atk:3576000, def:119000, crit:2, dodge:3.3, pen:16, critRes:30 },
-      { slug:'crab_king_karkinos', hp:6820000, atk:3952000, def:128000, crit:2, dodge:3.8, pen:19, critRes:34 },
-      { slug:'insect_queen', hp:7330000, atk:4320000, def:137000, crit:2, dodge:4.4, pen:22, critRes:38 },
-      { slug:'dryad_queen_rafflesia', hp:7830000, atk:4720000, def:146000, crit:3, dodge:4.9, pen:25, critRes:42 },
-      { slug:'god_warrior_isis', hp:8340000, atk:5080000, def:155000, crit:3, dodge:5.5, pen:27, critRes:46 },
-      { slug:'eldritch_overmind', hp:8850000, atk:5480000, def:164000, crit:3, dodge:6, pen:30, critRes:50 },
+      { slug:'arcane_golem', hp:3280000, atk:328000, def:65500, crit:1, dodge:0, pen:0, critRes:5 },
+      { slug:'mechascorpion', hp:3780000, atk:422000, def:74500, crit:1, dodge:0.5, pen:3, critRes:9 },
+      { slug:'tantalus', hp:4290000, atk:516000, def:83400, crit:1, dodge:1.1, pen:5, critRes:13 },
+      { slug:'runic_stone_golem_goliath', hp:4800000, atk:611000, def:92300, crit:2, dodge:1.6, pen:8, critRes:17 },
+      { slug:'shaccadyoggoth', hp:5300000, atk:705000, def:101000, crit:2, dodge:2.2, pen:11, critRes:21 },
+      { slug:'clockwork_king', hp:5810000, atk:799000, def:110000, crit:2, dodge:2.7, pen:14, critRes:25 },
+      { slug:'black_ant_queen', hp:6320000, atk:894000, def:119000, crit:2, dodge:3.3, pen:16, critRes:30 },
+      { slug:'crab_king_karkinos', hp:6820000, atk:988000, def:128000, crit:2, dodge:3.8, pen:19, critRes:34 },
+      { slug:'insect_queen', hp:7330000, atk:1080000, def:137000, crit:2, dodge:4.4, pen:22, critRes:38 },
+      { slug:'dryad_queen_rafflesia', hp:7830000, atk:1180000, def:146000, crit:3, dodge:4.9, pen:25, critRes:42 },
+      { slug:'god_warrior_isis', hp:8340000, atk:1270000, def:155000, crit:3, dodge:5.5, pen:27, critRes:46 },
+      { slug:'eldritch_overmind', hp:8850000, atk:1370000, def:164000, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'poseidon', hp:1128000000, atk:3010000, def:328000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'poseidon', hp:1880000000, atk:3010000, def:328000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   39: { /* 大乘 */
     waves: [
-      { slug:'shaccadyoggoth', hp:13100000, atk:5240000, def:262000, crit:1, dodge:0, pen:0, critRes:5 },
-      { slug:'tantalus', hp:15100000, atk:6760000, def:298000, crit:1, dodge:0.5, pen:3, critRes:9 },
-      { slug:'runic_stone_golem_goliath', hp:17200000, atk:8280000, def:334000, crit:1, dodge:1.1, pen:5, critRes:13 },
-      { slug:'clockwork_king', hp:19200000, atk:9760000, def:369000, crit:2, dodge:1.6, pen:8, critRes:17 },
-      { slug:'black_ant_queen', hp:21200000, atk:11280000, def:405000, crit:2, dodge:2.2, pen:11, critRes:21 },
-      { slug:'crab_king_karkinos', hp:23200000, atk:12800000, def:441000, crit:2, dodge:2.7, pen:14, critRes:25 },
-      { slug:'insect_queen', hp:25300000, atk:14280000, def:477000, crit:2, dodge:3.3, pen:16, critRes:30 },
-      { slug:'dryad_queen_rafflesia', hp:27300000, atk:15800000, def:512000, crit:2, dodge:3.8, pen:19, critRes:34 },
-      { slug:'god_warrior_isis', hp:29300000, atk:17320000, def:548000, crit:2, dodge:4.4, pen:22, critRes:38 },
-      { slug:'eldritch_overmind', hp:31300000, atk:18840000, def:584000, crit:3, dodge:4.9, pen:25, critRes:42 },
-      { slug:'zeograth', hp:33400000, atk:20320000, def:620000, crit:3, dodge:5.5, pen:27, critRes:46 },
-      { slug:'parrot_king', hp:35400000, atk:21840000, def:655000, crit:3, dodge:6, pen:30, critRes:50 },
+      { slug:'shaccadyoggoth', hp:13100000, atk:1310000, def:262000, crit:1, dodge:0, pen:0, critRes:5 },
+      { slug:'tantalus', hp:15100000, atk:1690000, def:298000, crit:1, dodge:0.5, pen:3, critRes:9 },
+      { slug:'runic_stone_golem_goliath', hp:17200000, atk:2070000, def:334000, crit:1, dodge:1.1, pen:5, critRes:13 },
+      { slug:'clockwork_king', hp:19200000, atk:2440000, def:369000, crit:2, dodge:1.6, pen:8, critRes:17 },
+      { slug:'black_ant_queen', hp:21200000, atk:2820000, def:405000, crit:2, dodge:2.2, pen:11, critRes:21 },
+      { slug:'crab_king_karkinos', hp:23200000, atk:3200000, def:441000, crit:2, dodge:2.7, pen:14, critRes:25 },
+      { slug:'insect_queen', hp:25300000, atk:3570000, def:477000, crit:2, dodge:3.3, pen:16, critRes:30 },
+      { slug:'dryad_queen_rafflesia', hp:27300000, atk:3950000, def:512000, crit:2, dodge:3.8, pen:19, critRes:34 },
+      { slug:'god_warrior_isis', hp:29300000, atk:4330000, def:548000, crit:2, dodge:4.4, pen:22, critRes:38 },
+      { slug:'eldritch_overmind', hp:31300000, atk:4710000, def:584000, crit:3, dodge:4.9, pen:25, critRes:42 },
+      { slug:'zeograth', hp:33400000, atk:5080000, def:620000, crit:3, dodge:5.5, pen:27, critRes:46 },
+      { slug:'parrot_king', hp:35400000, atk:5460000, def:655000, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'goddess_aphrodite', hp:3654000000, atk:12000000, def:1310000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'goddess_aphrodite', hp:6090000000, atk:12000000, def:1310000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   43: { /* 渡劫 */
     waves: [
-      { slug:'clockwork_king', hp:52400000, atk:20960000, def:1050000, crit:1, dodge:0, pen:0, critRes:5 },
-      { slug:'black_ant_queen', hp:60500000, atk:27000000, def:1190000, crit:1, dodge:0.5, pen:3, critRes:9 },
-      { slug:'crab_king_karkinos', hp:68600000, atk:33040000, def:1330000, crit:1, dodge:1.1, pen:5, critRes:13 },
-      { slug:'insect_queen', hp:76700000, atk:39080000, def:1480000, crit:2, dodge:1.6, pen:8, critRes:17 },
-      { slug:'dryad_queen_rafflesia', hp:84800000, atk:45200000, def:1620000, crit:2, dodge:2.2, pen:11, critRes:21 },
-      { slug:'god_warrior_isis', hp:92900000, atk:51200000, def:1760000, crit:2, dodge:2.7, pen:14, critRes:25 },
-      { slug:'eldritch_overmind', hp:101000000, atk:57200000, def:1910000, crit:2, dodge:3.3, pen:16, critRes:30 },
-      { slug:'zeograth', hp:109000000, atk:63200000, def:2050000, crit:2, dodge:3.8, pen:19, critRes:34 },
-      { slug:'parrot_king', hp:117000000, atk:69200000, def:2190000, crit:2, dodge:4.4, pen:22, critRes:38 },
-      { slug:'thunder_titan_dynamo', hp:125000000, atk:75200000, def:2340000, crit:3, dodge:4.9, pen:25, critRes:42 },
-      { slug:'ice_titan_demeres', hp:133000000, atk:81200000, def:2480000, crit:3, dodge:5.5, pen:27, critRes:46 },
-      { slug:'grand_sorceress_duesa', hp:142000000, atk:87200000, def:2620000, crit:3, dodge:6, pen:30, critRes:50 },
+      { slug:'clockwork_king', hp:52400000, atk:5240000, def:1050000, crit:1, dodge:0, pen:0, critRes:5 },
+      { slug:'black_ant_queen', hp:60500000, atk:6750000, def:1190000, crit:1, dodge:0.5, pen:3, critRes:9 },
+      { slug:'crab_king_karkinos', hp:68600000, atk:8260000, def:1330000, crit:1, dodge:1.1, pen:5, critRes:13 },
+      { slug:'insect_queen', hp:76700000, atk:9770000, def:1480000, crit:2, dodge:1.6, pen:8, critRes:17 },
+      { slug:'dryad_queen_rafflesia', hp:84800000, atk:11300000, def:1620000, crit:2, dodge:2.2, pen:11, critRes:21 },
+      { slug:'god_warrior_isis', hp:92900000, atk:12800000, def:1760000, crit:2, dodge:2.7, pen:14, critRes:25 },
+      { slug:'eldritch_overmind', hp:101000000, atk:14300000, def:1910000, crit:2, dodge:3.3, pen:16, critRes:30 },
+      { slug:'zeograth', hp:109000000, atk:15800000, def:2050000, crit:2, dodge:3.8, pen:19, critRes:34 },
+      { slug:'parrot_king', hp:117000000, atk:17300000, def:2190000, crit:2, dodge:4.4, pen:22, critRes:38 },
+      { slug:'thunder_titan_dynamo', hp:125000000, atk:18800000, def:2340000, crit:3, dodge:4.9, pen:25, critRes:42 },
+      { slug:'ice_titan_demeres', hp:133000000, atk:20300000, def:2480000, crit:3, dodge:5.5, pen:27, critRes:46 },
+      { slug:'grand_sorceress_duesa', hp:142000000, atk:21800000, def:2620000, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'sun_goddess', hp:16740000000, atk:48000000, def:5240000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'sun_goddess', hp:27900000000, atk:48000000, def:5240000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   47: { /* 真仙 */
     waves: [
-      { slug:'legendary_knight_michael', hp:210000000, atk:84000000, def:4190000, crit:1, dodge:0, pen:0, critRes:5 },
-      { slug:'librarium_animated_mechadragon_ladon', hp:242000000, atk:108000000, def:4770000, crit:1, dodge:0.5, pen:3, critRes:9 },
-      { slug:'librarium_animated_skull_knight_xoer', hp:275000000, atk:132000000, def:5340000, crit:1, dodge:1.1, pen:5, critRes:13 },
-      { slug:'light_titan_alfadriel', hp:307000000, atk:156400000, def:5910000, crit:2, dodge:1.6, pen:8, critRes:17 },
-      { slug:'zeograth', hp:339000000, atk:180400000, def:6480000, crit:2, dodge:2.2, pen:11, critRes:21 },
-      { slug:'parrot_king', hp:372000000, atk:204800000, def:7050000, crit:2, dodge:2.7, pen:14, critRes:25 },
-      { slug:'thunder_titan_dynamo', hp:404000000, atk:228800000, def:7630000, crit:2, dodge:3.3, pen:16, critRes:30 },
-      { slug:'ice_titan_demeres', hp:437000000, atk:252800000, def:8200000, crit:2, dodge:3.8, pen:19, critRes:34 },
-      { slug:'grand_sorceress_duesa', hp:469000000, atk:277200000, def:8770000, crit:2, dodge:4.4, pen:22, critRes:38 },
-      { slug:'thanatos', hp:501000000, atk:301200000, def:9340000, crit:3, dodge:4.9, pen:25, critRes:42 },
-      { slug:'continental_turtle_rukkha', hp:534000000, atk:325200000, def:9910000, crit:3, dodge:5.5, pen:27, critRes:46 },
-      { slug:'sea_dragon_leviathan', hp:566000000, atk:349600000, def:10500000, crit:3, dodge:6, pen:30, critRes:50 },
+      { slug:'legendary_knight_michael', hp:210000000, atk:21000000, def:4190000, crit:1, dodge:0, pen:0, critRes:5 },
+      { slug:'librarium_animated_mechadragon_ladon', hp:242000000, atk:27000000, def:4770000, crit:1, dodge:0.5, pen:3, critRes:9 },
+      { slug:'librarium_animated_skull_knight_xoer', hp:275000000, atk:33000000, def:5340000, crit:1, dodge:1.1, pen:5, critRes:13 },
+      { slug:'light_titan_alfadriel', hp:307000000, atk:39100000, def:5910000, crit:2, dodge:1.6, pen:8, critRes:17 },
+      { slug:'zeograth', hp:339000000, atk:45100000, def:6480000, crit:2, dodge:2.2, pen:11, critRes:21 },
+      { slug:'parrot_king', hp:372000000, atk:51200000, def:7050000, crit:2, dodge:2.7, pen:14, critRes:25 },
+      { slug:'thunder_titan_dynamo', hp:404000000, atk:57200000, def:7630000, crit:2, dodge:3.3, pen:16, critRes:30 },
+      { slug:'ice_titan_demeres', hp:437000000, atk:63200000, def:8200000, crit:2, dodge:3.8, pen:19, critRes:34 },
+      { slug:'grand_sorceress_duesa', hp:469000000, atk:69300000, def:8770000, crit:2, dodge:4.4, pen:22, critRes:38 },
+      { slug:'thanatos', hp:501000000, atk:75300000, def:9340000, crit:3, dodge:4.9, pen:25, critRes:42 },
+      { slug:'continental_turtle_rukkha', hp:534000000, atk:81300000, def:9910000, crit:3, dodge:5.5, pen:27, critRes:46 },
+      { slug:'sea_dragon_leviathan', hp:566000000, atk:87400000, def:10500000, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'hades', hp:68400000000, atk:192000000, def:21000000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'hades', hp:114000000000, atk:192000000, def:21000000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
   51: { /* 天仙 */
     waves: [
-      { slug:'mythical_knight_goldnharl', hp:839000000, atk:335600000, def:16800000, crit:1, dodge:0, pen:0, critRes:5 },
-      { slug:'god_warrior_skoll', hp:969000000, atk:432000000, def:19100000, crit:1, dodge:0.5, pen:3, critRes:9 },
-      { slug:'legendary_knight_regulus', hp:1100000000, atk:528000000, def:21400000, crit:1, dodge:1.1, pen:5, critRes:13 },
-      { slug:'son_of_valhalla', hp:1230000000, atk:624000000, def:23600000, crit:2, dodge:1.6, pen:8, critRes:17 },
-      { slug:'legendary_knight_remment', hp:1360000000, atk:720000000, def:25900000, crit:2, dodge:2.2, pen:11, critRes:21 },
-      { slug:'the_horde', hp:1490000000, atk:820000000, def:28200000, crit:2, dodge:2.7, pen:14, critRes:25 },
-      { slug:'dark_queen_shaccadyoggoth', hp:1620000000, atk:916000000, def:30500000, crit:2, dodge:3.3, pen:16, critRes:30 },
-      { slug:'librarium_animated_legendary_knight_pizarro', hp:1750000000, atk:1012000000, def:32800000, crit:2, dodge:3.8, pen:19, critRes:34 },
-      { slug:'colossal_crow', hp:1880000000, atk:1108000000, def:35100000, crit:2, dodge:4.4, pen:22, critRes:38 },
-      { slug:'dragon_huanglong', hp:2010000000, atk:1204000000, def:37400000, crit:3, dodge:4.9, pen:25, critRes:42 },
-      { slug:'sea_calamity_urmica', hp:2140000000, atk:1300000000, def:39700000, crit:3, dodge:5.5, pen:27, critRes:46 },
-      { slug:'darkness_titan_ilnoct', hp:2260000000, atk:1400000000, def:41900000, crit:3, dodge:6, pen:30, critRes:50 },
+      { slug:'mythical_knight_goldnharl', hp:839000000, atk:83900000, def:16800000, crit:1, dodge:0, pen:0, critRes:5 },
+      { slug:'god_warrior_skoll', hp:969000000, atk:108000000, def:19100000, crit:1, dodge:0.5, pen:3, critRes:9 },
+      { slug:'legendary_knight_regulus', hp:1100000000, atk:132000000, def:21400000, crit:1, dodge:1.1, pen:5, critRes:13 },
+      { slug:'son_of_valhalla', hp:1230000000, atk:156000000, def:23600000, crit:2, dodge:1.6, pen:8, critRes:17 },
+      { slug:'legendary_knight_remment', hp:1360000000, atk:180000000, def:25900000, crit:2, dodge:2.2, pen:11, critRes:21 },
+      { slug:'the_horde', hp:1490000000, atk:205000000, def:28200000, crit:2, dodge:2.7, pen:14, critRes:25 },
+      { slug:'dark_queen_shaccadyoggoth', hp:1620000000, atk:229000000, def:30500000, crit:2, dodge:3.3, pen:16, critRes:30 },
+      { slug:'librarium_animated_legendary_knight_pizarro', hp:1750000000, atk:253000000, def:32800000, crit:2, dodge:3.8, pen:19, critRes:34 },
+      { slug:'colossal_crow', hp:1880000000, atk:277000000, def:35100000, crit:2, dodge:4.4, pen:22, critRes:38 },
+      { slug:'dragon_huanglong', hp:2010000000, atk:301000000, def:37400000, crit:3, dodge:4.9, pen:25, critRes:42 },
+      { slug:'sea_calamity_urmica', hp:2140000000, atk:325000000, def:39700000, crit:3, dodge:5.5, pen:27, critRes:46 },
+      { slug:'darkness_titan_ilnoct', hp:2260000000, atk:350000000, def:41900000, crit:3, dodge:6, pen:30, critRes:50 },
     ],
-    boss: { slug:'the_fallen', hp:281400000000, atk:770000000, def:83800000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
+    boss: { slug:'the_fallen', hp:469000000000, atk:770000000, def:83800000, crit:25, dodge:10, pen:40, critRes:60, time:30 },
   },
 };
 
@@ -3182,6 +3164,7 @@ export {
   cldApiBase,
   cnNum,
   durTxt,
+  eqMult,
   esc,
   fin,
   finalStats,

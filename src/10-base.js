@@ -5,7 +5,7 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, ARMOR_POOL, BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, ARRAY_COST, ART_PREFIX, ART_SPECIAL, ART_SUFFIX, AURA_COLORS, BIGS, BTL, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, EQUI_SLOTI, FX_POOL, FX_TXT, G1_TPL, GAME_VER, JRN_TAIL, MATS, MIGRATIONS, MON_ATK_SCALE, MON_FX_POOL, MON_NAMES, MYST, PAGES_NEED, PEND_POOL, PLOT, QUALITY, RECIPES, RK_NAMES, RK_SEGS, SAVE_KEY, SCROLL_POOL, SEARCH_MAX, SEARCH_MIN, SEG_META, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, TRACE_ACT, TRAVEL_FIRST_MAX, TRAVEL_FIRST_STEP, TRAVEL_FIRST_WINDOW, TRAVEL_LATE_STEP, TRAVEL_SPAN, ZONES, __set_alTipT, __set_hbFails, __set_kicked, __set_parts, __set_tracePool, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, _tracePool, alIcoCls, alTipT, autoHuntOn, capDeviceDpr, cauldron, cld, cldApiBase, cnNum, durTxt, esc, eqStatsAssign, fin, finalStats, fmt, fxAgg, fxCount, fxValue, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, selRecipe, state } from './00-pure.js';
+import { $, ARMOR_POOL, BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, ARRAY_COST, ART_PREFIX, ART_SPECIAL, ART_SUFFIX, AURA_COLORS, BIGS, BTL, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, EQUI_SLOTI, FX_POOL, FX_TXT, G1_TPL, GAME_VER, JRN_TAIL, MATS, MIGRATIONS, MON_ATK_SCALE, MON_FX_POOL, MON_NAMES, MYST, PAGES_NEED, PEND_POOL, PLOT, QUALITY, RECIPES, RK_NAMES, RK_SEGS, SAVE_KEY, SCROLL_POOL, SEARCH_MAX, SEARCH_MIN, SEG_META, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, TRACE_ACT, TRAVEL_FIRST_MAX, TRAVEL_FIRST_STEP, TRAVEL_FIRST_WINDOW, TRAVEL_LATE_STEP, TRAVEL_SPAN, ZONES, __set_alTipT, __set_hbFails, __set_kicked, __set_parts, __set_tracePool, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, _tracePool, alIcoCls, alTipT, autoHuntOn, capDeviceDpr, cauldron, cld, cldApiBase, cnNum, durTxt, eqMult, esc, fin, finalStats, fmt, fxAgg, fxCount, fxValue, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, selRecipe, state } from './00-pure.js';
 
 (function () {
   const vt = document.getElementById("verTag"); if (vt) vt.textContent = GAME_VER;
@@ -1181,10 +1181,14 @@ function rollMonFx(big) {                           // 词缀妖兽: ~12% 带 1~
 
 function fmtFxTag(f) { return `${f.legendary ? "【极】" : ""}${FX_TXT[f.k]}+${f.v}%`; }
 
-function attrAssign(art, kind, q, pow) {        // 装备数值 + 词条
-  /* v5.17 三围=境界定值(eqStatsAssign: 基准×EQ_POW, 无随机/无品质乘子) ——
-   * 同境界同部位三围恒定; 品质价值全部走词条(fxCount 条数 / fxValue 数值 / 极品概率)。 */
-  eqStatsAssign(art, kind, pow);
+function attrAssign(art, kind, q, pow) {        // 装备数值(境界因子×品质乘子) + 词条
+  /* v7.1: 第四参从境界级 lv 改为 EQ_POW[realmIdx] —— 装备数值跟怪物毛坯同走 ×4 质变 */
+  const M = eqMult(q);
+  const r1 = Math.random(), r2 = Math.random(), r3 = Math.random();
+  if (kind === "w") { art.a = Math.max(1, Math.round((4 + r1 * 15) * pow * M)); art.h = 0; art.d = 0; }
+  else if (kind === "a") { art.h = Math.round((38 + r1 * 114) * pow * M); art.d = Math.max(1, Math.round((2 + r2 * 15) * pow * M)); art.a = 0; }
+  else if (kind === "p") { art.h = Math.round((15 + r1 * 46) * pow * M); art.d = Math.max(1, Math.round((2 + r2 * 6) * pow * M)); art.a = Math.round((1.5 + r3 * 4.5) * pow * M); }
+  else { art.a = Math.round((2.3 + r1 * 6.7) * pow * M); art.d = Math.max(1, Math.round((2 + r2 * 5) * pow * M)); art.h = 0; }
   art.fx = rollFx(kind, q);
 }
 

@@ -50,7 +50,7 @@ ev("const QUALITY =");
 ev("const FX_POOL =");
 ev("function fxCount");
 ev("function fxValue");
-ev("function eqStatsAssign");
+ev("function eqMult");
 ev("function finalStats");
 ev("const SKILL_DEFS =");
 ev("const MOB_POOLS =");
@@ -61,7 +61,7 @@ ev("function bigIndexOf");
 ev("function skillExpNeed");
 ev("const BIGS =");
 
-const { QUALITY, FX_POOL, fxCount, fxValue, eqStatsAssign, finalStats, SKILL_DEFS, MOB_POOLS,
+const { QUALITY, FX_POOL, fxCount, fxValue, eqMult, finalStats, SKILL_DEFS, MOB_POOLS,
   BASE_STATS, EQ_POW, QW_TABLE, skillExpNeed, BIGS } = C;
 
 /* ---- 50-battle.js 常量 ---- */
@@ -81,9 +81,10 @@ const calcDmg = (atk, mult, def, pen) =>
 let QNERF = false;
 let FORCE_FULLRED = false;
 function bestFullRed(bi) {
-  const pow = EQ_POW[Math.min(EQ_POW.length - 1, bi)] || 1;
-  const mk = (kind) => { const e = { slot: SLOT_KIND.indexOf(kind), q: 5, a: 0, d: 0, h: 0 }; eqStatsAssign(e, kind, pow); e.fx = rollFx(kind, 5); return e; };
-  return [mk("w"), mk("a"), mk("p"), mk("s")];
+  const M = eqMult(5), pow = EQ_POW[Math.min(EQ_POW.length - 1, bi)] || 1;
+  const mk = (kind, a, d, h) => ({ slot: SLOT_KIND.indexOf(kind), q: 5, a, d, h, fx: rollFx(kind, 5) });
+  return [ mk("w", Math.round(16 * pow * M), 0, 0), mk("a", 0, Math.round(13 * pow * M), Math.round(120 * pow * M)),
+           mk("p", Math.round(5 * pow * M), Math.round(6 * pow * M), Math.round(48 * pow * M)), mk("s", Math.round(8 * pow * M), Math.round(6 * pow * M), 0) ];
 }   // true = 中后期玄天概率下调(对照旋钮)
 const QW_NERF = { 6: [20,18,18,16,16,7], 7: [20,18,18,16,16,7], 8: [12,14,16,18,20,10], 9: [12,14,16,18,20,10], 10: [6,10,14,18,24,15], 11: [6,10,14,18,24,15] };
 function pickQ(bi) {
@@ -109,12 +110,15 @@ function rollFx(kind, q) {
 function makeArt(bi, artsLen) {
   const q = pickQ(bi);
   const slot = artsLen < 4 ? artsLen : (rnd() * 4) | 0;
-  const kind = SLOT_KIND[slot];
+  const kind = SLOT_KIND[slot], M = eqMult(q);
   const pow = EQ_POW[Math.min(EQ_POW.length - 1, bi)] || 1;
-  const a = { slot, q, a: 0, d: 0, h: 0 };
-  eqStatsAssign(a, kind, pow);   // v5.17 三围=境界定值
-  a.fx = rollFx(kind, q);
-  return a;
+  const r1 = rnd(), r2 = rnd(), r3 = rnd();
+  let a, d, h;
+  if (kind === "w") { a = Math.max(1, Math.round((4 + r1 * 15) * pow * M)); h = 0; d = 0; }
+  else if (kind === "a") { h = Math.round((38 + r1 * 114) * pow * M); d = Math.max(1, Math.round((2 + r2 * 15) * pow * M)); a = 0; }
+  else if (kind === "p") { h = Math.round((15 + r1 * 46) * pow * M); d = Math.max(1, Math.round((2 + r2 * 6) * pow * M)); a = Math.round((1.5 + r3 * 4.5) * pow * M); }
+  else { a = Math.round((2.3 + r1 * 6.7) * pow * M); d = Math.max(1, Math.round((2 + r2 * 5) * pow * M)); h = 0; }
+  return { slot, q, a, d, h, fx: rollFx(kind, q) };
 }
 function artCtxOf(bi, arts) {
   const bs = BASE_STATS[Math.min(BASE_STATS.length - 1, bi)];
@@ -233,8 +237,7 @@ function roundSim(bi, PST0, arts, skills, opt) {
     const idx = spawned;
     const e = idx < 120 ? pool.waves[Math.min(11, (idx / 10) | 0)] : pool.boss;
     const hpAdj = e === pool.boss ? e.hp * (opt.bossK || 1) : e.hp;
-    const atkAdj = e === pool.boss ? e.atk : e.atk * (opt.mobAtkK || 1);   // v5.17 小怪攻击放大(BOSS不放大, 保BOSS战生存)
-    foe = { hp: hpAdj, maxHp: hpAdj, atk: atkAdj, def: e.def, dodge: e.dodge, pen: e.pen, crit: e.crit, critRes: e.critRes, isBoss: idx >= 120 };
+    foe = { hp: hpAdj, maxHp: hpAdj, atk: e.atk, def: e.def, dodge: e.dodge, pen: e.pen, crit: e.crit, critRes: e.critRes, isBoss: idx >= 120 };
     foeGap = D_WALK;
     eAtkT = 0.6;
     spawned++;
@@ -452,18 +455,16 @@ if (require.main === module) {
   for (let i = 0; i < N; i++) { all.push(simulate({ dt: DT })); if (i % 5 === 4) console.error(`  ${i + 1}/${N} (${((Date.now() - t0) / 1000).toFixed(0)}s)`); }
   /* 汇总: 按境界 */
   console.log(`\n=== 各境界(${TAG}, 均值/中位/P90) ===`);
-  console.log("境界 | 轮数(中位) | 通关耗时h(中位) | 通关耗时h(均值) | 首轮120s击杀(中位) | 通关轮120s击杀(中位) | BOSS斩杀s(中位/P90) | 掉装(均值) | 穿戴(均值) | 灵石时薪(均值)");
+  console.log("境界 | 轮数(中位) | 通关耗时h(中位) | 通关耗时h(均值) | 首轮120s击杀(中位) | 通关轮120s击杀(中位) | BOSS斩杀s(中位) | 掉装(均值) | 穿戴(均值) | 熔灵石(均值)");
   for (let bi = 0; bi < 12; bi++) {
     const rs = all.map(s => s.out[bi]).filter(Boolean);
     if (!rs.length) break;
     const m = (f) => median(rs.map(f));
     const avg = (f) => rs.reduce((s, r) => s + f(r), 0) / rs.length;
-    const bAll = rs.map(r => r.bossUse).filter(u => u > 0).sort((x, y) => x - y);
-    const bP90 = bAll.length ? bAll[Math.min(bAll.length - 1, ((bAll.length * 0.9) | 0))] : 0;
     console.log(
       `${BIGS[bi].n} | ${m(r => r.rounds)} | ${m(r => r.wallH).toFixed(2)} | ${avg(r => r.wallH).toFixed(2)} | ` +
-      `${m(r => r.firstKills)} | ${m(r => r.clearKills)} | ${m(r => r.bossUse).toFixed(1)}/${bP90.toFixed(1)} | ` +
-      `${avg(r => r.drops).toFixed(0)} | ${avg(r => r.keeps).toFixed(0)} | ${avg(r => r.meltSpirit / Math.max(0.01, r.wallH)).toFixed(0)}`
+      `${m(r => r.firstKills)} | ${m(r => r.clearKills)} | ${m(r => r.bossUse).toFixed(1)} | ` +
+      `${avg(r => r.drops).toFixed(0)} | ${avg(r => r.keeps).toFixed(0)} | ${avg(r => r.meltSpirit).toFixed(0)}`
     );
   }
   const walls = all.map(s => s.grandWallH);
