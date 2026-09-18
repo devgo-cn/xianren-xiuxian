@@ -193,15 +193,15 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   /* 灵鹰宠物 */
   const petEagleImg = new Image();
   petEagleImg.onload = function() { G.petEagleSprite = solidify(petEagleImg); G.petEagleReady = true; };
-  petEagleImg.src = 'assets/pet_eagle.png';
+  petEagleImg.src = 'assets/pet_eagle.webp';
   /* 灵鹰弹幕 */
   const petEagleBolt = new Image();
   petEagleBolt.onload = function() { G.petEagleBoltSprite = solidify(petEagleBolt); G.petEagleBoltReady = true; };
-  petEagleBolt.src = 'assets/pet_eagle_bolt.png';
+  petEagleBolt.src = 'assets/pet_eagle_bolt.webp';
   /* 灵鹰攻击帧 */
   const petEagleAtk = new Image();
   petEagleAtk.onload = function() { G.petEagleAtkSprite = solidify(petEagleAtk); G.petEagleAtkReady = true; };
-  petEagleAtk.src = 'assets/pet_eagle_atk.png';
+  petEagleAtk.src = 'assets/pet_eagle_atk.webp';
   /* 技能素材: 剑气月牙 */
   const skillImg = new Image();
   skillImg.onload = function() { G.skillSprite = skillImg; G.skillReady = true; };
@@ -423,7 +423,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   }
   (function loadBones() {
     if (!window.BattleGL) { console.warn('[battle] BattleGL 未加载, 骨骼怪不可用'); return; }
-    loadBone('ratty', { ske:'assets/db/ratty_ske.json', tex:'assets/db/ratty_tex.json', img:'assets/db/ratty_tex.png' }, 'Ratty',
+    loadBone('ratty', { ske:'assets/db/ratty_ske.json', tex:'assets/db/ratty_tex.json', img:'assets/db/ratty_tex.webp' }, 'Ratty',
       ['idle','dead','attack','hurt','walk']);
     fetch('assets/db/monsters/index.json').then(r => r.json()).then(idx => {
       BONE_IDX_ALL = idx;
