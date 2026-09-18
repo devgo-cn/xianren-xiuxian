@@ -463,7 +463,7 @@
     "dt-theme.css": "7785edeead2c4060bf15ea40bc052134078d1e6c7ac4d08949756abc2e27b575",
     "fx2d.js": "ab4794f036fc4e9976392e336e004bcef13d83976e78d719415da6c7bc10ad0d",
     "index.html": "80f1200b46656918f7104cd1e8038db239e2f98ae974b984117fc1d037055f16",
-    "src/00-pure.js": "3876f553944d8a26568142c811f2bbeb722fb572a7f52c31511ed17ec2d8cf93",
+    "src/00-pure.js": "52d4fcec99c08192ad83ea5537df301be86a86d6991475f56491ba46dc315620",
     "src/10-base.js": "fb50502e593893bde039bc55e8d2b3109bf3c95228dbcccad7eaf0e5c4e9c405",
     "src/20-core.js": "6fb5c1f4a3753215233b71ac35ae8a57f3876ffea1bee6fd3bee9df4178dc120",
     "src/30-systems.js": "9123df30778cf52bfacf9892217e80a495eba6fe62605c5b3fd868b9cda3b4f6",
@@ -472,6 +472,6 @@
     "src/60-stage.js": "a098e6f38e898ff3fee4c6a1f79e652373f15cf791e344813fa3d76ddd521c5b",
     "src/main.js": "161f10c02a3aa4095b257cd77f5bf1834e85d1359e85555deb8e48dfd2bd9fba"
   },
-  "rev": "be8d4687c079207d",
+  "rev": "5c9710d4ff213680",
   "version": "5.37"
 }
