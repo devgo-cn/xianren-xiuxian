@@ -193,11 +193,21 @@ function adopt(s) {
     name: (typeof b.name === "string" ? b.name : "").slice(0, 12),
     start: Math.max(0, fin(b.start, 0)), until: Math.max(0, fin(b.until, 0)),
   })).filter(b => b.mult > 1 || b.boost > 0);
+  /* v5.8 boost 类同 tag 唯一(药力相冲): 历史档可能积了多条"兽潮余威" —— 只留最高一道。
+   * mult 类(修为丹多段累计)不受影响。 */
+  {
+    const best = {};
+    for (const b of s.buffs) if (b.boost > 0 && (!(b.tag in best) || b.boost > best[b.tag].boost)) best[b.tag] = b;
+    s.buffs = s.buffs.filter(b => b.mult > 1 || b.boost <= 0 || b === best[b.tag]);
+  }
   s.offlineBoostUntil = Math.max(0, fin(s.offlineBoostUntil, 0));
     /* v3.9 妖潮试炼: 纪录 + 离线收益加成(120s 击杀纪录 → 补偿档位) */
   s.trialBest = Math.max(0, Math.floor(fin(s.trialBest, 0)));
   s.trialBoost = Math.min(1.80, Math.max(0, fin(s.trialBoost, 0)));   /* v5.1 封顶180%(120只×1%+BOSS60%) */
   s.trialBoostUntil = Math.max(0, fin(s.trialBoostUntil, 0));
+  /* v5.8 兽潮效率快照(破纪录波实测产出): 驱动后端离线灵石/装备折算 */
+  s.trialSp = Math.max(0, Math.round(fin(s.trialSp, 0, 1e12)));
+  s.trialEq = Math.max(0, Math.round(fin(s.trialEq, 0, 100)));
   if (!s.travel || typeof s.travel !== "object") s.travel = null;
   /* v1.8.5 化身行囊: 信匣满后由服务端 stayTravel 攒进 travel.bag。
    * adopt 是白名单式的"规整"而非深拷贝原样保留 —— 显式归一 bag/bagPages,
@@ -818,7 +828,14 @@ function pushBuff(mult, durSec, name) {
 function pushBoost(boost, durSec, name, tag) {
   const now = Date.now();
   if (!((boost || 0) > 0) || !((durSec || 0) > 0)) return false;
-  state.buffs.push({ tag: tag === "trial" ? "trial" : "pill", mult: 1, boost,
+  const t = tag === "trial" ? "trial" : "pill";
+  /* v5.8 药力相冲·同类唯一: 同 tag 的 boost 类只留最高一道 —— 已有更强则新的不生效;
+   * 否则替换为新条目(时长随之刷新)。只动 boost 条目, 同 tag 的 mult 类修为丹不受影响。 */
+  state.buffs = (state.buffs || []).filter(b => b && (b.until || 0) > now);
+  const old = state.buffs.find(b => b.tag === t && (b.boost || 0) > 0);
+  if (old && (old.boost || 0) > boost) { _buffCache = null; return false; }
+  state.buffs = state.buffs.filter(b => !(b.tag === t && (b.boost || 0) > 0));
+  state.buffs.push({ tag: t, mult: 1, boost,
     name: (typeof name === "string" ? name : "").slice(0, 12), start: now, until: now + durSec * 1000 });
   _buffCache = null;
   return true;

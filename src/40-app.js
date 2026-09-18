@@ -523,14 +523,16 @@ function presentSettle(r) {
   const icoExp = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.2 C13.8 2.6 16.6 5 17.4 8.4 C18.2 12.4 15.4 16.2 11.4 17.2 C10.9 17.3 10.4 17.3 10 17.2 C6 16.8 2.8 13.6 2.6 9.8 C2.4 6.2 5.2 3 9 2.3 C9.3 2.3 9.7 2.2 10 2.2 Z" fill="none" stroke="#d8b06a" stroke-width="1.5"/><circle cx="10" cy="10" r="3.1" fill="none" stroke="#d8b06a" stroke-width="1.3" opacity=".75"/><path d="M10 5.4 C11.8 5.9 13.2 7.2 13.6 9" fill="none" stroke="#d8b06a" stroke-width="1" stroke-linecap="round" opacity=".55"/></svg>';
   const icoSpi = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5 L18.5 10 L10 18.5 L1.5 10 Z" fill="#67c9ab"/><path d="M10 1.5 L10 18.5 L18.5 10 Z" fill="#b7ecda"/><path d="M10 1.5 L1.5 10 L10 10 Z" fill="#9de0c9"/></svg>';
   const icoHunt = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.4 16.8 C6.8 12.4 11.2 8 16.2 3.6 C17 4.2 17.4 4.8 17.6 5.6 C13.4 10.6 8.8 14.8 4.4 17.6 C4 17.4 3.7 17.1 3.4 16.8 Z" fill="#c9a86a"/><path d="M2.6 13.8 C4.8 11.6 6.6 12.4 6.6 14.6" fill="none" stroke="#c9a86a" stroke-width="1.4" stroke-linecap="round"/></svg>';
-  /* 离线装备: 阿青择优佩戴N件, 多余熔灵石 */
+  /* 离线装备: 阿青择优佩戴N件, 多余熔灵石 —— v5.8 全览一行: 掉落总数/佩戴/熔炼+灵石 */
   const Eq = gg.equip;
   let huntExtra = "";
   const totalSpirit = gg.spirit || 0;
   let equipRow = "";
-  if (Eq && Eq.kept > 0) {
-    equipRow = `<div class="off-row"><span class="o-ico">${icoHunt}</span><span class="ol">阿青择优佩戴</span><b class="ov" style="color:#e0b45a">${Eq.kept} 件</b></div>`;
-    if (Eq.melted > 0) huntExtra = `<div class="off-hunt">另有 ${Eq.melted} 件不入眼，阿青投炉熔作灵石 +${fmt(Eq.meltSp || 0)}。</div>`;
+  if (Eq && ((Eq.total || 0) > 0 || (Eq.kept || 0) > 0)) {
+    const tot = (Eq.total != null) ? Eq.total : ((Eq.kept || 0) + (Eq.melted || 0));
+    const wearTxt = (Eq.kept || 0) > 0 ? `阿青佩戴 ${Eq.kept} 件` : "无可入眼";
+    const meltTxt = (Eq.melted || 0) > 0 ? `·熔炼 ${Eq.melted} 件 +${fmt(Eq.meltSp || 0)} 灵石` : "";
+    equipRow = `<div class="off-row"><span class="o-ico">${icoHunt}</span><span class="ol">化身代狩·共掉 ${tot} 件</span><b class="ov" style="color:#e0b45a">${wearTxt}${meltTxt}</b></div>`;
   }
   /* v5.6 通用 Buff 协议回传: gains.fx = 参与本次结算的加成条目(已由服务端按区间加权验算),
    * 前端结构化循环渲染 —— 以后新增任何丹方/加成源, 面板零改动。 */

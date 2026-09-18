@@ -153,6 +153,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     /* v3.9 试炼轮次: 120秒一场, 怪从T1一路刷到T5; 结算击杀数 → 纪录 → 离线补偿
      * v5.0 121只固定怪池: trialSpawned记录已刷序号, 按序号决定tier, 刷完121只提前结算 */
     trialT: BC.trialSecs, trialKills:0, trialTier:1, trialSettled:false, trialBossDone:false, bossT:0,
+    trialSpDrop: 0, trialEqDrop: 0,   /* v5.8 本波兽潮实测产出(灵石/装备掉落生成量), 破纪录时写存档快照 */
     trialSpawned:0, trialBossKilled:false,
   };
   /* v6.9 PERF: 粒子上限。每次命中/击杀/技能都 push 一个粒子, 同屏激烈时无上限会堆积
@@ -1594,6 +1595,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     return { x: CW * 0.5, y: 20 };
   }
   function spawnSpiritDrop(e, val, elite) {
+    /* v5.8 妖潮波内产出统计(生成量口径): 破纪录时随 trialBest 一起写存档快照 */
+    if (!G.trialSettled) G.trialSpDrop = (G.trialSpDrop || 0) + (val || 0);
     if (G.drops.filter(d => d.kind === 'spirit').length >= 14) {   // 过载: 直接入账, 跳过飞行动画
       G.spirit += val;
       try { if (window.BattleAPI.onDrop) window.BattleAPI.onDrop({ spirit: val, elite: !!elite, enemy: e.name }); } catch (err) {}
@@ -1605,6 +1608,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   function spawnEquipDrop(e, eq) {
     /* v6.15: 装备掉落改成宝箱——掉落后先展示 1.5 秒, 宠物再飞来捡。
      * 宝箱图预加载一次, 所有掉落共享。 */
+    if (!G.trialSettled) G.trialEqDrop = (G.trialEqDrop || 0) + 1;   /* v5.8 妖潮波内装备掉落计数 */
     if (!spawnEquipDrop._chestImg) {
       spawnEquipDrop._chestImg = new Image();
       spawnEquipDrop._chestImg.src = 'assets/chest.png';
@@ -2613,6 +2617,10 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         if (kills > best) {
           best = kills; isNew = true;
           st.trialBest = best;
+          /* v5.8 破纪录波效率快照: 本波实测掉落(灵石/装备件数)随档上传,
+           * 后端离线结算 = 快照 × 波数(120s/波) × 0.7 —— 离线效率跟玩家实测走 */
+          st.trialSp = Math.max(0, Math.round(G.trialSpDrop || 0));
+          st.trialEq = Math.max(0, Math.round(G.trialEqDrop || 0));
           try { window.addJournal && window.addJournal({ key: 'trial-' + Date.now(), big: realmName(), kind: '试炼', title: '妖潮试炼', text: `妖潮退去, 此番斩妖 ${kills} 只${bossKilled ? ', 击杀妖王' : ''}, 刷新试炼纪录。` }); } catch (err) {}
         }
         /* v5.0 累计制: 击杀数×1% + BOSS 60%, 封顶180% */
@@ -2657,6 +2665,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     G.bossActive = false;
     G.kills = 0;   /* v5.1 结算后HUD击杀数清零(原只重置trialKills, G.kills没重置导致HUD显示不清零) */
     G.trialT = BC.trialSecs; G.trialKills = 0; G.trialTier = 1;
+    G.trialSpDrop = 0; G.trialEqDrop = 0;   /* v5.8 新的一波, 产出统计归零 */
     G.trialSettled = false; G.trialBossDone = false;
     G.trialSpawned = 0; G.trialBossKilled = false;   /* v5.0 重置121只怪池计数 */
     G.bossT = 0;   /* v7.0 BOSS 30s 限时计时归零 */
