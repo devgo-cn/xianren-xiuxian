@@ -2095,12 +2095,12 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       if (nearest < Infinity) p.x = Math.min(p.x, nearest - PLAYER_HIT_GAP);
     }
   }
-  function updatePets(dt) {
+  function updatePets(sdt) {   /* v5.11: 形参由 dt 改 sdt —— 战斗计时(施法冷却/动画)与位移(跟随/捡装)全部随倍速加速 */
     const p = G.player;
     for (const pet of G.pets) {
       if (!pet.alive) continue;
       /* 飞行动画帧更新 */
-      pet.flyTimer += dt;
+      pet.flyTimer += sdt;
       const frameDur = pet.type === 'eagle' ? 1/20 : 1/24;
       if (pet.flyTimer >= frameDur) {
         pet.flyTimer -= frameDur;
@@ -2109,7 +2109,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       /* 朝向: 仅拾取/携带阶段按移动方向判朝向, 跟随阶段固定朝右(不摆头) */
       const dxFrame = pet.x - (pet.lastX ?? pet.x);
       pet.faceAcc = (pet.faceAcc || 0) + dxFrame;
-      const faceThresh = Math.max(0.6, 12 * dt);
+      const faceThresh = Math.max(0.6, 12 * sdt);
       pet.lastX = pet.x;
       /* 拾取装备: 飞行宠物飞向地板掉落, 拾起后缩小带回, 抵达即入包 */
       if (pet.fetch && pet.fetch.state === 'toDrop') {
@@ -2117,8 +2117,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         if (!d || d.phase === 'done') { pet.fetch.state = 'idle'; pet.fetch.drop = null; }
         else {
           const dx = d.wx - pet.x, dy = (d.y - 16) - pet.y, dist = Math.hypot(dx, dy), spd = 560;
-          if (dist <= spd * dt || dist < 10) { pet.x = d.wx; pet.y = d.y - 16; d.phase = 'carry'; d.t2 = 0; pet.fetch.state = 'carry'; }
-          else { pet.x += dx / dist * spd * dt; pet.y += dy / dist * spd * dt; }
+          if (dist <= spd * sdt || dist < 10) { pet.x = d.wx; pet.y = d.y - 16; d.phase = 'carry'; d.t2 = 0; pet.fetch.state = 'carry'; }
+          else { pet.x += dx / dist * spd * sdt; pet.y += dy / dist * spd * sdt; }
           /* 拾取阶段按移动方向判朝向 */
           if (pet.faceAcc > faceThresh) { pet.face = 1; pet.faceAcc = 0; }
           else if (pet.faceAcc < -faceThresh) { pet.face = -1; pet.faceAcc = 0; }
@@ -2129,8 +2129,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       if (pet.fetch && pet.fetch.state === 'carry') {
         const d = pet.fetch.drop;
         const tx = p.x + pet.offsetX, ty = floorY() + p.y + pet.offsetY, dx = tx - pet.x, dy = ty - pet.y, dist = Math.hypot(dx, dy), spd = 380;
-        if (dist <= spd * dt || dist < 8) { pet.x = tx; pet.y = ty; }
-        else { pet.x += dx / dist * spd * dt; pet.y += dy / dist * spd * dt; }
+        if (dist <= spd * sdt || dist < 8) { pet.x = tx; pet.y = ty; }
+        else { pet.x += dx / dist * spd * sdt; pet.y += dy / dist * spd * sdt; }
         d.x = worldToScreen(pet.x); d.y = pet.y - 6;             // 装备贴在宠物身上
         /* 携带阶段按移动方向判朝向 */
         if (pet.faceAcc > faceThresh) { pet.face = 1; pet.faceAcc = 0; }
@@ -2163,7 +2163,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         if (d) { d.claimed = true; d.phase = 'fetch'; pet.fetch = pet.fetch || { state: 'idle', drop: null }; pet.fetch.state = 'toDrop'; pet.fetch.drop = d; continue; }
       }
       /* 上下浮动(保留计时器, 渲染层用) */
-      pet.bobT += dt * 2.5;
+      pet.bobT += sdt * 2.5;
       /* ═══ v8.5 灵鹰独立化(用户明确要求) ═══
        * 灵鹰是【独立的攻击宠】, 不是跟随宠:
        *   ① 不绑玩家: 它自己悬停在战场上方, 玩家推进/后退它不跟着平移
@@ -2172,23 +2172,23 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
        * 因此这里给灵鹰单开一条分支, 在它自己处理完攻击后 continue,
        * 不再往下走"跟随玩家 + 施法"那两段共用逻辑。 */
       if (pet.type === 'eagle') {
-        updateEagle(dt, pet, p);
+        updateEagle(sdt, pet, p);
         continue;
       }
-      /* 跟随玩家: 左上方, 简单延迟跟随 —— 插值系数小(dt*3.5), 玩家快走时宠物
+      /* 跟随玩家: 左上方, 简单延迟跟随 —— 插值系数小(sdt*3.5), 玩家快走时宠物
        * 先愣一下(跟不上), 随后慢慢跟上。不用弹簧/惯性模型, 倍速起来也不乱晃。 */
       const targetX = p.x + pet.offsetX;
       const targetY = floorY() + p.y + pet.offsetY;
-      pet.x += (targetX - pet.x) * Math.min(1, dt * 3.5);
-      pet.y += (targetY - pet.y) * Math.min(1, dt * 3.5);
+      pet.x += (targetX - pet.x) * Math.min(1, sdt * 3.5);
+      pet.y += (targetY - pet.y) * Math.min(1, sdt * 3.5);
       /* 朝向固定朝右(宠物在玩家左侧跟随, 不摆头) */
       pet.face = 1;
 
       /* 施法系统 —— 【只有灵狐会走到这里】。
        * v8.5: 灵鹰已在上面 continue, 不会进来, 所以它的"施法光环"彻底消失。 */
       if (pet.casting) {
-        pet.castAnim += dt / 1.2;  /* 施法动画1.2秒 */
-        pet.effectTimer += dt;
+        pet.castAnim += sdt / 1.2;  /* 施法动画1.2秒 */
+        pet.effectTimer += sdt;
         /* 施法进行中: 生成治疗/攻击粒子 */
         if (pet.effectTimer >= 0.08) {
           pet.effectTimer = 0;
@@ -2220,7 +2220,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         }
       } else {
         /* 施法冷却 */
-        pet.castTimer -= dt;
+        pet.castTimer -= sdt;
         if (pet.castTimer <= 0) {
           /* 随机选择施法类型: 60%回血, 40%加攻击 */
           pet.casting = true;
@@ -2233,7 +2233,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
 
     /* 玩家攻击buff计时 */
     if (p.atkBuffTimer > 0) {
-      p.atkBuffTimer -= dt;
+      p.atkBuffTimer -= sdt;
       if (p.atkBuffTimer <= 0) { p.atkBuff = 0; p.atkBuffTimer = 0; }
     }
   }
@@ -2264,7 +2264,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     screenGapL: 90,
     screenGapR: 140,
   };
-  function updateEagle(dt, pet, p) {
+  function updateEagle(sdt, pet, p) {   /* v5.11: 形参由 dt 改 sdt —— 攻击间隔/弹幕飞行/站位插值随倍速加速 */
     /* ── 站位 ── */
     let anchorX = p.x + EAGLE.hoverBack;      /* 兜底: 场上没怪时, 玩家前方空域 */
     let front = -Infinity;                    /* 最靠前的怪(离玩家最近) */
@@ -2282,7 +2282,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     if (anchorX < scrMin) anchorX = scrMin;
     if (anchorX > scrMax) anchorX = scrMax;
     /* 平滑靠位(与灵狐同款延迟跟随手感, 但目标是空域锚点而非玩家) */
-    pet.x += (anchorX - pet.x) * Math.min(1, dt * 3.5);
+    pet.x += (anchorX - pet.x) * Math.min(1, sdt * 3.5);
     /* ── 高度: 战场上空, 与玩家无关 ──
      * ⚠️⚠️ v8.6 致命 BUG 修复(勿回退) —— "鹰压根看不到"的真正根因:
      * 渲染层对宠物用的是【绝对屏幕 y】(看 drawPets: `const sy = pet.y;
@@ -2297,12 +2297,12 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
      * 再减去半个鹰身, 保证整只鹰(含向上的羽翼)都落在画布内。 */
     const eagleH = Math.min(CH * 0.40, 64);          /* 与渲染层 drawH 一致 */
     const baseY = floorY() - CH * EAGLE.hoverH - eagleH * 0.5;
-    pet.y += (baseY - pet.y) * Math.min(1, dt * 3.5);
+    pet.y += (baseY - pet.y) * Math.min(1, sdt * 3.5);
     pet.face = 1;                             /* 素材默认朝右, 不摆头 */
-    pet.boltAnim = Math.max(0, (pet.boltAnim || 0) - dt);
+    pet.boltAnim = Math.max(0, (pet.boltAnim || 0) - sdt);
 
     /* ── 攻击: 定时朝最近的怪发射追踪弹幕 ── */
-    pet.boltTimer = (pet.boltTimer == null ? EAGLE.atkInterval : pet.boltTimer) - dt;
+    pet.boltTimer = (pet.boltTimer == null ? EAGLE.atkInterval : pet.boltTimer) - sdt;
     if (pet.boltTimer > 0) return;
     pet.boltTimer = EAGLE.atkInterval;
     if (!G.enemies || !G.enemies.some(e => e.alive)) return;
@@ -2330,11 +2330,11 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   }
 
   /* 灵鹰弹幕更新(不在宠物循环里, 只执行一次) */
-  function updateEagleBolts(dt) {
+  function updateEagleBolts(sdt) {   /* v5.11: 形参由 dt 改 sdt —— 弹幕飞行随倍速(追踪弹越目标后下帧必命中, 无穿透) */
     if (!G.eagleBolts || G.eagleBolts.length === 0) return;
     for (let i = G.eagleBolts.length - 1; i >= 0; i--) {
       const b = G.eagleBolts[i];
-      b.t += dt;
+      b.t += sdt;
       if (b.target && b.target.alive) {
         /* ⚠️ v8.6 坐标统一(勿回退): 弹幕全程走【屏幕坐标】, 见发射点处的长注释。
          * 追踪时同样要把怪的世界 x 转屏幕、并把车道偏移加上 floorY() 换成屏幕 y,
@@ -2345,8 +2345,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       const dx = b.tx - b.x, dy = b.ty - b.y;
       const dist = Math.sqrt(dx*dx + dy*dy);
       if (dist > 5) {
-        b.x += dx / dist * b.speed * dt;
-        b.y += dy / dist * b.speed * dt;
+        b.x += dx / dist * b.speed * sdt;
+        b.y += dy / dist * b.speed * sdt;
       }
       let hit = false;
       if (dist < 30) {
@@ -2722,7 +2722,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
     _pushT -= dt;
     if (_pushT <= 0) { _pushT = 5; if (typeof window.pushBattleStats === 'function') window.pushBattleStats(); }
-    updatePlayer(sdt); updatePets(dt); updateEagleBolts(dt); updateEnemies(sdt); updateFx(sdt); updateDrops(dt); updateCamera(sdt);
+    updatePlayer(sdt); updatePets(sdt); updateEagleBolts(sdt); updateEnemies(sdt);   /* v5.11: 宠物/鹰弹幕接入倍速 —— 与玩家/怪的 sdt 同源 */ updateFx(sdt); updateDrops(dt); updateCamera(sdt);
     /* 技能名播报: 独立推进(不吃身法倍速, 固定节奏即隐) */
     if (G.skillCall) { G.skillCall.t += dt; if (G.skillCall.t >= G.skillCall.dur) G.skillCall = null; }
   }
