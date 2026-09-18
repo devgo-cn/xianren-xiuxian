@@ -2257,7 +2257,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
    * 玩家会觉得"鹰丢了"。所以锚点按战线走, 但保持一个远离玩家的高空站位。 */
   const EAGLE = {
     atkInterval: 2,       /* 发射间隔(秒) */
-    boltSpeed: 500,
+    boltSpeed: 260,       /* v5.14: 500→260 —— 原速 0.3s 打到, 观感"直接落在怪身上";
+                             降到可视速度后弹丸全程可见, 配合残影拖尾有真实弹道轨迹 */
     hoverBack: 150,       /* 站在"最前怪"后方 150px 的空域(不贴玩家) */
     minGapToPlayer: 90,   /* 至少离玩家 90px, 避免看起来还粘在玩家身上 */
     hoverH: 0.30,         /* 高度: 横带高度的 30% 处(高空) */
@@ -2355,6 +2356,15 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       if (dist > 5) {
         b.x += dx / dist * b.speed * sdt;
         b.y += dy / dist * b.speed * sdt;
+        /* v5.14 弹道残影: 每 30ms 在当前位置留一个渐隐残影, 拖出可见轨迹。
+         * 硬上限 40 个防堆积(速度极低/卡顿时 shift 丢最老)。 */
+        b.trailT = (b.trailT || 0) + sdt;
+        if (b.trailT >= 0.03) {
+          b.trailT = 0;
+          const T = G.eagleTrails || (G.eagleTrails = []);
+          T.push({ x: b.x, y: b.y, rot: Math.atan2(dy, dx), a: 0.45 });
+          if (T.length > 40) T.shift();
+        }
       }
       let hit = false;
       if (dist < 30) {
@@ -2367,6 +2377,13 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       }
       if (hit || b.t > 3) G.eagleBolts.splice(i, 1);
     }
+  }
+
+  /* v5.14 弹道残影衰减(拖尾渐隐, 约 0.33s 消散) */
+  function updateEagleTrails(sdt) {
+    const T = G.eagleTrails;
+    if (!T || !T.length) return;
+    for (let i = T.length - 1; i >= 0; i--) { T[i].a -= sdt * 1.35; if (T[i].a <= 0) T.splice(i, 1); }
   }
 
   /* 骨骼怪动画状态机: 游戏状态(hurt/anim/moving/dying) → 动作, fadeIn 平滑过渡。
@@ -2744,7 +2761,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
     _pushT -= dt;
     if (_pushT <= 0) { _pushT = 5; if (typeof window.pushBattleStats === 'function') window.pushBattleStats(); }
-    updatePlayer(sdt); updatePets(sdt); updateEagleBolts(sdt); updateEnemies(sdt);   /* v5.11: 宠物/鹰弹幕接入倍速 —— 与玩家/怪的 sdt 同源 */ updateFx(sdt); updateDrops(dt); updateCamera(sdt);
+    updatePlayer(sdt); updatePets(sdt); updateEagleBolts(sdt); updateEagleTrails(sdt); updateEnemies(sdt);   /* v5.11: 宠物/鹰弹幕接入倍速 —— 与玩家/怪的 sdt 同源; v5.14: 残影拖尾同倍速 */ updateFx(sdt); updateDrops(dt); updateCamera(sdt);
     /* 技能名播报: 独立推进(不吃身法倍速, 固定节奏即隐) */
     if (G.skillCall) { G.skillCall.t += dt; if (G.skillCall.t >= G.skillCall.dur) G.skillCall = null; }
   }
@@ -2997,6 +3014,39 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         S.place.drawCircle(2.5, -r-1, 1.2);
         S.place.endFill();
       }
+    }
+
+    /* v5.14 渲染弹道残影(拖尾) —— 与弹幕同贴图, ADD 混合, alpha 渐隐, 比弹体细一档 */
+    if (G.petEagleBoltReady && G.petEagleBoltSprite && G.eagleTrails && G.eagleTrails.length) {
+      if (!G._boltTrailPool) G._boltTrailPool = [];
+      const tn = G.eagleTrails.length;
+      while (G._boltTrailPool.length < tn) {
+        const spr = new PIXI.Sprite(window.BattleGL.tex(G.petEagleBoltSprite));
+        spr.anchor.set(0.5, 0.5);
+        spr.blendMode = PIXI.BLEND_MODES.ADD;
+        window.BattleGL.layers.fx.addChild(spr);   /* 与弹幕同层: near 之上、text 之下 */
+        G._boltTrailPool.push(spr);
+      }
+      for (let i = 0; i < G._boltTrailPool.length; i++) {
+        const spr = G._boltTrailPool[i];
+        if (i < tn) {
+          const tr = G.eagleTrails[i];
+          spr.visible = true;
+          spr.position.set(tr.x, tr.y);
+          spr.rotation = tr.rot;
+          spr.alpha = tr.a;
+          const tex = spr.texture;
+          if (tex && tex.width && tex.height) {
+            const ar = tex.width / tex.height;
+            spr.height = 12;
+            spr.width = 12 * ar;
+          } else { spr.width = 56; spr.height = 26; }
+        } else {
+          spr.visible = false;
+        }
+      }
+    } else if (G._boltTrailPool) {
+      for (const spr of G._boltTrailPool) spr.visible = false;
     }
 
     /* 渲染灵鹰弹幕(对象池复用) */

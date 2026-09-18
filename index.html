@@ -234,6 +234,15 @@
   /* 主角（略微缩小以腾出战斗区空间） */
   .stage{position:fixed;inset:0;z-index:5;display:flex;align-items:flex-end;justify-content:center;pointer-events:none}
   .cult{position:relative;height:min(44vh,350px);aspect-ratio:825/835}
+  /* v5.14: 道号悬于打坐角色头顶 —— 书法大字+金描边+柔光呼吸; 未定名不显示 */
+  .cult-pname{position:absolute;left:50%;top:-2%;transform:translateX(-50%);z-index:3;
+    font-family:var(--font-brush);font-size:19px;letter-spacing:.16em;color:#f0d898;
+    text-shadow:0 0 12px rgba(232,197,107,.5),0 1px 2px rgba(0,0,0,.85);
+    pointer-events:auto;cursor:pointer;white-space:nowrap;display:none;
+    animation:pnameGlow 3.6s ease-in-out infinite}
+  .cult-pname.show{display:block}
+  @keyframes pnameGlow{0%,100%{text-shadow:0 0 9px rgba(232,197,107,.35),0 1px 2px rgba(0,0,0,.85)}
+    50%{text-shadow:0 0 20px rgba(244,214,140,.85),0 0 3px rgba(120,80,20,.9),0 1px 2px rgba(0,0,0,.85)}}
   .cult img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;transform-origin:50% 88%}
   /* v1.7.40: 三图层胸腔呼吸 + 辉光呼吸(收放); 头部层(.hair-top)不发辉光 */
   .cult .bodyL{animation:bodyBreath 5.4s ease-in-out infinite, cultGlow 3.6s ease-in-out infinite}
@@ -685,6 +694,7 @@
 
 <div class="stage">
   <div class="cult" id="cult">
+    <div class="cult-pname" id="cultPname" onclick="event.stopPropagation();openRename()" title="点此改道号"></div>
     <img class="bodyL" src="assets/cultivator_body.webp" alt="">
     <img class="robe" src="assets/cultivator_robe.webp" alt="">
     <img class="hair-low" src="assets/cultivator_hair.webp" alt="">

@@ -254,6 +254,12 @@ function renderPName() {
   el.textContent = nm || "定道号";
   el.classList.toggle("named", !!nm);
   el.title = nm ? "道号 · " + nm + "（点此改）" : "尚未定道号 · 点此起名（全服唯一；换设备寻档仍用玩家码）";
+  /* v5.14: 道号同步悬到打坐角色头顶 —— 未定名隐藏, 定名后金光大字 */
+  const cp = document.getElementById("cultPname");
+  if (cp) {
+    if (nm) { cp.textContent = nm; cp.classList.add("show"); }
+    else { cp.textContent = ""; cp.classList.remove("show"); }
+  }
 }
 
 function apiRoot() { try { return CLD_API.replace(/\/api\/save$/, ""); } catch (e) { return "https://save.devgo.cn"; } }

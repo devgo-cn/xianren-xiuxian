@@ -1263,8 +1263,9 @@
    ============================================================ */
 .realm-badge{background:transparent !important;box-shadow:none !important;padding:0 !important;position:relative !important;border:0 !important}
 /* v7.6: 资源栏迁走后顶部空出大片位置 → 境界牌松弛排版并整体右移(不再紧贴左缘) */
+/* v7.6 曾整体右移; v5.14 用户反馈左边空太多 → 回归贴左(容器自带 12px + 安全区内边距) */
 .realm-left{display:block !important;width:auto !important;text-align:left !important;
-  margin-left:clamp(10px, 11vw, 56px)}
+  margin-left:0 !important}
 .rb-table{border-collapse:collapse;text-align:left}
 .rb-table td{padding:0;vertical-align:middle;white-space:nowrap;text-align:left}
 /* 第 1 行: 大境界 + 小境界段位(同排, 段位略淡); 行距放宽 */
