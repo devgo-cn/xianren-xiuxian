@@ -12,8 +12,6 @@ const GAME_VER = "v" + (window.APP_VER || "dev");
 
 const CACHE_VER = window.APP_VER || "dev";
 
-const SEG4 = ["前期", "中期", "后期", "圆满"];
-
 const BIGS = [
   { n: "凡人", segs: 1, color: "#c6b07c", c: [198,176,124] },
   { n: "炼气", segs: 13, color: "#7fe0ff", c: [127,224,255] },
@@ -29,12 +27,6 @@ const BIGS = [
   { n: "天仙", segs: 4, color: "#fff0a8", c: [255,240,168] },
 ];
 
-const REALM_DAYS = [0.15, 2.5, 3.5, 5, 6.5, 8.5, 11, 14, 17.5, 21.5, 26, 32];
-
-const SEG_SCALE = 4;
-
-const ARRAY_MAX_LV = 32;
-
 const arrMult = lv => {
   let m = 1;
   for (let k = 2; k <= lv; k++) m += k <= 11 ? 0.12 : (k <= 21 ? 0.06 : (k <= 31 ? 0.02 : 0));
@@ -42,10 +34,6 @@ const arrMult = lv => {
 };
 
 const SPIRIT_RATE = lv => 0.5 + 0.34 * lv;
-
-const ARRAY_COST = lv => 900 * Math.pow(lv + 1, 2.55);
-
-const SEG_META = [];
 
 function cnNum(n) {
   return ["一","二","三","四","五","六","七","八","九","十","十一","十二","十三"][n - 1] || n;
@@ -517,8 +505,6 @@ const OFFLINE_CAP = 48 * 3600;
 
 
 
-
-const PAGES_NEED = [0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 
 const $ = id => document.getElementById(id);
 
@@ -2291,8 +2277,6 @@ export {
   bigIndexOf,
   MOB_BENCHMARK,
   $,
-  ARRAY_COST,
-  ARRAY_MAX_LV,
   AURA_COLORS,
   AURA_FPS,
   BIGS,
@@ -2320,22 +2304,17 @@ export {
   MS_SPIRIT,
   MYST,
   OFFLINE_CAP,
-  PAGES_NEED,
   PET,
   PET_BONUS,
   PET_COIN,
   PET_FORGE,
   PET_STILL,
   PLOT,
-  REALM_DAYS,
   RK_NAMES,
   RK_SEGS,
   SAVE_KEY,
   SEARCH_MAX,
   SEARCH_MIN,
-  SEG4,
-  SEG_META,
-  SEG_SCALE,
   SKILL_DEFS,
   SPIRIT_RATE,
   STORY_BY_KEY,

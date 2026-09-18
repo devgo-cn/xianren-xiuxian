@@ -7,7 +7,8 @@
  */
 import { live as NS5_live } from './05-v6.js';
 import { toNumber as N6_toNumber } from './00-num.js';
-import { $, ARRAY_COST, bigIndexOf, BASE_STATS, AURA_COLORS, BIGS, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, G1_TPL, GAME_VER, JRN_TAIL, MIGRATIONS, PAGES_NEED, PLOT, RK_NAMES, RK_SEGS, SAVE_KEY, SEARCH_MAX, SEARCH_MIN, SEG_META, SKILL_DEFS, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, __set_hbFails, __set_kicked, __set_parts, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, autoHuntOn, capDeviceDpr, cld, cldApiBase, cnNum, durTxt, esc, fin, fmt, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, state } from './00-pure.js';
+import * as RM from './00-realm.js';
+import { $, bigIndexOf, BASE_STATS, AURA_COLORS, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, G1_TPL, GAME_VER, JRN_TAIL, MIGRATIONS, PLOT, RK_NAMES, RK_SEGS, SAVE_KEY, SEARCH_MAX, SEARCH_MIN, SKILL_DEFS, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, __set_hbFails, __set_kicked, __set_parts, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, autoHuntOn, capDeviceDpr, cld, cldApiBase, durTxt, esc, fin, fmt, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, state } from './00-pure.js';
 
 (function () {
   const vt = document.getElementById("verTag"); if (vt) vt.textContent = GAME_VER;
@@ -145,9 +146,15 @@ window.__sndResume = () => { try { SND.resume(); } catch (e) {} };
 
 SND.initFiles();
 
-const TOTAL_SEGS = BIGS.reduce((s, b) => s + b.segs, 0);
-
-function seg(i) { return SEG_META[Math.min(i, TOTAL_SEGS - 1)]; }
+/* 境界总数（含凡人）。
+ *
+ * 阶段5c: 原来走旧分段表（00-pure 的段数求和），现在改为
+ * v6 权威表的派生量 REALM_STATES（BIG_REALMS 段数之和 = 54）。
+ * 两者数值相同 —— 但 v6 才是唯一数据源，避免两处各维护一份段数。
+ *
+ * 仍被本模块的 realmIdx 归一化（下方 adopt）与 30-systems 的「已臻极巅」
+ * 文案使用，故保留导出。 */
+const TOTAL_SEGS = RM.REALM_STATES;
 
 function adopt(s) {
   if (!s || !Array.isArray(s.arts)) return null;
@@ -476,14 +483,6 @@ function tickDsp(dt) {
   if (Math.abs(state.exp - _dsp.exp) < 0.5) _dsp.exp = state.exp;
 }
 
-function 段名(r) {
-  if (r.big === "凡人") return "";
-  if (r.big === "炼气") return cnNum(r.segNo) + "层";
-  return r.label.split("·")[1];
-}
-
-function arrayCostNow() { return ARRAY_COST(state.arrayLv); }
-
 function pushMsg(side, html) {
   const box = $((side === "main") ? "mainFeed" : "avatarFeed");
   if (!box) return;
@@ -739,10 +738,6 @@ function renderPillHints() {
 }
 
 
-function pagesOf(bi) { return (state.pages && state.pages["b" + bi]) || 0; }
-
-function hiddenUnlocked(bi) { return pagesOf(bi) >= PAGES_NEED[bi]; }
-
 function cloudSnap(src) {
   const s = src || state;
   const out = Object.assign({}, s);
@@ -917,7 +912,6 @@ export {
   _auraT,
   adopt,
   apiRoot,
-  arrayCostNow,
   artMult,
   bctx,
   bcv,
@@ -950,7 +944,6 @@ export {
   g1Unpack,
   handleKicked,
   hbFail,
-  hiddenUnlocked,
   createFxLayer,
   createStageLayers,
   initAura,
@@ -960,7 +953,6 @@ export {
   journalHasKey,
   migrate,
   openRename,
-  pagesOf,
   pickNoRepeat,
   pushBattleStats,
   pushBoost,
@@ -973,7 +965,6 @@ export {
   resetDimKnob,
   rkSegLabel,
   searchMs,
-  seg,
   setRealmSub,
   settleBlocked,
   sizeBurst,
@@ -987,7 +978,6 @@ export {
   tickDsp,
   trimJournal,
   trimJr,
-  段名,
 };
 
 /* ── 可变状态写入口（由 tools/split2.js 自动生成）────────────────

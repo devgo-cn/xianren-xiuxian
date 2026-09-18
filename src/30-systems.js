@@ -5,39 +5,9 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, AURA_COLORS, AURA_FPS, BIGS, MAIN_STORY, PLOT, REALM_DAYS, SEG4, SEG_META, SEG_SCALE, SKILL_DEFS, __set_settling, _dsp, _floatPrev, _settling, bigSub, cld, cnNum, state } from './00-pure.js';
+import { $, AURA_COLORS, AURA_FPS, MAIN_STORY, PLOT, SKILL_DEFS, __set_settling, _dsp, _floatPrev, _settling, cld, state } from './00-pure.js';
 import { __set_auraAcc, __set_auraT, _auraAcc, _auraColor, _auraCtx, _auraP, _auraT, cldUI, pickNoRepeat, pushMsg } from './10-base.js';
 import { _cloudSettleRun, bigIdx, realm, renderSkills, showChapter, skillVal } from './20-core.js';
-
-(function buildSegs() {
-  let cum = 0;
-  for (let bi = 0; bi < BIGS.length; bi++) {
-    const big = BIGS[bi];
-    const s = big.segs;
-    const dsecTotal = REALM_DAYS[bi] * 86400;
-    const ws = [];
-    for (let j = 0; j < s; j++) ws.push(s <= 1 ? 1 : (j + 1) / s);  // v2.6 线性分配: 圆满占40%, 中间段平滑递增, 消除圆满陡增
-    const sw = ws.reduce((a, b) => a + b, 0);
-    for (let q = 0; q < s; q++, cum++) {
-      let label, isBigEnd = false;
-      if (big.n === "凡人") {
-        label = "凡人";
-      } else if (big.n === "炼气") {
-        label = `${big.n}·${cnNum(q + 1)}层`;
-        isBigEnd = (q === s - 1);
-      } else {
-        label = `${big.n}·${SEG4[q]}`;
-        isBigEnd = (q === s - 1);
-      }
-      // 凡人: 新手入门, 几分钟即可渡入炼气; 其余按目标时长 × 大境强度
-      const need = big.n === "凡人" ? 2500
-        : Math.max(120, Math.round(SEG_SCALE * Math.pow(bi + 1, 3.0) * dsecTotal * ws[q] / sw));
-      SEG_META.push({ bigIdx: bi, big: big.n, label, need, isBigEnd,
-        color: big.color, c: big.c, segNo: q + 1,
-        sub: bigSub(bi) });
-    }
-  }
-})();
 
 async function cldPush() {
   /* v1.8.0: 服务端只有一种写操作 —— 结算。

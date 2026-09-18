@@ -6,9 +6,25 @@
  * 重建: node tools/split2.js <repo> <out>
  */
 import { $, DROP_CFG, JRN_CAP, SAVE_KEY, SKILL_DEFS, STORY_BY_KEY, STORY_PAGE, __set_rate, __set_rkAt, __set_srvOffset, __set_state, __set_storyChap, _pred, _rkAt, _storyChap, cld, cnNum, esc, fmt, rnOk, state } from './00-pure.js';
-import { CLD_API, SND, adopt, apiRoot, cldFlash, cldId, cldUI, closeRename, cloudSnap, cloudSoon, deviceId, exitDim, g1Pack, g1Unpack, handleKicked, migrate, pushBattleStats, pushMsg, renderPName, renderSettings, resetDimKnob, rkSegLabel, seg, setRealmSub, sizeBurst, skillVal, storyItemHtml, trimJournal } from './10-base.js';
+import * as RM from './00-realm.js';
+import { CLD_API, SND, adopt, apiRoot, cldFlash, cldId, cldUI, closeRename, cloudSnap, cloudSoon, deviceId, exitDim, g1Pack, g1Unpack, handleKicked, migrate, pushBattleStats, pushMsg, renderPName, renderSettings, resetDimKnob, rkSegLabel, setRealmSub, sizeBurst, skillVal, storyItemHtml, trimJournal } from './10-base.js';
 
-function realm() { return seg(state.realmIdx); }
+/**
+ * 当前境界描述（旧体系入口，现已改为读 v6 境界表）。
+ *
+ * ── 阶段5c 改造 ──────────────────────────────────────────────────
+ * 原来这里走旧分段表查询（查 00-pure 的 SEG_META，旧的分段表，
+ * 由 30-systems.buildSegs() 在启动时填充）。那张表与 v6 的 BIG_REALMS
+ * 是【同一套境界的另一份副本】，两处维护必然漂移。
+ *
+ * 现在直接问 v6 的权威境界表：RM.realmName(state.realmIdx)。
+ * 由于阶段5b 已把 v6 境界单向镜像到 state.realmIdx（见 06-v6ui.mirrorRealmToLegacy），
+ * 本函数拿到的就是 v6 的当前境界 —— 主线因此「跟境界挂钩」且只有一个数据源。
+ *
+ * 返回值形状与旧分段函数保持兼容（bigIdx/big/color 等字段名一致），
+ * 这样 30-systems/40-app 里的 `realm().big` 等调用一行都不用改。
+ */
+function realm() { return RM.realmName(state.realmIdx); }
 
 function bigIdx() { return realm().bigIdx; }
 
