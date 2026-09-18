@@ -3584,7 +3584,15 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         o.spr.texture = window.BattleGL.tex(SK_TEX[f.tex]);
 
         o.spr.blendMode = f.blend === 'NORMAL' ? PIXI.BLEND_MODES.NORMAL : PIXI.BLEND_MODES.ADD;
+        /* v5.11 弹道修正(对齐鹰弹 v8.7 先例): spike 素材原弹头朝【左下 27°】(PCA 实测),
+         * 已在素材侧预旋转掰正为"默认朝左"(轴水平、弹头在左端中线), 代码不再需要角度偏置。
+         * 这里只按飞行方向做纯旋转: 小怪平飞 dy≈0 → 无旋转; BOSS 高空俯射/追踪时弹头跟随。
+         * orb 光球各向同性, 不旋转。 */
+        const isSpike = f.tex === 'spike';
         o.spr.anchor.set(f.dir < 0 ? 1 : 0, 0.5);
+        o.spr.rotation = isSpike
+          ? Math.atan2(f.dy || 0, f.dx || f.dir) - (f.dir < 0 ? Math.PI : 0)
+          : 0;
 
         /* 位置曲线: v4.9 沿 2 维瞄准方向推进(dx/dy 为发射时朝玩家的归一化方向) */
         const adv = f.travel ? f.travel * Math.min(1, kx / 0.8) : 0;
@@ -3611,7 +3619,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
         const W = f.thick * taper * breathe;
         o.spr.width = L;
         o.spr.height = W;
-        /* v4.9 spike 素材朝左(尖端在左): 向左打不翻转, 向右打才水平翻转 */
+        /* v5.11: spike 素材已预旋转摆正(弹头朝左), 水平镜像仅负责"向右发射"换向;
+         * rotation(上方)跟随飞行方向, 二者叠加后弹头始终指向飞行方向 */
         o.spr.scale.x = Math.abs(o.spr.scale.x) * (f.dir < 0 ? 1 : -1);
         o.spr.position.set(px, py);
 
