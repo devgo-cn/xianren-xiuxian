@@ -238,7 +238,6 @@ const BRIDGE = {
   "realm": function () { return NS_src_20_core_js["realm"]; },
   "realmMult": function () { return NS_src_30_systems_js["realmMult"]; },
   "realmPlot": function () { return NS_src_40_app_js["realmPlot"]; },
-  "refreshGlow": function () { return NS_src_30_systems_js["refreshGlow"]; },
   "renderAutoHunt": function () { return NS_src_10_base_js["renderAutoHunt"]; },
   "renderCraftBtn": function () { return NS_src_20_core_js["renderCraftBtn"]; },
   "renderPName": function () { return NS_src_10_base_js["renderPName"]; },
