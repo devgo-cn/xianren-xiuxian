@@ -270,6 +270,11 @@
   /* .btn .label 样式在 dt-theme.css 中定义(绝对定位右侧+不换行) */
   .btn .prog{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;
     mix-blend-mode:multiply;isolation:isolate}   /* v1.7.49: 与按钮底色相乘 → 恒为"本色加深", 任何状态(金/红/禁用灰调)都不割裂 */
+  /* v5.14: 进度填充由 SVG rect 转纯 CSS 渐变条(宽度由 setProg 写 style.width),
+     原 progGreen/progJade 深色叠加色按 stop 原样平移 */
+  .btn .prog > i{position:absolute;inset:0;width:0;display:block;
+    background:linear-gradient(90deg, rgba(74,58,34,.24) 0%, rgba(62,47,26,.27) 55%, rgba(51,38,20,.30) 100%)}
+  #btnBreak .prog > i{background:linear-gradient(90deg, rgba(70,48,36,.24) 0%, rgba(51,35,26,.30) 100%)}
   /* v2.6.1: 皮肤已换 webp 图片 → 进度填充改用图片 alpha 作 mask 裁形, 与新皮肤天然贴合
      (替代旧 SVG clipPath 墨形; 聚灵阵皮肤有 scaleX(-1) 镜像, mask 需用预翻转副本保持填充方向从左到右) */
   #btnArray .prog{-webkit-mask-image:url(assets/ui_icons/btn_array_flip.webp);mask-image:url(assets/ui_icons/btn_array_flip.webp);
@@ -612,13 +617,6 @@
 <!-- v1.8.0 连接中断遮罩: 心跳连续失败时盖住 —— 不让玩家在已经和服务端脱节的账本上继续玩 -->
 <div id="netOverlay"><div class="net-box"><b>连接中断</b><span>正在尝试重新连接服务器…</span><button type="button" onclick="location.reload()">重新加载</button></div></div>
 
-<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
-<linearGradient id="gradGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9c47e"/><stop offset=".5" stop-color="#c79d52"/><stop offset="1" stop-color="#8a6a30"/></linearGradient>
-<linearGradient id="gradCin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d04e35"/><stop offset=".5" stop-color="#b03a28"/><stop offset="1" stop-color="#862a18"/></linearGradient>
-<!-- v1.7.49 进度层=中性深色 × 按钮底色(multiply) → 呈现为按钮本色的加深版, 无色相割裂 -->
-<linearGradient id="progGreen" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4a3a22" stop-opacity=".24"/><stop offset=".55" stop-color="#3e2f1a" stop-opacity=".27"/><stop offset="1" stop-color="#332614" stop-opacity=".30"/></linearGradient>
-<linearGradient id="progJade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#463024" stop-opacity=".24"/><stop offset="1" stop-color="#33231a" stop-opacity=".30"/></linearGradient>
-</defs></svg>
 <!-- v4.1: #stage 2D 舞台画布已删除 —— 渲染栈统一 WebGL(#battleGL)，此处仅剩 .bg-img 静态底图 -->
 <div class="bg-img"></div>
 <!-- v3.2: 灵气层已并入 #stage -->
@@ -685,7 +683,7 @@
   </div>
   <!-- v7.5 资源栏(灵石 + 修为): 战斗区左下角裸文字, 与右下大图标同一水平带 -->
   <div class="res-bar">
-    <div class="spirit" title="灵石"><svg class="sico" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5 L18.5 10 L10 18.5 L1.5 10 Z" fill="#67c9ab"/><path d="M10 1.5 L10 18.5 L18.5 10 Z" fill="#b7ecda"/><path d="M10 1.5 L1.5 10 L10 10 Z" fill="#9de0c9"/></svg><span id="spirit">0</span></div>
+    <div class="spirit" title="灵石"><span class="sico" aria-hidden="true" style="display:inline-block;width:12px;height:12px;line-height:12px;font-size:11px;text-align:center;color:#67c9ab;text-shadow:0 0 6px rgba(103,201,171,.55)">◆</span><span id="spirit">0</span></div>
     <div class="rate"><span class="rl">修为</span><b id="rateText">0</b><span class="rl">/秒</span></div>
   </div>
   <div class="big-icons">
@@ -713,8 +711,8 @@
 <div class="feed feed-avatar" id="avatarFeed"></div>
 <div class="feed feed-main" id="mainFeed"></div>
 <div class="actions">
-  <button class="btn" id="btnArray" onclick="tapArray()"><img class="skin" src="assets/ui_icons/btn_array.webp" alt=""><svg class="prog" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true"><rect id="arrFill" x="0" y="0" width="0" height="60" fill="url(#progGreen)"/></svg><span class="label">聚灵阵 <span id="arrayLv">1</span></span><i class="pnum" id="arrNum"></i></button>
-  <button class="btn primary" id="btnBreak" onclick="manualBreak()"><img class="skin" src="assets/ui_icons/btn_break.webp" alt=""><svg class="prog" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true"><rect id="brkFill" x="0" y="0" width="0" height="60" fill="url(#progJade)"/></svg><span class="label">突 破</span><i class="pnum" id="brkNum"></i></button>
+  <button class="btn" id="btnArray" onclick="tapArray()"><img class="skin" src="assets/ui_icons/btn_array.webp" alt=""><i class="prog" aria-hidden="true"><i id="arrFill"></i></i><span class="label">聚灵阵 <span id="arrayLv">1</span></span><i class="pnum" id="arrNum"></i></button>
+  <button class="btn primary" id="btnBreak" onclick="manualBreak()"><img class="skin" src="assets/ui_icons/btn_break.webp" alt=""><i class="prog" aria-hidden="true"><i id="brkFill"></i></i><span class="label">突 破</span><i class="pnum" id="brkNum"></i></button>
   <button class="btn" id="btnTravel" onclick="openTravel()"><img class="skin" src="assets/ui_icons/btn_travel.webp" alt=""><span class="label">云游</span></button>
 </div>
 
@@ -725,7 +723,7 @@
 <div class="trib" id="trib"></div>
 
 <div id="cloudPanel">
-  <div class="cp-title"><svg viewBox="0 0 20 20" style="width:14px;height:14px;vertical-align:-2px" aria-hidden="true"><path d="M5.6 14.6 C3.4 14.4 2 12.8 2.2 10.8 C2.4 9 3.8 7.8 5.6 7.8 C6 5.6 7.8 4 10.2 4 C12.6 4 14.4 5.6 14.8 7.8 C16.6 8 18 9.4 18 11.2 C18 13 16.6 14.4 14.6 14.6 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> 云存档</div>
+  <div class="cp-title"><img src="assets/ui_icons/icon_cloud.webp" style="width:14px;height:14px;vertical-align:-2px" alt=""> 云存档</div>
   <div class="cp-row">玩家码&nbsp;<b id="cloudId">-</b><button class="cp-btn" onclick="cloudCopyId()">复制</button></div>
   <div class="cp-row">换存档&nbsp;<input id="cloudInput" placeholder="粘贴他人玩家码" maxlength="24"><button class="cp-btn" onclick="cloudBind()">绑定</button></div>
   <div class="cp-row"><button class="cp-btn" onclick="cloudPushNow()">立即上传</button><button class="cp-btn" onclick="cloudPullNow()">拉取云端</button></div>
@@ -768,7 +766,7 @@
     <div class="chips-row" id="storyChips"></div>
     <div class="story-body" id="storyBody">
     </div>
-    <button class="btn primary story-close" onclick="closeStory()"><svg class="skin" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true"><path class="ink" d="M14 7 C30 2 40 12 56 6 C72 1 84 9 100 6 C118 3 132 8 150 5 C166 3 184 6 194 12 C199 20 196 28 197 36 C198 44 194 50 180 52 C166 54 150 49 136 53 C120 57 104 50 90 54 C76 58 62 52 48 55 C34 57 20 52 10 53 C2 52 3 44 4 36 C5 27 3 19 6 14 C7 11 10 9 14 7 Z"/></svg><span class="label">合 上</span></button>
+    <button class="btn primary story-close" onclick="closeStory()">合 上</button>
   </div>
 </div>
 
@@ -865,13 +863,13 @@
     <h3>设 置</h3>
     <div class="set-list">
       <button class="set-row" id="setBgm" onclick="toggleBgm()">
-        <span class="set-ic"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.6 15.4 C7.4 13.8 7.4 9.4 7.8 4.6 C8 3.8 8.6 3.4 9.4 3.6 C11.4 4.2 13.2 4.4 14.6 4.2 C15.4 4.6 15.6 5.6 15 6.4 C13.4 6.6 11.6 6.4 9.8 5.8 C9.7 8.6 9.7 11.4 9.8 14.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="7" cy="15.2" r="2.1" fill="currentColor"/><circle cx="12.2" cy="14.4" r="2.1" fill="currentColor"/></svg></span><span class="set-tx">背景音乐</span><em class="set-st">开</em>
+        <span class="set-tx">背景音乐</span><em class="set-st">开</em>
       </button>
       <button class="set-row" id="setSfx" onclick="toggleSfx()">
-        <span class="set-ic"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.4 C10.6 5.6 11.8 7.6 14.4 8.2 C15.8 8.5 16.8 8.6 17.6 8.5 C15.4 9.4 13.8 10.4 13 11.8 C12.2 13.2 11.9 15.2 12 17.6 C11 15.6 9.9 14 8.5 13.1 C7.1 12.2 5.1 11.9 2.4 12 C4.6 11 6.2 10 7.1 8.6 C8 7.2 8.3 5.2 8.2 2.4 C8.8 2.4 9.4 2.4 10 2.4 Z" fill="currentColor"/></svg></span><span class="set-tx">音效</span><em class="set-st">开</em>
+        <span class="set-tx">音效</span><em class="set-st">开</em>
       </button>
       <button class="set-row" id="setDim" onclick="enterDim()">
-        <span class="set-ic"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13.4 2.6 C15 4.8 15.6 7.4 14.8 10 C13.8 13.6 10.6 16.2 6.8 16.6 C5.8 16.7 4.9 16.6 4.2 16.4 C6 15.2 7.6 13.6 8.6 11.6 C9.8 9.2 10 6.4 9.2 3.8 C10.5 2.8 11.9 2.4 13.4 2.6 Z" fill="currentColor"/></svg></span><span class="set-tx">黑屏挂机</span><em class="set-st go">进</em>
+        <span class="set-tx">黑屏挂机</span><em class="set-st go">进</em>
       </button>
     </div>
     <p class="story-tip">黑屏挂机时游戏照常运转，轻触屏幕任意处唤醒。</p>
@@ -893,7 +891,7 @@
   </div>
   <div class="dim-slide" id="dimSlide">
     <span class="dim-slide-tx">滑动进入游戏</span>
-    <div class="dim-knob" id="dimKnob"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.6 5.4 C11.4 7.6 13.6 9.8 15.6 12 C13.9 14.1 11.8 16.2 9.2 18.4" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="dim-knob" id="dimKnob"><span style="font-size:22px;font-weight:700;line-height:1;pointer-events:none">›</span></div>
   </div>
 </div>
 

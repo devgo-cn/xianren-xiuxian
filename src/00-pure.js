@@ -1160,8 +1160,9 @@ function spawnFloat(el, txt, neg) {
 function pulseChip(el) { if (!el) return; el.classList.remove("pulse"); void el.offsetWidth; el.classList.add("pulse"); }
 
 function setProg(id, pct) {
+  /* v5.14: 进度填充由 SVG rect 转纯 CSS 渐变条, 这里写百分比宽度 */
   const el = document.getElementById(id); if (!el) return;
-  el.setAttribute("width", (Math.max(0, Math.min(1, pct || 0)) * 200).toFixed(1));
+  el.style.width = (Math.max(0, Math.min(1, pct || 0)) * 100).toFixed(1) + "%";
 }
 
 const PLOT = [
@@ -2604,12 +2605,6 @@ const EQUI_SLOTI = ["w", "a", "p", "s"];
 
 const EQUI_CELLPOS = [{ pos: "left", i: 0 }, { pos: "up", i: 1 }, { pos: "right", i: 3 }, { pos: "down", i: 2 }];
 
-const EQUI_ICON = {
-  w: '<svg viewBox="0 0 32 32"><path d="M23.6 2.6 C25.2 3.4 27 5.2 28 6.8 C22.4 13.6 15.6 20.2 9.4 24.8 C8.2 23.9 7.2 22.8 6.4 21.5 C11.7 15.2 17.4 8.8 23.6 2.6 Z" fill="currentColor"/><path d="M24.4 1.6 C25.6 2.2 26.8 3.2 27.8 4.4 C28.2 3.8 28.5 3 28.4 2.4 C27.5 1.6 26.3 1.2 25.2 1 Z" fill="currentColor" opacity=".8"/><path d="M7.2 20.8 C9.4 20.6 11.6 22.2 12.2 24.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6.6 23.8 C5.4 25.4 4.6 27.2 4.4 29.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8.2 25 C7.6 26.6 7.6 28.2 8.2 29.8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".75"/></svg>',
-  a: '<svg viewBox="0 0 32 32"><path d="M16 2.6 C21 4.2 25.2 6 27.2 8.2 C28.2 14.2 26.8 20.8 23.2 25 C21 27.6 18.6 29.2 16 30.2 C13.2 29 10.6 27.2 8.4 24.4 C5.2 20.2 4 14 4.8 8.2 C7 6 11 4.2 16 2.6 Z" fill="currentColor"/><path d="M16 6.4 C16.1 13 16.1 20 16 26.4" stroke="rgba(8,12,20,.5)" stroke-width="1.7" fill="none" stroke-linecap="round"/><circle cx="10.6" cy="12.4" r="1.35" fill="rgba(8,12,20,.5)"/><circle cx="21.4" cy="12.4" r="1.35" fill="rgba(8,12,20,.5)"/></svg>',
-  p: '<svg viewBox="0 0 32 32"><path d="M17.8 3.4 C22.6 4.6 26 8.6 26.2 13.6 C26.4 19 22.6 23.6 17.4 24.6 C11.8 25.6 6.6 21.8 5.8 16.4 C5 11 8.8 6.2 14.2 5.2" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M13.6 3.4 C14.4 2 16.8 2 17.6 3.4 C18 4.2 17.6 5 16.6 5.2 L14.8 5.2 C13.8 5 13.4 4.2 13.6 3.4 Z" fill="currentColor"/><path d="M15.4 25.2 C15 27.2 15.2 29.2 16 31" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M12.8 24.6 C12 26.4 11.8 28.4 12.2 30.4" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".8"/></svg>',
-  s: '<svg viewBox="0 0 32 32"><path d="M9 4.6 C13.6 3 18.8 3 23.2 4.6 C24.8 6.2 24.8 8.8 23.2 10.3 C18.8 11.9 13.6 11.9 9 10.3 C7.4 8.8 7.4 6.2 9 4.6 Z" fill="currentColor" opacity=".95"/><path d="M9.6 11.4 C13.8 12.7 18.4 12.7 22.6 11.5 C23.8 17 23.7 22.6 22.4 27.9 C18.4 29.4 13.8 29.4 9.7 28 C8.4 22.5 8.4 17 9.6 11.4 Z" fill="rgba(8,12,20,.55)"/></svg>',
-};
 
 const LIC_QCOL = { 0: "#aab2c0", 1: "#6b9df5", 2: "#3fc9a2", 3: "#e0b45a", 4: "#c08af0", 5: "#ff5257" };
 
@@ -3076,7 +3071,6 @@ export {
   DIMSTAT,
   DROP_CFG,
   EQUI_CELLPOS,
-  EQUI_ICON,
   EQUI_SLOTI,
   EVENTS,
   FX_POOL,

@@ -5,7 +5,7 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, ARMOR_POOL, BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, ARRAY_COST, ART_PREFIX, ART_SPECIAL, ART_SUFFIX, AURA_COLORS, BIGS, BTL, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, EQUI_ICON, EQUI_SLOTI, FX_POOL, FX_TXT, G1_TPL, GAME_VER, JRN_TAIL, MATS, MIGRATIONS, MON_ATK_SCALE, MON_FX_POOL, MON_NAMES, MYST, PAGES_NEED, PEND_POOL, PLOT, QUALITY, RECIPES, RK_NAMES, RK_SEGS, SAVE_KEY, SCROLL_POOL, SEARCH_MAX, SEARCH_MIN, SEG_META, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, TRACE_ACT, TRAVEL_FIRST_MAX, TRAVEL_FIRST_STEP, TRAVEL_FIRST_WINDOW, TRAVEL_LATE_STEP, TRAVEL_SPAN, ZONES, __set_alTipT, __set_hbFails, __set_kicked, __set_parts, __set_tracePool, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, _tracePool, alIcoCls, alTipT, autoHuntOn, capDeviceDpr, cauldron, cld, cldApiBase, cnNum, durTxt, eqMult, esc, fin, finalStats, fmt, fxAgg, fxCount, fxValue, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, selRecipe, state } from './00-pure.js';
+import { $, ARMOR_POOL, BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, ARRAY_COST, ART_PREFIX, ART_SPECIAL, ART_SUFFIX, AURA_COLORS, BIGS, BTL, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, EQUI_SLOTI, FX_POOL, FX_TXT, G1_TPL, GAME_VER, JRN_TAIL, MATS, MIGRATIONS, MON_ATK_SCALE, MON_FX_POOL, MON_NAMES, MYST, PAGES_NEED, PEND_POOL, PLOT, QUALITY, RECIPES, RK_NAMES, RK_SEGS, SAVE_KEY, SCROLL_POOL, SEARCH_MAX, SEARCH_MIN, SEG_META, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, TRACE_ACT, TRAVEL_FIRST_MAX, TRAVEL_FIRST_STEP, TRAVEL_FIRST_WINDOW, TRAVEL_LATE_STEP, TRAVEL_SPAN, ZONES, __set_alTipT, __set_hbFails, __set_kicked, __set_parts, __set_tracePool, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, _tracePool, alIcoCls, alTipT, autoHuntOn, capDeviceDpr, cauldron, cld, cldApiBase, cnNum, durTxt, eqMult, esc, fin, finalStats, fmt, fxAgg, fxCount, fxValue, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, selRecipe, state } from './00-pure.js';
 
 (function () {
   const vt = document.getElementById("verTag"); if (vt) vt.textContent = GAME_VER;
@@ -1122,7 +1122,7 @@ function licBuild(cross, arr) {
   }).join("");
   lic.innerHTML = `
     <div class="lclose" onclick="closeLic(event)">✕</div>
-    <div class="lh"><span class="ico licface" style="width:38px;height:38px;flex:none"><span class="licsvg">${EQUI_ICON.w}</span>${faces}</span><b></b><i></i></div>
+    <div class="lh"><span class="ico licface" style="width:38px;height:38px;flex:none">${faces}</span><b></b><i></i></div>
     <div class="lr" data-k="a"><span>攻</span><b></b></div>
     <div class="lr" data-k="d"><span>防</span><b></b></div>
     <div class="lr" data-k="h"><span>血</span><b></b></div>

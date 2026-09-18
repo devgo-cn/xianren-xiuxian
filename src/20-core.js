@@ -389,7 +389,7 @@ function renderMailBox() {
     for (const mk of (m.mats || [])) if (MATS[mk.id]) {
       chips.push(`<span class="mg" title="${MATS[mk.id].n}"><img src="assets/modals/ico/${mk.id}.webp" alt="" onerror="this.remove()"><em>${MATS[mk.id].n}</em><i>×${mk.q}</i></span>`);
     }
-    if (m.page) chips.push(`<span class="mg" title="丹方残页"><svg viewBox="0 0 24 24"><path d="M7 3.5h7.2L18.5 8v12.5H7z" fill="#e8dcc0" stroke="rgba(140,110,60,.55)" stroke-width="1.1"/><path d="M14.2 3.5 18.5 8h-4.3z" fill="#c9b98f"/><path d="M9.2 11.5h6.4M9.2 14.2h6.4M9.2 16.9h4.2" stroke="rgba(120,95,55,.5)" stroke-width="1.1" stroke-linecap="round"/></svg><em>丹方残页</em><i>×1</i></span>`);
+    if (m.page) chips.push(`<span class="mg" title="丹方残页"><em>丹方残页</em><i>×1</i></span>`);
     const goods = chips.length
       ? `<span class="m-gl">内附</span>${chips.join("")}`
       : `<span class="m-plain">一封平安信，无甚物什</span>`;

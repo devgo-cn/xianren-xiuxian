@@ -520,9 +520,9 @@ function presentSettle(r) {
   const hh = Math.floor(dt / 3600), mm = Math.floor((dt % 3600) / 60);
   /* v1.9.5: 面板结构化 —— 收益行(修为/灵石/巡猎) + 「机缘已收」朱印(CSS), 告别内联 style 拼串。
    * 云游产出仍全在【鸿雁信匣】(v1.9.0 约定), 此处只字提示。 */
-  const icoExp = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.2 C13.8 2.6 16.6 5 17.4 8.4 C18.2 12.4 15.4 16.2 11.4 17.2 C10.9 17.3 10.4 17.3 10 17.2 C6 16.8 2.8 13.6 2.6 9.8 C2.4 6.2 5.2 3 9 2.3 C9.3 2.3 9.7 2.2 10 2.2 Z" fill="none" stroke="#d8b06a" stroke-width="1.5"/><circle cx="10" cy="10" r="3.1" fill="none" stroke="#d8b06a" stroke-width="1.3" opacity=".75"/><path d="M10 5.4 C11.8 5.9 13.2 7.2 13.6 9" fill="none" stroke="#d8b06a" stroke-width="1" stroke-linecap="round" opacity=".55"/></svg>';
-  const icoSpi = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5 L18.5 10 L10 18.5 L1.5 10 Z" fill="#67c9ab"/><path d="M10 1.5 L10 18.5 L18.5 10 Z" fill="#b7ecda"/><path d="M10 1.5 L1.5 10 L10 10 Z" fill="#9de0c9"/></svg>';
-  const icoHunt = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.4 16.8 C6.8 12.4 11.2 8 16.2 3.6 C17 4.2 17.4 4.8 17.6 5.6 C13.4 10.6 8.8 14.8 4.4 17.6 C4 17.4 3.7 17.1 3.4 16.8 Z" fill="#c9a86a"/><path d="M2.6 13.8 C4.8 11.6 6.6 12.4 6.6 14.6" fill="none" stroke="#c9a86a" stroke-width="1.4" stroke-linecap="round"/></svg>';
+  const icoExp = '<span style="color:#d8b06a;font-size:12px">◎</span>';   /* v5.14: SVG→字符(丹环) */
+  const icoSpi = '<span style="color:#67c9ab;font-size:11px">◆</span>';   /* v5.14: SVG→字符(灵石) */
+  const icoHunt = '<span style="color:#c9a86a;font-size:11px">✦</span>';   /* v5.14: SVG→字符(巡猎) */
   /* 离线装备: 阿青择优佩戴N件, 多余熔灵石 —— v5.8 全览一行: 掉落总数/佩戴/熔炼+灵石 */
   const Eq = gg.equip;
   let huntExtra = "";

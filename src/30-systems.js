@@ -5,7 +5,7 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, ARRAY_MAX_LV, AURA_COLORS, AURA_FPS, BIGS, BTL, DAN_ZONE, EQUI_CELLPOS, EQUI_ICON, EQUI_SLOTI, MAIL_CAP, MAIN_STORY, MATS, MS_ARRAY, MS_ART, MS_SPIRIT, MYST, PAGES_NEED, PLOT, QUALITY, REALM_DAYS, RECIPES, SEG4, SEG_META, SEG_SCALE, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, TRAVEL_FIRST_WINDOW, TRAVEL_SPAN, __set_cauldron, __set_eqSel, __set_lastReadyHint, __set_selRecipe, __set_settling, _dsp, _eqSel, _floatPrev, _settling, arrMult, bigSub, cauldron, cld, cnNum, durTxt, fin, finalStats, fmt, lastReadyHint, pulseChip, selRecipe, setProg, skillExpNeed, spawnFloat, state } from './00-pure.js';
+import { $, ARRAY_MAX_LV, AURA_COLORS, AURA_FPS, BIGS, BTL, DAN_ZONE, EQUI_CELLPOS, EQUI_SLOTI, MAIL_CAP, MAIN_STORY, MATS, MS_ARRAY, MS_ART, MS_SPIRIT, MYST, PAGES_NEED, PLOT, QUALITY, REALM_DAYS, RECIPES, SEG4, SEG_META, SEG_SCALE, SKILL_DEFS, SKILL_MAX, SLOT_TYPES, TRAVEL_FIRST_WINDOW, TRAVEL_SPAN, __set_cauldron, __set_eqSel, __set_lastReadyHint, __set_selRecipe, __set_settling, _dsp, _eqSel, _floatPrev, _settling, arrMult, bigSub, cauldron, cld, cnNum, durTxt, fin, finalStats, fmt, lastReadyHint, pulseChip, selRecipe, setProg, skillExpNeed, spawnFloat, state } from './00-pure.js';
 import { BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, boostMult, EQUI_SLOTN, TOTAL_SEGS, __set_auraAcc, __set_auraT, _auraAcc, _auraColor, _auraCtx, _auraP, _auraT, alHave, alInFurn, alTip, arrayCostNow, artMult, artName, attrAssign, buffMult, cldUI, equipBonus, fitsRecipe, hiddenUnlocked, locById, pagesOf, pickNoRepeat, pushMsg, recipeCan, recipeCardHTML, renderBag, renderCabinet, renderFurn, seg, skillGet, skillLv, srvNow, travelBtnLbl, travelMailCount, travelNextMailIn, travelSent, zoneOfBig, 段名 } from './10-base.js';
 import { _cloudSettleRun, addJournal, artScore, bigIdx, licSync, realm, renderCraftBtn, renderSkills, save, showChapter, skillAddExp, skillTotalLv, skillVal } from './20-core.js';
 
@@ -338,7 +338,7 @@ function travelAvatarHTML() {
           <div style="font-size:12.5px;color:#c9b98a;margin-top:5px;line-height:1.8">${backTxt}</div>
           ${mailWarn}
         </div>
-        <button class="btn" style="margin-top:12px" onclick="openMail()"><svg class="skin" viewBox="0 0 200 60" preserveAspectRatio="none"><path class="ink" d="M12 9 C28 3 44 10 60 6 C76 2 92 8 108 6 C124 4 140 8 158 6 C174 4 192 8 197 16 C199 26 198 34 195 41 C193 46 196 52 182 53 C168 55 154 50 140 53 C124 56 110 50 96 53 C82 56 68 51 56 53 C42 55 30 50 20 52 C8 54 2 46 3 38 C3 28 2 20 5 15 C7 12 9 10 12 9 Z"/></svg><span class="label">去拆信 · 已收 ${(state.mails || []).length} 封</span></button>
+        <button class="btn" style="margin-top:12px" onclick="openMail()"><span class="label">去拆信 · 已收 ${(state.mails || []).length} 封</span></button>
         <div style="font-size:10.5px;color:#6d7688;margin-top:8px">开炉炼丹与服丹，请去左上角 <b style="color:#a98a5a">丹</b> 房。</div></div>`;
   }
   const z = zoneOfBig(bigIdx());
@@ -346,7 +346,7 @@ function travelAvatarHTML() {
   return `<div style="padding:10px 4px 14px;text-align:center;border-bottom:1px dashed rgba(201,168,106,.16)">
       <div style="font-family:var(--font-brush);font-size:16px;color:#d8b06a;letter-spacing:.06em">${z.name}</div>
       <p style="color:#8b94a8;font-size:11.5px;margin-top:6px;line-height:1.9">化身会顺着自己的心意，在 ${placeNames} 一带游历。<br>在外每满 <b style="color:#a98a5a">30 分钟</b> 寄回一封手札，八封（四个小时）后<b style="color:#a98a5a">自行回山</b>；若你久不归来，它便放慢到<b style="color:#a98a5a">每 2 小时</b>一封，最多在外守候 <b style="color:#a98a5a">两日</b>。</p>
-      <button class="btn" style="margin-top:10px" onclick="startTravel()"><svg class="skin" viewBox="0 0 200 60" preserveAspectRatio="none"><path class="ink" d="M12 9 C28 3 44 10 60 6 C76 2 92 8 108 6 C124 4 140 8 158 6 C174 4 192 8 197 16 C199 26 198 34 195 41 C193 46 196 52 182 53 C168 55 154 50 140 53 C124 56 110 50 96 53 C82 56 68 51 56 53 C42 55 30 50 20 52 C8 54 2 46 3 38 C3 28 2 20 5 15 C7 12 9 10 12 9 Z"/></svg><span class="label">遣化身出门</span></button>
+      <button class="btn" style="margin-top:10px" onclick="startTravel()"><span class="label">遣化身出门</span></button>
     </div>
     <div style="font-size:10.5px;color:#6d7688;text-align:center;padding:10px 4px;line-height:1.8">拾得的药草与丹方残页都装在<b style="color:#a98a5a">鸿雁信匣</b>里，拆开才算你的。<br>信匣最多存 <b style="color:#a98a5a">${MAIL_CAP}</b> 封，满了化身就停笔。</div>`;
 }
@@ -430,7 +430,7 @@ function renderEquip() {                 // v1.9.8 十字格工作台: 四正方
   const box = $("equipBody"); if (!box) return;
   const eb = equipBonus();
   const arr = (state.arts || []).slice(-6);
-  const SLOTN = EQUI_SLOTN, SLOTI = EQUI_SLOTI, CELLPOS = EQUI_CELLPOS, ICON = EQUI_ICON;
+  const SLOTN = EQUI_SLOTN, SLOTI = EQUI_SLOTI, CELLPOS = EQUI_CELLPOS;
   const sc = (a) => Math.round(artScore(a));   // v1.9.9b: 抽 licCardHTML 时误删的局部定义, total 战力依赖它(缺失会 ReferenceError 致法宝窗打不开)
   let cross = "";
   let total = 0;
@@ -439,13 +439,13 @@ function renderEquip() {                 // v1.9.8 十字格工作台: 四正方
     const slotI = SLOTI[(typeof (a && a.slot) === "number" && a.slot < 4) ? a.slot : i];
     if (!a) {
       cross += `<div class="gx-cell ${pos}" style="cursor:default" title="${SLOTN[i]} · 空位">
-        <span class="ico" style="opacity:.32"><img class="icoim" src="assets/modals/art-ico/${slotI}0.webp" alt="" onerror="this.remove()">${ICON[slotI]}</span><em>${SLOTN[i]} · 空</em></div>`;
+        <span class="ico" style="opacity:.32"><img class="icoim" src="assets/modals/art-ico/${slotI}0.webp" alt="" onerror="this.remove()"></span><em>${SLOTN[i]} · 空</em></div>`;
       continue;
     }
     const q = a.q;
     total += sc(a);
     cross += `<div class="gx-cell ${pos} qc${q}" title="${(QUALITY[q] || QUALITY[0]).name} · ${a.name}" onclick="event.stopPropagation();pickArt(${i})">
-      <span class="ico"><img class="icoim" src="assets/modals/art-ico/${slotI}${q}.webp" alt="" onerror="this.remove()">${ICON[slotI]}</span><em>${SLOTN[i]}</em></div>`;
+      <span class="ico"><img class="icoim" src="assets/modals/art-ico/${slotI}${q}.webp" alt="" onerror="this.remove()"></span><em>${SLOTN[i]}</em></div>`;
   }
   /* v1.9.8c 下方面板: 角色「道身」各项总属性(裸身+装备+词条合并后的面板值), 常显不随选中变化 */
   let detail;
