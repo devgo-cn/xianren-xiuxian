@@ -5,9 +5,9 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, ARRAY_MAX_LV, AURA_COLORS, AURA_FPS, BIGS, BTL, MAIN_STORY, MS_ARRAY, MS_ART, MS_SPIRIT, MYST, PAGES_NEED, PLOT, REALM_DAYS, SEG4, SEG_META, SEG_SCALE, SKILL_DEFS, __set_lastReadyHint, __set_settling, _dsp, _floatPrev, _settling, arrMult, bigSub, cld, cnNum, durTxt, fin, finalStats, fmt, lastReadyHint, pulseChip, setProg, spawnFloat, state } from './00-pure.js';
-import { BASE_STATS, bigIndexOf, boostMult, __set_auraAcc, __set_auraT, _auraAcc, _auraColor, _auraCtx, _auraP, _auraT, arrayCostNow, buffMult, cldUI, hiddenUnlocked, pagesOf, pickNoRepeat, pushMsg, seg, srvNow, 段名 } from './10-base.js';
-import { _cloudSettleRun, addJournal, bigIdx, realm, renderCraftBtn, renderSkills, save, showChapter, skillVal, v6RateNow } from './20-core.js';
+import { $, AURA_COLORS, AURA_FPS, BIGS, MAIN_STORY, PLOT, REALM_DAYS, SEG4, SEG_META, SEG_SCALE, SKILL_DEFS, __set_settling, _dsp, _floatPrev, _settling, bigSub, cld, cnNum, state } from './00-pure.js';
+import { __set_auraAcc, __set_auraT, _auraAcc, _auraColor, _auraCtx, _auraP, _auraT, cldUI, pickNoRepeat, pushMsg } from './10-base.js';
+import { _cloudSettleRun, bigIdx, realm, renderSkills, showChapter, skillVal } from './20-core.js';
 
 (function buildSegs() {
   let cum = 0;
@@ -54,22 +54,21 @@ function cloudPushNow() {
   cldPush().then(ok => { if (ok) { cld.dirty = false; cldUI("on"); } });   // v2.5: 上传成功清脏, 避免周期兜底反复空传
 }
 
-const _hud = { rateText: null };
-
 function updateHUD() {
   /* ⚠️ v6 阶段5: 旧系统 HUD 全部下线。
    *   旧元素(#arrNum/#brkNum/#arrayLv/#btnBreak/.actions 聚灵阵+突破按钮)已在 a70db3e 的
    *   §9 清理中从 index.html 删除, 而 #arrFill/#btnArray 也已不存在 —— 那些分支永远是死代码。
    *
    *   ⚠️ #spirit 也【不再由本函数写】：灵石已归 v6 管（大数对象 {m,e}），
-   *   由 06-v6ui.js:169 用 N.fmt(S6.spirit) 统一刷新。此前两边都写同一个节点，
+   *   由 06-v6ui.js 用 N.fmt(S6.spirit) 统一刷新。此前两边都写同一个节点，
    *   旧侧喂的是缓动值 _dsp.spirit（追的是 legacy state.spirit，类型/节奏都跟不上 v6），
    *   实测显示会在真实数字与 "∞" 之间来回跳。
    *
-   *   ⚠️ #rateText 显示的是「修为/秒」。旧的 rateNow() 已随旧打坐体系删除，
-   *   现在这个数字由 v6 的推关产出速率提供（见下方 v6RateText()）。 */
-  if (!_hud.rateText) _hud.rateText = $("rateText");
-  if (_hud.rateText) _hud.rateText.textContent = fmt(v6RateNow());
+   *   ⚠️ #rateText 同理【不再由本函数写】：修为/秒的口径属于 v6
+   *   （关/秒 × 每关均产，见 06-v6ui.js 的 render6）。此处若再写一次，
+   *   会与 v6 每 200ms 的刷新节奏互相覆盖 —— 与 #spirit 的双写 bug 同源。
+   *
+   *   现在本函数只剩：把缓动基准同步到 state，供 _dsp 的平滑逻辑使用。 */
   _floatPrev.spirit = state.spirit;
   _floatPrev.exp = state.exp;
 }

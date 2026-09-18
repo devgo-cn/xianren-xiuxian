@@ -181,7 +181,6 @@ const BRIDGE = {
   "cnNum": function () { return NS_src_00_pure_js["cnNum"]; },
   "deviceId": function () { return NS_src_10_base_js["deviceId"]; },
   "dimRender": function () { return NS_src_10_base_js["dimRender"]; },
-  "doBreak": function () { return NS_src_40_app_js["doBreak"]; },
   "durTxt": function () { return NS_src_00_pure_js["durTxt"]; },
   "enterDim": function () { return NS_src_10_base_js["enterDim"]; },
   "eqMult": function () { return NS_src_00_pure_js["eqMult"]; },
@@ -217,7 +216,6 @@ const BRIDGE = {
   "loop": function () { return NS_src_40_app_js["loop"]; },
   "mainMoment": function () { return NS_src_30_systems_js["mainMoment"]; },
   "petMoment": function () { return NS_src_40_app_js["petMoment"]; },
-  "manualBreak": function () { return NS_src_40_app_js["manualBreak"]; },
   "migrate": function () { return NS_src_10_base_js["migrate"]; },
   "onBattleDrop": function () { return NS_src_40_app_js["onBattleDrop"]; },
   "openRank": function () { return NS_src_20_core_js["openRank"]; },
@@ -269,7 +267,6 @@ const BRIDGE = {
   "storyItemHtml": function () { return NS_src_10_base_js["storyItemHtml"]; },
   "storyLoadMore": function () { return NS_src_20_core_js["storyLoadMore"]; },
   "storyResolve": function () { return NS_src_10_base_js["storyResolve"]; },
-  "tapArray": function () { return NS_src_40_app_js["tapArray"]; },
   "tickAura": function () { return NS_src_30_systems_js["tickAura"]; },
   "tickBurst": function () { return NS_src_10_base_js["tickBurst"]; },
   "tickDsp": function () { return NS_src_10_base_js["tickDsp"]; },
@@ -366,22 +363,6 @@ setTimeout(function () {
     /* ── 阶段5: #rateText（修为/秒）的数据源改由 v6 提供 ──
      * 旧 rateNow() 随打坐体系删除。这里注入 v6 的产出速率口径，
      * 供 30-systems.js 的 updateHUD 显示。 */
-    NS_src_20_core_js.bindV6Rate(function () {
-      try {
-        const S = NS_src_06_v6ui_js.state6();
-        if (!S) return 0;
-        /* 展示口径: 「当前这一关」的灵石产出 = cumSpirit(s) - cumSpirit(s-1)。
-         * v6 的产出是随关卡指数增长的大数, 转原生后超范围就退化成 0
-         * （宁可不显示, 也不要在 HUD 上打一个 Infinity 出来）。 */
-        const s = Math.max(1, S.stage | 0);
-        const inc = NS_src_00_num_js.sub(
-          NS_src_05_v6_js.cumSpirit(s),
-          NS_src_05_v6_js.cumSpirit(s - 1)
-        );
-        const n = NS_src_00_num_js.toNumber(inc);
-        return isFinite(n) ? n : 0;
-      } catch (e) { return 0; }
-    });
     /* initV6 内部：S6 = fromLegacy(window.state) —— 若存档里有 v6 数据，
      * fromLegacy 会直接读出来，所以这里无需再调 loadV6。 */
     NS_src_06_v6ui_js.initV6(typeof window !== 'undefined' ? window.state : null);

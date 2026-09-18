@@ -7,7 +7,7 @@
  */
 import { live as NS5_live } from './05-v6.js';
 import { toNumber as N6_toNumber } from './00-num.js';
-import { $, ARRAY_COST, bigIndexOf, BASE_STATS, AURA_COLORS, BIGS, BTL, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, G1_TPL, GAME_VER, JRN_TAIL, MIGRATIONS, MON_NAMES, MYST, PAGES_NEED, PLOT, RK_NAMES, RK_SEGS, SAVE_KEY, SEARCH_MAX, SEARCH_MIN, SEG_META, SKILL_DEFS, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, TRACE_ACT, __set_alTipT, __set_hbFails, __set_kicked, __set_parts, __set_tracePool, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, _tracePool, alIcoCls, alTipT, autoHuntOn, capDeviceDpr, cld, cldApiBase, cnNum, durTxt, esc, fin, fmt, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, state } from './00-pure.js';
+import { $, ARRAY_COST, bigIndexOf, BASE_STATS, AURA_COLORS, BIGS, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, G1_TPL, GAME_VER, JRN_TAIL, MIGRATIONS, PAGES_NEED, PLOT, RK_NAMES, RK_SEGS, SAVE_KEY, SEARCH_MAX, SEARCH_MIN, SEG_META, SKILL_DEFS, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, __set_hbFails, __set_kicked, __set_parts, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, autoHuntOn, capDeviceDpr, cld, cldApiBase, cnNum, durTxt, esc, fin, fmt, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, state } from './00-pure.js';
 
 (function () {
   const vt = document.getElementById("verTag"); if (vt) vt.textContent = GAME_VER;

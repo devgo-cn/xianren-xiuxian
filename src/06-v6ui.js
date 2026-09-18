@@ -214,10 +214,35 @@ export function render6(force) {
     if (bs.textContent !== txt) bs.textContent = txt;
   }
 
-  /* ── 修为/秒（旧节点）改成推关速率，语义更贴新玩法 ── */
+  /* ── 修为/秒（旧节点）：口径 = 灵石/秒 ──────────────────────────────
+   *
+   * 这里曾经是 v6 的「推关速率」（关/秒，来自 stats.rateNum），但节点上的
+   * 标签写的是「修为/秒」，量纲对不上 —— 实测推关 30 关/秒而灵石只涨
+   * 约 30/秒时，显示 30 会让人以为收益是它的 30 倍。
+   *
+   * 现在改成真正的灵石/秒：
+   *   关/秒 × 每关均产
+   * 其中「每关均产」取最近 10 关窗口的均值（cumSpirit(s) - cumSpirit(s-10)）/10。
+   *   不用单关增量：它会随关卡逐关跳（曾观察 70 → 16）。
+   *   不用全局均值 cumSpirit(s)/s：会被开局低收益段长期拖住，读数偏小。
+   *
+   * 该量仍然可能超出原生 Number 范围（v6 产出是指数增长的大数），
+   * 越界时直接显示 0 而不是 Infinity。
+   *
+   * ⚠️ #rateText 由本函数【独占】。30-systems.js 的 updateHUD 已不再写它，
+   *   否则两个系统会以各自的节奏互相覆盖（此前 #spirit 出现 ∞ 闪烁
+   *   就是同一类双写 bug）。 */
   const rt = el('rateText');
   if (rt) {
-    const t = st.rate.toFixed(st.rate < 10 ? 1 : 0);
+    let numRate = 0;
+    try {
+      const s = Math.max(1, st.stage | 0);
+      const span = Math.min(10, s);
+      const inc = N.toNumber(N.sub(V.cumSpirit(s), V.cumSpirit(s - span))) / span;
+      const perSec = inc * (isFinite(st.rate) ? st.rate : 0);
+      if (isFinite(perSec) && perSec > 0) numRate = perSec;
+    } catch (e) { numRate = 0; }
+    const t = numRate < 10 ? numRate.toFixed(1) : String(Math.floor(numRate));
     if (rt.textContent !== t) rt.textContent = t;
   }
 }

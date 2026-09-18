@@ -11,7 +11,7 @@
  * ⚠️ 本文件由工具生成，手改会在下次重建时丢失。
  */
 
-import { SND, pushBoost } from './10-base.js';
+import { SND } from './10-base.js';
 import { state, DIMSTAT } from './00-pure.js';
 import * as NS_STAGE from './00-stage.js';   /* v6: 关卡数值权威(30k 关公式表) */
 import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量是可超 1e77 的大数 */

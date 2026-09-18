@@ -3,9 +3,9 @@
  *
  * 拓扑层 L8~L14，31 个顶层声明。
  */
-import { $, ARRAY_MAX_LV, BIGS, CACHE_VER, CLD_KEY, DIMSTAT, DROP_CFG, EVENTS, MAIN_STORY, PET_BONUS, PET_COIN, PET_FORGE, PET_STILL, PLOT, SAVE_KEY, __set_breaking, __set_dropSaveT, __set_encNext, __set_hiddenAt, __set_hudAcc, __set_state, _dropSaveT, _dsp, _floatPrev, _hiddenAt, _hudAcc, _pred, _rate, _settling, _srvOffset, _syncAt, autoHuntOn, breaking, cld, cnNum, esc, fmt, hbOk, initFxDiag, state } from './00-pure.js';
-import { CLD_API, adopt, arrayCostNow, buffAtCap, buffHintOf, burstBoom, cldApi, cldFlash, cldId, cldUI, cloudSnap, cloudSoon, createFxLayer, dimRender, g1Pack, g1Unpack, hbFail, hiddenUnlocked, journalHasKey, pickNoRepeat, pushBattleStats, pushBoost, pushBuff, pushMsg, renderAutoHunt, renderPName, searchMs, seg, settleBlocked, spiritRate, srvNow, tickDsp } from './10-base.js';
-import { addJournal, adoptKeep, bigIdx, cldFail, load, realm, save, updateRealmUI } from './20-core.js';
+import { $, BIGS, CACHE_VER, CLD_KEY, DIMSTAT, MAIN_STORY, PET_STILL, PLOT, SAVE_KEY, __set_hiddenAt, __set_hudAcc, __set_state, _dsp, _floatPrev, _hiddenAt, _hudAcc, _pred, _rate, _srvOffset, _syncAt, cld, esc, fmt, hbOk, initFxDiag, state } from './00-pure.js';
+import { adopt, cldApi, cldFlash, cldId, cldUI, dimRender, g1Unpack, hbFail, journalHasKey, pickNoRepeat, pushBattleStats, pushMsg, renderAutoHunt, renderPName, spiritRate, srvNow, tickDsp } from './10-base.js';
+import { addJournal, bigIdx, cldFail, load, realm, save, updateRealmUI } from './20-core.js';
 import { cldPush, cloudPushNow, cloudSettle, mainMoment, openStory, updateHUD } from './30-systems.js';
 
 let __dimT = 0;   /* 黑屏挂机面板刷新计时器 */
@@ -129,85 +129,6 @@ async function bootCloud() {
   cloudFlush();                                // 启动结算后尽快把建档/离线收益上云
   updateRealmUI(); updateHUD(); realmPlot();
   return true;
-}
-
-function doBreak() {
-  if (breaking || settleBlocked()) return;
-  const r = realm();
-  if (state.exp < r.need || state.realmIdx >= TOTAL_SEGS - 1) return;
-  __set_breaking(true);
-  const next = seg(state.realmIdx + 1);
-  const isBigBreak = r.isBigEnd;   // 大境界突破(跨大境) → 天劫; 小境界 → 简版金光
-
-  const finishBreak = () => {
-    state.realmIdx++;
-    state.exp = isBigBreak ? 0 : Math.max(0, state.exp - r.need);  // 大境清零, 小境扣需
-    /* ⚠️ v6: 原「跨大境清兽潮加成」随妖潮删除 —— 加成来源只剩丹药,
-     * 与境界无关, 不再需要重校。 */
-    __set_breaking(false);
-    /* 黑屏挂机: 记录突破 */
-    if (DIMSTAT.on) { DIMSTAT.breaks.push(next.label); try { dimRender(); } catch(e) {} }
-    updateRealmUI(); updateHUD(); save(); pushBattleStats();   // 境界变了 → 战斗三围与怪物成长线重算
-    cloudFlush();
-    const nr = realm();
-    if (isBigBreak) {
-      const GREET_BY_BIG = { 1: "洗髓易骨，踏入炼气！", 2: "踏入筑基！", 3: "金丹凝形！", 4: "元婴出窍！",
-        5: "化神之姿！", 6: "虚室生白，炼神返虚！", 7: "法相天地，合道归真！", 8: "返璞归真，大乘无上！",
-        9: "度劫化凡，一步登仙！", 10: "羽化登仙，仙界之门！", 11: "位列仙班，天仙永寿！" };
-      const greet = GREET_BY_BIG[nr.bigIdx] || "";
-      pushMsg("main", `<span class="g">${nr.big}</span>！${greet || "修行又进一步"}`);
-    } else {
-      pushMsg("main", `修为精进 → <span class="g">${nr.big === "炼气" ? "炼气" + cnNum(nr.segNo) + "层" : nr.label}</span>`);
-    }
-    realmPlot();
-  };
-
-  // 通用破境特效: 金光闪 + 境界名弹字 + 粒子爆发
-  const boomFx = () => {
-    const fl = $("flash"); fl.style.transition = "none"; fl.style.opacity = .95;
-    requestAnimationFrame(() => { fl.style.transition = "opacity 1.8s ease-out"; fl.style.opacity = 0; });
-    const up = $("realmUp");
-    $("realmUpT").textContent = isBigBreak ? next.big : next.label;
-    $("realmUpT").style.fontSize = (isBigBreak ? next.big.length > 2 : next.label.length > 4) ? "26px" : "38px";
-    up.classList.remove("show"); void up.offsetWidth; up.classList.add("show");
-    burstBoom();
-  };
-
-  if (isBigBreak) {
-    /* 大境界: 天劫蓄力1s → 破境特效 → 0.95s后落地 */
-    pushMsg("main", `<span class="r">天劫将至……</span>${r.label} 将渡 ${next.label}`);
-    const trib = $("trib"); if (trib) { trib.classList.remove("show"); void trib.offsetWidth; trib.classList.add("show"); }
-    const cult = $("cult"); if (cult) { cult.classList.remove("trib-glow"); void cult.offsetWidth; cult.classList.add("trib-glow"); }
-    setTimeout(() => {
-      if (trib) trib.classList.remove("show");
-      if (cult) cult.classList.remove("trib-glow");
-      boomFx();
-      pushMsg("main", `<span class="r">天劫降临！</span>${r.label} → <span class="r">${next.label}</span>`);
-      setTimeout(finishBreak, 950);
-    }, 1000);
-  } else {
-    /* 小境界: 直接破境特效 → 0.6s后落地 */
-    boomFx();
-    pushMsg("main", `突破！${r.label} → <span class="g">${next.label}</span>`);
-    setTimeout(finishBreak, 600);
-  }
-}
-
-function manualBreak() { doBreak(); }
-
-function tapArray() {
-  if (settleBlocked()) return;
-  if (state.arrayLv >= ARRAY_MAX_LV) {
-    pushMsg("main", `聚灵阵已至圆满 Lv.${state.arrayLv}，周天流转自足，灵石另作他用`);
-    return;
-  }
-  const cost = arrayCostNow();
-  if (state.spirit >= cost) {
-    state.spirit -= cost; state.arrayLv++; save(); updateHUD(); cloudFlush();  // v1.5.1: 花灵石升阵 → 立即上云
-    pushMsg("main", `聚灵阵升至 <span class="g">Lv.${state.arrayLv}</span>（下一级需灵石 ${fmt(arrayCostNow())}）`);
-  } else {
-    pushMsg("main", `灵石不足(升至 Lv.${state.arrayLv + 1} 需 ${fmt(cost)})，阿青见你叹气，尾巴一竖，满山替你找矿去了`);
-  }
 }
 
 function realmPlot() {
@@ -717,14 +638,11 @@ export {
   cloudFlush,
   cloudInit,
   cloudPullNow,
-  doBreak,
   loop,
-  manualBreak,
   onBattleDrop,
   presentSettle,
   realmPlot,
   requestEquipDrop,
   startGame,
   startHeartbeat,
-  tapArray,
 };

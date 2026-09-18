@@ -5,8 +5,8 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, BIGS, DROP_CFG, JRN_CAP, LIC_QCOL, SAVE_KEY, SKILL_DEFS, STORY_BY_KEY, STORY_PAGE, __set_rate, __set_rkAt, __set_srvOffset, __set_state, __set_storyChap, __set_traceT, _pred, _rkAt, _storyChap, _traceT, cld, cnNum, esc, fmt, rnOk, state } from './00-pure.js';
-import { CLD_API, SND, adopt, apiRoot, cldFlash, cldId, cldUI, closeRename, cloudSnap, cloudSoon, deviceId, exitDim, g1Pack, g1Unpack, handleKicked, migrate, pushBattleStats, pushMsg, renderPName, renderSettings, resetDimKnob, rkSegLabel, seg, setRealmSub, sizeBurst, skillDef, skillVal, storyItemHtml, trimJournal } from './10-base.js';
+import { $, DROP_CFG, JRN_CAP, SAVE_KEY, SKILL_DEFS, STORY_BY_KEY, STORY_PAGE, __set_rate, __set_rkAt, __set_srvOffset, __set_state, __set_storyChap, _pred, _rkAt, _storyChap, cld, cnNum, esc, fmt, rnOk, state } from './00-pure.js';
+import { CLD_API, SND, adopt, apiRoot, cldFlash, cldId, cldUI, closeRename, cloudSnap, cloudSoon, deviceId, exitDim, g1Pack, g1Unpack, handleKicked, migrate, pushBattleStats, pushMsg, renderPName, renderSettings, resetDimKnob, rkSegLabel, seg, setRealmSub, sizeBurst, skillVal, storyItemHtml, trimJournal } from './10-base.js';
 
 function realm() { return seg(state.realmIdx); }
 
@@ -72,21 +72,12 @@ async function loadRank(force) {
  */
 let _v6Save = null;   // () => void        把 v6 状态写进 state
 let _v6Load = null;   // () => void        从 state 读回 v6 状态
-let _v6Rate = null;   // () => number      v6 的「修为/秒」显示口径（供旧 HUD 的 #rateText）
 
 /** 由 main.js 注入 v6 的存取实现 */
 export function bindV6Save(saveV6, loadV6) {
   _v6Save = typeof saveV6 === 'function' ? saveV6 : null;
   _v6Load = typeof loadV6 === 'function' ? loadV6 : null;
 }
-
-/** 由 main.js 注入 v6 的速率口径（阶段5: 旧 rateNow 删除后 #rateText 的数据源） */
-export function bindV6Rate(fn) {
-  _v6Rate = typeof fn === 'function' ? fn : null;
-}
-
-/** v6 修为速率；未注入时返回 0（旧 HUD 不显示假数字） */
-export function v6RateNow() { return _v6Rate ? _v6Rate() : 0; }
 
 function save() {
   /* ⚠️ v8.4: "新建存档"正在 reload 时必须跳过落盘。
