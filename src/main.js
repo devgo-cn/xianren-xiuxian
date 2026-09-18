@@ -126,7 +126,6 @@ const BRIDGE = {
   "addJournal": function () { return NS_src_20_core_js["addJournal"]; },
   "adopt": function () { return NS_src_10_base_js["adopt"]; },
   "adoptKeep": function () { return NS_src_20_core_js["adoptKeep"]; },
-  "adventure": function () { return NS_src_40_app_js["adventure"]; },
   "alIcoCls": function () { return NS_src_00_pure_js["alIcoCls"]; },
   "alTipT": function () { return NS_src_00_pure_js["alTipT"]; },
   "apiRoot": function () { return NS_src_10_base_js["apiRoot"]; },
@@ -151,7 +150,6 @@ const BRIDGE = {
   "buffSpanMs": function () { return NS_src_10_base_js["buffSpanMs"]; },
   "burstBoom": function () { return NS_src_10_base_js["burstBoom"]; },
   "capDeviceDpr": function () { return NS_src_00_pure_js["capDeviceDpr"]; },
-  "checkMilestones": function () { return NS_src_30_systems_js["checkMilestones"]; },
   "cld": function () { return NS_src_00_pure_js["cld"]; },
   "cldAdoptCloud": function () { return NS_src_40_app_js["cldAdoptCloud"]; },
   "cldApi": function () { return NS_src_10_base_js["cldApi"]; },
@@ -218,6 +216,7 @@ const BRIDGE = {
   "loadRank": function () { return NS_src_20_core_js["loadRank"]; },
   "loop": function () { return NS_src_40_app_js["loop"]; },
   "mainMoment": function () { return NS_src_30_systems_js["mainMoment"]; },
+  "petMoment": function () { return NS_src_40_app_js["petMoment"]; },
   "manualBreak": function () { return NS_src_40_app_js["manualBreak"]; },
   "migrate": function () { return NS_src_10_base_js["migrate"]; },
   "onBattleDrop": function () { return NS_src_40_app_js["onBattleDrop"]; },
@@ -234,7 +233,6 @@ const BRIDGE = {
   "pushBattleStats": function () { return NS_src_10_base_js["pushBattleStats"]; },
   "pushBuff": function () { return NS_src_10_base_js["pushBuff"]; },
   "pushMsg": function () { return NS_src_10_base_js["pushMsg"]; },
-  "rateNow": function () { return NS_src_30_systems_js["rateNow"]; },
   "realm": function () { return NS_src_20_core_js["realm"]; },
   "realmMult": function () { return NS_src_30_systems_js["realmMult"]; },
   "realmPlot": function () { return NS_src_40_app_js["realmPlot"]; },
@@ -352,6 +350,38 @@ setTimeout(function () {
       NS_src_06_v6ui_js.saveV6,
       NS_src_06_v6ui_js.loadV6
     );
+    /* ── 阶段5: 把 v6 的境界镜像给 legacy 侧（主线/修行录按境界推进）──
+     * legacy 侧的 realmPlot/renderStory/mainMoment 都是按 state.realmIdx 取
+     * BIGS/PLOT 下标。v6 是境界的唯一权威，这里注入 setter，
+     * 由 06-v6ui 在转生/读档时把 v6 的 realm 写回 state.realmIdx。 */
+    NS_src_06_v6ui_js.bindLegacyRealm(function (idx) {
+      const st = window.state;
+      if (!st) return;
+      st.realmIdx = Math.max(0, idx | 0);
+      /* 旧侧 realm() 依赖 state.exp 判断"是否已圆满"（pos = exp/need）。
+       * v6 不产出 state.exp，这里给个饱和值让剧情推进取到完整段位，
+       * 否则 realmPlot 的 pos 恒 0 → 剧情永远停在每大境第一段。 */
+      st.exp = Number.MAX_SAFE_INTEGER;
+    });
+    /* ── 阶段5: #rateText（修为/秒）的数据源改由 v6 提供 ──
+     * 旧 rateNow() 随打坐体系删除。这里注入 v6 的产出速率口径，
+     * 供 30-systems.js 的 updateHUD 显示。 */
+    NS_src_20_core_js.bindV6Rate(function () {
+      try {
+        const S = NS_src_06_v6ui_js.state6();
+        if (!S) return 0;
+        /* 展示口径: 「当前这一关」的灵石产出 = cumSpirit(s) - cumSpirit(s-1)。
+         * v6 的产出是随关卡指数增长的大数, 转原生后超范围就退化成 0
+         * （宁可不显示, 也不要在 HUD 上打一个 Infinity 出来）。 */
+        const s = Math.max(1, S.stage | 0);
+        const inc = NS_src_00_num_js.sub(
+          NS_src_05_v6_js.cumSpirit(s),
+          NS_src_05_v6_js.cumSpirit(s - 1)
+        );
+        const n = NS_src_00_num_js.toNumber(inc);
+        return isFinite(n) ? n : 0;
+      } catch (e) { return 0; }
+    });
     /* initV6 内部：S6 = fromLegacy(window.state) —— 若存档里有 v6 数据，
      * fromLegacy 会直接读出来，所以这里无需再调 loadV6。 */
     NS_src_06_v6ui_js.initV6(typeof window !== 'undefined' ? window.state : null);

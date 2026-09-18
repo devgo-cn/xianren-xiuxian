@@ -304,6 +304,7 @@ export function confirmRebirth() {
   const before = V.previewRebirth(S6).realmNowName;
   const r = V.applyRebirth(S6);
   closeRebirth();
+  mirrorRealmToLegacy();
   render6(true);
   const nowName = RM.nameOf(r.realm);
   toast(r.realmGain > 0
@@ -311,6 +312,31 @@ export function confirmRebirth() {
     : '转世重开：仍是 ' + nowName + '，修为已累计',
     r.realmGain > 0 ? 4200 : 3000);
 }
+
+/**
+ * v6 阶段5: 把 v6 的境界镜像进 legacy 的 state.realmIdx。
+ *
+ * 为什么需要：
+ *   用户要求「主线（剧情/修行录）跟境界挂钩」。主线的推进逻辑（40-app.js realmPlot /
+ *   30-systems.js mainMoment / renderStory）都是按 state.realmIdx 取 BIGS/PLOT 下标，
+ *   而 v6 的境界存在 S6.realm，两者【完全独立、互不同步】。
+ *   这里做单向镜像：v6 是境界的唯一权威，legacy 侧只读跟随。
+ *
+ * 为什么用注入槽而不是直接 import：
+ *   06-v6ui 位于依赖图最下游，legacy 侧（20-core/30-systems/40-app）在它上游。
+ *   由 main.js 在启动时把 setter 注进来（同 bindV6Save 的思路），依赖方向保持单向。
+ */
+let _setLegacyRealm = null;
+/** 由 main.js 注入 legacy 境界写入器 */
+export function bindLegacyRealm(fn) {
+  _setLegacyRealm = typeof fn === 'function' ? fn : null;
+}
+function mirrorRealmToLegacy() {
+  if (_setLegacyRealm && S6) { try { _setLegacyRealm(S6.realm | 0); } catch (e) {} }
+}
+
+/** 转生/读档后调用一次，保证主线与 v6 境界对齐 */
+export function syncRealmMirror() { mirrorRealmToLegacy(); }
 
 /* ─────────────────────────────────────────────────────────────
  *  离线结算

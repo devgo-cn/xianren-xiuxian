@@ -72,12 +72,21 @@ async function loadRank(force) {
  */
 let _v6Save = null;   // () => void        把 v6 状态写进 state
 let _v6Load = null;   // () => void        从 state 读回 v6 状态
+let _v6Rate = null;   // () => number      v6 的「修为/秒」显示口径（供旧 HUD 的 #rateText）
 
 /** 由 main.js 注入 v6 的存取实现 */
 export function bindV6Save(saveV6, loadV6) {
   _v6Save = typeof saveV6 === 'function' ? saveV6 : null;
   _v6Load = typeof loadV6 === 'function' ? loadV6 : null;
 }
+
+/** 由 main.js 注入 v6 的速率口径（阶段5: 旧 rateNow 删除后 #rateText 的数据源） */
+export function bindV6Rate(fn) {
+  _v6Rate = typeof fn === 'function' ? fn : null;
+}
+
+/** v6 修为速率；未注入时返回 0（旧 HUD 不显示假数字） */
+export function v6RateNow() { return _v6Rate ? _v6Rate() : 0; }
 
 function save() {
   /* ⚠️ v8.4: "新建存档"正在 reload 时必须跳过落盘。

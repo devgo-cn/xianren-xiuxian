@@ -6,7 +6,7 @@
 import { $, ARRAY_MAX_LV, BIGS, CACHE_VER, CLD_KEY, DIMSTAT, DROP_CFG, EVENTS, MAIN_STORY, PET_BONUS, PET_COIN, PET_FORGE, PET_STILL, PLOT, SAVE_KEY, __set_breaking, __set_dropSaveT, __set_encNext, __set_hiddenAt, __set_hudAcc, __set_state, _dropSaveT, _dsp, _floatPrev, _hiddenAt, _hudAcc, _pred, _rate, _settling, _srvOffset, _syncAt, autoHuntOn, breaking, cld, cnNum, esc, fmt, hbOk, initFxDiag, state } from './00-pure.js';
 import { CLD_API, adopt, arrayCostNow, buffAtCap, buffHintOf, burstBoom, cldApi, cldFlash, cldId, cldUI, cloudSnap, cloudSoon, createFxLayer, dimRender, g1Pack, g1Unpack, hbFail, hiddenUnlocked, journalHasKey, pickNoRepeat, pushBattleStats, pushBoost, pushBuff, pushMsg, renderAutoHunt, renderPName, searchMs, seg, settleBlocked, spiritRate, srvNow, tickDsp } from './10-base.js';
 import { addJournal, adoptKeep, bigIdx, cldFail, load, realm, save, updateRealmUI } from './20-core.js';
-import { checkMilestones, cldPush, cloudPushNow, cloudSettle, mainMoment, openStory, rateNow, updateHUD } from './30-systems.js';
+import { cldPush, cloudPushNow, cloudSettle, mainMoment, openStory, updateHUD } from './30-systems.js';
 
 let __dimT = 0;   /* 黑屏挂机面板刷新计时器 */
 
@@ -236,25 +236,19 @@ function realmPlot() {
   void last;
 }
 
-function adventure() {
-  const roll = Math.random();
-  const bi = Math.min(bigIdx(), EVENTS.length - 1);
+function petMoment() {
+  /* ⚠️ v6 阶段5: 原 adventure() ——「奇遇」原本会发一笔灵石(state.spirit += spiritRate())。
+   *   灵石现由 v6 统一结算（大数对象, 走 06-v6ui 的 grantSpirit）, 旧侧不再参与经济,
+   *   所以这里只保留阿青的日常碎语, 纯叙事、无副作用。 */
   const petTag = `<span class="pet">阿青</span>`;
   pushMsg("avatar", `${petTag}${pickNoRepeat(PET_STILL, "petS")}`);
-  state.spirit += spiritRate();
-  updateHUD();
 }
 
 function loop(dt) {
-  if (!breaking) {
-    /* v1.8.0: 本地这一笔是「预测」—— 只为了让数字看着在涨。计入 _pred, 上传时会被扣掉,
-       真正的账由服务端按自己的钟结算。 */
-    const _g = rateNow() * dt;
-    state.exp += _g; _pred.exp += _g;
-    if (DIMSTAT.on) DIMSTAT.exp += _g;   /* 黑屏挂机: 累加修为 */
-    /* v2.5: 所有境界突破均改为手动 —— 移除自动小境界升级循环, 修为满后玩家点"突破"按钮 */
-    /* v2.6 PERF: realmPlot 每帧 → 并入下方 100ms HUD 节流(幂等, 触发时机无感差异) */
-  }
+  /* ⚠️ v6 阶段5: 旧的「打坐攒修为」结算已整块删除。
+   *   原这里是 `const _g = rateNow()*dt; state.exp += _g; _pred.exp += _g;`
+   *   —— 修为/境界现在完全由 v6 推关驱动（06-v6ui.js 的 setInterval 驱动），
+   *   旧循环不再产生任何成长，只保留与渲染/DOM 相关的副作用。 */
   /* 黑屏挂机: 跳过tickDsp/HUD/realmPlot等DOM更新(面板盖住了看不到), 只跑dimRender */
   if (DIMSTAT.on) {
     __dimT = (__dimT || 0) + dt; if (__dimT >= 0.5) { __dimT = 0; try { dimRender(); } catch(e) {} }
@@ -262,10 +256,17 @@ function loop(dt) {
   }
   tickDsp(dt);
   /* v3.2: 灵气层与爆发粒子层已并入统一舞台 #stage，由 60-stage 的 ticker 驱动。
-   * 原先是 `if (!DIMSTAT.on) tickAura(dt)` / `tickBurst(dt)` 两处 —— 它们各自
-   * 有一份 30fps 限帧逻辑，和主循环/背景/战斗的限帧相位不齐，白白多跑。
-   * 下面这个 loop 现在只管【游戏逻辑】（修为结算 / HUD 节流），不再碰渲染。 */
-  __set_hudAcc(_hudAcc + (dt)); if (_hudAcc >= 0.1) { __set_hudAcc(0); updateHUD(); realmPlot(); checkMilestones(); if (Math.random() < 0.035) adventure(); if (Math.random() < 0.006) mainMoment(); }   // PERF-1: HUD ~10FPS; PERF-3: adventure/mainMoment 从每帧 60 次随机检查降到 10fps(概率等价换算: 0.35*0.1 / 0.06*0.1)
+   * v6 阶段5: 修为结算删除后, 这里只剩 HUD 节流 + 主线剧情的按境界推进。
+   *   realmPlot() 是幂等的（按 state.realmIdx 判定该解锁哪些剧情段），
+   *   境界由 v6 镜像写入 state.realmIdx（见 06-v6ui.js bindLegacyRealm），
+   *   所以主线依然「跟境界挂钩」，只是境界的权威变成了 v6。 */
+  __set_hudAcc(_hudAcc + (dt));
+  if (_hudAcc >= 0.1) {
+    __set_hudAcc(0);
+    updateHUD(); realmPlot();
+    if (Math.random() < 0.006) mainMoment();     // 主线文案（纯叙事，不发修为）
+    if (Math.random() < 0.035) petMoment();      // 阿青/宠物的日常碎语
+  }
 }
 
 async function bootGate() {
@@ -344,8 +345,10 @@ function startGame() {
      * 只跑修为结算(挂机收益不能停), 跳过 tickDsp/HUD 更新(后台不可见),
      * 回前台自动恢复 30fps。此前后台 30fps 空转是耗电主因(CPU 后台占 91%)。 */
     if (document.hidden) {
-      const dt = Math.min(1, (now - lastLoop) / 1000); lastLoop = now;
-      if (!breaking) { const _g = rateNow() * dt; state.exp += _g; _pred.exp += _g; }
+      /* v6 阶段5: 后台不再跑旧修为结算（旧的 rateNow 链路已删）。
+       * 成长由 v6 的 setInterval 驱动承担 —— 它在页面隐藏时【不会】被浏览器冻结，
+       * 所以挂机收益照常累积，这里只负责降频省电。 */
+      lastLoop = now;
       _sleepT = setTimeout(() => { _sleepT = 0; main(); }, 1000);
       return;
     }
@@ -388,7 +391,7 @@ window.__game = {
   setRealm: i => { state.realmIdx = i; state.exp = 0; updateRealmUI(); updateHUD(); },
   giveExp: n => { state.exp += n; updateHUD(); },
   giveSpirit: n => { state.spirit += n; updateHUD(); },
-  adventure: () => adventure(),
+  petMoment: () => petMoment(),
   mainMoment: () => mainMoment(),
   realmPlot: () => realmPlot(),
   openStory, pushMsg, save, load,
@@ -702,7 +705,7 @@ function pollBattleLayer(stage) {
 })();
 
 export {
-  adventure,
+  petMoment,
   applyEquipDrop,
   bindBattleHooks,
   boot,

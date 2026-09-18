@@ -7,7 +7,7 @@
  */
 import { $, ARRAY_MAX_LV, AURA_COLORS, AURA_FPS, BIGS, BTL, MAIN_STORY, MS_ARRAY, MS_ART, MS_SPIRIT, MYST, PAGES_NEED, PLOT, REALM_DAYS, SEG4, SEG_META, SEG_SCALE, SKILL_DEFS, __set_lastReadyHint, __set_settling, _dsp, _floatPrev, _settling, arrMult, bigSub, cld, cnNum, durTxt, fin, finalStats, fmt, lastReadyHint, pulseChip, setProg, spawnFloat, state } from './00-pure.js';
 import { BASE_STATS, bigIndexOf, boostMult, __set_auraAcc, __set_auraT, _auraAcc, _auraColor, _auraCtx, _auraP, _auraT, arrayCostNow, buffMult, cldUI, hiddenUnlocked, pagesOf, pickNoRepeat, pushMsg, seg, srvNow, 段名 } from './10-base.js';
-import { _cloudSettleRun, addJournal, bigIdx, realm, renderCraftBtn, renderSkills, save, showChapter, skillVal } from './20-core.js';
+import { _cloudSettleRun, addJournal, bigIdx, realm, renderCraftBtn, renderSkills, save, showChapter, skillVal, v6RateNow } from './20-core.js';
 
 (function buildSegs() {
   let cum = 0;
@@ -54,13 +54,6 @@ function cloudPushNow() {
   cldPush().then(ok => { if (ok) { cld.dirty = false; cldUI("on"); } });   // v2.5: 上传成功清脏, 避免周期兜底反复空传
 }
 
-function realmMult() { return Math.pow(bigIdx() + 1, 2.05); }
-
-function rateNow() {
-  /* v5.7: boost 池(丹力/兽潮)在线也生效, 与服务端 gExp = 4*arrM*dt*pillMult*offMult 对齐 —— 在线挂机不能比离线亏 */
-  return Math.max(0, fin(4 * realmMult() * arrMult(state.arrayLv) * buffMult() * boostMult(), 0));
-}
-
 const _hud = { rateText: null };
 
 function updateHUD() {
@@ -72,29 +65,13 @@ function updateHUD() {
    *   由 06-v6ui.js:169 用 N.fmt(S6.spirit) 统一刷新。此前两边都写同一个节点，
    *   旧侧喂的是缓动值 _dsp.spirit（追的是 legacy state.spirit，类型/节奏都跟不上 v6），
    *   实测显示会在真实数字与 "∞" 之间来回跳。
-   *   本函数现在只负责 v6 尚未覆盖的 #rateText（修为/秒）。 */
+   *
+   *   ⚠️ #rateText 显示的是「修为/秒」。旧的 rateNow() 已随旧打坐体系删除，
+   *   现在这个数字由 v6 的推关产出速率提供（见下方 v6RateText()）。 */
   if (!_hud.rateText) _hud.rateText = $("rateText");
-  const _rate = rateNow();
-  if (_hud.rateText) _hud.rateText.textContent = fmt(_rate);
+  if (_hud.rateText) _hud.rateText.textContent = fmt(v6RateNow());
   _floatPrev.spirit = state.spirit;
   _floatPrev.exp = state.exp;
-}
-
-function fireMilestone(flagKey, title, text) {
-  const M = state.milestones || (state.milestones = {});
-  if (M[flagKey]) return false;
-  M[flagKey] = 1;
-  addJournal({ key: "ms-" + flagKey, big: realm().big, kind: "纪事", title, text });
-  pushMsg("main", `<span class="b">纪事</span>·${title}｜${text}`);
-  return true;
-}
-
-function checkMilestones() {
-  if (state.spirit > state.peakSpirit) state.peakSpirit = state.spirit;
-  let fired = false;
-  for (const [th, t, x] of MS_SPIRIT) if (state.peakSpirit >= th && fireMilestone("s" + th, t, x)) fired = true;
-  for (const [L, t, x] of MS_ARRAY) if (state.arrayLv >= L && fireMilestone("r" + L, t, x)) fired = true;
-  if (fired) save();
 }
 
 function openStory() {
@@ -195,10 +172,13 @@ function tickAura(dt, target) {
 }
 
 function mainMoment() {
-  const pool = MAIN_STORY[Math.min(bigIdx(), MAIN_STORY.length - 1)];
-  const g = Math.round(rateNow() * 2.5);
-  state.exp += g;
-  pushMsg("main", `<span class="b">主线</span>·修为<span class="g">+${fmt(g)}</span>｜${pickNoRepeat(pool, "m" + bigIdx())}`);
+  /* ⚠️ v6 阶段5: 主线剧情保留（用户要求：主线跟境界挂钩），但不再发修为。
+   *   修为/境界已由 v6 推关驱动，旧 state.exp 不再是成长来源 ——
+   *   这里只负责把大境界对应的主线文案推给玩家，纯叙事，无副作用。 */
+  const bi = Math.min(bigIdx(), MAIN_STORY.length - 1);
+  const pool = MAIN_STORY[bi];
+  if (!pool || !pool.length) return;
+  pushMsg("main", `<span class="b">主线</span>｜${pickNoRepeat(pool, "m" + bi)}`);
 }
 
 async function cloudSettle() {
@@ -228,16 +208,12 @@ window.openSkills = openSkills;
 
 export {
   auraColorNow,
-  checkMilestones,
   cldPush,
   cloudPushNow,
   cloudSettle,
-  fireMilestone,
   mainMoment,
   openSkills,
   openStory,
-  rateNow,
-  realmMult,
   renderStory,
   skillAddExpAll,
   tickAura,
