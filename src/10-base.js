@@ -5,7 +5,7 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, ARMOR_POOL, BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, ARRAY_COST, ART_PREFIX, ART_SPECIAL, ART_SUFFIX, AURA_COLORS, BIGS, BTL, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, EQUI_SLOTI, FX_POOL, FX_TXT, G1_TPL, GAME_VER, JRN_TAIL, MATS, MIGRATIONS, MON_ATK_SCALE, MON_FX_POOL, MON_NAMES, MYST, PAGES_NEED, PEND_POOL, PLOT, QUALITY, RECIPES, RK_NAMES, RK_SEGS, SAVE_KEY, SCROLL_POOL, SEARCH_MAX, SEARCH_MIN, SEG_META, SKILL_DEFS, SLOT_TYPES, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, TRACE_ACT, TRAVEL_FIRST_MAX, TRAVEL_FIRST_STEP, TRAVEL_FIRST_WINDOW, TRAVEL_LATE_STEP, TRAVEL_SPAN, ZONES, __set_alTipT, __set_hbFails, __set_kicked, __set_parts, __set_tracePool, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, _tracePool, alIcoCls, alTipT, autoHuntOn, capDeviceDpr, cauldron, cld, cldApiBase, cnNum, durTxt, eqMult, esc, fin, finalStats, fmt, fxAgg, fxCount, fxValue, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, selRecipe, state } from './00-pure.js';
+import { $, ARMOR_POOL, BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, ARRAY_COST, ART_PREFIX, ART_SPECIAL, ART_SUFFIX, AURA_COLORS, BIGS, BTL, BUFF_CAP_MS, CACHE_VER, CLD_ALPH, CLD_KEY, CUR_VER, DEV_KEY, DIMSTAT, EQUI_SLOTI, FX_POOL, FX_TXT, G1_TPL, GAME_VER, JRN_TAIL, MIGRATIONS, MON_ATK_SCALE, MON_FX_POOL, MON_NAMES, MYST, PAGES_NEED, PEND_POOL, PLOT, QUALITY, RK_NAMES, RK_SEGS, SAVE_KEY, SCROLL_POOL, SEARCH_MAX, SEARCH_MIN, SEG_META, SKILL_DEFS, SLOT_TYPES, SPIRIT_RATE, STORY_BY_KEY, STORY_BY_SID, TRACE_ACT, __set_alTipT, __set_hbFails, __set_kicked, __set_parts, __set_tracePool, _dsp, _hbFails, _kicked, _lastPick, _pred, _settling, _srvOffset, _tracePool, alIcoCls, alTipT, autoHuntOn, capDeviceDpr, cld, cldApiBase, cnNum, durTxt, eqMult, esc, fin, finalStats, fmt, fxAgg, fxCount, fxValue, g1b64, g1merge, g1prune, g1unb64, parts, seekHide, state } from './00-pure.js';
 
 (function () {
   const vt = document.getElementById("verTag"); if (vt) vt.textContent = GAME_VER;
@@ -216,20 +216,6 @@ function adopt(s) {
   /* v5.8 兽潮效率快照(破纪录波实测产出): 驱动后端离线灵石/装备折算 */
   s.trialSp = Math.max(0, Math.round(fin(s.trialSp, 0, 1e12)));
   s.trialEq = Math.max(0, Math.round(fin(s.trialEq, 0, 100)));
-  if (!s.travel || typeof s.travel !== "object") s.travel = null;
-  /* v1.8.5 化身行囊: 信匣满后由服务端 stayTravel 攒进 travel.bag。
-   * adopt 是白名单式的"规整"而非深拷贝原样保留 —— 显式归一 bag/bagPages,
-   * 免得服务端下发的行囊在本地被当作脏字段丢掉(云游面板要显示"行囊在攒")。 */
-  if (s.travel) {
-    s.travel.since = fin(s.travel.since, Date.now());
-    if (s.travel.mailAt) s.travel.mailAt = fin(s.travel.mailAt, 0);
-    s.travel.bag = Array.isArray(s.travel.bag)
-      ? s.travel.bag.filter(x => x && typeof x.id === "string" && fin(x.q, 0) > 0)
-          .map(x => ({ id: x.id, q: Math.round(fin(x.q, 0)) }))
-      : [];
-    s.travel.bagPages = Math.max(0, Math.round(fin(s.travel.bagPages, 0)));
-  }
-  if (!Array.isArray(s.mails)) s.mails = [];
   /* v1.10.0: 历史档迁移(六槽→四部位/缺属性老件确定性补全)已随旧档退役 —— adopt 只做
    * 「schema v1 结构的防御性规整」: 类型钳制 + 缺省补默认, 不再背负任何代际转换。 */
   if (Array.isArray(s.arts)) {
@@ -692,129 +678,6 @@ function initAura(sharedCtx) {
   return true;
 }
 
-function zoneOfBig(bi) { const z = ZONES[bi]; return z ? z : ZONES[ZONES.length - 1]; }
-
-function zoneOfLoc(id) { for (const z of ZONES) if (z.locs.some(l => l.id === id)) return z; return null; }
-
-function locById(id) { for (const z of ZONES) { const l = z.locs.find(x => x.id === id); if (l) return l; } return null; }
-
-function travelBtnLbl() {
-  const b = $("btnTravel"); if (!b) return;
-  const lb = b.querySelector(".label"); if (!lb) return;
-  if (state.travel) {
-    const l = locById(state.travel.loc);
-    lb.innerHTML = "云游中";
-    b.classList.add("traveling");
-    b.title = l ? "化身正于 " + l.n : "化身在外游历";
-  } else { lb.innerHTML = "云游"; b.classList.remove("traveling"); b.title = ""; }
-}
-
-function matBagHTML() {
-  const own = Object.keys(MATS).filter(k => ((state.mats || {})[k] || 0) > 0);
-  if (!own.length) return `<div class="al-sec">行囊 · 手头材料</div><div class="al-empty">行囊空空——遣化身出门云游，可捎回药草灵石。</div>`;
-  const chips = own.map(k => `<span class="al-bagchip" title="${MATS[k].n} · ${MATS[k].src}">${MATS[k].n}<b>×${state.mats[k]}</b><i class="t">${MATS[k].t}</i></span>`).join("");
-  return `<div class="al-sec">行囊 · 手头材料 <i>尚未采到的不在此列</i></div><div class="al-bag">${chips}</div>`;
-}
-
-function pillCabinetHTML() {
-  const pk = Object.keys(state.pills || {}).filter(id => RECIPES[id]);
-  if (!pk.length) return `<div class="al-sec">丹药匣</div><div class="al-empty">尚无丹药——材料齐了即可开炉。</div>`;
-  const row = pk.map(id => {
-    const rp = RECIPES[id];
-    const fn = rp.d.split("：").pop();          // v1.9.9: 服用信息(效果摘要), 图标下方两行截断
-    return `<span class="al-pill" title="${rp.d}">${pillIco(id, 44)}<span class="nm">${rp.n}</span><span class="fx">${fn}</span><b>×${state.pills[id]}</b><button class="take" onclick="consumePill('${id}')">服</button></span>`;
-  }).join("");
-  return `<div class="al-sec">丹药匣 <i>点“服”即用</i></div><div class="al-grid">${row}</div>`;
-}
-
-function closeAlchemy() { const m = $("alchemyModal"); if (m) m.classList.remove("show"); }
-
-const alHave = m => (state.mats || {})[m] || 0;
-
-const alInFurn = m => cauldron[m] || 0;
-
-const alIco = (m, sz) => `<span class="ico ${alIcoCls(MATS[m].t)}"${sz ? ` style="width:${sz}px;height:${sz}px;font-size:${Math.round(sz * .45)}px"` : ""}><img class="icoim" src="assets/modals/ico/${m}.webp" alt="" onerror="this.remove()">${MATS[m].n[0]}</span>`;
-
-const pillIco = (id, sz) => `<span class="ico pillbg"${sz ? ` style="width:${sz}px;height:${sz}px;font-size:${Math.round(sz * .45)}px"` : ""}><img class="icoim" src="assets/modals/ico/${id}.webp" alt="" onerror="this.remove()">${RECIPES[id].n[RECIPES[id].n.length - 2] || "丹"}</span>`;
-
-const recipeCan = id => Object.keys(RECIPES[id].need).every(m => alHave(m) >= RECIPES[id].need[m]);
-
-function renderFurn() {
-  const el = $("furnSlots"); if (!el) return;
-  const mids = Object.keys(cauldron).filter(m => cauldron[m] > 0);
-  let h = mids.map(m => `<div class="slot" title="${MATS[m].n} · 点之退回" onclick="takeMat('${m}')">
-      ${alIco(m, 34)}<b>×${cauldron[m]}</b></div>`).join("");
-  for (let i = mids.length; i < 3; i++) h += `<div class="slot"><em>空</em></div>`;
-  el.innerHTML = h;
-}
-
-function renderBag() {
-  const nEl = $("bagN"), el = $("bagGrid"); if (!el) return;
-  const own = Object.keys(MATS).filter(m => alHave(m) > 0);
-  if (nEl) nEl.textContent = `${own.length} / ${Object.keys(MATS).length}`;
-  let h = own.map(m => `<div class="cell" title="${MATS[m].n} · ${MATS[m].src}" onclick="putMat('${m}')">
-      ${alIco(m)}<b>×${alHave(m) - alInFurn(m)}</b></div>`).join("");
-  const pad = (3 - own.length % 3) % 3;
-  for (let i = 0; i < pad + 3; i++) h += `<div class="cell empty"><em>空</em></div>`;
-  el.innerHTML = h;
-}
-
-function renderCabinet() {
-  const wrap = $("cabWrap"), el = $("cabGrid"); if (!el) return;
-  const pk = Object.keys(state.pills || {}).filter(id => RECIPES[id] && state.pills[id] > 0);
-  if (wrap) wrap.style.display = pk.length ? "" : "none";
-  el.innerHTML = pk.map(id => {
-    const rp = RECIPES[id];
-    const fn = rp.d.split("：").pop();          // v1.9.9: 服用信息行
-    return `<div class="pillb" title="${rp.d}" onclick="consumePill('${id}')">
-      ${pillIco(id)}<span class="nm">${rp.n}</span><span class="fx">${fn}</span><b>×${state.pills[id]}</b><em>服</em></div>`;
-  }).join("");
-}
-
-function fitsRecipe() {
-  if (!selRecipe) return false;
-  const need = RECIPES[selRecipe].need, ks = Object.keys(need);
-  return ks.every(m => alInFurn(m) === need[m]) && Object.keys(cauldron).filter(m => cauldron[m] > 0).length === ks.length;
-}
-
-function alTip(id, m) {
-  const el = $(id), M = MATS[m];
-  if (!el || !M) return;
-  el.innerHTML = `<b>${M.n}</b><i>${M.t} · ${M.src}</i>`;
-  el.classList.add("on");
-  clearTimeout(alTipT);
-  __set_alTipT(setTimeout(() => el.classList.remove("on"), 1500));
-}
-
-function closeTravel() { const m = $("travelModal"); if (m) m.classList.remove("show"); }
-
-function travelMailCount(awaySec) {
-  const t = Math.max(0, Math.min(+awaySec || 0, TRAVEL_SPAN));
-  const fast = Math.min(t, TRAVEL_FIRST_WINDOW);
-  const slow = Math.max(0, t - TRAVEL_FIRST_WINDOW);
-  return Math.floor(fast / TRAVEL_FIRST_STEP) + Math.floor(slow / TRAVEL_LATE_STEP);
-}
-
-function travelSent() {
-  const t = state.travel;
-  if (!t) return 0;
-  return Math.max(0, Math.floor(t.sent || 0));
-}
-
-function travelNextMailIn(awaySec) {
-  const t = Math.max(0, Math.min(+awaySec || 0, TRAVEL_SPAN));
-  if (t >= TRAVEL_SPAN) return null;
-  const n = travelMailCount(t);
-  const at = travelSecForMails(n + 1);
-  return Math.max(0, at - t);
-}
-
-function travelSecForMails(n) {
-  if (n <= 0) return 0;
-  if (n <= TRAVEL_FIRST_MAX) return n * TRAVEL_FIRST_STEP;
-  return TRAVEL_FIRST_WINDOW + (n - TRAVEL_FIRST_MAX) * TRAVEL_LATE_STEP;
-}
-
 function buffSpanMs(mult) {
   const now = Date.now();
   const segs = [];
@@ -890,28 +753,10 @@ function renderPillHints() {
     (boosts.length ? (multN ? " · " : "") + `<span style="color:#8fd8bd">${bTxt}</span>` : "");
 }
 
-mailDot();
 
 function pagesOf(bi) { return (state.pages && state.pages["b" + bi]) || 0; }
 
 function hiddenUnlocked(bi) { return pagesOf(bi) >= PAGES_NEED[bi]; }
-
-function recipeCardHTML(id) {
-  const rp = RECIPES[id];
-  const needTxt = Object.keys(rp.need).map(mid => {
-    const have = (state.mats || {})[mid] || 0, nd = rp.need[mid];
-    return `<span class="al-chip ${have >= nd ? "ok" : "no"}">${MATS[mid].n} ${have}/${nd}</span>`;
-  }).join("");
-  const can = Object.keys(rp.need).every(mid => ((state.mats || {})[mid] || 0) >= rp.need[mid]);
-  return `<div class="al-card${can ? " can" : ""}">
-    <div style="flex:1;min-width:0">
-      <div class="nm">${rp.n}</div>
-      <div class="ds">${rp.d}</div>
-      <div class="nd">${needTxt}</div>
-    </div>
-    <button class="al-craft ${can ? "on" : "off"}" ${can ? `onclick="craftPill('${id}')"` : "disabled"}>开炉</button>
-  </div>`;
-}
 
 function cloudSnap(src) {
   const s = src || state;
@@ -926,19 +771,6 @@ function cloudSnap(src) {
   if (_pred.exp) out.exp = Math.max(0, (out.exp || 0) - _pred.exp);
   if (_pred.spirit) out.spirit = Math.max(0, (out.spirit || 0) - _pred.spirit);
   return out;
-}
-
-function mailLine(locId, ts) {
-  const loc = locById(locId);
-  if (!loc || !loc.tale || !loc.tale.length) return "";
-  const t = loc.tale.length;
-  return loc.tale[(((ts || 0) / 60000 | 0) % t + t) % t];
-}
-
-function mailDot() {
-  const n = (state.mails || []).length;
-  const d = $("mailDot"); if (d) d.style.display = n ? "block" : "none";
-  const b = $("mailChip"); if (b) b.classList.toggle("has-mail", !!n);
 }
 
 function settleBlocked() {
@@ -964,8 +796,6 @@ function handleKicked() {
   cld.ready = false;
   try { SND.suspend(); } catch (e) {}
 }
-
-function closeMail() { const m = $("mailModal"); if (m) m.classList.remove("show"); }
 
 function closeSettings() { const m = $("setModal"); if (m) m.classList.remove("show"); }
 
@@ -1040,37 +870,7 @@ function renderAutoHunt() {
   if (!on) seekHide();
 }
 
-function traceRefresh() {
-  const el = $("traceArea"); if (!el) return;
-  if (BTL || MYST) return;   // 战斗/秘境演出中, 行迹条保持现状不覆写
-  if (state.travel) {
-    const loc = locById(state.travel.loc);
-    const where = loc ? loc.n : "远方";
-    const lid = state.travel.loc;
-    if (el.dataset.k !== lid || !_tracePool.length) {
-      el.dataset.k = lid;
-      __set_tracePool((loc && loc.tale && loc.tale.length ? loc.tale.slice() : []).concat(TRACE_ACT.slice()));
-      if (!_tracePool.length) __set_tracePool(TRACE_ACT.slice());
-    }
-    const s = _tracePool.shift(); _tracePool.push(s);
-    el.className = "trace travel";
-    /* v1.9.0: 「召回」按钮删除 —— 归来由满 8 封信决定。这里改成"看信"入口。 */
-    el.innerHTML = `<span class="t-row"><span class="t-ic">迹</span><span class="t-txt">化身在 <b>${where}</b>：${s}</span><button class="trace-go" onclick="event.stopPropagation();openTravel()">进度</button></span>`;
-    return;
-  }
-  if (el.dataset.k === "idle") return;
-  el.dataset.k = "idle";
-  el.className = "trace idle";
-  el.innerHTML = `<span class="t-row"><span class="t-ic">云</span><span class="t-txt">化身尚未出行 —— 遣它下山?</span><button class="trace-go" onclick="event.stopPropagation();openTravel()">云游</button></span>`;
-}
-
 renderAutoHunt();
-
-function debugEncounter() {
-  if (BTL || MYST) { pushMsg("main", "正在斗法/探秘中，且待收场。"); return; }
-  closeTravel();
-  pushMsg("main", "文字斗法已撤，妖物都在下方战斗区里 —— 看着打便是。");
-}
 
 function artCtx() {
   const lv = (state.realmIdx || 0) + 1;
@@ -1251,10 +1051,6 @@ export {
   _auraP,
   _auraT,
   adopt,
-  alHave,
-  alIco,
-  alInFurn,
-  alTip,
   apiRoot,
   arrayCostNow,
   artCtx,
@@ -1274,28 +1070,23 @@ export {
   cldFlash,
   cldId,
   cldUI,
-  closeAlchemy,
   closeEquip,
-  closeMail,
   closeOffline,
   closeRank,
   closeRename,
   closeSettings,
   closeSkills,
   closeStory,
-  closeTravel,
   cloudNew,
   cloudSnap,
   cloudSoon,
   cloudTogglePanel,
-  debugEncounter,
   deviceId,
   dimRender,
   ensureScrollFx,
   enterDim,
   equipBonus,
   exitDim,
-  fitsRecipe,
   fmtFxTag,
   g1Pack,
   g1Unpack,
@@ -1311,26 +1102,15 @@ export {
   initFxLayer,
   journalHasKey,
   licBuild,
-  locById,
-  mailDot,
-  mailLine,
-  matBagHTML,
   migrate,
   openRename,
   pagesOf,
   pickNoRepeat,
-  pillCabinetHTML,
-  pillIco,
   pushBattleStats,
   pushBoost,
   pushBuff,
   pushMsg,
-  recipeCan,
-  recipeCardHTML,
   renderAutoHunt,
-  renderBag,
-  renderCabinet,
-  renderFurn,
   renderPName,
   renderPillHints,
   renderSettings,
@@ -1351,16 +1131,8 @@ export {
   storyResolve,
   tickBurst,
   tickDsp,
-  traceRefresh,
-  travelBtnLbl,
-  travelMailCount,
-  travelNextMailIn,
-  travelSecForMails,
-  travelSent,
   trimJournal,
   trimJr,
-  zoneOfBig,
-  zoneOfLoc,
   段名,
 };
 

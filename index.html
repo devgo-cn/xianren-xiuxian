@@ -764,7 +764,6 @@
 </div>
 
 <!-- 丹力/洗髓 提示: 独立定层, 固定在右上角小图标正下方, 不再压图标 -->
-<div id="pillHints"></div>
 
 <!-- v1.5.0 顶部纵向流: 行迹 → 搜寻妖踪提示 → 战斗横幅, 依次排布不挤压(自动战斗开关已上移资源栏) -->
 <div class="top-stack" id="topStack">
@@ -788,8 +787,6 @@
 <div class="small-icons" id="smallIcons">
   <button class="icon-btn small" id="btnSet" onclick="openSettings()" title="设置" aria-label="设置"><img src="assets/ui_icons/icon_settings.webp" alt="设置"></button>
   <div class="icon-btn small" id="cloudChip" onclick="cloudTogglePanel(event)" title="云存档"><img src="assets/ui_icons/icon_cloud.webp" alt="云存档"><span class="dot"></span><span id="cloudTxt" style="display:none">云存</span></div>
-  <div class="icon-btn small" id="mailChip" onclick="openMail()" title="鸿雁信匣"><img src="assets/ui_icons/icon_mail.webp" alt="邮件"><span class="mail-dot" id="mailDot"></span></div>
-  <button class="icon-btn small" id="storyBtn" onclick="openStory()" title="剧情纲目"><img src="assets/ui_icons/icon_story.webp" alt="剧情"></button>
 </div>
 
 <!-- 战斗区UI图标层：大图标(地板右下) + 顶部HUD(击杀/妖潮/倍速/状态) + 资源栏(左下裸文字) -->
@@ -809,8 +806,6 @@
   </div>
   <div class="big-icons">
     <div class="icon-btn" id="equipChip" onclick="openEquip()" title="法宝·装备"><img src="assets/ui_icons/icon_treasure.webp" alt="宝物"></div>
-    <div class="icon-btn" id="alchemyChip" onclick="openAlchemy()" title="丹房·炼丹"><img src="assets/ui_icons/icon_alchemy.webp" alt="丹房"><span class="lg"></span></div>
-    <div class="icon-btn" id="skillChip" onclick="openSkills()" title="神通·技能"><img src="assets/ui_icons/icon_skill.webp" alt="技能"></div>
   </div>
 
   <!-- v6.0 关卡推进条（战斗带内，紧贴 HUD 下方） -->
@@ -950,14 +945,6 @@
 </div>
 
 
-<div class="modal" id="travelModal">
-  <div class="card story-card" style="--bgart:url(assets/modals/bg-travel.webp)">
-    <div class="mhead"><h3>云 游<i>TRAVEL</i></h3><button class="xbtn" onclick="closeTravel()">✕</button></div>
-    <p class="story-tip" style="color:#8b94a8">化身替你下山跑腿 —— 遣它出门，关了页它也在走。<br>拾到的药草、灵石与丹方残页都收进<b style="color:#c9b98a">丹房行囊</b>，随时可去开炉炼丹。</p>
-    <div class="story-body" id="travelBody"></div>
-  </div>
-</div>
-
 <div class="modal" id="rankModal">
   <div class="card story-card">
     <div class="mhead"><h3>风云榜<i>RANK</i></h3><button class="xbtn" onclick="closeRank()">✕</button></div>
@@ -983,43 +970,6 @@
   </div>
 </div>
 
-<div class="modal" id="alchemyModal">
-  <div class="card story-card">
-    <div class="mhead"><h3>丹 房<i>ALCHEMY</i></h3><button class="xbtn" onclick="closeAlchemy()">✕</button></div>
-    <div class="workgrid">
-      <div class="pane furn">
-        <div class="cap">丹 炉</div>
-        <div class="furn-fig"><img src="assets/modals/art-furnace.webp" alt="" aria-hidden="true"><div class="fig-tip" id="furnTip"></div></div>
-        <div class="slots" id="furnSlots"></div>
-      </div>
-      <div class="pane bagpane">
-        <div class="cap">背 包<i id="bagN"></i></div>
-        <div class="bag-scroll"><div class="bag-grid" id="bagGrid"></div></div>
-        <div class="bag-tip" id="bagTip"></div>
-      </div>
-    </div>
-    <div class="cap" style="margin:10px 1px 7px">丹 方<i>材料齐则现 · 点之入炉</i></div>
-    <div class="rp-list" id="rpList"></div>
-    <div id="cabWrap" style="display:none;margin-top:9px">
-      <div class="cap">丹 药 匣<i>点 “服” 即用</i></div>
-      <div class="cab-grid" id="cabGrid"></div>
-    </div>
-    <div class="cta"><button id="craftBtn" disabled onclick="doCraft()">炼 制</button></div>
-  </div>
-</div>
-
-
-<div class="modal" id="mailModal">
-  <div class="card story-card" style="--bgart:url(assets/modals/bg-mail.webp)">
-    <div class="mhead"><h3>信 匣<i>MAIL</i></h3><button class="xbtn" onclick="closeMail()">✕</button></div>
-    <p class="story-tip" style="color:#8b94a8">化身在外行走，每满 <b style="color:#a98a5a">30 分钟</b> 托雁足寄回一封书信。<br>展信收取，物什才算真正归你。<br>匣中至多存 <b style="color:#a98a5a">50</b> 封——满了化身便停笔，拆几封它自会续上。</p>
-    <div class="mail-bulkbar" id="mailBulkBar">
-      <span class="mb-count" id="mailBulkCount"></span>
-      <button class="btn primary seal" type="button" onclick="collectAllMail()"><span class="label">一键收取</span></button>
-    </div>
-    <div class="story-body" id="mailBody"></div>
-  </div>
-</div>
 
 
 <div class="modal" id="equipModal">

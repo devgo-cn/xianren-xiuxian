@@ -5,8 +5,8 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, ARRAY_MAX_LV, AURA_COLORS, AURA_FPS, BIGS, BTL, DAN_ZONE, EQUI_CELLPOS, EQUI_SLOTI, MAIL_CAP, MAIN_STORY, MATS, MS_ARRAY, MS_ART, MS_SPIRIT, MYST, PAGES_NEED, PLOT, QUALITY, REALM_DAYS, RECIPES, SEG4, SEG_META, SEG_SCALE, SKILL_DEFS, SLOT_TYPES, TRAVEL_FIRST_WINDOW, TRAVEL_SPAN, __set_cauldron, __set_eqSel, __set_lastReadyHint, __set_selRecipe, __set_settling, _dsp, _eqSel, _floatPrev, _settling, arrMult, bigSub, cauldron, cld, cnNum, durTxt, fin, finalStats, fmt, lastReadyHint, pulseChip, selRecipe, setProg, spawnFloat, state } from './00-pure.js';
-import { BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, boostMult, EQUI_SLOTN, TOTAL_SEGS, __set_auraAcc, __set_auraT, _auraAcc, _auraColor, _auraCtx, _auraP, _auraT, alHave, alInFurn, alTip, arrayCostNow, artMult, artName, attrAssign, buffMult, cldUI, equipBonus, fitsRecipe, hiddenUnlocked, locById, pagesOf, pickNoRepeat, pushMsg, recipeCan, recipeCardHTML, renderBag, renderCabinet, renderFurn, seg, srvNow, travelBtnLbl, travelMailCount, travelNextMailIn, travelSent, zoneOfBig, 段名 } from './10-base.js';
+import { $, ARRAY_MAX_LV, AURA_COLORS, AURA_FPS, BIGS, BTL, EQUI_CELLPOS, EQUI_SLOTI, MAIN_STORY, MS_ARRAY, MS_ART, MS_SPIRIT, MYST, PAGES_NEED, PLOT, QUALITY, REALM_DAYS, SEG4, SEG_META, SEG_SCALE, SKILL_DEFS, SLOT_TYPES, __set_eqSel, __set_lastReadyHint, __set_settling, _dsp, _eqSel, _floatPrev, _settling, arrMult, bigSub, cld, cnNum, durTxt, fin, finalStats, fmt, lastReadyHint, pulseChip, setProg, spawnFloat, state } from './00-pure.js';
+import { BASE_STATS, EQ_POW, QW_TABLE, bigIndexOf, boostMult, EQUI_SLOTN, TOTAL_SEGS, __set_auraAcc, __set_auraT, _auraAcc, _auraColor, _auraCtx, _auraP, _auraT, arrayCostNow, artMult, artName, attrAssign, buffMult, cldUI, equipBonus, hiddenUnlocked, pagesOf, pickNoRepeat, pushMsg, seg, srvNow, 段名 } from './10-base.js';
 import { _cloudSettleRun, addJournal, artScore, bigIdx, licSync, realm, renderCraftBtn, renderSkills, save, showChapter, skillVal } from './20-core.js';
 
 (function buildSegs() {
@@ -162,23 +162,9 @@ function refreshGlow(canBreak) {
   const eb = (sel, on) => { const el = document.querySelector(sel); if (el) el.classList.toggle("glow-ember", !!on); };
   gb("#btnBreak", canBreak);                                    // 渡劫可突破
   gb("#btnArray", state.arrayLv < ARRAY_MAX_LV && state.spirit >= arrayCostNow());  // 聚灵阵可升级(32级圆满后不再提示)
-  gb("#btnTravel", !state.travel);                              // 化身在府可遣出
-  let craftAny = false;                                         // 丹房: 存在一则可炼(已通晓且材料足)
-  const bi = bigIdx(), mats = state.mats || {};
-  for (const id in RECIPES) {
-    const rp = RECIPES[id];
-    if (!rp || rp.big > bi) continue;
-    if (rp.h && !hiddenUnlocked(bi)) continue;
-    let ok = true;
-    for (const k in rp.need) { if ((mats[k] || 0) < rp.need[k]) { ok = false; break; } }
-    if (ok) { craftAny = true; break; }
-  }
-  eb("#alchemyChip", craftAny);
   /* 文字同步提亮(双保险: 按钮光晕 + 内部文字亮度跳动) */
   const lg = (sel, on) => { const el = document.querySelector(sel); if (el) el.classList.toggle("hint-gold", !!on); };
   lg("#btnBreak .label", canBreak); lg("#btnArray .label", state.arrayLv < ARRAY_MAX_LV && state.spirit >= arrayCostNow());
-  lg("#btnTravel .label", !state.travel);
-  const le = document.querySelector("#alchemyChip .lg"); if (le) le.classList.toggle("hint-ember", craftAny);
 }
 
 function fireMilestone(flagKey, title, text) {
@@ -305,137 +291,11 @@ function mainMoment() {
   pushMsg("main", `<span class="b">主线</span>·修为<span class="g">+${fmt(g)}</span>｜${pickNoRepeat(pool, "m" + bigIdx())}`);
 }
 
-function pickLoc() { const z = zoneOfBig(bigIdx()); return { z, l: z.locs[(Math.random() * z.locs.length) | 0] }; }
-
-function travelAvatarHTML() {
-  if (state.travel) {
-    const l = locById(state.travel.loc);
-    const awaySec = Math.max(0, Math.floor((srvNow() - state.travel.since) / 1000));
-    /* v1.9.0 面板: 不再有「召回」—— 化身何时回山由信决定。
-     * 这里呈现的是「已发几封 / 还要多久下一封 / 何时自动归来」。 */
-    const sent = Math.min(travelSent(), travelMailCount(awaySec));
-    const want = travelMailCount(awaySec);
-    const inFirst = awaySec < TRAVEL_FIRST_WINDOW;
-    const backAt = TRAVEL_FIRST_WINDOW;                       // 满 8 封(4 小时)即归来
-    const backIn = Math.max(0, backAt - awaySec);
-    const nextIn = travelNextMailIn(awaySec);
-    const capped = awaySec >= TRAVEL_SPAN;
-    const mailLeft = MAIL_CAP - (state.mails || []).length;
-    /* 发信节奏说明 */
-    const pace = inFirst
-      ? `每 <b>30 分钟</b> 一封（前八封）`
-      : `每 <b>2 小时</b> 一封（第八封之后）`;
-    const nextTxt = capped
-      ? `<span style="color:#8fd8bd">已在外满两日，信不再增，化身就此回山。</span>`
-      : nextIn == null
-        ? `<span style="color:#8fd8bd">八封已足，上线即可收化身回山。</span>`
-        : `下一封还需 <b style="color:#c9b98a">${durTxt(nextIn)}</b>`;
-    const backTxt = cld.ready
-      ? (awaySec >= backAt
-          ? `<span style="color:#8fd8bd">已够八封，下次上线化身便自行回山。</span>`
-          : `再在外 <b style="color:#c9b98a">${durTxt(backIn)}</b> 满八封，届时上线即自行归来。`)
-      : `<span style="color:#8b94a8">云端未就绪，归来判定以服务端为准。</span>`;
-    /* 进度: 0..8 封(前段)；超出后段就用"距两日"的进度 */
-    const prog = inFirst ? Math.min(8, sent) / 8 : Math.min(1, (awaySec - TRAVEL_FIRST_WINDOW) / (TRAVEL_SPAN - TRAVEL_FIRST_WINDOW));
-    const progPct = Math.round(prog * 100);
-    const mailWarn = mailLeft <= 0
-      ? `<div style="color:#e08a6a;font-size:11px;margin-top:6px">信匣已满 <b>${MAIL_CAP}</b> 封 —— 化身暂时停笔，拆几封它便续上。</div>`
-      : mailLeft <= 5
-        ? `<div style="color:#c9b98a;font-size:11px;margin-top:6px">信匣余 <b>${mailLeft}</b> 封空位。</div>`
-        : "";
-    return `<div style="text-align:center;padding:14px 4px">
-        <div style="font-family:var(--font-brush);font-size:18px;color:#d8b06a;letter-spacing:.12em">化身在${l ? l.n : "远方"} · ${durTxt(awaySec)}</div>
-        <p style="color:#a7b0c4;margin-top:10px;line-height:1.9">化身在外游历，${pace}。已寄回 <b style="color:#c9b98a">${sent}</b> 封手札。<br>满 <b style="color:#c9b98a">八封</b>（四个小时）化身便自行回山，<b style="color:#c9b98a">无从召回</b>——它在外的所得，全在信里。</p>
-        <div style="height:4px;background:rgba(201,168,106,.14);margin:11px 18px 0">
-          <i style="display:block;height:100%;width:${Math.min(100, progPct)}%;background:linear-gradient(90deg,rgba(201,168,106,.55),rgba(232,197,107,.95))"></i>
-        </div>
-        <p style="color:#8b94a8;font-size:11.5px;margin-top:8px;line-height:1.7">${nextTxt}</p>
-        <div style="text-align:left;margin:10px 10px 0;padding:9px 11px;background:rgba(201,168,106,.07);border:1px dashed rgba(201,168,106,.22)">
-          <div style="font-size:11px;color:#8b94a8;letter-spacing:.04em">归山 · 由信而定</div>
-          <div style="font-size:12.5px;color:#c9b98a;margin-top:5px;line-height:1.8">${backTxt}</div>
-          ${mailWarn}
-        </div>
-        <button class="btn" style="margin-top:12px" onclick="openMail()"><span class="label">去拆信 · 已收 ${(state.mails || []).length} 封</span></button>
-        <div style="font-size:10.5px;color:#6d7688;margin-top:8px">开炉炼丹与服丹，请去左上角 <b style="color:#a98a5a">丹</b> 房。</div></div>`;
-  }
-  const z = zoneOfBig(bigIdx());
-  const placeNames = z.locs.map(x => x.n).join("、");
-  return `<div style="padding:10px 4px 14px;text-align:center;border-bottom:1px dashed rgba(201,168,106,.16)">
-      <div style="font-family:var(--font-brush);font-size:16px;color:#d8b06a;letter-spacing:.06em">${z.name}</div>
-      <p style="color:#8b94a8;font-size:11.5px;margin-top:6px;line-height:1.9">化身会顺着自己的心意，在 ${placeNames} 一带游历。<br>在外每满 <b style="color:#a98a5a">30 分钟</b> 寄回一封手札，八封（四个小时）后<b style="color:#a98a5a">自行回山</b>；若你久不归来，它便放慢到<b style="color:#a98a5a">每 2 小时</b>一封，最多在外守候 <b style="color:#a98a5a">两日</b>。</p>
-      <button class="btn" style="margin-top:10px" onclick="startTravel()"><span class="label">遣化身出门</span></button>
-    </div>
-    <div style="font-size:10.5px;color:#6d7688;text-align:center;padding:10px 4px;line-height:1.8">拾得的药草与丹方残页都装在<b style="color:#a98a5a">鸿雁信匣</b>里，拆开才算你的。<br>信匣最多存 <b style="color:#a98a5a">${MAIL_CAP}</b> 封，满了化身就停笔。</div>`;
-}
-
-function openTravel() {
-  const m = $("travelModal"); if (!m) return;
-  const box = $("travelBody"); if (!box) return;
-  box.innerHTML = travelAvatarHTML();
-  m.classList.add("show");
-  travelBtnLbl();
-}
-
-function renderRecipes() {
-  const el = $("rpList"); if (!el) return;
-  const bi = bigIdx();
-  const ok = Object.keys(RECIPES).filter(id => {
-    const rp = RECIPES[id];
-    if (rp.big > bi) return false;                        // 境界未至不示
-    if (rp.h && !hiddenUnlocked(rp.big)) return false;    // 残卷未齐不示
-    return recipeCan(id);                                 // 材料齐则现
-  });
-  el.innerHTML = ok.length ? ok.map(id => {
-    const rp = RECIPES[id];
-    const need = Object.keys(rp.need).map(m => `${MATS[m].n}${rp.need[m]}`).join(" · ");
-    const fn = rp.d.split("：").pop();                    // 只展示功能: 取「:」后段
-    return `<div class="rp-card${selRecipe === id ? " sel" : ""}" title="${rp.n} · ${rp.d}｜需 ${need}" onclick="loadRecipe('${id}')">
-      <div class="rp-ico"><img class="icoim" src="assets/modals/ico/${id}.webp" alt="" onerror="this.remove()">${rp.n[rp.n.length - 2] || "丹"}</div>
-      <div class="rp-bd"><span class="nm">${rp.n}</span><span class="ds">${fn}</span></div>
-      <div class="rp-arrow">${selRecipe === id ? "在炉" : "入炉"}</div></div>`;
-  }).join("") : `<div class="al-empty" style="border:1px dashed rgba(201,168,106,.16);border-radius:10px;padding:13px;text-align:center;font-style:normal">
-    <b style="font-size:12px;color:#8b94a8;letter-spacing:2px;font-weight:normal">暂 无 可 炼 丹 方</b></div>`;
-}
-
-function renderAlch() { renderFurn(); renderBag(); renderRecipes(); renderCabinet(); renderCraftBtn(); }
-
-function putMat(m) {
-  if (alHave(m) - alInFurn(m) <= 0) return;
-  cauldron[m] = alInFurn(m) + 1;
-  if (selRecipe && !fitsRecipe()) __set_selRecipe(null);
-  renderAlch();
-  alTip("bagTip", m);
-}
-
-function takeMat(m) {
-  if (!cauldron[m]) return;
-  cauldron[m]--; if (!cauldron[m]) delete cauldron[m];
-  if (selRecipe && !fitsRecipe()) __set_selRecipe(null);
-  renderAlch();
-  alTip("furnTip", m);
-}
-
-function loadRecipe(id) {
-  if (!recipeCan(id)) { pushMsg("main", "材料不齐，丹炉难以为继"); return; }
-  __set_selRecipe(selRecipe === id ? null : id);
-  __set_cauldron({});
-  if (selRecipe) for (const m in RECIPES[id].need) cauldron[m] = RECIPES[id].need[m];
-  renderAlch();
-}
-
-function openAlchemy() {
-  const m = $("alchemyModal"); if (!m) return;
-  renderAlch();
-  m.classList.add("show");
-}
-
 async function cloudSettle() {
   if (!window.fetch || !cld.id || _settling) return null;
   __set_settling(true);
   try { return await _cloudSettleRun(); } finally { __set_settling(false); }
 }
-
-function traceTap() { if (!BTL && !MYST) openTravel(); }
 
 function openEquip() {
   const m = $("equipModal"); if (!m) return;
@@ -523,29 +383,19 @@ export {
   cloudPushNow,
   cloudSettle,
   fireMilestone,
-  loadRecipe,
   mainMoment,
   makeArt,
-  openAlchemy,
   openEquip,
   openSkills,
   openStory,
-  openTravel,
   pickArt,
-  pickLoc,
   pickQ,
-  putMat,
   rateNow,
   realmMult,
   refreshGlow,
-  renderAlch,
   renderEquip,
-  renderRecipes,
   renderStory,
   skillAddExpAll,
-  takeMat,
   tickAura,
-  traceTap,
-  travelAvatarHTML,
   updateHUD,
 };

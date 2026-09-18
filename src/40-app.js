@@ -3,10 +3,10 @@
  *
  * 拓扑层 L8~L14，31 个顶层声明。
  */
-import { $, ARRAY_MAX_LV, BIGS, CACHE_VER, CLD_KEY, DIMSTAT, DROP_CFG, EVENTS, MAIL_CAP, MAIN_STORY, MATS, PET_BONUS, PET_COIN, PET_FORGE, PET_STILL, PLOT, QUALITY, RECIPES, SAVE_KEY, SLOT_TYPES, __set_breaking, __set_cauldron, __set_dropSaveT, __set_encNext, __set_equipId, __set_hiddenAt, __set_hudAcc, __set_selRecipe, __set_state, __set_stayLast, _dropSaveT, _dsp, _equipId, _equipQueue, _floatPrev, _hiddenAt, _hudAcc, _pred, _rate, _settling, _srvOffset, _stayLast, _syncAt, autoHuntOn, breaking, cld, cnNum, esc, fmt, hbOk, initFxDiag, selRecipe, state } from './00-pure.js';
-import { CLD_API, TOTAL_SEGS, adopt, arrayCostNow, buffAtCap, buffHintOf, burstBoom, cldApi, cldFlash, cldId, cldUI, closeTravel, cloudSnap, cloudSoon, createFxLayer, dimRender, ensureScrollFx, fitsRecipe, g1Pack, g1Unpack, hbFail, hiddenUnlocked, journalHasKey, locById, mailDot, pickNoRepeat, pushBattleStats, pushBoost, pushBuff, pushMsg, renderAutoHunt, renderPName, renderPillHints, searchMs, seg, settleBlocked, spiritRate, srvNow, tickDsp, traceRefresh, travelBtnLbl, zoneOfLoc } from './10-base.js';
-import { addJournal, adoptKeep, bigIdx, cldFail, keepArtQuiet, load, realm, renderMailBox, save, showTravelMail, smartEquip, updateArts, updateRealmUI } from './20-core.js';
-import { checkMilestones, cldPush, cloudPushNow, cloudSettle, mainMoment, makeArt, openAlchemy, openStory, openTravel, pickLoc, rateNow, updateHUD } from './30-systems.js';
+import { $, ARRAY_MAX_LV, BIGS, CACHE_VER, CLD_KEY, DIMSTAT, DROP_CFG, EVENTS, MAIN_STORY, PET_BONUS, PET_COIN, PET_FORGE, PET_STILL, PLOT, QUALITY, SAVE_KEY, SLOT_TYPES, __set_breaking, __set_dropSaveT, __set_encNext, __set_equipId, __set_hiddenAt, __set_hudAcc, __set_state, _dropSaveT, _dsp, _equipId, _equipQueue, _floatPrev, _hiddenAt, _hudAcc, _pred, _rate, _settling, _srvOffset, _syncAt, autoHuntOn, breaking, cld, cnNum, esc, fmt, hbOk, initFxDiag, state } from './00-pure.js';
+import { CLD_API, TOTAL_SEGS, adopt, arrayCostNow, buffAtCap, buffHintOf, burstBoom, cldApi, cldFlash, cldId, cldUI, cloudSnap, cloudSoon, createFxLayer, dimRender, ensureScrollFx, g1Pack, g1Unpack, hbFail, hiddenUnlocked, journalHasKey, pickNoRepeat, pushBattleStats, pushBoost, pushBuff, pushMsg, renderAutoHunt, renderPName, searchMs, seg, settleBlocked, spiritRate, srvNow, tickDsp } from './10-base.js';
+import { addJournal, adoptKeep, bigIdx, cldFail, keepArtQuiet, load, realm, save, smartEquip, updateArts, updateRealmUI } from './20-core.js';
+import { checkMilestones, cldPush, cloudPushNow, cloudSettle, mainMoment, makeArt, openStory, rateNow, updateHUD } from './30-systems.js';
 
 let __dimT = 0;   /* 黑屏挂机面板刷新计时器 */
 
@@ -27,10 +27,9 @@ function cldAdoptCloud(s) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { console.warn('[app] 本地存档写入失败:', e); }
   ensureScrollFx();             // v2.5: 云端旧档的功法可能没有攻速词条 → 补齐
   updateRealmUI(); updateHUD(); updateArts(); realmPlot();
-  /* v1.5.0: 云端档可能没有 autoHunt / travel 字段(老档), 采纳后按钮与行迹要跟着重绘,
+  /* v1.5.0: 云端档可能没有 autoHunt 字段(老档), 采纳后按钮要跟着重绘,
      否则会出现"state 已变、开关还停在旧态"的错看 */
-  renderAutoHunt(); travelBtnLbl(); traceRefresh();
-  renderPillHints();            // v1.9.8c.2: 采纳云端档后药力行(丹力正盛/洗髓)要跟着重绘, 否则重开不显示
+  renderAutoHunt();
   renderPName();                // v1.7.26: 云端档自带道号 → 界面同步
   pushBattleStats();            // 换档 → 战斗三围/技能等级随之更新
   return true;
@@ -345,7 +344,6 @@ function startGame() {
   });
   cloudInit();                  // 云存档面板交互 + 断网恢复
   startHeartbeat();             // v1.8.0 周期心跳(90s)
-  setInterval(() => { if (document.hidden) return; stayMailCheck(); }, 60000);   // 在线寄包: iOS 常驻标签页也能收到化身手札; 后台跳过
   initFxDiag();
   /* v3.2: 装配统一舞台 —— 原先这里是 initAura() + initBg() + initFxLayer() 三次调用,
    * 各自启一张全屏 canvas + 一个 rAF。现在合成为 1 张 #stage / 1 个 ticker。
@@ -415,102 +413,6 @@ window.__game = {
   openStory, pushMsg, save, load,
 };
 
-function doCraft() { if (selRecipe && fitsRecipe()) craftPill(selRecipe); }
-
-function refreshOpenPanel() {
-  const am = $("alchemyModal"), tm = $("travelModal");
-  if (am && am.classList.contains("show")) openAlchemy();
-  else if (tm && tm.classList.contains("show")) openTravel();
-}
-
-function startTravel() {
-  if (state.travel) { pushMsg("main", "化身尚在云游，去行迹条看看它走到哪了"); closeTravel(); return; }
-  const { l } = pickLoc();
-  /* v1.9.0: 派发时记录 sent=0(已发封数游标) —— 服务端据此补齐信匣, 天然幂等 */
-  state.travel = { loc: l.id, since: Date.now(), sent: 0 };
-  __set_encNext(autoHuntOn() ? Date.now() + searchMs() : 0);   // 重置巡猎: 自动斗法开则重新起算搜寻
-  pushMsg("main", `你为化身备好行囊。它往<span class="r">${l.n}</span>的方向去了，阿青蹲在门口目送，尾巴搭在你脚边。`);
-  pushMsg("avatar", `阿青送化身到山门口，回来在你蒲团边卧下`);
-  pushMsg("main", `<span class="b">化身在外每满 30 分钟寄回一封手札</span>，满八封（四个小时）便自行回山。<br>记得常去右上角鸿雁处拆信——信里的东西，隔着匣子不算你的。`);
-  travelBtnLbl(); traceRefresh(); updateHUD(); save(); cloudSoon();
-  closeTravel();
-}
-
-function consumePill(id) {
-  const rp = RECIPES[id]; if (!rp) return;
-  if (!state.pills || !state.pills[id]) return;
-  const now = Date.now(); const e = rp.eff;
-  /* v1.9.0: 增益类丹药到顶(累计 24 小时)就不再允许服用 —— 提示而非静默失败 */
-  if ((e.k === "buff" || e.k === "grand") && buffAtCap(e.mult)) {
-    pushMsg("main", `<span class="b">药力已至上限</span>：此丹药力已积满 <b>24 小时</b>，再服无益，且待药力散去。`);
-    renderPillHints();
-    return;
-  }
-  state.pills[id]--;
-  if (state.pills[id] <= 0) delete state.pills[id];
-  /* v1.8.4: buff 记 start ✅ —— 服务端按"有效时段"计 */
-  /* v5.5: 丹药 buff 记丹名(name) —— 服务端验算后随 gains.pill.names 回传, 结算面板按名展示 */
-  if (e.k === "buff") { pushBuff(e.mult, e.dur, rp.n); pushMsg("main", `药力化开，周天运转如飞${buffHintOf(e.mult)}`); }
-  else if (e.k === "inst") { const gg = rateNow() * e.sec; state.exp += gg; pushMsg("main", `药力化开，修为<span class="g">+${fmt(gg)}</span>`); }
-  else if (e.k === "grand") { const gg = rateNow() * e.sec; state.exp += gg; pushBuff(e.mult, e.dur, rp.n); pushMsg("main", `感悟天劫真意，修为<span class="g">+${fmt(gg)}</span>，道韵萦绕${buffHintOf(e.mult)}`); }
-  /* v5.6: 离线加成走通用 Buff 协议(pushBoost) —— 兽潮余威/丹药离线加成同一张表, 后端零知识验算 */
-  else if (e.k === "offline") {
-    pushBoost(e.boost || 0, e.dur || 0, rp.n, "pill");
-    pushMsg("main", `洗髓伐脉，此后游历修炼更有所得（+${Math.round((e.boost || 0) * 100)}%·庇佑 ${Math.max(1, Math.round(e.dur / 3600))} 小时）`);
-  }
-  updateHUD(); save(); cloudSoon(); refreshOpenPanel(); renderPillHints();
-}
-
-function craftPill(id) {
-  if (settleBlocked()) return;
-  const rp = RECIPES[id]; if (!rp) return;
-  if (rp.h && !hiddenUnlocked(rp.big)) { pushMsg("main", "丹方残页未集齐，此丹方还锁在雾里"); return; }
-  for (const mid in rp.need) {
-    if (((state.mats || {})[mid] || 0) < rp.need[mid]) {
-      pushMsg("main", "材料不齐，丹炉难以为继"); return;
-    }
-  }
-  for (const mid in rp.need) state.mats[mid] -= rp.need[mid];
-  state.pills[id] = (state.pills[id] || 0) + 1;
-  pushMsg("main", `丹炉开火，一炉<span class="r">${rp.n}</span>成了，药香满室。`);
-  pushMsg("avatar", `阿青闻到药香，在丹炉边蹲成一团，尾巴尖轻轻晃`);
-  /* v1.9.8 工程化工作台: 成丹即清炉, 重开工作台 */
-  __set_selRecipe(null); __set_cauldron({});
-  save(); cloudSoon(); updateHUD(); refreshOpenPanel();
-}
-
-async function stayMailCheck() {
-  if (!window.fetch || !cld.id || !cld.ready) return;
-  if (!state.travel || !state.travel.loc) return;          // 化身不在外无需寄信
-  if (_settling) return;                                   // settle 往返中, 下轮心跳再问
-  /* v1.9.0: 寄信周期 30 分钟, 故心跳每 2 分钟问一次足矣(周期远大于轮询间隔)。
-   * 服务端 stayTravel 是幂等的 —— 多问几次不会多发信, 只保证"到点即寄"。 */
-  const now0 = Date.now();
-  if (now0 - _stayLast < 120000) return;
-  __set_stayLast(now0);
-  const ctl = new AbortController();
-  const tm = setTimeout(() => ctl.abort(), 7000);
-  try {
-    const r = await fetch(CLD_API + "?id=" + encodeURIComponent(cld.id) + "&stay=1", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ __z: await g1Pack(cloudSnap(state)) }),
-      signal: ctl.signal,
-    });
-    clearTimeout(tm);
-    if (!r.ok) return;
-    const j = await r.json();
-    if (j && j.ok && j.data) {
-      const c0 = await g1Unpack(j.data);
-      if (c0 && adoptKeep(c0)) { updateHUD(); mailDot(); }
-      if (j.stay && j.stay.id && ((j.stay.mats && j.stay.mats.length) || j.stay.page)) {
-        showTravelMail(j.stay);
-        updateRealmUI();
-      }
-    }
-  } catch (e) { clearTimeout(tm); console.warn('[app] stayMailCheck 寄信请求失败:', e); }
-}
-
 function presentSettle(r) {
   const gg = (r && r.gains) || {};
   if (!gg || !gg.settled) return;
@@ -559,8 +461,6 @@ function presentSettle(r) {
   if (offTEl) offTEl.innerHTML =
     `闭关 ${hh ? hh + " 时" + (mm ? " " : "") : ""}${mm ? mm + " 分" : (hh ? "" : "片刻")}<i>化身替你行走的账，都回来了</i>`;
   /* v1.9.0: 信匣满则化身停笔, 只提一句(细节在云游面板) */
-  const bagTip = (state.travel && state.travel.loc && (state.mails || []).length >= MAIL_CAP)
-    ? `<div class="off-hunt" style="color:#a98a5a">鸿雁信匣已满 ${MAIL_CAP} 封，化身暂时停笔 —— 拆几封它便续上。</div>` : "";
   $("offlineText").innerHTML =
     `<div class="off-rows">` +
     `<div class="off-row"><span class="o-ico">${icoExp}</span><span class="ol">周天运转 · 修为</span><b class="ov">+${fmt(gg.exp)}</b></div>` +
@@ -584,75 +484,6 @@ function presentSettle(r) {
   }
   $("offlineModal").classList.add("show");
   updateRealmUI(); updateHUD();
-}
-
-async function mailClaim(idOrAll) {
-  if (settleBlocked()) return;
-  if (!window.fetch || !cld.id || !cld.ready) { cloudSoon(); return; }
-  try {
-    const r = await fetch(CLD_API + "?id=" + encodeURIComponent(cld.id) + "&claim=" + encodeURIComponent(idOrAll), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ __z: await g1Pack(cloudSnap(state)) }),
-    });
-    const j = r.ok ? await r.json() : null;
-    if (j && j.ok && j.data) {
-      const c0 = await g1Unpack(j.data);
-      if (c0 && adoptKeep(c0)) { mailDot(); updateHUD(); }
-    } else { cloudSoon(); }
-  } catch (e) { cloudSoon(); }
-}
-
-function collectAllMail() {
-  if (settleBlocked()) return;
-  const ml = state.mails || [];
-  if (!ml.length) return;
-  const total = {};
-  let pages = 0, n = 0;
-  for (const m of ml) {
-    for (const mk of (m.mats || [])) {
-      if (!MATS[mk.id]) continue;
-      state.mats[mk.id] = (state.mats[mk.id] || 0) + mk.q;
-      total[mk.id] = (total[mk.id] || 0) + mk.q;
-    }
-    if (m.page) {
-      const z = zoneOfLoc(m.loc);
-      if (z) { state.pages["b" + z.big] = (state.pages["b" + z.big] || 0) + 1; pages++; }
-    }
-    n++;
-  }
-  state.mails = [];
-  const gotTxt = Object.keys(total).map(id => MATS[id].n + "×" + total[id]).join("、");
-  pushMsg("main", `你一并拆开 <b>${n}</b> 封雁书，收下 <span class="r">${gotTxt || "数纸见闻"}</span>`
-    + (pages ? `，另得 <b>丹方残页×${pages}</b>` : "") + "。");
-  pushMsg("avatar", `展信收取 · 共 ${n} 封`);
-  renderMailBox(); mailDot(); updateHUD();
-  save(); mailClaim("all");            // v1.8.4: 告知服务端清空信匣, 防重复收取
-}
-
-function collectMail(id) {
-  const ml = state.mails || [];
-  const i = ml.findIndex(x => String(x.id) === String(id));
-  if (i < 0) return;
-  const m = ml[i];
-  const got = [];
-  for (const mk of (m.mats || [])) {
-    if (!MATS[mk.id]) continue;
-    state.mats[mk.id] = (state.mats[mk.id] || 0) + mk.q;
-    got.push(MATS[mk.id].n + "×" + mk.q);
-  }
-  if (m.page) {
-    const z = zoneOfLoc(m.loc);
-    if (z) { state.pages["b" + z.big] = (state.pages["b" + z.big] || 0) + 1; got.push("丹方残页×1"); }
-  }
-  ml.splice(i, 1);
-  const loc = locById(m.loc);
-  const where = loc ? loc.n : "远方";
-  const gotTxt = got.length ? '收下 <span class="r">' + got.join("、") + "</span>" : "只余一纸见闻";
-  pushMsg("main", "你拆开" + where + "的来信，" + gotTxt + "。");
-  pushMsg("avatar", "展信收取 · 化身自" + where + "寄回");
-  renderMailBox(); mailDot(); updateHUD();
-  save(); mailClaim(m.id);             // v1.8.4: 告知服务端删掉这封, 防重复收取
 }
 
 function onBattleDrop(info) {
@@ -928,23 +759,14 @@ export {
   cloudFlush,
   cloudInit,
   cloudPullNow,
-  collectAllMail,
-  collectMail,
-  consumePill,
-  craftPill,
   doBreak,
-  doCraft,
   loop,
-  mailClaim,
   manualBreak,
   onBattleDrop,
   presentSettle,
   realmPlot,
-  refreshOpenPanel,
   requestEquipDrop,
   startGame,
   startHeartbeat,
-  startTravel,
-  stayMailCheck,
   tapArray,
 };

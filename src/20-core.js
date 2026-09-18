@@ -5,8 +5,8 @@
  * 由 tools/split2.js 从 game.js 自动切分（纯搬迁，语句源码逐字保留，逻辑零改动）。
  * 重建: node tools/split2.js <repo> <out>
  */
-import { $, BIGS, DROP_CFG, EQUI_CELLPOS, FX_TXT, JRN_CAP, LIC_QCOL, MATS, QUALITY, SAVE_KEY, SKILL_DEFS, SLOT_TYPES, STORY_BY_KEY, STORY_PAGE, __set_rate, __set_rkAt, __set_srvOffset, __set_state, __set_storyChap, __set_traceT, __set_travelReturned, _eqRecycle, _eqSel, _pred, _rkAt, _storyChap, _traceT, _travelReturned, cld, cnNum, esc, fmt, rnOk, selRecipe, state } from './00-pure.js';
-import { CLD_API, EQUI_SLOTN, SND, adopt, apiRoot, artCtx, cldFlash, cldId, cldUI, closeRename, cloudSnap, cloudSoon, debugEncounter, deviceId, ensureScrollFx, exitDim, fitsRecipe, g1Pack, g1Unpack, handleKicked, licBuild, locById, mailDot, mailLine, migrate, pushBattleStats, pushMsg, renderPName, renderPillHints, renderSettings, resetDimKnob, rkSegLabel, seg, setRealmSub, sizeBurst, skillDef, skillVal, storyItemHtml, traceRefresh, travelBtnLbl, trimJournal } from './10-base.js';
+import { $, BIGS, DROP_CFG, EQUI_CELLPOS, FX_TXT, JRN_CAP, LIC_QCOL, QUALITY, SAVE_KEY, SKILL_DEFS, SLOT_TYPES, STORY_BY_KEY, STORY_PAGE, __set_rate, __set_rkAt, __set_srvOffset, __set_state, __set_storyChap, __set_traceT, _eqRecycle, _eqSel, _pred, _rkAt, _storyChap, _traceT, cld, cnNum, esc, fmt, rnOk, state } from './00-pure.js';
+import { CLD_API, EQUI_SLOTN, SND, adopt, apiRoot, artCtx, cldFlash, cldId, cldUI, closeRename, cloudSnap, cloudSoon, deviceId, ensureScrollFx, exitDim, g1Pack, g1Unpack, handleKicked, licBuild, migrate, pushBattleStats, pushMsg, renderPName, renderSettings, resetDimKnob, rkSegLabel, seg, setRealmSub, sizeBurst, skillDef, skillVal, storyItemHtml, trimJournal } from './10-base.js';
 
 function realm() { return seg(state.realmIdx); }
 
@@ -253,41 +253,13 @@ function keepArtQuiet(a) {          // 静默版 smartEquip: 批量结算不发�
 
 function renderCraftBtn() {
   const b = $("craftBtn"); if (!b) return;
-  b.disabled = !(selRecipe && fitsRecipe());
 }
 
-travelBtnLbl();
 
-renderPillHints();
 
 function adoptKeep(st) {          // 采用结算后的存档, 但本地叙事(非云端净化)不回退
   const keep = (state.journal || []).slice();
-  const hadTravel = state.travel;          // 采纳前的本地云游状态
-  const c = adopt(st);
-  if (!c) return false;
-  c.journal = keep.length >= (c.journal || []).length ? keep : c.journal;
-  /* v1.8.1 派发竞态保护(沿用): 心跳的普通 settle 不该把刚派发的云游抹掉。
-   * 只有当服务端明确给出「化身归来」事件(gains.travel)时才认可清空。
-   * v1.9.0 补充: 归来由「满 8 封」决定, 因此若本地已发满 8 封而服务端尚未判归来,
-   * 也保留 travel —— 等下一次上线结算时由服务端统一收走, 不在此提前清。 */
-  if (hadTravel && !c.travel && !_travelReturned) {
-    c.travel = hadTravel;
-  }
-  __set_state(c);
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}
-  travelBtnLbl();            // 云端结算可能清 travel(化身归来) → 按钮文字同步
-  renderPillHints();         // v1.9.8c.2: 结算合并后药力过期段已被服务端清掉 → 药力行同步
-  mailDot();
   return true;
-}
-
-function showTravelMail(mail) {
-  const loc = locById(mail.loc);
-  const where = loc ? loc.n : "远方";
-  pushMsg("avatar", `鸿雁衔书而至｜化身自${where}寄回一封手札`);
-  pushMsg("main", `<span class="b">雁书已入信匣</span>：化身在${where}写了封信，内附几样远行收获。<br>点右上角鸿雁展开，收取后方才归你。`);
-  if ($("mailModal") && $("mailModal").classList.contains("show")) renderMailBox();
-  mailDot();
 }
 
 async function _cloudSettleRun() {
@@ -322,14 +294,10 @@ async function _cloudSettleRun() {
       if (j.rate) __set_rate({ exp: +j.rate.exp || 0, spirit: +j.rate.spirit || 0 });
       /* 战斗掉落系数由服务端下发(每击杀产出); 没下发就用内置默认, 断网照常可玩 */
       if (j.dropRates) applyDropRates(j.dropRates);
-      /* v1.8.1: 先判定本轮是否「真归来」, 再 adopt —— adoptKeep 据此决定是否保留本地 travel */
-      __set_travelReturned(!!(j.gains && j.gains.travel));
       const j0 = await g1Unpack(j.data);
       if (!adoptKeep(j0)) return null;
-      __set_travelReturned(false);
       _pred.exp = 0; _pred.spirit = 0;     // 账本已被服务端权威值覆盖 → 本地预测清零, 从新账本重新开始
       state._lastTs0 = Date.now(); state._settledTs = Date.now();
-      mailDot();
       state._cloudTs = j.ts || Date.now();
       cld.ready = true; cld.lastOkTs = Date.now(); cld.lastOkLocal = state.lastTs;
       cld.lastPushTs = Date.now();
@@ -342,12 +310,6 @@ async function _cloudSettleRun() {
     cldFail(e);
     return null;
   }
-}
-
-function openMail() {
-  const m = $("mailModal"); if (!m) return;
-  renderMailBox();
-  m.classList.add("show");
 }
 
 function openSettings() {
@@ -389,65 +351,6 @@ function toggleSfx() { SND.setSfx(!SND.sfxOn); renderSettings(); }
   document.addEventListener("touchmove", move, { passive: false });
   document.addEventListener("touchend", up);
 })();
-
-function renderMailBox() {
-  const box = $("mailBody"); if (!box) return;
-  const ml = (state.mails || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
-  /* v1.8.2 一键收取: 信匣有条数时显示批量条 */
-  const bar = $("mailBulkBar"), cnt = $("mailBulkCount");
-  if (bar) bar.style.display = ml.length ? "" : "none";
-  if (cnt) cnt.textContent = ml.length ? `共 ${ml.length} 封` : "";
-  if (!ml.length) {
-    box.innerHTML = `<div class="mail-empty">信匣空空。<br>遣化身出门远行，它每半小时便会托雁足捎信回来——<br>到时候，记得拆开看看。</div>`;
-    return;
-  }
-  box.innerHTML = ml.map(m => {
-    const loc = locById(m.loc);
-    const where = loc ? loc.n : "远方";
-    const mins = Math.max(1, Math.round((Date.now() - (m.ts || Date.now())) / 60000));
-    const ag = mins >= 60 ? (mins / 60 >= 24 ? Math.round(mins / 1440) + " 天前" : Math.round(mins / 60) + " 小时前") : mins + " 分钟前";
-    /* v1.9.9e 内附物品图标化: 缩小的 ico 物品图 + 名称 + 数量(图标库 assets/modals/ico/<id>.webp);
-       丹方残页无专属图, 用内联纸卷 SVG 兜底; 无附件显示平安信 */
-    const chips = [];
-    for (const mk of (m.mats || [])) if (MATS[mk.id]) {
-      chips.push(`<span class="mg" title="${MATS[mk.id].n}"><img src="assets/modals/ico/${mk.id}.webp" alt="" onerror="this.remove()"><em>${MATS[mk.id].n}</em><i>×${mk.q}</i></span>`);
-    }
-    if (m.page) chips.push(`<span class="mg" title="丹方残页"><em>丹方残页</em><i>×1</i></span>`);
-    const goods = chips.length
-      ? `<span class="m-gl">内附</span>${chips.join("")}`
-      : `<span class="m-plain">一封平安信，无甚物什</span>`;
-    return `<div class="mail-item">
-      <div class="mail-head">
-        <span class="m-loc" title="${where}">${where.slice(0, 1)}</span>
-        <span class="m-from">${where} · 化身亲笔</span>
-        <span class="m-age">${ag}</span>
-      </div>
-      <p class="mail-txt">“${mailLine(m.loc, m.ts)}”</p>
-      <div class="mail-foot">
-        <span class="m-goods">${goods}</span>
-        <button class="btn primary seal" type="button" onclick="collectMail('${m.id}')"><span class="label">收 取</span></button>
-      </div>
-    </div>`;
-  }).join("");
-}
-
-function traceBeat() {
-  if (!state) return;
-  if (document.hidden) return;
-  /* 原战斗系统已移除，新战斗动画后续接入资源结算 */
-  if (Date.now() - _traceT > 150000) { __set_traceT(Date.now()); traceRefresh(); }
-}
-
-function traceBeatLoop() {
-  traceBeat();
-  setTimeout(traceBeatLoop, 2500);
-}
-
-setTimeout(traceBeatLoop, 2500);
-
-traceRefresh();
-
-window.debugEncounter = debugEncounter;
 
 function artScore(a) {
   /* v7.2 重写: 去掉anchor+cap, 改成属性加权×品质乘数。
@@ -611,24 +514,20 @@ export {
   licSync,
   load,
   loadRank,
-  openMail,
   openRank,
   openSettings,
   realm,
   renderCraftBtn,
-  renderMailBox,
   renderSkills,
   save,
   saveRename,
   showChapter,
-  showTravelMail,
   skillVal,
   state,
   smartEquip,
   storyLoadMore,
   toggleBgm,
   toggleSfx,
-  traceBeat,
   updateArts,
   updateRealmUI,
 };
