@@ -501,10 +501,9 @@ const MAIN_STORY = [
  ]
 ];
 
-let state = { ver: 1, realmIdx: 0, exp: 0, spirit: 0,
+let state = { ver: 1, realmIdx: 0, exp: 0, spirit: 0, journal: [],
   milestones: {}, peakSpirit: 0,
-  buffs: [], offPills: [], offlineBoostUntil: 0,
-  trialBest: 0, trialBoost: 0, trialBoostUntil: 0 };
+  buffs: [], offPills: [], offlineBoostUntil: 0 };
   /* ⚠️ v6: 旧 state 已不再承载技能 —— 技能恒定无等级, 不入存档（见 SKILL_DEFS 注释）。
    *    本对象整体属于旧系统，待 §9 清理时删除；此处只保留字段不再新增。 */
 
@@ -551,7 +550,6 @@ let _rkAt = 0;
 
 const G1_TPL = { realmIdx: 0, exp: 0, spirit: 0,
   peakSpirit: 0, offPills: [],
-  offlineBoostUntil: 0, trialBest: 0, trialBoost: 0, trialBoostUntil: 0, trialSp: 0, trialEq: 0,
   pages: {}, name: "", _pn: "", _named: 0, _settledAt: 0, ver: 2 };
 
 function g1prune(v, tpl) {
@@ -2024,7 +2022,7 @@ let _settling = false;
 
 let _kicked = false;
 
-const DIMSTAT = { on: false, battles: 0, win: 0, spirit: 0, exp: 0, loot: [], trials: 0, breaks: [] };
+const DIMSTAT = { on: false, battles: 0, win: 0, spirit: 0, exp: 0, loot: [], breaks: [] };
 
 const MON_NAMES = [
   ["野狼妖", "灰鬃豺獠", "赤目獠牙鬼", "黑纹山猫妖", "独眼豺王", "白额虎妖", "青鬃野猪妖", "雾谷山魈"],

@@ -191,13 +191,11 @@ function adopt(s) {
       start: Date.now(), until: s.offlineBoostUntil });
     s.offlineBoostUntil = 0;
   }
-  if ((s.trialBoostUntil || 0) > Date.now() && (s.trialBoost || 0) > 0) {
-    s.buffs.push({ tag: "trial", mult: 1, boost: Math.min(1.8, Math.max(0, fin(s.trialBoost, 0))), name: "兽潮余威",
-      start: Date.now(), until: s.trialBoostUntil });
-    s.trialBoost = 0; s.trialBoostUntil = 0;
-  }
+  /* ⚠️ v6: 妖潮已删除 —— 旧档里的 trial 类 buff 直接丢弃, 不再迁入 buffs 表。
+   * 保留字段清零是为了让旧档的这几个键落回中性值(读档后不再携带兽潮语义)。 */
+  s.trialBoost = 0; s.trialBoostUntil = 0; s.trialBest = 0; s.trialSp = 0; s.trialEq = 0;
   s.buffs = s.buffs.filter(b => b && typeof b === "object").map(b => ({
-    tag: b.tag === "trial" ? "trial" : "pill", mult: Math.min(10, Math.max(1, fin(b.mult, 1))),
+    tag: "pill", mult: Math.min(10, Math.max(1, fin(b.mult, 1))),
     boost: b.boost ? Math.min(2, Math.max(0, fin(b.boost, 0))) : 0,
     name: (typeof b.name === "string" ? b.name : "").slice(0, 12),
     start: Math.max(0, fin(b.start, 0)), until: Math.max(0, fin(b.until, 0)),
@@ -211,12 +209,7 @@ function adopt(s) {
   }
   s.offlineBoostUntil = Math.max(0, fin(s.offlineBoostUntil, 0));
     /* v3.9 妖潮试炼: 纪录 + 离线收益加成(120s 击杀纪录 → 补偿档位) */
-  s.trialBest = Math.max(0, Math.floor(fin(s.trialBest, 0)));
-  s.trialBoost = Math.min(1.80, Math.max(0, fin(s.trialBoost, 0)));   /* v5.1 封顶180%(120只×1%+BOSS60%) */
-  s.trialBoostUntil = Math.max(0, fin(s.trialBoostUntil, 0));
   /* v5.8 兽潮效率快照(破纪录波实测产出): 驱动后端离线灵石/装备折算 */
-  s.trialSp = Math.max(0, Math.round(fin(s.trialSp, 0, 1e12)));
-  s.trialEq = Math.max(0, Math.round(fin(s.trialEq, 0, 100)));
   /* v1.10.0: 历史档迁移(六槽→四部位/缺属性老件确定性补全)已随旧档退役 —— adopt 只做
    * 「schema v1 结构的防御性规整」: 类型钳制 + 缺省补默认, 不再背负任何代际转换。 */
   if (!s.pages || typeof s.pages !== "object") s.pages = {};
@@ -703,11 +696,11 @@ function pushBuff(mult, durSec, name) {
 }
 
 /* v5.6 通用 Buff 协议: 收益加成条目(boost>0, v5.7 起在线离线都生效, 不吃 24h 修为丹封顶)。
- * 兽潮余威也走这里(tag:"trial") —— 前端新增任何加成源只需 push 一条, 后端零改动。 */
+ * 前端新增任何加成源只需 push 一条, 后端零改动。 */
 function pushBoost(boost, durSec, name, tag) {
   const now = Date.now();
   if (!((boost || 0) > 0) || !((durSec || 0) > 0)) return false;
-  const t = tag === "trial" ? "trial" : "pill";
+  const t = "pill";   /* ⚠️ v6: 妖潮已删, 加成来源只剩丹药 */
   /* v5.8 药力相冲·同类唯一: 同 tag 的 boost 类只留最高一道 —— 已有更强则新的不生效;
    * 否则替换为新条目(时长随之刷新)。只动 boost 条目, 同 tag 的 mult 类修为丹不受影响。 */
   state.buffs = (state.buffs || []).filter(b => b && (b.until || 0) > now);
@@ -800,7 +793,6 @@ function renderSettings() {
 }
 
 function dimRender() {
-  const t = $("dimTrials"); if (t) t.textContent = DIMSTAT.trials;
   const s = $("dimSpirit"); if (s) s.textContent = fmt(DIMSTAT.spirit);
   const e = $("dimExp"); if (e) e.textContent = fmt(DIMSTAT.exp);
   const brEl = $("dimBreaks");
@@ -830,7 +822,7 @@ function enterDim() {
   d.classList.add("show");
   document.body.classList.add("dimmed");
   DIMSTAT.on = true;
-  DIMSTAT.battles = 0; DIMSTAT.win = 0; DIMSTAT.spirit = 0; DIMSTAT.exp = 0; DIMSTAT.loot = []; DIMSTAT.trials = 0; DIMSTAT.breaks = [];
+  DIMSTAT.battles = 0; DIMSTAT.win = 0; DIMSTAT.spirit = 0; DIMSTAT.exp = 0; DIMSTAT.loot = []; DIMSTAT.breaks = [];
   dimRender();
   SND.mute(true);                                  // 音乐 + 音效 全关(硬静音, 音效不会自己跳出来)
   /* v5.2: 黑屏挂机不再 pause 任何层 —— ticker 继续跑, 战斗层 draw() 里

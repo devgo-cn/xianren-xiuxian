@@ -12,7 +12,9 @@
  */
 
 import { SND, pushBoost } from './10-base.js';
-import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪录/离线加成写档; 黑屏挂机统计; v7.0: 正规怪物池 */
+import { state, DIMSTAT } from './00-pure.js';
+import * as NS_STAGE from './00-stage.js';   /* v6: 关卡数值权威(30k 关公式表) */
+import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量是可超 1e77 的大数 */
 
 
   const BC = {
@@ -66,15 +68,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     },
     tierNeedBase: 7,      /* 首档升档击杀数: T2@7, T3@9, T4@12, T5@15(累计43) —— 120s 产能约46只, 顶尖玩家压哨进 T5 */
     tierNeedStep: 1.3,    /* 每档所需击杀数递增系数 */
-    trialSecs: 120,       /* 试炼轮时长: 120 秒结算, 击杀数计入纪录 → 离线补偿 */
-    /* v5.1 妖潮121只怪池: 120普通+1BOSS, 按序号逐渐增强(T1→T10分段, 每12只一档),
-     * 每杀1只+1%离线加成, 杀BOSS+60%, 全杀满累计180%封顶(120+60)。
-     * 刷完121只提前结算弹弹窗, 不必等120秒。击杀即刷新(从屏幕左边生成)。 */
-    trialPool: {
-      totalMobs: 120, bossAt: 121,
-      boostPerKill: 0.01, boostPerBoss: 0.60, boostCap: 1.80,
-      tierBands: [12, 24, 36, 48, 60, 72, 84, 96, 108, 120],   /* T1@1-12 ... T10@109-120 */
-    },
+    /* ⚠️ v6: 原「妖潮试炼」已整体拆除 —— 没有 120 秒轮次、没有 121 只怪池、没有 BOSS 限时。
+     * 现在是【无尽刷怪】: 杀一只补一只, 怪物强度由 v6 的推关进度(境界/关卡)驱动,
+     * 不再靠"本波第几只"分段灌 tier。 */
     /* v5.1 骨骼池怪数值模板大幅上调 —— hpK控制在1.5~4.0, 小怪更耐打 */
     boneTpl: {
       /* v6.6 数值定稿(毕业档+法宝模拟, 二次扫描): atkK 已乘凹曲线 f(t)=1+0.5*((t-1)/9)^1.6
@@ -95,13 +91,6 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       10:{ hpK:4.00, atkK:2.48, defK:1.12, speed:125, crit:20, dodge:8,   pen:40, critRes:60 },
     },
   };
-  /* v5.0 121只怪池: 按序号返回tier(T1@1-30, T2@31-60, ... T10@271-300) */
-  function tierForSpawn(n) {
-    const bands = BC.trialPool.tierBands;
-    for (let t = 1; t <= 10; t++) { if (n <= bands[t-1]) return t; }
-    return 10;
-  }
-
   /* 玩家属性(主游戏 pushBattleStats 注入) —— 战斗内一切数值伤害以此为准 */
   let PST = { lv:1, atk:56, hp:430, def:31, crit:0, critB:0, critD:0, pen:0, dodge:0 };
   /* 掉落系数(服务端可下发覆盖; 断网/离线用内置默认值, 保证照常可玩) */
@@ -116,9 +105,6 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   };
 
   if (typeof window !== 'undefined') {
-    /* v5.0 强制解冻妖潮倒计时: 不管旧代码残留什么值, 正式游戏必须正常结算。
-     * 需要调试冻结时在控制台手动设 window.__trialFreeze=true 后刷新 */
-    window.__trialFreeze = false;
     /* v4.7 攻距手感旋钮: 0.30~0.70 之间调 —— 调大怪站更远(更不挡人但更不近战),
      * 调小怪贴更近(更近战但大怪可能少量遮住玩家)。改完刷下一只怪即生效。 */
     if (window.__torsoFrac      === undefined) window.__torsoFrac      = 0.45;
@@ -154,11 +140,9 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     skillSprite:null, skillReady:false,
     bossActive:false,   /* v3.8.2 打满100只小怪才刷BOSS(原10) */
     skillCall:null,          /* 技能名播报槽: 覆盖式大字快闪, {name,t,dur} */
-    /* v3.9 试炼轮次: 120秒一场, 怪从T1一路刷到T5; 结算击杀数 → 纪录 → 离线补偿
-     * v5.0 121只固定怪池: trialSpawned记录已刷序号, 按序号决定tier, 刷完121只提前结算 */
-    trialT: BC.trialSecs, trialKills:0, trialTier:1, trialSettled:false, trialBossDone:false, bossT:0,
-    trialSpDrop: 0, trialEqDrop: 0,   /* v5.8 本波兽潮实测产出(灵石/装备掉落生成量), 破纪录时写存档快照 */
-    trialSpawned:0, trialBossKilled:false,
+    /* ⚠️ v6 无尽刷怪: 无轮次/无结算/无怪池上限。
+     * spawned 只用于「本场第一只特判」(生成在玩家眼前, 免去开场空等), 不再是怪池游标。 */
+    spawned: 0,
   };
   /* v6.9 PERF: 粒子上限。每次命中/击杀/技能都 push 一个粒子, 同屏激烈时无上限会堆积
    * 几十个 PIXI.Sprite/Graphics, 每帧合成开销线性涨。同屏 80 个粒子已经足够特效密度。
@@ -454,19 +438,23 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
        * 后果: 筑基以上全部加载【凡人】包, 而 spawnWave 要的是当前境界包 → 永远 not ready → 干等,
        * 且 _boneLoaded 去重导致加载过就永不重载 → 整场一只怪都刷不出来。
        *
-       * 正确做法: 直接用 poolFor() 反查当前 lv 对应的池 —— 这与 spawnWave 用的是同一个函数,
-       * 从源头上保证"加载的"和"要刷的"永远是同一套 13 个包。
+       * ⚠️ v6: 怪种按【关卡循环轮换】(见 00-stage.js mobFor: (s-1) % 80),
+       * 也就是 80 只骨骼怪全都会用到 —— 不再是"本境界 13 只"。所以这里直接铺满
+       * MOB_SLUGS, 并按【当前关卡附近要用到的先加载】排序, 保证开局那只一定就绪。
        *
-       * 加载顺序: 严格按实战波次 + BOSS 最后, 第1波最先就绪 → 开局立刻能开打。 */
-      const poolsNow = poolFor(Math.max(1, PST.lv || 1));
+       * 加载顺序: 从当前关起往后取 12 只(覆盖最近要刷的), 剩下的按清单顺序铺。 */
+      const order = NS_STAGE.MOB_SLUGS.slice();
+      const cur = Math.max(1, v6Progress().stage);
+      const prio = [];
+      for (let k = 0; k < order.length; k++) prio.push(NS_STAGE.mobFor(cur + k));
       const needed = [];
       const seenNeed = new Set();
       const pushNeed = (slug) => {
         if (slug && slug !== 'ratty' && !handMade.has(slug) && !seenNeed.has(slug) && idx[slug]) { seenNeed.add(slug); needed.push(slug); }
       };
-      for (const w of (poolsNow.waves || [])) pushNeed(w && w.slug);          /* 按波次顺序: 第1波在最前 */
-      if (poolsNow.boss) pushNeed(poolsNow.boss.slug);                        /* BOSS 最后(第121只才出场) */
-      /* 懒加载泵: 每 1.5s 3 只, 就绪一只即可刷一只。只跑本境界的 13 只 → 约 6.5s 全部到位。 */
+      for (const slug of prio) pushNeed(slug);
+      for (const slug of order) pushNeed(slug);
+      /* 懒加载泵: 每 1.5s 3 只, 就绪一只即可刷一只。 */
       let i = 0;
       const pump = setInterval(() => {
         const batch = needed.slice(i, i + 3); i += 3;
@@ -478,26 +466,13 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
 
 
   /* 音效加载 */
-  /* v8.0 突破时按需补载: 记录已为哪个境界铺过货, 境界一变就把新境界的 13 个包补上。
-   * 只加载"用得到的", 所以必须在这里兜住突破换怪的情况。
-   * ⚠️ v8.0 修复: 旧实现用 Math.min(5, PST.lv) 取池 → 筑基以上全被夹到不存在的键 5 →
-   *    回退凡人池 → 突破后加载的仍是凡人怪, 新境界怪一只都刷不出来。改用 poolFor() 反查。 */
-  let BONE_IDX_ALL = null;   /* index.json 原始表, 供突破补载查 cfg */
+  /* ⚠️ v6: 旧的"按境界补载怪物包"整套机制已删除(原 v8.0 按 PST.lv 查 poolFor 补载)。
+   * 现改为启动时一次性铺开全部 80 只骨骼怪, 见上方 loadBones()。 */
+  let BONE_IDX_ALL = null;   /* index.json 原始表 */
   let _bonesTierLoaded = 0;
-  function maybeLoadBonesForTier() {
-    if (!BONE_IDX_ALL) return;                       /* index.json 还没回来 */
-    const lvNow = Math.max(1, PST.lv || 1);
-    if (lvNow === _bonesTierLoaded) return;          /* 没变, 直接返回(每 5s 调用无开销) */
-    _bonesTierLoaded = lvNow;
-    const poolsNow = poolFor(lvNow);
-    const need = [];
-    const seen = new Set();
-    const push = (s) => { if (s && s !== 'ratty' && !seen.has(s) && BONE_IDX_ALL[s]) { seen.add(s); need.push(s); } };
-    for (const w of (poolsNow.waves || [])) push(w && w.slug);
-    if (poolsNow.boss) push(poolsNow.boss.slug);
-    need.forEach(s => ensureBone(s, BONE_IDX_ALL));  /* ensureBone 内部去重, 已加载的跳过 */
-    if (window.__battleDebug) console.log('[battle] lv' + lvNow + ' 怪物包补载 ' + need.length + ' 个');
-  }
+  /* ⚠️ v6: 80 只骨骼怪在启动时已一次性铺开(见 loadBones), 不再需要"按境界补载"。
+   * 保留空壳只为兼容 5s 定时器的旧调用点。 */
+  function maybeLoadBonesForTier() { /* v6: 无操作 —— 全量已铺 */ }
 
   /* 音效加载 */
   const sfx = {
@@ -1030,19 +1005,12 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   };
 
   window.BattleAPI = {
-    /* v3.2: 统一舞台接入点 ---- 返回 60-stage 契约层对象 { name, draw(ctx,W,H,dt) }。
+    /* v3.2: 统一舞台接入点 —— 返回 60-stage 契约层对象 { name, draw(ctx,W,H,dt) }。
      * 调用后本层不再自持 rAF，逻辑与绘制都由舞台按统一 30fps 驱动。
      * ⚠️ 舞台传进来的 dt 必须是原始 dt —— 倍速乘法留在 update() 内部。 */
-    /* v4.1.2: 舞台接管时必须显式置 _managed —— 此前 initManaged 无人调用,
-     * _managed 恒 false, 模块加载自启的独立泵从未停过(双泵: update 双跑=逻辑
-     * 双倍速潜伏至今; GL 迁移后独立泵 frame(0,innerH) 可见 = 画面上下抖动)。 */
-    createStageLayer: () => { _managed = true; _rafOn = false; trialRestart(); return battleLayer(); },  /* v5.0 FIX: 每次进入战斗重置妖潮状态, 否则上一场结算后trialSettled=true残留, 新一场不倒计时不结算 */
+    createStageLayer: () => { _managed = true; _rafOn = false; respawnArena(); return battleLayer(); },  /* v6: 每次进入战斗清场重来 */
     getKills: () => G.kills,
-    resetKills: () => { G.kills = 0; },
-    /* ⚠️ v6: 游戏倍速的唯一来源改为【Buff 宠物】（上限 3.5，见设计文档 §1 #16）。
-     *   疾风步/缩地成寸已改为纯身法 buff（闪避+攻速），不再授予倍速，
-     *   所以这里删掉了 triggerSpeedSkill / trySpeedSkill / getSpeedMult 三个技能入口。
-     *   主游戏把宠物倍速注入进来即可，本层只做 max 收敛，不做叠加。 */
+    resetKills: () => { G.kills = 0; updateHUD(); },
     setSpeedMult: (mult, duration) => {
       const m = Math.max(BASE_SPEED_MULT, Math.min(BUFF_SPEED_CAP, mult || BASE_SPEED_MULT));
       G.speedMult = m;
@@ -1051,11 +1019,48 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       return G.speedMult;
     },
     /* 倍速状态快照：给验收脚本读剩余时长用 */
+    setStats: (s) => {
+      if (!s) return;
+      PST = Object.assign(PST, s);
+      if (G.player) {
+        G.player.atk = PST.atk;
+        /* v6.6 血量随面板等比缩放: maxHp 变化(升境/换装/法宝)时按比例换算当前血量 ——
+         * 旧逻辑"只裁剪不抬升"有初始化时序 bug: init() 先用默认面板(hp=430)建玩家,
+         * 主游戏 setStats 后 maxHp 已 1.3万, hp 还是 430 → 开局 3% 丝血(实测)。
+         * 等比换算下 makePlayer(hp=maxHp=100%) → setStats 后仍 100%, 开局必满血。 */
+        const oldMax = G.player.maxHp > 0 ? G.player.maxHp : PST.hp;
+        G.player.maxHp = PST.hp;
+        if (oldMax > 0 && G.player.hp > 0)
+          G.player.hp = Math.min(G.player.maxHp, Math.max(1, Math.round(G.player.hp * PST.hp / oldMax)));
+        if (G.player.hp > G.player.maxHp) G.player.hp = G.player.maxHp;
+        /* v2.5 功法攻速词条: 面板攻速(基础1.1×词条乘区, 主游戏侧已封顶3.0) → 同步进玩家,
+         * 战斗节奏 atkT=1/aspd 随之加快; 无词条旧档回落 BC.playerAspd */
+        G.player.aspd = Math.min(3, PST.aspd || BC.playerAspd);
+      }
+      /* v7.9: 境界可能变了(突破) → 按需补载新境界的怪物包。
+       * 因为开局只加载"当前境界需要的 13 个", 突破到新境界时必须把新的一批补上,
+       * 否则新波次的怪会因骨骼未就绪而一直不刷。内部有去重, 每 5s 调一次无副作用。 */
+      maybeLoadBonesForTier();
+    },
+    getStats: () => Object.assign({}, PST),
+    /* 服务端下发掉落系数(每击杀产出) */
+    setDropRates: (r) => { if (r) Object.assign(DROP, r); },
+    getDropRates: () => Object.assign({}, DROP),
+    onDrop: null,      // 主游戏赋值: ({spirit, elite, enemy}) => void
+    getSpirit: () => G.spirit,
+    /* v8.0 怪物包诊断口: 定位"一只怪都不出"这类问题 —— 一眼看清
+     *   当前 lv / 该用哪个池 / 池里 13 个 slug / 哪些已请求 / 哪些已就绪。
+     * 排查口诀: 若"该加载的 13 个"里有 slug 不在"已请求"中 → 加载范围错(loadBones 的池取错);
+     *           若"已请求"但长期不在"已就绪" → 是资源 404 / 解析失败, 与刷怪逻辑无关。 */
     getSpeedState: () => ({ mult: G.speedMult, timer: G.speedMultTimer, dodge: G.speedDodge || 0 }),
     /* v6 身法 buff 快照：{ 技能id: { name, cd, dur, cdLeft, durLeft, active } }
      * 验收脚本据此断言「buff 是 CD 触发、冷却期自动释放」。 */
     getSkillBuffs: () => getBuffState(),
     /* v4.1.1 诊断口: 抖动取证 —— managed=true 且 pumpRuns 增长 = 双泵实锤 */
+    __setSpeedMultForTest: (m, dur) => window.BattleAPI.setSpeedMult(m, dur),
+    /* 主游戏注入玩家三围(境界+装备汇总后的面板值)
+     * 注意: 必须同步进 p.atk / p.maxHp —— 战斗逻辑读的是 player 身上的字段,
+     * 只更新 PST 会导致"面板数字涨了、打出去还是建号那把剑"(v2.5 回归修复)。 */
     __glDiag: () => ({ managed: _managed, rafOn: _rafOn, pumpRuns: _pumpRuns, paused: G.paused, gl: window.BattleGL ? window.BattleGL.diag : null }),
     /* v4.4 诊断口: 程序化行走自检 —— 列出每只骨骼怪的归一化动画名、是否自带真 walk、
      * 以及检测到的腿链; 以及当前场上每只怪的驱动状态。验收脚本据此断言:
@@ -1095,61 +1100,27 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
                hand: Object.entries(BC.enemies).map(([k, d]) => ({ key:k, name:d.name, role:d.role, atkRange:d.atkRange })) };
     },
     /* 验收用：直接设定倍速（跳过宠物 proc），让 A/B 对照可复现。传 1 即清除加速。 */
-    __setSpeedMultForTest: (m, dur) => window.BattleAPI.setSpeedMult(m, dur),
-    /* 主游戏注入玩家三围(境界+装备汇总后的面板值)
-     * 注意: 必须同步进 p.atk / p.maxHp —— 战斗逻辑读的是 player 身上的字段,
-     * 只更新 PST 会导致"面板数字涨了、打出去还是建号那把剑"(v2.5 回归修复)。 */
-    setStats: (s) => {
-      if (!s) return;
-      PST = Object.assign(PST, s);
-      if (G.player) {
-        G.player.atk = PST.atk;
-        /* v6.6 血量随面板等比缩放: maxHp 变化(升境/换装/法宝)时按比例换算当前血量 ——
-         * 旧逻辑"只裁剪不抬升"有初始化时序 bug: init() 先用默认面板(hp=430)建玩家,
-         * 主游戏 setStats 后 maxHp 已 1.3万, hp 还是 430 → 开局 3% 丝血(实测)。
-         * 等比换算下 makePlayer(hp=maxHp=100%) → setStats 后仍 100%, 开局必满血。 */
-        const oldMax = G.player.maxHp > 0 ? G.player.maxHp : PST.hp;
-        G.player.maxHp = PST.hp;
-        if (oldMax > 0 && G.player.hp > 0)
-          G.player.hp = Math.min(G.player.maxHp, Math.max(1, Math.round(G.player.hp * PST.hp / oldMax)));
-        if (G.player.hp > G.player.maxHp) G.player.hp = G.player.maxHp;
-        /* v2.5 功法攻速词条: 面板攻速(基础1.1×词条乘区, 主游戏侧已封顶3.0) → 同步进玩家,
-         * 战斗节奏 atkT=1/aspd 随之加快; 无词条旧档回落 BC.playerAspd */
-        G.player.aspd = Math.min(3, PST.aspd || BC.playerAspd);
-      }
-      /* v7.9: 境界可能变了(突破) → 按需补载新境界的怪物包。
-       * 因为开局只加载"当前境界需要的 13 个", 突破到新境界时必须把新的一批补上,
-       * 否则新波次的怪会因骨骼未就绪而一直不刷。内部有去重, 每 5s 调一次无副作用。 */
-      maybeLoadBonesForTier();
-    },
-    getStats: () => Object.assign({}, PST),
-    /* 服务端下发掉落系数(每击杀产出) */
-    setDropRates: (r) => { if (r) Object.assign(DROP, r); },
-    getDropRates: () => Object.assign({}, DROP),
-    onDrop: null,      // 主游戏赋值: ({spirit, elite, enemy}) => void
-    getSpirit: () => G.spirit,
-    /* v8.0 怪物包诊断口: 定位"一只怪都不出"这类问题 —— 一眼看清
+
+  /* v8.0 怪物包诊断口: 定位"一只怪都不出"这类问题 —— 一眼看清
      *   当前 lv / 该用哪个池 / 池里 13 个 slug / 哪些已请求 / 哪些已就绪。
      * 排查口诀: 若"该加载的 13 个"里有 slug 不在"已请求"中 → 加载范围错(loadBones 的池取错);
      *           若"已请求"但长期不在"已就绪" → 是资源 404 / 解析失败, 与刷怪逻辑无关。 */
     boneDiag: () => {
-      const lv = Math.max(1, PST.lv || 1);
-      const pool = poolFor(lv);
+      const st = v6Progress();
       const wanted = [];
-      for (const w of (pool.waves || [])) wanted.push(w && w.slug);
-      if (pool.boss) wanted.push(pool.boss.slug);
+      for (let k = 0; k < 12; k++) wanted.push(NS_STAGE.mobFor(st.stage + k));
       const uniq = [...new Set(wanted)].filter(Boolean);
       const requested = Object.keys(BONES);
       const ready = requested.filter(s => BONES[s] && BONES[s].ready);
       return {
-        lv,
-        poolKey: Object.keys(MOB_POOLS).map(Number).sort((a,b)=>b-a).find(k => lv >= k),
+        stage: st.stage,
+        curSlug: NS_STAGE.mobFor(st.stage),
         wanted: uniq,
         requested,
         ready,
         missing: uniq.filter(s => !BONES[s]),           /* 要刷却没请求加载 → 加载逻辑漏了 */
         loading: uniq.filter(s => BONES[s] && !BONES[s].ready), /* 请求了但没就绪 → 资源问题 */
-        spawned: G.trialSpawned,
+        spawned: G.spawned,
       };
     },
     /* 调参用调试口(只读快照) */
@@ -1174,7 +1145,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     getPets: () => G.pets,
     spawnWave: () => spawnWave(),
     /* v3.9 试炼轮次: 结算面板「再战一轮」入口 */
-    trialRestart: () => trialRestart(),
+    respawnArena: () => respawnArena(),
     /* v2.9: 暂停时清掉限帧 sleep 句柄 —— 否则那枚 setTimeout 醒来时 G.paused 已为 true,
      * 会直接 return 且把 _rafOn 留成 true, 导致 resume 认为"泵还在跑"而不重启(死锁)。 */
     pause: () => { G.paused = true; if (_sleepT) { clearTimeout(_sleepT); _sleepT = 0; } _rafOn = false; },
@@ -1198,19 +1169,29 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   /* 怪物成长系统: 三围随玩家境界 lv 线性成长(怪只吃境界, 不吃装备 → 换装备=变快)。
    * v3.9 三维系统: 三围 = 境界基准 × 怪种hpK/atkK/defK × 波次tier倍率 ——
    * 怪包统一池, 每个境界都会刷到全怪种; 同一只怪随境界+波次档位三维缩放。 */
-  function tierMul(t) { const d = BC.tier[t || G.trialTier || 1]; return d ? d.mul : 1; }
+  /* ⚠️ v6: 怪物强度不再来自「妖潮 tier」(本波第几只 → T1..T10 分段), 也不再来自
+   * 旧手填表 MOB_POOLS —— 而是由 v6 的【当前关卡】唯一决定, 走 00-stage.js 的公式:
+   *   H(s) = H₀ · g^(s-1)   (g=1.006, H₀=10, s ∈ [1,30000])
+   * 怪种按 80 个骨骼资源循环轮换(mobFor)。这样"推关"才是唯一的难度轴。 */
+  function v6Progress() {
+    try {
+      const V = (typeof window !== 'undefined') && window.V6;
+      if (!V || !V.state) return { realm: 0, stage: 1 };
+      const st = V.state();
+      return { realm: Math.max(0, st.realm || 0), stage: Math.max(1, st.stage || 1) };
+    } catch (e) { return { realm: 0, stage: 1 }; }
+  }
   /* v3.9.2 全量接入: makeEnemy 拆两层 —— makeEnemyFrom(合成def) 为实, BC.enemies 手配怪与
    * index.json 骨骼池怪(档位模板数值)共用同一条构造路径。 */
   function makeEnemyFrom(def, tierOverride, key) {
-    const lv = Math.max(1, PST.lv || 1);
     const elite = Math.random() < DROP.eliteChance;
-    const mul = tierMul(tierOverride);
-    let hp  = Math.round((60 + 26*lv) * def.hpK * mul);
-    /* v6.6 怪攻基数斜率 5→15: 玩家血量随装备/法宝成长(每境×2~3), 旧斜率下怪攻成长(×2.2)跟不上,
-     * 高境界(渡劫+)血线常年 90%+ 碾压(实测)。斜率15 让怪攻与玩家面板同速 ——
-     * 各境界威胁度拉平, 中段实测血线 35~48%(模拟器毕业档定稿)。 */
-    let atk = Math.round((8 + 15*lv)  * def.atkK * mul);
-    const dfn = Math.round((2 + 2*lv)   * def.defK * mul);
+    /* ⚠️ v6: 怪数值基准改为【当前关卡】(00-stage.js 的 H(s)/A(s)), 不再是
+     * (60+26*lv) 这套按战斗层 lv 的旧公式 —— 那套的 lv 现在恒为 1, 完全失效。
+     * def.hpK/atkK/defK 仍作为怪种间的相对偏置系数(手配怪/BOSS 用)。 */
+    const proto = stageEnemyProto();
+    let hp  = Math.round(proto.entry.hp  * (def.hpK  || 1));
+    let atk = Math.round(proto.entry.atk * (def.atkK || 1));
+    const dfn = Math.round(proto.entry.def * (def.defK || 1));
     if (elite) { hp = Math.round(hp*DROP.eliteHp); atk = Math.round(atk*1.2); }
     const lane = Math.random();   /* v5.0: 纵深比例 0~1 连续随机(无道) */
     /* v4.6 全局减速旋钮: window.__enemySpeedMul(默认 1) 统一作用于所有怪的移速 ——
@@ -1384,16 +1365,35 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
    * 数值全部来自 00-pure.js 的 MOB_POOLS 手填表(运行时零公式, 调平衡直接改表)。
    * 波次 = 已刷序号: 前10只波1怪, 打完10只换下一种, 曲线逐步上升。
    * 锚定: 本境界毕业玩家(装备不跨境界), 120s 杀满 120 只, BOSS 30s 限时击杀。 */
-  function poolFor(lv) {
-    const keys = Object.keys(MOB_POOLS).map(Number).sort((a,b) => b-a);
-    for (const k of keys) { if (lv >= k) return MOB_POOLS[k]; }
-    return MOB_POOLS[1];
+  /* ⚠️ v6: 旧的 poolFor(lv) 按 PST.lv 选 12 张手填表已废弃 ——
+   * 怪数值一律由当前关卡 s 走 00-stage.js 公式生成, 与推关进度严格同步。 */
+  function stageEnemyProto() {
+    const s = v6Progress().stage;
+    const info = NS_STAGE.stageInfo(s);
+    const slug = info.slug;
+    const cfg = BONE_IDX[slug] || {};
+    const dh = cfg.drawH || 84;
+    const sk = SK_OF[slug];
+    /* 大数 → Number: 00-stage 的血量在第 30000 关可达 1e77, 但战斗层是 Number 域。
+     * toNumber 在大数超 Number 上限时返回 Infinity —— 这里夹到 1e308 以内,
+     * 与"玩家打不过就推不动"的推关设计一致(玩家面板同样走 toNumber)。 */
+    let hp = NS_NUM.toNumber(info.hp);
+    let atk = NS_NUM.toNumber(info.atk);
+    if (!isFinite(hp) || hp <= 0) hp = 1e300;
+    if (!isFinite(atk) || atk <= 0) atk = 1e300;
+    return { entry: { slug, hp, atk, def: Math.max(0, Math.round(atk * 0.12)),
+                      crit: 0, dodge: 0, pen: 0, critRes: 0 },
+             def: { name: slug.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()),
+                    role: sk ? 'ranged' : 'melee', atkRange: sk ? 52 : 34, speed: 120,
+                    hpK:1, atkK:1, defK:1, crit:0, dodge:0, pen:0, critRes:0,
+                    hasSkill: !!sk, color:'#9aa8b8', bone: slug, tier:1,
+                    drawH: dh, hpBarW: Math.max(24, Math.round(dh*0.55)) } };
   }
+  /* 兼容旧调用签名(池表怪): 仍按 entry 覆盖数值 */
   function makePoolEnemy(entry, isBoss) {
     const cfg = BONE_IDX[entry.slug] || {};
     const dh = cfg.drawH || 84;
     const sk = SK_OF[entry.slug];
-    /* 骨架数值先走 makeEnemyFrom 通用路径(体型攻距/腿部动画), 再用池表数值整体覆盖 */
     const def = { name: entry.slug.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()),
       role: sk ? 'ranged' : 'melee', atkRange: sk ? 52 : 34, speed: isBoss ? 90 : 120,
       hpK:1, atkK:1, defK:1, crit:entry.crit||0, dodge:entry.dodge||0, pen:entry.pen||0, critRes:entry.critRes||0,
@@ -1402,69 +1402,39 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     e.hp = e.maxHp = entry.hp;
     e.atk = entry.atk;
     e.def = entry.def;
-    e.elite = false;             /* 池表怪不吃随机精英(数值即策划定值) */
+    e.elite = false;
     return e;
   }
+  /* ⚠️ v6 无尽刷怪: 没有怪池游标、没有刷完即停、没有 BOSS 出场条件。
+   * 每次调用就生一只 —— 数值完全由当前关卡 s 决定(00-stage.js), 与推关进度严格同步。 */
   function spawnWave() {
-    const pool = poolFor(Math.max(1, PST.lv || 1));
-    /* BOSS活跃时不刷新小怪 */
-    if (G.bossActive) return null;
-    /* v7.0 BOSS = 第121只, 120只小怪刷完后出场, 一轮一次。
-     * 三重保护: trialBossDone + bossActive + 场上BOSS对象(含死亡动画中), 防双BOSS。
-     * 工厂未就绪不创建(否则序列帧兜底与骨骼版双BOSS站一起)。 */
-    if (G.trialSpawned >= BC.trialPool.totalMobs && !G.trialBossDone && !G.bossActive && !G.enemies.some(e => e.type === 'boss')) {
-      if (!BONES[pool.boss.slug] || !BONES[pool.boss.slug].ready) return null;
-      if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
-      const e = makePoolEnemy(pool.boss, true);
-      e.x = G.camX + stageW() + BC.enemySpawnOffset;
-      e.lane = MID_LANE; e.y = laneOff(MID_LANE);   /* BOSS 固定中道, 突出存在感 */
-      G.enemies.push(e);
-      G.bossActive = true;
-      G.trialBossDone = true;
-      G.trialSpawned++;   /* 第121只 */
-      G.bossT = pool.boss.time || 30;   /* v7.0 BOSS 30s 限时: 到点打不死 → 重新开始兽潮 */
-      return e;
-    }
-    /* v5.0 121只怪池刷完则停刷(提前结算) */
-    if (G.trialSpawned >= BC.trialPool.bossAt) return null;
-    /* v7.0 顺序分波: 前10只=波1, 11-20=波2, ... 波次内同种怪, 池表定值, 非随机 */
-    const waveIdx = Math.min(11, Math.floor(G.trialSpawned / 10));
-    const entry = pool.waves[waveIdx];
-    if (!(BONES[entry.slug] && BONES[entry.slug].ready)) {
-      /* v8.0: 骨骼没就绪就一直不刷 —— 这里必须能报出来, 否则表现就是"一只怪都不出"却毫无线索。
-       * 排查口径: 若骨架从未被 ensureBone 请求过 → 说明加载范围与波次表不一致(见 loadBones)。
+    if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
+    const proto = stageEnemyProto();
+    const slug = proto.entry.slug;
+    if (!(BONES[slug] && BONES[slug].ready)) {
+      /* 骨骼没就绪就一直不刷 —— 必须能报出来, 否则表现就是"一只怪都不出"却毫无线索。
        * 卡 8s 以上才告警一次, 避免刷屏。 */
-      if (!BONES[entry.slug]) {
+      if (!BONES[slug]) {
         const now = performance.now();
         if (!G._boneMissT || now - G._boneMissT > 8000) {
           G._boneMissT = now;
-          console.warn('[battle] 波' + (waveIdx + 1) + ' 怪物包未加载: ' + entry.slug
-            + ' (lv=' + (PST.lv || 1) + ', 池=' + pool.waves.map(w => w.slug).join(',') + ')');
+          console.warn('[battle] 怪物包未加载: ' + slug + ' (stage=' + v6Progress().stage + ')');
         }
       }
-      return null;   /* 工厂未就绪这一拍不刷(避免占位图) */
+      return null;
     }
-    if (G.enemies.filter(x => x.alive && x.dying <= 0).length >= capAlive()) return null;
-    const e = makePoolEnemy(entry, false);
-    /* ⚠️ v7.8 FIX (勿回退) —— 刷怪"要走好几秒才看得到"的根因:
-     * 【v7.8 修正】设计意图(用户明确): 砍死一只 → 刷新一只, 同屏基本只有 1 只。
-     * 所以 spawnWave 的生成点【保持原样】(从屏幕右侧外一点生成, 让怪"走进来"有推进感),
-     * 只是把开局的"入场空等"修掉 —— 见下方 firstWave 特判。
-     *   e.x = camX + stageW() + 40  → 屏幕 x 452(可视区 0~412), 屏外 40px
-     *   该值本身是设计的一部分, 不要改成屏内生成(会造成"凭空出现"且与"补一只"节奏冲突)。 */
+    const e = makePoolEnemy(proto.entry, false);
+    /* ⚠️ v7.8 (勿回退) —— 设计意图(用户明确): 砍死一只 → 刷新一只, 同屏基本只有 1 只。
+     * 生成点从屏幕右侧外一点生成, 让怪"走进来"有推进感。
+     *   e.x = camX + stageW() + 40  → 屏外 40px。不要改成屏内生成。 */
     e.x = G.camX + stageW() + BC.enemySpawnOffset;
-    /* ⚠️ v7.8 FIX —— 用户反馈的"开头走个三四秒才出现一只怪":
-     * 开局那一刻 camX 还是 0 且玩家在 x=100, 相机尚未收敛到 player.x-173;
-     * 同时场上一只怪都没有, spawnT 从 0 起算要等 0.25s 才首次生成,
-     * 生成后怪又要从屏幕外 452 走到玩家面前 ≈250px 才被看见 —— 叠加就是三四秒的空场。
-     *
-     * 修法(只动开局, 不动稳态): 本场第一只怪(spawned 0)直接生成在玩家前方不远处,
-     * 玩家一进游戏就看见怪在眼前; 第 2 只起恢复"从屏幕右边走进来", 节奏与设计一致。 */
-    if (G.trialSpawned === 0) {
-      e.x = (G.player ? G.player.x : 100) + stageW() * 0.30;   /* 玩家前方约 124px 处, 屏内可见 */
+    /* 本场第一只(spawned 0)直接生成在玩家前方不远处, 免去开局"走三四秒才见怪"的空场。
+     * 第 2 只起恢复"从屏幕右边走进来"。 */
+    if (G.spawned === 0) {
+      e.x = (G.player ? G.player.x : 100) + stageW() * 0.30;
     }
     G.enemies.push(e);
-    G.trialSpawned++;
+    G.spawned = (G.spawned || 0) + 1;
     return e;
   }
   /* ---------- 数值伤害 v7.1: 量纲平衡式 dmg = atk²/(atk+有效防御), 破甲按百分比削减防御 ----------
@@ -1567,25 +1537,11 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   /* ---------- 击杀结算: 灵石 + (装备由主游戏 roll) + 技能经验 + 追猎/加速 ---------- */
   function onKill(e) {
     const isBoss = e.type === 'boss';
-    /* BOSS/小怪击杀计数 */
-    if (isBoss) {
-      G.bossActive = false;
-      G.trialBossKilled = true;   /* v5.0 BOSS被杀标记, 结算时+50% */
-    }
-    /* v5.0 试炼计数: BOSS和小怪都计入击杀数, 固定怪池不需要按击杀升档 */
-    if (!G.trialSettled) {
-      G.trialKills++;
-      updateHUD();
-      /* v5.1 击杀即刷新: 杀一只小怪立即补一只(从右边生成), 避免按频率刷怪排队AOE全死光。
-       * 同屏上限12只自动停刷, BOSS被杀不补充, 怪池刷完不补充。 */
-      if (!isBoss && G.trialSpawned < BC.trialPool.bossAt) {
-        spawnWave();
-      }
-      /* v5.0 121只全刷完且BOSS已死 → 提前结算弹弹窗 */
-      if (G.trialSpawned >= BC.trialPool.bossAt && G.trialBossKilled) {
-        settleTrial();
-      }
-    }
+    if (isBoss) G.bossActive = false;
+    updateHUD();
+    /* ⚠️ v6 无尽刷怪: 击杀即刷新 —— 杀一只立即补一只(从右边生成), 下界无尽头。
+     * 同屏上限由 spawnWave 内的 capAlive 约束。 */
+    spawnWave();
     const mul = e.elite ? DROP.eliteMul : 1;
     const jitter = 1 - DROP.spiritRand + Math.random()*DROP.spiritRand*2;
     /* v2.5 BOSS 专属产出: 灵石在精英倍率上再 ×8 */
@@ -1630,8 +1586,8 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     return { x: CW * 0.5, y: 20 };
   }
   function spawnSpiritDrop(e, val, elite) {
-    /* v5.8 妖潮波内产出统计(生成量口径): 破纪录时随 trialBest 一起写存档快照 */
-    if (!G.trialSettled) G.trialSpDrop = (G.trialSpDrop || 0) + (val || 0);
+    /* v6: 本场累计产出(统计用) */
+    G.spiritGain = (G.spiritGain || 0) + (val || 0);   /* v6: 本场累计产出(统计用) */
     if (G.drops.filter(d => d.kind === 'spirit').length >= 14) {   // 过载: 直接入账, 跳过飞行动画
       G.spirit += val;
       try { if (window.BattleAPI.onDrop) window.BattleAPI.onDrop({ spirit: val, elite: !!elite, enemy: e.name }); } catch (err) {}
@@ -1643,7 +1599,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   function spawnEquipDrop(e, eq) {
     /* v6.15: 装备掉落改成宝箱——掉落后先展示 1.5 秒, 宠物再飞来捡。
      * 宝箱图预加载一次, 所有掉落共享。 */
-    if (!G.trialSettled) G.trialEqDrop = (G.trialEqDrop || 0) + 1;   /* v5.8 妖潮波内装备掉落计数 */
+
     if (!spawnEquipDrop._chestImg) {
       spawnEquipDrop._chestImg = new Image();
       spawnEquipDrop._chestImg.src = 'assets/chest.png';
@@ -2593,7 +2549,7 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
             for (const e of G.enemies) { e.alive = false; e.dying = 0; despawnEnemy(e); }
             G.enemies.length = 0;
             G.bossActive = false;
-            trialRestart();
+            respawnArena();
           }
         }
       }
@@ -2636,95 +2592,15 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     G.camX += (targetCam-G.camX)*Math.min(1, dt*20);   /* v4.4: 平滑系数6→20, 相机更紧密跟随玩家, 背景滚动与玩家移动同步 */
   }
   let _pushT = 0;
-  /* ── v3.9 试炼轮次状态机 ──────────────────────────────────────────
-   * 120 秒一场, 怪从 T1 妖群一路升到 T5 妖皇; 时间到结算:
-   *   本轮击杀 → 与纪录(trialBest)比较 → 按档位给离线游历收益加成(trialBoost)。
-   * 【计时器与倍速分离】倒计时吃原始 dt(真实时间); 身法倍速只加速战斗实体 ——
-   *   运气好触发倍速多, 同样 120 秒里刷的怪就更多, 击杀数即纯收益。 */
-  function updateTrial(dt) {
-    if (G.trialSettled) return;          /* 结算面板期间不倒计时、不刷怪 */
-    /* v4.6 素材过目: window.__trialFreeze = true 冻结倒计时 —— 120s 看不完 79 只怪,
-     * 冻结后不会到点结算清场, 可以慢慢逐只过目。置回 false 即恢复。 */
-    if (typeof window !== 'undefined' && window.__trialFreeze) return;
-    /* v7.0 BOSS关底战 30s 限时: 杀满120只小怪后 BOSS 出场, 主倒计时冻结, 独立 30s ——
-     * 30s 内杀死 BOSS → 提前结算弹面板(+60% 加成); 打不死 → trialRestart 重新开始兽潮 */
-    if (G.bossActive) {
-      G.bossT -= dt;
-      if (G.bossT <= 0) { G.bossT = 0; trialRestart(); }
-      return;
-    }
-    G.trialT -= dt;
-    if (G.trialT <= 0) { G.trialT = 0; settleTrial(); }
-  }
-  /* v5.0 离线加成累计制: 每杀1只+1%, 杀BOSS+60%, 全杀满180%封顶; 48h有效 */
-  function settleTrial() {
-    G.trialSettled = true;
-    const kills = G.trialKills;
-    const bossKilled = G.trialBossKilled;
-    /* 清场: 轮次结束, 场上怪走死亡动画自然退去(掉落保留让玩家收完) */
-    for (const e of G.enemies) { e.alive = false; if (e.dying <= 0) e.dying = 0.4; }
-    G.bossActive = false;
-    /* 纪录 + 离线加成(写进 state, 随云存档同步) */
-    let best = 0, boost = 0, isNew = false;
-    try {
-      const st = state;
-      if (st) {
-        best = st.trialBest || 0;
-        if (kills > best) {
-          best = kills; isNew = true;
-          st.trialBest = best;
-          /* v5.8 破纪录波效率快照: 本波实测掉落(灵石/装备件数)随档上传,
-           * 后端离线结算 = 快照 × 波数(120s/波) × 0.7 —— 离线效率跟玩家实测走 */
-          st.trialSp = Math.max(0, Math.round(G.trialSpDrop || 0));
-          st.trialEq = Math.max(0, Math.round(G.trialEqDrop || 0));
-          try { window.addJournal && window.addJournal({ key: 'trial-' + Date.now(), big: realmName(), kind: '试炼', title: '妖潮试炼', text: `妖潮退去, 此番斩妖 ${kills} 只${bossKilled ? ', 击杀妖王' : ''}, 刷新试炼纪录。` }); } catch (err) {}
-        }
-        /* v5.0 累计制: 击杀数×1% + BOSS 60%, 封顶180% */
-        boost = Math.min(BC.trialPool.boostCap, kills * BC.trialPool.boostPerKill + (bossKilled ? BC.trialPool.boostPerBoss : 0));
-        if (boost > 0) {
-          /* v5.6 兽潮加成走通用 Buff 协议: 与丹药同一张 buffs 表(tag:"trial"),
-           * 后端按区间加权验算, 面板由 gains.fx 结构化回显 —— 不再写 trialBoost/trialBoostUntil 旧字段。 */
-          pushBoost(boost, 48 * 3600, "兽潮余威", "trial");
-        }
-      }
-    } catch (err) { console.warn('[battle] 试炼结算写档失败', err); }
-    /* v5.0 破纪录立即上传服务器, 不等下次自动同步(关键战绩不丢) */
-    if (isNew) { try { window.save && window.save(); window.cloudFlush && window.cloudFlush(); } catch (err) {} }
-    /* 黑屏挂机统计: 兽潮场次+1 */
-    if (DIMSTAT.on) DIMSTAT.trials++;
-    /* v5.2 结算小卡片: 遮罩+小卡片, 5秒后自动消失进入下一场 */
-    try {
-      if (document.hidden || DIMSTAT.on) {
-        setTimeout(() => { try { trialRestart(); } catch(err) {} }, 200);
-      } else {
-        const el = document.getElementById('trialToast');
-        if (el) {
-          document.getElementById('trialKillsN').textContent = kills + (bossKilled ? '·含妖王' : '');
-          document.getElementById('trialBestN').textContent = best + (isNew ? '·新纪录' : '');
-          document.getElementById('trialBoostN').textContent = boost > 0 ? `+${Math.round(boost*100)}%` : '—';
-          el.classList.add('show');
-          setTimeout(() => {
-            el.classList.remove('show');
-            try { trialRestart(); } catch(err) {}
-          }, 5000);
-        }
-      }
-    } catch (err) {}
-    updateHUD();
-  }
-  function trialRestart() {
-    document.getElementById('trialToast') && document.getElementById('trialToast').classList.remove('show');
-    /* v5.0 FIX: 清场 —— 原trialRestart只重置计数不清场, 死亡/结算后旧BOSS(序列帧史莱姆王)残留,
-     * 新BOSS(骨骼九尾狐王)创建后两个BOSS站一起。这里把场上怪全部清除。 */
+  /* ⚠️ v6: 原「妖潮试炼状态机」已整体拆除 ——
+   * updateTrial(120s 倒计时) / settleTrial(结算弹窗+纪录+离线加成) / trialRestart(重置怪池)
+   * 三个函数连同 trialToast 结算面板一并删除。现在是无尽刷怪, 没有"一轮"这个概念。
+   * 唯一保留下来的是「玩家倒下后清场重来」—— 见下面 respawnArena()。 */
+  function respawnArena() {
     for (const e of G.enemies) { e.alive = false; e.dying = 0; if (e.armature) { try { despawnEnemy(e); } catch(err) {} } }
     G.enemies.length = 0;
     G.bossActive = false;
-    G.kills = 0;   /* v5.1 结算后HUD击杀数清零(原只重置trialKills, G.kills没重置导致HUD显示不清零) */
-    G.trialT = BC.trialSecs; G.trialKills = 0; G.trialTier = 1;
-    G.trialSpDrop = 0; G.trialEqDrop = 0;   /* v5.8 新的一波, 产出统计归零 */
-    G.trialSettled = false; G.trialBossDone = false;
-    G.trialSpawned = 0; G.trialBossKilled = false;   /* v5.0 重置121只怪池计数 */
-    G.bossT = 0;   /* v7.0 BOSS 30s 限时计时归零 */
+    G.spawned = 0;      /* 重来后第一只仍然生成在玩家眼前 */
     G.paused = false;
     updateHUD();
   }
@@ -2750,15 +2626,6 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     for (const e of G.enemies) if (e.alive) _aliveCount++;
     G.targetFrameMs = (_aliveCount === 0 && !G.bossActive) ? 66
       : (_aliveCount < 5 && !G.bossActive && G.speedMultTimer <= 0) ? 50 : 42;
-    /* v5.0 FIX: 结算面板已关闭但trialSettled仍为true(玩家关面板没走trialRestart) → 自动重置,
-     * 否则新一场妖潮不倒计时不结算。杀BOSS提前结算与120秒结算都设trialSettled=true, 这是冲突根因。 */
-    if (G.trialSettled) {
-      if (!_trialModalEl) _trialModalEl = document.getElementById('trialToast');
-      const modal = _trialModalEl;
-      if (!modal || !modal.classList.contains('show')) { trialRestart(); }
-    }
-    /* v3.9 试炼倒计时: 原始 dt —— 计时器与倍速分离, 倍速只加战斗节奏不加轮时 */
-    updateTrial(dt);
     /* v5.0 定期刷新HUD: 打BOSS期间无新击杀/状态不变, 倒计时数字显示会卡住, 每0.25秒刷一次 */
     _hudRefreshT += dt;
     if (_hudRefreshT >= 0.25) { _hudRefreshT = 0; updateHUD(); }
@@ -2769,17 +2636,15 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
     G.spawnT -= dt;   /* v5.0 刷怪频率用原始dt, 不受身法倍速影响 —— 倍速只加战斗节奏不加刷怪密度 */
     /* v4.6 刷怪间隔旋钮: window.__spawnSlowMul(默认 1) —— 调大则刷得更稀, 便于逐只端详。 */
     const spawnGap = BC.spawnInterval * ((typeof window !== 'undefined' && window.__spawnSlowMul) || 1);
-    if (G.trialSettled) { G.spawnT = spawnGap; }   /* 结算面板期间停刷怪 */
-    /* v4.8 弹道验收台: 关掉刷怪，否则试炼波次会往验收台里掺进无关怪
-     * （表现为 probe 里冒出 sword_goblin / 第二只同名怪，把画面糊掉）。 */
-    else if (window.__skillFreeze) { G.spawnT = spawnGap; }
+    /* v4.8 弹道验收台: 关掉刷怪，否则无关怪会掺进验收台把画面糊掉。 */
+    if (window.__skillFreeze) { G.spawnT = spawnGap; }
     else if (G.spawnT <= 0) {
       /* ⚠️ v7.8/v7.9 定案 —— 设计意图(用户明确): 同屏基本只留 1 只, 砍死一只→刷新一只。
        * 曾误判 `< 1` 是 bug 并改成填充 6 只, 结果出现"一波十几只、一刀全秒"的过密场面,
        * 与设计冲突, 现已改回。这里的 `< 1` 是【刻意】的: 只在场上彻底空了才补,
        * 与 onKill 里的"击杀即刷新"互为兜底(正常路径靠 onKill 补, 这里防漏)。
        * 不要把它改成 >1 的填充值。 */
-      if (aliveCount < 1 && G.trialSpawned < BC.trialPool.bossAt) spawnWave();
+      if (aliveCount < 1) spawnWave();   /* v6 无尽刷怪: 场上空了就补, 无怪池上限 */
       G.spawnT = spawnGap;
     }
     /* 属性/技能等级每 5s 重新取一次(自愈: 即便某次变更没通知到也不会一直用旧值) */
@@ -2795,7 +2660,6 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
   const _drawList = [];   /* 复用: 避免每帧两次分配+两次排序 */
   const _waterMat = new PIXI.Matrix();   /* 复用: 避免水精灵每帧 new Matrix */
   let _wasSpeedBuff = false;   /* 身法状态切换检测: 避免每帧调 updateHUD */
-  let _trialModalEl = null;   /* trialModal 元素懒加载缓存 */
   function stageW() { return CW; }
   function floorY() { return CH * 0.92; }
   /* v3.7 三车道: lane 0 最近, 1 居中, 2 最远(靠上)。v3.7.1 对齐新背景的石板路:
@@ -4039,17 +3903,18 @@ import { state, DIMSTAT, MOB_POOLS } from './00-pure.js';   /* v3.9: 试炼纪�
       if (parts.length) { speedEl.style.display = ''; speedEl.textContent = parts.join(' · '); }
       else speedEl.style.display = 'none';
     }
-    /* v3.9 试炼 HUD: 倒计时+档位; 有离线加成时点亮 */
+    /* ⚠️ v6: 妖潮倒计时 HUD 已随试炼系统拆除(#battleTrial 节点已重新用作关卡显示)。
+     * 无尽刷怪下玩家最需要知道的是"现在打到第几关、这只怪有多硬"。 */
     if (trEl) {
-      const td = BC.tier[G.trialTier] || BC.tier[1];
-      const m = Math.floor(G.trialT / 60), s = Math.floor(G.trialT % 60);
-      /* v4.6 过目模式: 倒计时冻结时加 ⏸ 标记, 免得看着像卡住了 */
-      const frozen = (typeof window !== 'undefined' && window.__trialFreeze) ? '⏸ ' : '';
-      trEl.textContent = `${frozen}妖潮·${td.name} ${m}:${s < 10 ? '0' : ''}${s}`;
+      const pr = v6Progress();
+      let hpTxt = '—';
       try {
-        /* v5.6: 兽潮加成读通用 buffs 表(tag:"trial") —— 旧字段已废弃 */
-        if (state && (state.buffs || []).some(b => b.tag === "trial" && (b.boost || 0) > 0 && (b.until || 0) > Date.now())) trEl.classList.add('boosted');
-        else trEl.classList.remove('boosted');
+        const hp = NS_NUM.toNumber(NS_STAGE.stageInfo(pr.stage).hp);
+        hpTxt = hp >= 1e6 ? hp.toExponential(1) : Math.round(hp).toLocaleString('en-US');
+      } catch (e) {}
+      trEl.textContent = `第 ${pr.stage} 关 · 怪血 ${hpTxt}`;
+      try {
+        if (pr.stage > 1) trEl.classList.add('boosted'); else trEl.classList.remove('boosted');
       } catch (err) {}
     }
   }

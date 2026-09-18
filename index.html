@@ -538,19 +538,6 @@
   #skillModal #skillBody{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
   .story-card h3{margin-bottom:3px}
   .story-tip{font-size:10.5px;color:var(--dim);margin-bottom:4px;line-height:1.6}
-  /* v3.9 妖潮试炼结算卡: 自适应高度 + 战报行 */
-  #trialModal .story-card{height:auto;min-height:0;max-height:min(88vh,780px)}
-  .trial-rows{margin:10px 0 6px}
-  .trial-rows .off-row b{margin-left:auto}
-  .trial-tip{font-size:10.5px;color:var(--dim);line-height:1.7;margin-bottom:6px}
-  /* v5.2 妖潮结算: 小卡片+遮罩, 5秒自动消失 */
-  .trial-toast{position:fixed;inset:0;z-index:35;display:none;align-items:center;justify-content:center;pointer-events:none}
-  .trial-toast.show{display:flex;pointer-events:none}
-  .trial-toast .tt-card{background:rgba(10,17,34,.7);border:1px solid rgba(232,197,107,.25);border-radius:14px;padding:14px 22px;min-width:220px;text-align:center;backdrop-filter:blur(4px)}
-  .trial-toast .tt-title{color:var(--gold);font-size:15px;letter-spacing:.14em;margin-bottom:8px}
-  .trial-toast .tt-rows{display:flex;flex-direction:column;gap:4px}
-  .trial-toast .tt-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--dim)}
-  .trial-toast .tt-row b{color:#7fe0c3;font-weight:700;margin-left:16px}
   .chips-row{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
   .chips-row::-webkit-scrollbar{display:none}
   .chip{flex:none;font-size:10.5px;padding:4px 10px;border-radius:999px;border:1px solid rgba(232,197,107,.28);
@@ -685,9 +672,6 @@
   .dim-battles{display:flex;align-items:baseline;gap:8px}
   .dim-battles b{font-size:44px;font-weight:600;color:rgba(214,226,246,.55);font-variant-numeric:tabular-nums}
   .dim-battles em{font-style:normal;font-size:12.5px;letter-spacing:.18em;color:rgba(190,200,220,.34)}
-  .dim-trials{display:flex;align-items:baseline;gap:8px}
-  .dim-trials b{font-size:44px;font-weight:600;color:rgba(214,226,246,.55);font-variant-numeric:tabular-nums}
-  .dim-trials em{font-style:normal;font-size:12.5px;letter-spacing:.18em;color:rgba(190,200,220,.34)}
   .dim-breaks{font-size:12px;letter-spacing:.08em;color:rgba(232,180,100,.5);line-height:1.6;text-align:center}
   .dim-gain{display:flex;gap:20px;font-size:12.5px;letter-spacing:.06em;color:rgba(180,192,214,.34)}
   .dim-gain b{font-weight:600;color:rgba(206,218,240,.48);font-variant-numeric:tabular-nums}
@@ -793,7 +777,7 @@
     <span class="kills">击杀 <b id="battleKills">0</b></span>
     <!-- v7.5: 灵石已迁到战斗区左下角资源栏, 此处仅留隐藏锚点(供旧逻辑引用), 不再显示 -->
     <span class="kills" style="display:none" aria-hidden="true">灵石 <b id="battleSpirit">0</b></span>
-    <span class="trial" id="battleTrial">妖潮·妖群 2:00</span>
+    <span class="trial" id="battleTrial">第 1 关 · 怪血 10</span>
     <span class="speed" id="battleSpeed" style="display:none">×2 倍速</span>
     <span id="battleState">推进中</span>
   </div>
@@ -906,16 +890,7 @@
 <div class="realm-up" id="realmUp"><div class="t" id="realmUpT">筑基</div><div class="s">天人感应 · 修为暴涨</div></div>
 
 <!-- v3.9 妖潮试炼结算: 120秒一轮, 击杀数→纪录→离线游历收益加成 -->
-<div class="trial-toast" id="trialToast">
-  <div class="tt-card">
-    <div class="tt-title">妖潮退去</div>
-    <div class="tt-rows">
-      <div class="tt-row"><span>斩妖</span><b id="trialKillsN">0</b></div>
-      <div class="tt-row"><span>纪录</span><b id="trialBestN">0</b></div>
-      <div class="tt-row"><span>加成</span><b id="trialBoostN">—</b></div>
-    </div>
-  </div>
-</div>
+
 
 <div class="modal" id="offlineModal">
   <div class="card story-card">
@@ -1000,7 +975,6 @@
 <div id="dimScreen">
   <div class="dim-panel">
     <div class="dim-title">静 心 挂 机</div>
-    <div class="dim-trials"><b id="dimTrials">0</b><em>次兽潮</em></div>
     <div class="dim-gain">
       <span>灵石 <b id="dimSpirit">0</b></span>
       <span>修为 <b id="dimExp">0</b></span>

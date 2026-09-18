@@ -142,14 +142,8 @@ function doBreak() {
   const finishBreak = () => {
     state.realmIdx++;
     state.exp = isBigBreak ? 0 : Math.max(0, state.exp - r.need);  // 大境清零, 小境扣需
-    /* v7.2 跨大境重校: 兽潮离线加成与大境界绑定 —— 怪池换了, 效率必须
-     * 重新校对, 否则低境刷满 121 的 180% 常驻档案吃到天荒地老。trialBest 保留作
-     * 全程炫耀纪录, 小境界突破(同池)不清。
-     * v5.6: 加成已迁入 buffs 表(tag:"trial") → 按条目清除。 */
-    if (isBigBreak) {
-      state.trialBoost = 0; state.trialBoostUntil = 0;   /* 兼容旧字段 */
-      state.buffs = (state.buffs || []).filter(b => b.tag !== "trial");
-    }
+    /* ⚠️ v6: 原「跨大境清兽潮加成」随妖潮删除 —— 加成来源只剩丹药,
+     * 与境界无关, 不再需要重校。 */
     __set_breaking(false);
     /* 黑屏挂机: 记录突破 */
     if (DIMSTAT.on) { DIMSTAT.breaks.push(next.label); try { dimRender(); } catch(e) {} }
@@ -423,19 +417,17 @@ function presentSettle(r) {
   }
   /* v5.6 通用 Buff 协议回传: gains.fx = 参与本次结算的加成条目(已由服务端按区间加权验算),
    * 前端结构化循环渲染 —— 以后新增任何丹方/加成源, 面板零改动。 */
-  let trialRow = "";
-  const T = gg.trial;
-  if (T && T.waves > 0) trialRow = `<div class="off-row"><span class="o-ico">${icoHunt}</span><span class="ol">兽潮·化身代守</span><b class="ov">${T.waves} 波 · 斩妖 ${fmt(T.kills)}</b></div>`;
+  /* ⚠️ v6: 妖潮已删 —— 不再有"兽潮·化身代守"结算行, 加成行只认丹药。 */
+  let fxRow = "";
   for (const f of (gg.fx || [])) {
     const nm = f.name ? "·" + esc(f.name) : "";
     if (f.mult > 1) {
-      trialRow += `<div class="off-row"><span class="o-ico">${icoExp}</span><span class="ol">${f.tag === "trial" ? "兽潮加成" : "丹药加持" + nm}</span><b class="ov">×${Number(f.mult).toFixed(2)}</b></div>`;
+      fxRow += `<div class="off-row"><span class="o-ico">${icoExp}</span><span class="ol">丹药加持${nm}</span><b class="ov">×${Number(f.mult).toFixed(2)}</b></div>`;
     } else if (f.boost > 0) {
       /* v5.7: boost 在线也生效 → 结算区间可能是几分钟(心跳段), 庇佑时长智能显示 时/分 */
       const cvr = Math.max(1, Math.round((f.covered || 0) / 60000));
       const cvrTxt = cvr >= 60 ? `庇佑 ${Math.round(cvr / 60)} 时` : `庇佑 ${cvr} 分`;
-      if (f.tag === "trial") trialRow += `<div class="off-row"><span class="o-ico">${icoExp}</span><span class="ol">兽潮加成${nm}</span><b class="ov" style="color:#e0b45a">×${(1 + f.boost).toFixed(2)}·${cvrTxt}</b></div>`;
-      else trialRow += `<div class="off-row"><span class="o-ico">${icoSpi}</span><span class="ol">丹力加成${nm}</span><b class="ov jade">+${Math.round(f.boost * 100)}%·${cvrTxt}</b></div>`;
+      fxRow += `<div class="off-row"><span class="o-ico">${icoSpi}</span><span class="ol">丹力加成${nm}</span><b class="ov jade">+${Math.round(f.boost * 100)}%·${cvrTxt}</b></div>`;
     }
   }
   /* v1.9.8: 连破境 → 横幅右上朱印; 闭关时长 → 横幅标题带(各一行小字) */
@@ -452,7 +444,7 @@ function presentSettle(r) {
     `<div class="off-rows">` +
     `<div class="off-row"><span class="o-ico">${icoExp}</span><span class="ol">周天运转 · 修为</span><b class="ov">+${fmt(gg.exp)}</b></div>` +
     `<div class="off-row"><span class="o-ico">${icoSpi}</span><span class="ol">聚灵阵 · 灵石</span><b class="ov jade">+${fmt(totalSpirit)}</b></div>` +
-    trialRow + equipRow +
+    fxRow + equipRow +
     `</div>` + huntExtra + bagTip;
   // 离线际遇叙事(每满 1 小时一段, 至多 3 段; 纯叙事)
   const bi = Math.min(bigIdx(), MAIN_STORY.length - 1);
