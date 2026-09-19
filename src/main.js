@@ -279,6 +279,8 @@ const BRIDGE = {
   "upEquip": function () { return NS_src_06_v6ui_js["upEquip"]; },
   "setStep": function () { return NS_src_06_v6ui_js["setStep"]; },
   "doRebirthUI": function () { return NS_src_06_v6ui_js["doRebirthUI"]; },
+  "deathChooseRebirth": function () { return NS_src_06_v6ui_js["deathChooseRebirth"]; },
+  "deathChooseRestart": function () { return NS_src_06_v6ui_js["deathChooseRestart"]; },
   "closeRebirth": function () { return NS_src_06_v6ui_js["closeRebirth"]; },
   "confirmRebirth": function () { return NS_src_06_v6ui_js["confirmRebirth"]; },
   /* 调试入口：window.V6 可查状态与手动结算 */

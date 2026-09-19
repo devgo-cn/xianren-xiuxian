@@ -1004,6 +1004,8 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
     return r;
   };
 
+  let _deathCb = null;   /* v8.1 死亡回调(06-v6ui 经 BattleAPI.onPlayerDeath 注册) */
+
   window.BattleAPI = {
     /* v3.2: 统一舞台接入点 —— 返回 60-stage 契约层对象 { name, draw(ctx,W,H,dt) }。
      * 调用后本层不再自持 rAF，逻辑与绘制都由舞台按统一 30fps 驱动。
@@ -1047,6 +1049,16 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
     setDropRates: (r) => { if (r) Object.assign(DROP, r); },
     getDropRates: () => Object.assign({}, DROP),
     onDrop: null,      // 主游戏赋值: ({spirit, elite, enemy}) => void
+    /* v8.1 死亡接管: 玩家被怪打死 → 冻结战斗并回调; 上层弹「转生/从头开始」面板,
+     * 选择后调 respawn() —— 回满血+按(可能已重置的)关卡重刷+解除暂停。 */
+    onPlayerDeath: (cb) => { _deathCb = typeof cb === 'function' ? cb : null; },
+    setPaused: (on) => { G.paused = !!on; updateHUD(); },
+    respawn: () => {
+      if (G.player) { G.player.hp = G.player.maxHp; G.player.hurtT = 0; }
+      respawnArena();
+      /* v8.1: 独立泵模式下 G.paused 期间泵已自退(见 loop), 解冻后必须重启 —— 同 resume() 的 guard */
+      if (!_managed && !_rafOn) { _rafOn = true; requestAnimationFrame(loop); }
+    },
     getSpirit: () => G.spirit,
     /* v8.0 怪物包诊断口: 定位"一只怪都不出"这类问题 —— 一眼看清
      *   当前 lv / 该用哪个池 / 池里 13 个 slug / 哪些已请求 / 哪些已就绪。
@@ -2544,12 +2556,12 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
           G.pushDmg({ x:p.x,y:p.y-40, val:dmg, crit, color: crit ? '#ff5a3c' : '#ff8a7a', t:0 });
           G.pushFx({ kind:'hitSpark', x:p.x,y:p.y-20, color:'#ff8a7a', t:0,dur:0.3 });
           if (p.hp <= 0) {
-            /* v5.0 死亡判定: 玩家倒下后妖潮从头开始(清场+重置怪池+回满血) */
-            p.hp = p.maxHp;
-            for (const e of G.enemies) { e.alive = false; e.dying = 0; despawnEnemy(e); }
-            G.enemies.length = 0;
-            G.bossActive = false;
-            respawnArena();
+            /* v8.1 死亡: 不再原地满血复活 —— 冻结战斗, 弹「转生 / 从头开始」面板。
+             * 回调由 06-v6ui 注册(BattleAPI.onPlayerDeath), 选择后经 BattleAPI.respawn 恢复。 */
+            p.hp = 0;
+            p.hurtT = 0.25;
+            G.paused = true;
+            if (typeof _deathCb === 'function') { try { _deathCb(); } catch (err) {} }
           }
         }
       }

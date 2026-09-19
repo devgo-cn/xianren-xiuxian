@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<script>window.APP_VER="5.44";</script>
+<script>window.APP_VER="5.45";</script>
 <title>闲人修仙</title>
 <meta name="description" content="闲人修仙：主身巡猎斗法、分身云游寻宝，离线亦在成长。">
 <link rel="icon" href="data:,">
@@ -57,6 +57,11 @@
   .res-bar .spirit #spirit{display:inline-block;box-sizing:border-box;text-align:center;width:5.4ch}
   .res-bar .rate #rateText{display:inline-block;box-sizing:border-box;text-align:center;width:4.6ch}
   /* v7.5 窄屏(≤375px): 字号微降 + 数字预留收窄, 保证一行不折 */
+  /* v8.1 死亡面板: 同转生面板骨架, 换暗红基调 */
+  #deathPanel .rb-card{border-color:rgba(255,90,60,.45)}
+  #deathPanel .rb-t{color:#ffb0a0}
+  #deathPanel .rb-line span:last-child{color:#ffd0c4}
+
   @media (max-width:375px){
     .res-bar{left:9px;bottom:8px;gap:9px;max-width:68%}
     .res-bar .spirit{gap:3px;font-size:12px}
@@ -151,25 +156,25 @@
   .abtn.brk.hot .alab i{color:#9ed7b8}
 
   /* 转生结算弹窗 */
-  #rbPanel{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+  #rbPanel,#deathPanel{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
     background:rgba(6,8,12,.82);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
-  #rbPanel.on{display:flex}
-  #rbPanel .rb-card{width:min(86vw,340px);padding:20px 18px;border-radius:10px;
+  #rbPanel.on,#deathPanel.on{display:flex}
+  #rbPanel .rb-card,#deathPanel .rb-card{width:min(86vw,340px);padding:20px 18px;border-radius:10px;
     border:1px solid rgba(200,110,255,.4);
     background:linear-gradient(180deg,rgba(30,24,44,.99),rgba(14,12,20,.99));
     box-shadow:0 12px 40px rgba(0,0,0,.7);color:#d8dee8;text-align:center}
-  #rbPanel .rb-t{font-size:16px;font-weight:800;color:#dcc4ff;letter-spacing:3px;margin-bottom:14px}
-  #rbPanel .rb-line{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;
+  #rbPanel .rb-t,#deathPanel .rb-t{font-size:16px;font-weight:800;color:#dcc4ff;letter-spacing:3px;margin-bottom:14px}
+  #rbPanel .rb-line,#deathPanel .rb-line{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;
     border-bottom:1px solid rgba(255,255,255,.06)}
-  #rbPanel .rb-line span:first-child{color:#8d97a9}
-  #rbPanel .rb-line span:last-child{color:#ffd98a;font-weight:800}
-  #rbPanel .rb-line.gain span:last-child{color:#9ed7b8;font-size:14px}
-  #rbPanel .rb-btns{display:flex;gap:8px;margin-top:18px}
-  #rbPanel .rb-btns button{flex:1;padding:9px 0;cursor:pointer;font-family:inherit;font-size:13px;
+  #rbPanel .rb-line span:first-child,#deathPanel .rb-line span:first-child{color:#8d97a9}
+  #rbPanel .rb-line span:last-child,#deathPanel .rb-line span:last-child{color:#ffd98a;font-weight:800}
+  #rbPanel .rb-line.gain span:last-child,#deathPanel .rb-line.gain span:last-child{color:#9ed7b8;font-size:14px}
+  #rbPanel .rb-btns,#deathPanel .rb-btns{display:flex;gap:8px;margin-top:18px}
+  #rbPanel .rb-btns button,#deathPanel .rb-btns button{flex:1;padding:9px 0;cursor:pointer;font-family:inherit;font-size:13px;
     font-weight:800;border-radius:5px;letter-spacing:1px;transition:all .15s}
-  #rbPanel .rb-btns button:active{transform:scale(.96)}
-  #rbPanel #rbCancel{border:1px solid rgba(140,150,170,.35);background:rgba(24,28,36,.9);color:#a9b4c6}
-  #rbPanel #rbOk{border:1px solid rgba(200,110,255,.6);
+  #rbPanel .rb-btns button,#deathPanel .rb-btns button:active{transform:scale(.96)}
+  #rbCancel,#dpRestart{border:1px solid rgba(140,150,170,.35);background:rgba(24,28,36,.9);color:#a9b4c6}
+  #rbOk,#dpRebirth{border:1px solid rgba(200,110,255,.6);
     background:linear-gradient(180deg,rgba(78,46,110,.95),rgba(40,24,60,.98));color:#e8d6ff}
 
   @media (max-width:375px){
@@ -687,7 +692,7 @@
     box-shadow:0 2px 10px rgba(0,0,0,.55);cursor:grab;touch-action:none}
   .dim-knob svg{width:20px;height:20px;display:block}
 </style>
-<link rel="stylesheet" href="dt-theme.css?v=5.44">
+<link rel="stylesheet" href="dt-theme.css?v=5.45">
 </head>
 <body>
 <!-- v1.7.58 开屏页: 品牌 + 进度 + 健康游戏忠告(load 完成或点击后淡出) -->
@@ -836,8 +841,8 @@
      突破不是操作按钮 —— 转生时自动结算是否破境(转生 ≠ 突破), 此处仅作状态提示(.brk)。 -->
 <div class="act-bar" id="actBar">
   <button class="abtn" id="abRebirth" onclick="doRebirthUI()">
-    <img class="skin" src="assets/ui_icons/btn_array.webp" alt="重生">
-    <span class="alab"><b>重 生</b><i id="rbGain">+0 修为点</i></span>
+    <img class="skin" src="assets/ui_icons/btn_array.webp" alt="转生">
+    <span class="alab"><b>转 生</b><i id="rbGain">+0 修为点</i></span>
   </button>
   <button class="abtn brk" id="abBreak">
     <img class="skin" src="assets/ui_icons/btn_break.webp" alt="突破">
@@ -872,7 +877,7 @@
 <!-- v6.0 转世重开结算面板 -->
 <div id="rbPanel">
   <div class="rb-card">
-    <div class="rb-t">转 世 重 开</div>
+    <div class="rb-t">转 生</div>
     <div class="rb-line"><span>本轮最高关</span><span id="rbMax">0</span></div>
     <div class="rb-line"><span>修为点</span><span id="rbPts">0</span></div>
     <div class="rb-line gain"><span>可得修为点</span><span id="rbNew">+0</span></div>
@@ -882,7 +887,21 @@
     <div class="rb-line"><span>灵石</span><span id="rbSpirit">清零</span></div>
     <div class="rb-btns">
       <button id="rbCancel" onclick="closeRebirth()">再 想 想</button>
-      <button id="rbOk" onclick="confirmRebirth()">转 世</button>
+      <button id="rbOk" onclick="confirmRebirth()">转 生</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ v8.1 死亡面板：被怪打死 → 转生 / 从头开始 二选一 ══
+     弹出时战斗与 v6 驱动全部冻结; 转生=结算修为/境界并清装备灵石;
+     从头开始=修为/境界/装备保留, 只把关卡拉回第 1 关。 -->
+<div id="deathPanel">
+  <div class="rb-card">
+    <div class="rb-t">身 死 道 消</div>
+    <div class="rb-line" style="border-bottom:0;justify-content:center"><span style="flex:none;text-align:center;color:#c3d3c8">道友兵解于此，何去何从？</span></div>
+    <div class="rb-btns">
+      <button id="dpRestart" onclick="deathChooseRestart()">从头开始</button>
+      <button id="dpRebirth" onclick="deathChooseRebirth()">转 生</button>
     </div>
   </div>
 </div>

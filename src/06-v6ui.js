@@ -62,6 +62,7 @@ export function initV6(legacy) {
   S6.lastTick = Date.now();
   render6(true);
   startDriver();
+  bindDeathHook(0);
   return S6;
 }
 
@@ -278,7 +279,7 @@ export function getStep(key) { return key ? (STEPS[key] || 1) : STEPS; }
 export function doRebirthUI() {
   if (!S6) return;
   const rb = V.rebirthText(S6);
-  if (!rb.can) { toast('先推几关再来转世'); return; }
+  if (!rb.can) { toast('先推几关再转生'); return; }
 
   setText('rbMax', String(rb.maxStage));
   setText('rbPts', N.fmt(S6.totalPoints));
@@ -309,8 +310,62 @@ export function confirmRebirth() {
   const nowName = RM.nameOf(r.realm);
   toast(r.realmGain > 0
     ? '突破！' + before + ' → ' + nowName
-    : '转世重开：仍是 ' + nowName + '，修为已累计',
+    : '转生：仍是 ' + nowName + '，修为已累计',
     r.realmGain > 0 ? 4200 : 3000);
+}
+
+/* ─────────────────────────────────────────────────────────────
+ *  v8.1 死亡面板: 玩家被怪打死 → 冻结一切, 「转生 / 从头开始」二选一
+ * ───────────────────────────────────────────────────────────── */
+
+/** 战斗层死亡回调 → 冻结 v6 驱动(修为/关卡/灵石全停) + 弹面板 */
+function showDeathPanel() {
+  stopDriver();
+  const p = el('deathPanel');
+  if (p) p.classList.add('on');
+}
+
+/** 恢复: 时间基准重置(暂停时长不计入推进) → 重启驱动 → 战斗回满血重刷并解冻 */
+function resumeFromDeath() {
+  if (S6) S6.lastTick = Date.now();
+  startDriver();
+  const BA = (typeof window !== 'undefined') && window.BattleAPI;
+  if (BA && typeof BA.respawn === 'function') BA.respawn();
+}
+
+/** 死亡面板·转生: 直接结算(修为点/境界/清装备灵石), 回第 1 关 */
+export function deathChooseRebirth() {
+  const p = el('deathPanel');
+  if (p) p.classList.remove('on');
+  if (S6) {
+    const before = V.previewRebirth(S6).realmNowName;
+    const r = V.applyRebirth(S6);
+    mirrorRealmToLegacy();
+    render6(true);
+    const nowName = RM.nameOf(r.realm);
+    toast(r.realmGain > 0
+      ? '转生突破！' + before + ' → ' + nowName
+      : '转生：仍是 ' + nowName + '，修为已累计', 4200);
+  }
+  resumeFromDeath();
+}
+
+/** 死亡面板·从头开始: 修为/境界/装备保留, 只把关卡拉回第 1 关 */
+export function deathChooseRestart() {
+  const p = el('deathPanel');
+  if (p) p.classList.remove('on');
+  if (S6) { S6.stage = 1; render6(true); }
+  toast('从头开始', 2400);
+  resumeFromDeath();
+}
+
+/** 等动态加载的 BattleAPI 就绪后注册死亡回调(40-app bindBattleHooks 同款轮询) */
+function bindDeathHook(attempt) {
+  if (typeof window === 'undefined') return;
+  const BA = window.BattleAPI;
+  if (BA && typeof BA.onPlayerDeath === 'function') { BA.onPlayerDeath(showDeathPanel); return; }
+  if ((attempt || 0) > 50) return;
+  setTimeout(function () { bindDeathHook((attempt || 0) + 1); }, 200);
 }
 
 /**
