@@ -3876,7 +3876,6 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
   }
 
   function updateHUD() {
-    const killsEl = document.getElementById('battleKills');
     const speedEl = document.getElementById('battleSpeed');
     const stateEl = document.getElementById('battleState');
     const spEl = document.getElementById('battleSpirit');
@@ -3884,9 +3883,8 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
     const _st = G.state === 'fight' ? '战斗中' : '推进中';
     if (stateEl && stateEl.textContent !== _st) stateEl.textContent = _st;
     /* v5.13 PERF: 同值跳写 —— textContent 赋值即使值相同也会走失效检查, 挂机期
-     * kills/spirit/state 大多帧不变, 同值判断直接省掉无效 DOM 写。 */
-    const _ks = String(G.kills);
-    if (killsEl && killsEl.textContent !== _ks) killsEl.textContent = _ks;
+     * spirit/state 大多帧不变, 同值判断直接省掉无效 DOM 写。
+     * v7.6: 击杀显示已删(用户: 现在推关, 不显示杀怪)。 */
     if (spEl) { const s = fmtNum(G.spirit); if (spEl.textContent !== s) spEl.textContent = s; }
     if (speedEl) {
       /* v6: 这个位置改显示【游戏倍速】与【身法 buff】两条信息。
@@ -3904,15 +3902,10 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
       else speedEl.style.display = 'none';
     }
     /* ⚠️ v6: 妖潮倒计时 HUD 已随试炼系统拆除(#battleTrial 节点已重新用作关卡显示)。
-     * 无尽刷怪下玩家最需要知道的是"现在打到第几关、这只怪有多硬"。 */
+     * v7.6: 怪血显示已删(用户: 左边已显示关卡), 顶部只留当前推到第几关。 */
     if (trEl) {
       const pr = v6Progress();
-      let hpTxt = '—';
-      try {
-        const hp = NS_NUM.toNumber(NS_STAGE.stageInfo(pr.stage).hp);
-        hpTxt = hp >= 1e6 ? hp.toExponential(1) : Math.round(hp).toLocaleString('en-US');
-      } catch (e) {}
-      trEl.textContent = `第 ${pr.stage} 关 · 怪血 ${hpTxt}`;
+      trEl.textContent = `第 ${pr.stage} 关`;
       try {
         if (pr.stage > 1) trEl.classList.add('boosted'); else trEl.classList.remove('boosted');
       } catch (err) {}

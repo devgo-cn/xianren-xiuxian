@@ -27,8 +27,8 @@ import * as V from './05-v6.js';
 /** v6 运行时状态（全局唯一实例） */
 let S6 = null;
 
-/** 当前升级档位（1/10/100/1000/10000） */
-let STEP = 1;
+/** 各装备槽独立升级档位（1/10/100/1000/10000）；旧共用档位已拆成每槽一个下拉 */
+const STEPS = { atk: 1, hp: 1, def: 1, aspd: 1 };
 
 /** 上一次 DOM 渲染时间戳 */
 let lastRender = 0;
@@ -60,8 +60,6 @@ export function initV6(legacy) {
   if (S6) return S6;
   S6 = V.fromLegacy(legacy || (typeof window !== 'undefined' ? window.state : null));
   S6.lastTick = Date.now();
-  bindStepButtons();
-  refreshStepButtons();
   render6(true);
   startDriver();
   return S6;
@@ -158,23 +156,17 @@ export function render6(force) {
   setText('sbStage', String(st.stage));
   setText('sbMob', st.mobName);
   setText('sbBest', String(st.best));
-  const fill = el('sbFill');
-  if (fill) {
-    const pct = (st.stuck ? 100 : st.progress * 100).toFixed(1) + '%';
-    if (fill.style.width !== pct) fill.style.width = pct;
-  }
 
   /* ── 灵石（复用旧 HUD 的 #spirit 节点，避免两个数字打架）── */
   const spiritTxt = N.fmt(S6.spirit);
   setText('spirit', spiritTxt);
   setText('battleSpirit', spiritTxt);
 
-  /* ── 4 个升级按钮 ── */
+  /* ── 4 个升级按钮（v7.6c: 按钮只显示等级, 槽名在按钮上方小字, 费用靠 no/ready 变色表达）── */
   for (const slot of E.SLOTS) {
     const info = V.slotText(S6, slot.key);
     const cap = slot.key.charAt(0).toUpperCase() + slot.key.slice(1);
-    setText('lv' + cap, 'Lv ' + info.lv);
-    setText('cost' + cap, info.costText);
+    setText('lv' + cap, info.maxed ? 'MAX' : 'Lv ' + info.lv);
     const btn = el('up' + cap);
     if (btn) {
       btn.classList.toggle('max', info.maxed);
@@ -183,22 +175,27 @@ export function render6(force) {
     }
   }
 
-  /* ── 转生按钮 ── */
+  /* ── 重生按钮（聚灵阵图标皮肤, #abRebirth）── */
   const rb = V.rebirthText(S6);
   setText('rbGain', rb.gainText + ' 修为点');
-  const rbtn = el('btnRebirth');
+  const rbtn = el('abRebirth');
   if (rbtn) {
     rbtn.classList.toggle('off', !rb.can);
     rbtn.classList.toggle('hot', rb.can && st.stuck);
   }
 
-  /* ── 境界 + 修为进度 ──────────────────────────────────────────
-   * 显示可读境界名（「炼气三层」）和「离下一境还差多少修为」。
-   * 这是新玩法的核心反馈：转生 ≠ 突破，玩家要能看到自己攒了多少。 */
-  setText('sbRealm', st.realmName);
-  const rnEl = el('sbRealm');
-  if (rnEl && st.realmColor) rnEl.style.color = st.realmColor;
-  setText('sbToNext', N.fmt(st.toNext));
+  /* ── 突破状态提示（自动突破, 非操作按钮, #abBreak / #brkHint）──
+   * 转生 ≠ 突破: 是否破境在转生时自动结算, 这里只提示下一次重生会不会破境。 */
+  const brk = el('abBreak');
+  if (brk) {
+    if (rb.willBreak) {
+      setText('brkHint', '破境 → ' + rb.realmNextName);
+      brk.classList.add('hot');
+    } else {
+      setText('brkHint', '还差 ' + rb.toNextText);
+      brk.classList.remove('hot');
+    }
+  }
 
   /* ── 战斗 HUD 的倍速显示（旧节点，复用）── */
   const spd = el('battleSpeed');
@@ -254,7 +251,7 @@ export function render6(force) {
 /** 点击某一格的升级按钮 */
 export function upEquip(key) {
   if (!S6) return;
-  const r = V.upgradeSlot(S6, key, STEP);
+  const r = V.upgradeSlot(S6, key, STEPS[key] || 1);
   render6(true);
   if (!r.ok) {
     const msg = r.reason === 'not_enough' ? '灵石不足'
@@ -264,36 +261,14 @@ export function upEquip(key) {
   }
 }
 
-/** 设置升级档位 */
-export function setStep(n) {
-  STEP = n | 0;
-  if (STEP <= 0) STEP = 1;
-  refreshStepButtons();
+/** 设置某装备槽的升级档位（每槽独立下拉, ×1/×10/×100/×1000/×1万） */
+export function setStep(key, val) {
+  const n = parseInt(val, 10);
+  STEPS[key] = n > 0 ? n : 1;
 }
 
-/** 取当前档位（调试/测试用） */
-export function getStep() { return STEP; }
-
-function bindStepButtons() {
-  const row = el('stepRow');
-  if (!row) return;
-  /* 用事件委托 —— 按钮是静态 DOM，逐个绑也行，但委托省一次遍历 */
-  row.addEventListener('click', function (ev) {
-    const t = ev.target.closest ? ev.target.closest('.step-btn') : null;
-    if (!t) return;
-    const n = +t.getAttribute('data-step') || 1;
-    setStep(n);
-  });
-}
-
-function refreshStepButtons() {
-  if (typeof document === 'undefined') return;
-  const btns = document.querySelectorAll('.step-btn');
-  for (const b of btns) {
-    const n = +b.getAttribute('data-step') || 1;
-    b.classList.toggle('on', n === STEP);
-  }
-}
+/** 取当前档位（调试/测试用；不传 key 返回整表） */
+export function getStep(key) { return key ? (STEPS[key] || 1) : STEPS; }
 
 /* ─────────────────────────────────────────────────────────────
  *  事件：转生

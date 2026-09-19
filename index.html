@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<script>window.APP_VER="5.41";</script>
+<script>window.APP_VER="5.42";</script>
 <title>闲人修仙</title>
 <meta name="description" content="闲人修仙：主身巡猎斗法、分身云游寻宝，离线亦在成长。">
 <link rel="icon" href="data:,">
@@ -73,7 +73,9 @@
 
   /* ══ v6.0 挂机重构: 关卡条 / 四装备升级 / 档位 / 转生 ══════════════════ */
 
-  /* ── 关卡推进条: 位于 .battle-ui(战斗带) 顶部, 紧贴 HUD 下方 ── */
+  /* ── 关卡推进条: 只留「第X关 / 怪名 / 最高关」──
+     v7.6: 旧「境界行 + 距下一境进度条」已删(用户: 那条杠不需要)。境界本就常驻左上角
+     境界牌, 修为差距改由底部「突破」按钮承载, 战斗区不再重复。 */
   .stage-bar{position:absolute;left:10px;right:10px;top:22px;z-index:2;pointer-events:none;
     display:flex;flex-direction:column;gap:3px}
   .stage-bar .sb-main{display:flex;align-items:baseline;gap:9px;font-size:12px;color:#c2c9d6;
@@ -84,77 +86,71 @@
     text-overflow:ellipsis;white-space:nowrap}
   .stage-bar .sb-rec{color:#8d97a9;font-size:11px;white-space:nowrap}
   .stage-bar .sb-rec b{color:#9ed7b8}
-  /* v6.1 境界行: 左边境界名(按大境着色), 右边"距下一境 X 修为" */
-  .stage-bar .sb-realm-row{display:flex;align-items:baseline;gap:8px;
-    font-size:11.5px;text-shadow:0 1px 3px rgba(0,0,0,.85)}
-  .stage-bar .sb-realm{color:#e8c56b;font-weight:700;white-space:nowrap}
-  .stage-bar .sb-tonext{color:#8d97a9;margin-left:auto;white-space:nowrap}
-  .stage-bar .sb-tonext b{color:#ffd98a}
-  .stage-bar .sb-prog{height:3px;border-radius:2px;background:rgba(255,255,255,.10);overflow:hidden}
-  .stage-bar .sb-prog i{display:block;height:100%;width:0%;border-radius:2px;
-    background:linear-gradient(90deg,#67c9ab,#ffd98a);transition:width .18s linear}
 
-  /* ── v6 操作面板: 独立 fixed 底部面板 ──
-     背景必须足够不透明: 下方是深色立绘区, 若用半透明渐隐,
-     立绘会从按钮缝隙里透出来, 数字与图标糊成一片(实测截图复现)。
-     故整块给实心底, 只在最顶部留一条 18px 的渐隐过渡带做视觉衔接。 */
-  .v6-panel{position:fixed;left:0;right:0;bottom:0;z-index:5;
-    padding:8px 10px calc(7px + env(safe-area-inset-bottom, 0px));
-    display:flex;flex-direction:column;gap:6px;
-    background:#0a0d14;
-    box-shadow:0 -1px 0 rgba(232,197,107,.14), 0 -10px 24px rgba(0,0,0,.55)}
-  /* 顶部渐隐过渡带: 盖在面板上沿之外, 让面板与上方场景自然地连起来 */
-  .v6-panel::before{content:"";position:absolute;left:0;right:0;top:-18px;height:18px;
-    background:linear-gradient(180deg, rgba(10,13,20,0) 0%, rgba(10,13,20,.92) 100%);
-    pointer-events:none}
-
-  /* 4 槽升级按钮 */
-  .v6-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-  .up-btn{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:1px;padding:7px 2px 6px;cursor:pointer;overflow:hidden;font-family:inherit;
-    border-radius:7px;border:1px solid rgba(232,197,107,.28);
-    background:linear-gradient(180deg,rgba(30,35,46,.94),rgba(16,19,26,.97));
-    color:#d8dee8;transition:transform .12s,border-color .2s,box-shadow .2s}
-  .up-btn:active{transform:scale(.93)}
-  .up-btn .uico{font-size:16px;line-height:1;filter:saturate(.9)}
-  .up-btn .ulbl{font-size:10.5px;color:#a9b4c6;letter-spacing:.5px}
-  .up-btn .ulv{font-size:13px;font-weight:800;color:#ffd98a;line-height:1.15}
-  .up-btn .ucost{font-size:10.5px;color:#9ed7b8;font-weight:700}
+  /* ── v7.6 装备行: 战斗带【正下方】的 4 槽横排 ──
+     原来压在视口最底部, 被打坐立绘挡得只剩一半(实测截图)。移到战斗带下沿的空隙里,
+     与推关联动最紧: 盯着战斗区时就能顺手点。每槽底下挂一个独立步长下拉,
+     替掉旧的共用「档位」按钮行(用户: 决定这一格一级一级升, 还是一百级一百级升)。 */
+  .equip-bar{position:fixed;left:0;right:0;bottom:calc(44vh + 14px);z-index:6;
+    display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 10px;pointer-events:none}
+  /* 偏移 14px 的由来: 按钮压扁后装备带高约 86px, 战斗带底边在 44vh+130px、
+     立绘头顶约在 44vh+120px 之上 —— 恰好放进两者之间的空区, 上下各留 ~30px */
+  .equip-bar .eq-slot{display:flex;flex-direction:column;gap:4px;min-width:0;pointer-events:auto}
+  /* v7.6c: 槽名(攻击/血量/防御/速度)放按钮上方小字, 按钮本体只显示等级(用户: 简化, 别成竖条) */
+  .eq-slot .elbl{font-size:10px;color:#a9b4c6;letter-spacing:1px;text-align:center;line-height:1;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .up-btn{position:relative;display:flex;align-items:center;justify-content:center;
+    padding:8px 2px 7px;cursor:pointer;overflow:hidden;font-family:inherit;
+    border-radius:8px;border:1px solid rgba(232,197,107,.30);
+    background:linear-gradient(180deg,rgba(30,35,46,.95),rgba(16,19,26,.98));
+    color:#d8dee8;transition:transform .12s,border-color .2s,box-shadow .2s;
+    box-shadow:0 3px 12px rgba(0,0,0,.5);min-width:0}
+  .up-btn:active{transform:scale(.94)}
+  .up-btn .ulv{font-size:13px;font-weight:800;color:#ffd98a;line-height:1.15;white-space:nowrap}
   /* 灵石不足 → 熄墨压暗; 可升 → 朱砂呼吸; 满级 → 青玉 */
   .up-btn.no{opacity:.45;border-color:rgba(120,130,150,.25)}
-  .up-btn.no .ucost{color:#8d97a9}
-  .up-btn.ready{border-color:rgba(255,140,80,.6);box-shadow:0 0 10px rgba(255,140,80,.22)}
+  .up-btn.ready{border-color:rgba(255,140,80,.62);box-shadow:0 0 10px rgba(255,140,80,.22)}
   .up-btn.max{opacity:.62;border-color:rgba(150,220,180,.35)}
   .up-btn.max .ulv{color:#9ed7b8}
+  /* 步长下拉: 每槽独立, 决定这一格点一次升几级(×1/×10/×100/×1000/×1万) */
+  .eq-slot .ustep{width:100%;height:24px;padding:0;cursor:pointer;font-family:inherit;
+    font-size:11px;font-weight:800;text-align:center;text-align-last:center;
+    color:#d6e8dc;background:rgba(18,23,31,.96);border:1px solid rgba(232,197,107,.26);
+    border-radius:6px;outline:none;appearance:none;-webkit-appearance:none}
+  .eq-slot .ustep:active{transform:scale(.96)}
 
-  /* 档位行 */
-  .v6-row{display:flex;align-items:center;gap:6px}
-  .v6-row .step-lbl{font-size:10.5px;color:#8d97a9;flex:none}
-  .step-row{display:flex;align-items:center;gap:5px;flex:1}
-  .step-btn{flex:1;padding:4px 0;cursor:pointer;font-family:inherit;font-size:11px;
-    border-radius:4px;border:1px solid rgba(232,197,107,.22);
-    background:rgba(20,24,32,.9);color:#a9b4c6;transition:all .15s}
-  .step-btn:active{transform:scale(.93)}
-  .step-btn.on{border-color:rgba(255,217,138,.78);background:rgba(62,49,26,.95);
-    color:#ffd98a;font-weight:800;box-shadow:0 0 8px rgba(255,217,138,.28)}
-
-  /* 转生按钮 */
-  .rb-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;
-    padding:8px 0;cursor:pointer;font-family:inherit;border-radius:6px;
-    border:1px solid rgba(200,110,255,.38);
-    background:linear-gradient(180deg,rgba(50,32,70,.94),rgba(24,16,34,.97));
-    color:#dcc4ff;transition:all .16s}
-  .rb-btn:active{transform:scale(.975)}
-  .rb-btn .rbl{font-size:12.5px;font-weight:800;letter-spacing:2px}
-  .rb-btn .rbs{font-size:10.5px;color:#bda6e6}
-  .rb-btn.off{opacity:.45;border-color:rgba(120,130,150,.25);color:#8d97a9}
-  .rb-btn.off .rbs{color:#8d97a9}
-  .rb-btn.hot{border-color:rgba(255,180,255,.85);
-    animation:rbPulse 1.6s ease-in-out infinite}
-  @keyframes rbPulse{
-    0%,100%{box-shadow:0 0 10px rgba(200,110,255,.25)}
-    50%{box-shadow:0 0 20px rgba(230,150,255,.55)}
-  }
+  /* ── v7.6 底部动作栏: 重生 + 突破 ──
+     直接沿用旧「聚灵阵 / 突破」那两块整块墨金皮肤(assets/ui_icons/btn_array|btn_break.webp):
+     左端圆章就是图标, 右端留白放按钮文字 —— 图标即「原来的图标」。
+     突破是【自动突破提示】, 不做操作按钮(转生 ≠ 突破, 是否破境在转生时自动结算)。
+     v7.6b: 整条背景全透明(用户: 让它透明) —— 只留两块皮肤按钮浮在立绘上。 */
+  .act-bar{position:fixed;left:0;right:0;bottom:0;z-index:10;
+    display:flex;justify-content:center;gap:10px;
+    padding:8px 14px calc(7px + env(safe-area-inset-bottom, 0px));
+    background:transparent}
+  .abtn{position:relative;flex:1 1 0;max-width:186px;min-width:0;aspect-ratio:3/1;padding:0;margin:0;
+    cursor:pointer;border:0;background:none;font-family:inherit;
+    transition:transform .14s,filter .2s;-webkit-tap-highlight-color:transparent}
+  .abtn .skin{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none}
+  .abtn .alab{position:absolute;left:31%;right:4%;top:50%;transform:translateY(-50%);
+    display:flex;flex-direction:column;align-items:center;gap:1px;pointer-events:none;min-width:0}
+  .abtn .alab b{font-size:13px;font-weight:800;letter-spacing:2px;line-height:1.1;white-space:nowrap;
+    color:#ffe6b0;text-shadow:0 1px 3px rgba(0,0,0,.85)}
+  .abtn .alab i{font-style:normal;font-size:9.5px;line-height:1.1;white-space:nowrap;
+    max-width:100%;overflow:hidden;text-overflow:ellipsis;
+    color:#c3d3c8;text-shadow:0 1px 2px rgba(0,0,0,.85)}
+  .abtn:active{transform:scale(.97)}
+  .abtn.off{filter:grayscale(.8) brightness(.6)}
+  .abtn.hot{animation:abPulse 1.5s ease-in-out infinite}
+  .abtn.hot .alab b{color:#fff}
+  @keyframes abPulse{
+    0%,100%{filter:drop-shadow(0 0 4px rgba(255,190,140,.35))}
+    50%{filter:drop-shadow(0 0 12px rgba(255,150,90,.8))}}
+  /* 突破 = 自动突破提示(非操作): 不响应按压 */
+  .abtn.brk{cursor:default}
+  .abtn.brk:active{transform:none}
+  .abtn.brk .alab b{color:#ffd6a2}
+  .abtn.brk.hot .alab i{color:#9ed7b8}
 
   /* 转生结算弹窗 */
   #rbPanel{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
@@ -181,19 +177,17 @@
   @media (max-width:375px){
     .up-btn{padding:6px 1px 5px}
     .up-btn .ulv{font-size:12px}
-    .up-btn .ucost{font-size:9.5px}
-    .up-btn .ulbl{font-size:9.5px}
-    .up-btn .uico{font-size:14px}
+    .eq-slot .elbl{font-size:9px}
     .stage-bar .sb-mob{font-size:10.5px}
-    .step-btn{font-size:10px;padding:3px 0}
-    .rb-btn .rbl{font-size:11.5px}
-    .v6-panel{padding-left:8px;padding-right:8px}
+    .eq-slot .ustep{height:22px;font-size:10px}
+    .abtn .alab b{font-size:12px}
+    .abtn .alab i{font-size:9px}
   }
   /* 矮屏(横屏/小机): 压缩按钮高度, 避免面板吃掉太多可视区 */
   @media (max-height:640px){
     .up-btn{padding:4px 1px 3px}
-    .up-btn .uico{display:none}
-    .rb-btn{padding:6px 0}
+    .eq-slot .ustep{height:20px}
+    .abtn{max-width:168px}
   }
   /* hud-row 第二行: 境界卡(左) + 按钮组(中) + hud-icons(右), grid 三列; 段位允许换行不截断 */
     .realm-left{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
@@ -273,7 +267,8 @@
      表现为倍速/妖潮倒计时/击杀数全部"消失"。2D 时代 canvas 在容器内部
      (且 display:none)，不存在此问题，故为 WebGL 迁移的遗漏。
      提到 3 即可压在 #battleGL(1) 之上，且仍在 .battle-ui(4)/.stage(5) 之下。 */
-  .battle-stage{position:fixed;left:0;right:0;top:92px;bottom:calc(44vh + 84px);z-index:3;pointer-events:none !important;overflow:hidden}
+  /* v7.6: 底边预留 84px → 130px —— 让出空间给「战斗带正下方」的 4 装备行(见 .equip-bar)。 */
+  .battle-stage{position:fixed;left:0;right:0;top:92px;bottom:calc(44vh + 130px);z-index:3;pointer-events:none !important;overflow:hidden}
   .battle-stage *{pointer-events:none !important}
   /* v3.2: 战斗层已并入 #stage。这里只留一个零尺寸占位 canvas 作为几何参照，
      不再显示任何内容（保留 #battleStage 容器是因为战斗 HUD 挂在里面）。 */
@@ -291,7 +286,7 @@
   .battle-hud .trial.boosted{color:#ffd76b;text-shadow:0 0 6px rgba(255,215,107,.55)}
 
   /* 战斗区UI图标层：大图标(地板右下) + 小图标(右上角) */
-  .battle-ui{position:fixed;left:0;right:0;top:92px;bottom:calc(44vh + 84px);z-index:4;pointer-events:none}
+  .battle-ui{position:fixed;left:0;right:0;top:92px;bottom:calc(44vh + 130px);z-index:4;pointer-events:none}
   .battle-ui .big-icons{position:absolute;bottom:6px;right:10px;display:flex;gap:7px;pointer-events:auto}
   .small-icons{position:fixed;top:6px;right:8px;display:grid;grid-template-columns:repeat(2,1fr);gap:4px;pointer-events:auto;z-index:100}
   .small-icons .icon-btn{position:relative;width:28px;height:28px;border-radius:3px;overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .3s;border:1px solid rgba(232,197,107,.25);background:transparent;flex:none}
@@ -693,7 +688,7 @@
     box-shadow:0 2px 10px rgba(0,0,0,.55);cursor:grab;touch-action:none}
   .dim-knob svg{width:20px;height:20px;display:block}
 </style>
-<link rel="stylesheet" href="dt-theme.css?v=5.41">
+<link rel="stylesheet" href="dt-theme.css?v=5.42">
 </head>
 <body>
 <!-- v1.7.58 开屏页: 品牌 + 进度 + 健康游戏忠告(load 完成或点击后淡出) -->
@@ -774,10 +769,11 @@
 <!-- 战斗区UI图标层：大图标(地板右下) + 顶部HUD(击杀/妖潮/倍速/状态) + 资源栏(左下裸文字) -->
 <div class="battle-ui" id="battleUI">
   <div class="battle-hud">
-    <span class="kills">击杀 <b id="battleKills">0</b></span>
-    <!-- v7.5: 灵石已迁到战斗区左下角资源栏, 此处仅留隐藏锚点(供旧逻辑引用), 不再显示 -->
+    <!-- v7.6: 击杀/杀怪显示已删(用户: 现在推关, 不显示杀怪)。
+         灵石已迁到战斗区左下角资源栏, 此处仅留隐藏锚点(供旧逻辑引用), 不再显示 -->
     <span class="kills" style="display:none" aria-hidden="true">灵石 <b id="battleSpirit">0</b></span>
-    <span class="trial" id="battleTrial">第 1 关 · 怪血 10</span>
+    <!-- v7.6: 怪物血量已删(用户: 左边已显示关卡)。顶部仅保留当前推关进度 -->
+    <span class="trial" id="battleTrial">第 1 关</span>
     <span class="speed" id="battleSpeed" style="display:none">×2 倍速</span>
     <span id="battleState">推进中</span>
   </div>
@@ -796,42 +792,57 @@
       <span class="sb-mob" id="sbMob">—</span>
       <span class="sb-rec">最高 <b id="sbBest">0</b></span>
     </div>
-    <!-- v6.1: 境界 + 离下一境还差多少修为。
-         显式展示「攒修为」的过程 —— 转生 ≠ 突破，多数轮次只涨修为不跨境。 -->
-    <div class="sb-realm-row">
-      <span class="sb-realm" id="sbRealm">凡人</span>
-      <span class="sb-tonext">距下一境 <b id="sbToNext">0</b></span>
-    </div>
-    <div class="sb-prog"><i id="sbFill"></i></div>
+    <!-- v7.6: 旧「境界行 + 距下一境进度条」已删(用户: 那条杠不需要)。
+         境界/破境信息现并入底部「突破」状态提示(自动结算)。 -->
   </div>
 </div>
 
-<!-- ══ v6.0 操作面板：4 装备槽升级 + 档位 + 转生 ══════════════════════
-     独立于 .battle-ui 的固定底部面板。
-     为什么不放进 .battle-ui 里：.battle-ui 是「视口顶部往下、到 44vh 处截止」
-     的一条固定带（bottom:calc(44vh + 84px)），在里面用 bottom:5x px 定位会
-     相对那条带算，结果按钮浮在屏幕中部、压住灵石与修为数字（实测截图复现）。
-     这里改用 .battle-ui 之外的独立 fixed 面板，锚在视口底部，
-     并把背景做成不透明渐隐，保证压过下方的立绘区。 -->
-<div class="v6-panel" id="v6Panel">
-  <div class="v6-grid" id="upGrid">
-    <button class="up-btn" id="upAtk"  onclick="upEquip('atk')"><span class="uico">⚔</span><span class="ulbl">攻击</span><span class="ulv" id="lvAtk">Lv 0</span><span class="ucost" id="costAtk">10</span></button>
-    <button class="up-btn" id="upHp"   onclick="upEquip('hp')"><span class="uico">❤</span><span class="ulbl">血量</span><span class="ulv" id="lvHp">Lv 0</span><span class="ucost" id="costHp">10</span></button>
-    <button class="up-btn" id="upDef"  onclick="upEquip('def')"><span class="uico">🛡</span><span class="ulbl">防御</span><span class="ulv" id="lvDef">Lv 0</span><span class="ucost" id="costDef">10</span></button>
-    <button class="up-btn" id="upAspd" onclick="upEquip('aspd')"><span class="uico">⚡</span><span class="ulbl">攻速</span><span class="ulv" id="lvAspd">Lv 0</span><span class="ucost" id="costAspd">10</span></button>
+<!-- ══ v7.6 装备带：4 装备槽（各带独立档位下拉），固定在战斗区正下方 ══
+     原 .v6-panel 压在视口最底部, 被打坐立绘挡得只剩一半(实测截图)。
+     现移到 44vh 战斗带下沿的空隙, 与推关联动最紧。每槽独立步长下拉,
+     替掉旧共用「档位」按钮行(用户: 决定这一格一级一级升, 还是一百级一百级升)。 -->
+<div class="equip-bar" id="equipBar">
+  <div class="eq-slot">
+    <span class="elbl">攻击</span>
+    <button class="up-btn" id="upAtk" onclick="upEquip('atk')"><span class="ulv" id="lvAtk">Lv 0</span></button>
+    <select class="ustep" id="stepAtk" onchange="setStep('atk',this.value)">
+      <option value="1" selected>×1</option><option value="10">×10</option><option value="100">×100</option><option value="1000">×1000</option><option value="10000">×1万</option>
+    </select>
   </div>
-  <div class="v6-row">
-    <span class="step-lbl">档位</span>
-    <div class="step-row" id="stepRow">
-      <button class="step-btn" data-step="1" onclick="setStep(1)">×1</button>
-      <button class="step-btn" data-step="10" onclick="setStep(10)">×10</button>
-      <button class="step-btn" data-step="100" onclick="setStep(100)">×100</button>
-      <button class="step-btn" data-step="1000" onclick="setStep(1000)">×1000</button>
-      <button class="step-btn" data-step="10000" onclick="setStep(10000)">×1万</button>
-    </div>
+  <div class="eq-slot">
+    <span class="elbl">血量</span>
+    <button class="up-btn" id="upHp" onclick="upEquip('hp')"><span class="ulv" id="lvHp">Lv 0</span></button>
+    <select class="ustep" id="stepHp" onchange="setStep('hp',this.value)">
+      <option value="1" selected>×1</option><option value="10">×10</option><option value="100">×100</option><option value="1000">×1000</option><option value="10000">×1万</option>
+    </select>
   </div>
-  <button class="rb-btn" id="btnRebirth" onclick="doRebirthUI()">
-    <span class="rbl">转 世 重 开</span><span class="rbs" id="rbGain">+0 修为点</span>
+  <div class="eq-slot">
+    <span class="elbl">防御</span>
+    <button class="up-btn" id="upDef" onclick="upEquip('def')"><span class="ulv" id="lvDef">Lv 0</span></button>
+    <select class="ustep" id="stepDef" onchange="setStep('def',this.value)">
+      <option value="1" selected>×1</option><option value="10">×10</option><option value="100">×100</option><option value="1000">×1000</option><option value="10000">×1万</option>
+    </select>
+  </div>
+  <div class="eq-slot">
+    <span class="elbl">攻速</span>
+    <button class="up-btn" id="upAspd" onclick="upEquip('aspd')"><span class="ulv" id="lvAspd">Lv 0</span></button>
+    <select class="ustep" id="stepAspd" onchange="setStep('aspd',this.value)">
+      <option value="1" selected>×1</option><option value="10">×10</option><option value="100">×100</option><option value="1000">×1000</option><option value="10000">×1万</option>
+    </select>
+  </div>
+</div>
+
+<!-- ══ v7.6 行动条：重生(聚灵阵图标) + 突破(自动突破提示, 非可点) ══
+     沿用旧整块墨金皮肤 btn_array.webp / btn_break.webp: 左端圆章=图标, 右端留白=文字。
+     突破不是操作按钮 —— 转生时自动结算是否破境(转生 ≠ 突破), 此处仅作状态提示(.brk)。 -->
+<div class="act-bar" id="actBar">
+  <button class="abtn" id="abRebirth" onclick="doRebirthUI()">
+    <img class="skin" src="assets/ui_icons/btn_array.webp" alt="重生">
+    <span class="alab"><b>重 生</b><i id="rbGain">+0 修为点</i></span>
+  </button>
+  <button class="abtn brk" id="abBreak">
+    <img class="skin" src="assets/ui_icons/btn_break.webp" alt="突破">
+    <span class="alab"><b>突 破</b><i id="brkHint">自动突破</i></span>
   </button>
 </div>
 
