@@ -96,11 +96,26 @@ spBig.realm = 30;
 var bigRate = V.live(spBig).rateNum;
 var bigReach = V.live(spBig).maxReach;
 console.log('  满攻速档：rate=' + bigRate.toFixed(0) + ' 关/秒, maxReach=' + bigReach + ' 关');
-/* 推 2 秒（v7.1 三乘区下 ≈ 12.25 关）以确保不撞顶，验证的是换算本身 */
+/* 推 2 秒。⚠️ v7.9 起跳关是【随机】的，单次 tick 会抖（可能一把撕掉好几关），
+ * 所以这里不验单次精确值，而是：
+ *   1) 单次落在合理区间（换算本身没崩）
+ *   2) 多次采样的【均值】收敛到 rate×dt（长期口径正确，赛程才可标定） */
 var r1 = V.tickV6(spBig, 2);
-t('满攻速按速率推进（未撞顶时 = rate×dt）',
-  Math.abs(r1.advanced - Math.floor(bigRate * 2)) <= 1,
-  'advanced=' + r1.advanced + ' expect=' + Math.floor(bigRate * 2));
+t('单次推进落在合理区间（随机抖动允许 ±3 倍）',
+  r1.advanced >= 1 && r1.advanced <= Math.ceil(bigRate * 2) * 3,
+  'advanced=' + r1.advanced + ' base=' + Math.floor(bigRate * 2));
+var sumAdv = 0, SAMPLES = 400;
+for (var si = 0; si < SAMPLES; si++) {
+  var probe = V.newV6(); probe.gameSpeed = 3.5;
+  probe.equip = { atk: 0, hp: 0, def: 0, aspd: 33000 }; probe.realm = 30;
+  sumAdv += V.tickV6(probe, 2).advanced;
+}
+var avgAdv = sumAdv / SAMPLES;
+console.log('  满攻速 ×2s：单次=' + r1.advanced + '，' + SAMPLES + ' 次采样均值=' + avgAdv.toFixed(2)
+  + '（理论 rate×dt=' + (bigRate * 2).toFixed(2) + '）');
+t('长期均值 = rate×dt（' + SAMPLES + ' 次采样，±10%）',
+  Math.abs(avgAdv / (bigRate * 2) - 1) < 0.10,
+  'avg=' + avgAdv.toFixed(2) + ' expect=' + (bigRate * 2).toFixed(2));
 t('stage 前进', spBig.stage > 1, 'got ' + spBig.stage);
 t('maxStage 同步', spBig.maxStage === spBig.stage && spBig.bestStage === spBig.stage);
 
@@ -193,7 +208,8 @@ t('转生次数+1', sr.rebirths === 1);
  * bestStage=2039 → 触发 500/2000 两档中的最高一档 → 倍速 2.0；跳关要 3000 关，还没到。 */
 t('转生后宠物倍速保留（bestStage 2039 → ×2.0）', Math.abs(sr.gameSpeed - 2.0) < 1e-9,
   'got ' + sr.gameSpeed);
-t('bestStage 2039 未解锁跳关（门槛 3000）', sr.skip === 0, 'got ' + sr.skip);
+/* v7.9：第一关起就能跳，2039 关已解锁最高档 1（第二档要 3000 关） */
+t('bestStage 2039 已解锁跳关档 1', sr.skip === 1, 'got ' + sr.skip);
 
 /* 转生后 maxReach 应回到起点附近（装备清零 = 本轮推进器重置）。
  * ⚠️ 转生【清零装备】，所以转生瞬间面板反而比「刷满装备时」小 ——

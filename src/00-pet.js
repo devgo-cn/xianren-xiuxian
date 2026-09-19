@@ -60,23 +60,35 @@ export const PET_CFG = {
   ],
 
   /**
-   * 宠物跳关解锁表：按【历史最高关】分段授予，转生【不清零】。
+   * 宠物跳关解锁表：按【历史最高关】分段解锁【可跳到的最高档】，转生【不清零】。
    *
-   * 格式 [历史最高关门槛, 跳关档位]。档位含义：宠物每一击额外撕掉 N 关，
-   * 落在第三乘区 (1 + 跳关) 上，所以最高档 20 关 = 速率 ×21。
+   * ⚠️ v7.9（用户明确要求）：第一档门槛是 **0** —— 从第一关开始就能跳。
+   *    原设计从 3000 关才给第一档，理由是前期每轮本来就短；实测下来前期
+   *    那段恰恰是最磨的（要刷七百多轮、两百多小时在线才拿到起始关补给），
+   *    再不给跳关等于把新手期的苦役拉长。
    *
-   * ⚠️ 第一个门槛是 3000 —— 这与起始关机制的启用线【同一个数】，
-   *    不是巧合：3000 关以前每轮本来就很短（<2 分钟），再给跳关会让
-   *    前期一闪而过，新手完全看不到「打怪→推关→掉灵石」的循环。
+   * ⚠️ 这里的数值是【天花板】，不是每次实际跳的关数 ——
+   *    实际每次在「已解锁档位 ∪ {0}」里**随机**抽一档（见 rollSkip），
+   *    0 表示这一下没跳过，也可能一把撕掉 20 关。
    */
   SKIP_STEPS: [
-    [3000, 1],
-    [6000, 2],
-    [10000, 4],
-    [14000, 8],
-    [18000, 10],
-    [22000, 20],
+    [0, 1],
+    [3000, 2],
+    [6000, 4],
+    [10000, 8],
+    [14000, 10],
+    [18000, 20],
   ],
+
+  /**
+   * 抽档权重（可选）。留空 = 均匀随机。
+   *
+   * ⚠️ 改这里会直接改动长期平均速率 —— 速率第三乘区用的是【期望值】
+   *    E[skip]（见 skipExpected），不是最高档。想要"大跳更常见"就上调
+   *    高档位的权重，但那等价于整体加速，记得重跑 tests/test_pet 的
+   *    「期望落在家区间」断言，以及用 sim_repo.mjs 复验赛程。
+   */
+  SKIP_WEIGHTS: null,
 
   SPD_CAP: 3.5,   // 倍速硬上限（与 RATE_CFG.SPD_CAP 必须一致，测试有断言）
   SKIP_CAP: 20,   // 跳关硬上限
@@ -145,15 +157,87 @@ export function unlockedSkip(bestStage) {
 }
 
 /**
+ * 已经解锁的跳关档位集合（升序，含 0 = 这一下不跳）。
+ *
+ * @param {number} bestStage 历史最高关
+ * @returns {number[]} 例如当前最高档为 4 时 → [0, 1, 2, 4]
+ */
+export function unlockedSkipTiers(bestStage) {
+  const max = unlockedSkip(bestStage);
+  return SKIP_TIERS.filter((t) => t <= max);
+}
+
+/**
+ * 掷一次宠物跳关：在已解锁档位里随机抽一档（含 0）。
+ *
+ * ── 为什么速率公式里不用它，而用 skipExpected ──────────────────────
+ *   这只是【单次结果】。tick 每秒跑几十帧，如果每帧都用它当乘数，
+ *   宏观速率会变成一个随机数（方差被部分抵消但仍会漂），
+ *   而「多久毕业」这种赛程标定必须是可预测的数 ——
+ *   所以：
+ *     · 实际抖动   ← rollSkip 的结果（玩家能感到时快时慢）
+ *     · 速率公式   ← skipExpected 的期望值（长期严格等于随机过程的均值）
+ *
+ * @param {number} bestStage 历史最高关
+ * @returns {number} 本次跳关数（0 / 1 / 2 / 4 / 8 / 10 / 20）
+ */
+export function rollSkip(bestStage) {
+  const tiers = unlockedSkipTiers(bestStage);
+  if (tiers.length <= 1) return 0;
+  const weights = weightsFor(tiers);
+  let total = 0;
+  for (const w of weights) total += w;
+  if (total <= 0) return tiers[0];
+  let r = Math.random() * total;
+  for (let i = 0; i < tiers.length; i++) {
+    r -= weights[i];
+    if (r < 0) return tiers[i];
+  }
+  return tiers[tiers.length - 1];
+}
+
+/**
+ * 跳关的【期望值】E[skip] —— 第三乘区真正用的数。
+ *
+ * 掷一次跳关的期望 = Σ pᵢ·tierᵢ，是概率意义上的长期平均。用它做乘数时，
+ * 实际随机过程的长期推进速率严格等于「恒定按 E 跳」的结果，赛程标定因此可预测。
+ *
+ * @param {number} bestStage 历史最高关
+ * @returns {number}
+ */
+export function skipExpected(bestStage) {
+  const tiers = unlockedSkipTiers(bestStage);
+  if (tiers.length <= 1) return 0;
+  const weights = weightsFor(tiers);
+  let total = 0, acc = 0;
+  for (let i = 0; i < tiers.length; i++) { total += weights[i]; acc += weights[i] * tiers[i]; }
+  return total > 0 ? acc / total : 0;
+}
+
+/** 权重表：未配置时退化为全 1（均匀随机） */
+function weightsFor(tiers) {
+  const cfg = PET_CFG.SKIP_WEIGHTS;
+  if (!cfg || !cfg.length) return tiers.map(() => 1);
+  return tiers.map((t) => {
+    const w = cfg[SKIP_TIERS.indexOf(t)];
+    return (typeof w === 'number' && w > 0) ? w : 1;
+  });
+}
+
+/**
  * 一次性取全部宠物资产。
  *
  * @param {number} bestStage 历史最高关
- * @returns {{gameSpeed:number, skip:number}}
+ * @returns {{gameSpeed:number, skip:number, skipExp:number}}
+ *   skip    = 当前能跳到的【最高档】（UI 展示用：显示「跳 ≤4」）
+ *   skipExp = 期望值（速率第三乘区用，见 rollSkip 注释）
  */
 export function petAssetsFor(bestStage) {
+  const skip = unlockedSkip(bestStage);
   return {
     gameSpeed: unlockedSpeed(bestStage),
-    skip: unlockedSkip(bestStage),
+    skip,
+    skipExp: skipExpected(bestStage),
   };
 }
 

@@ -17,6 +17,30 @@ import * as NS_STAGE from './00-stage.js';   /* v6: 关卡数值权威(30k 关�
 import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量是可超 1e77 的大数 */
 
 
+  /* ══════════════════════════════════════════════════════════════════════
+   *  v7.9 擂台常量（用户明确要求，勿回退）
+   * ──────────────────────────────────────────────────────────────────────
+   * 每一关 = 一屏擂台：
+   *   · 相机【不再跟随玩家】（updateCamera 直接锁 camX=0）
+   *   · 玩家每关从左侧 SPAWN_FRAC 处出生
+   *   · 怪从右侧 SPAWN_FRAC 处生成
+   *   · 打完一只（=过一关）→ resetStage()：清场 + 玩家回出生点 + 回满血
+   *
+   * ⚠️ MAX_W 是本设计的关键：所有横向比例都乘 arenaW() 而不是 CW，
+   *    宽屏（PC 浏览器）下擂台被压到 MAX_W 并居中，
+   *    否则同样是 0.16→0.76，在 1200px 宽屏上要走 440px / 42px每秒 ≈ 10 秒才见到怪，
+   *    「走半天」这个吐槽就是这么来的。手机（≤520px）不受影响，arenaW()===CW。
+   * ══════════════════════════════════════════════════════════════════════ */
+  const ARENA = {
+    MAX_W: 520,        /* 擂台宽度上限 —— 超过这个宽度一律按手机尺度布局 */
+    LEFT: 0.16,        /* 玩家出生点：擂台 16% 处 */
+    RIGHT: 0.76,       /* 怪物生成点：擂台 76% 处（屏幕右侧，可见处出场） */
+  };
+  function arenaW() { return Math.min(CW || 390, ARENA.MAX_W); }
+  function arenaLeft() { return ((CW || 390) - arenaW()) / 2; }   /* 宽屏擂台居中，两侧留背景 */
+  function playerSpawnX() { return arenaLeft() + arenaW() * ARENA.LEFT; }
+  function enemySpawnX() { return arenaLeft() + arenaW() * ARENA.RIGHT; }
+
   const BC = {
     /* 占位怪 demon(妖将)/raptor(妖弓) 已移除 —— 只保留两种有真实素材的怪 */
     playerAtkRange: 75, playerAspd: 1.1, playerSpeed: 42,   /* v4.4: 基础移速 28→42 (×1.5), 走得太慢 */
@@ -736,10 +760,9 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
      * 打几秒后双方位置全漂移，"站在 atkRange 上开火"的前提就失效了。 */
     window.__skillFreeze = true;
     labClearEnemies();
-    /* camX 初值在任何一次 updateCamera 之前是 NaN/undefined —— 而 updateCamera 用的是
-     * G.camX += ... 的累加式，NaN 一旦进入就永远收敛不回来，worldToScreen 全变 NaN，
-     * 整场黑屏（验收台首次接入时踩到）。这里直接按 updateCamera 的目标式给定值。 */
-    G.camX = G.player.x - stageW() * 0.42;
+    /* v7.9：相机已锁死 camX=0（updateCamera 每帧赋 0），这里不必再给初值。
+     * 旧写法 `camX = player.x - stageW()*0.42` 是给「跟拍式累加」兜底的（防 NaN 进累加），
+     * 现在 updateCamera 是赋值而非累加，那行只会让验收台的第一帧画面被平移一次。 */
     const out = [];
     const n = list.length;
     for (let i = 0; i < n; i++) {
@@ -1436,18 +1459,62 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
       return null;
     }
     const e = makePoolEnemy(proto.entry, false);
-    /* ⚠️ v7.8 (勿回退) —— 设计意图(用户明确): 砍死一只 → 刷新一只, 同屏基本只有 1 只。
-     * 生成点从屏幕右侧外一点生成, 让怪"走进来"有推进感。
-     *   e.x = camX + stageW() + 40  → 屏外 40px。不要改成屏内生成。 */
-    e.x = G.camX + stageW() + BC.enemySpawnOffset;
-    /* 本场第一只(spawned 0)直接生成在玩家前方不远处, 免去开局"走三四秒才见怪"的空场。
-     * 第 2 只起恢复"从屏幕右边走进来"。 */
-    if (G.spawned === 0) {
-      e.x = (G.player ? G.player.x : 100) + stageW() * 0.30;
-    }
+    /* 生成新怪 = 开新一关 → 先把擂台清干净（见 resetStage 注释）。
+     * 位置必须在 makePoolEnemy 之后：新怪此时还不在 G.enemies 里，不会被一起清掉。 */
+    resetStage();
+    /* ⚠️ v7.9 擂台化（勿回退）—— 生成点统一为【擂台右侧可见处】enemySpawnX()。
+     * 历史沿革：v7.8 曾分「第一只生成在玩家前方 30%、其余生成在屏外 40px」两种，
+     *   屏外那只因为看不见，玩家要傻等它走进来；并且两种算法让节奏不统一。
+     *   现在一关 = 一屏擂台，怪必须在屏内右侧出场才有「对面来了一只」的读秒感。
+     *   e.x 直接给屏幕坐标 —— camX 已锁 0（相机不跟随），worldToScreen 是恒等式。 */
+    e.x = enemySpawnX();
     G.enemies.push(e);
     G.spawned = (G.spawned || 0) + 1;
     return e;
+  }
+
+  /**
+   * 进入下一关：把擂台重置成开局状态。
+   *
+   * ══════════════════════════════════════════════════════════════════
+   *  ⚠️ v7.9 核心改动（用户明确要求，勿回退）
+   * ══════════════════════════════════════════════════════════════════
+   *  旧版是「一条血打到底」：血量只在死亡/复活时回满，中间连打十几只怪，
+   *  攒下来的伤害必然把玩家磨死 —— 表现为「一条血根本打不了几关」。
+   *  现在每关都重置：
+   *    · 场上残留全部清掉（活着的怪 / 伤害数字 / 技能特效 / 敌方弹道）
+   *    · 玩家回到擂台左侧出生点，HP 回满
+   *    · 宠物同步拉回出生点附近，不做「跨屏飞行」
+   *
+   *  ⚠️ 掉落物【不清】：drops 里正飞向 HUD 的灵石/装备是玩家已到手的收益，
+   *     清掉会直接吞钱。它们有自己的生命周期（1.5s 展示 + 飞向顶栏），清场不必管。
+   */
+  function resetStage() {
+    /* 敌人：连同 PIXI 实例一起回收，否则只是从数组里摘掉会留在画面上 */
+    for (const e of G.enemies) {
+      e.alive = false; e.dying = 0;
+      if (e.armature) { try { despawnEnemy(e); } catch (err) {} }
+    }
+    G.enemies.length = 0;
+    G.bossActive = false;
+    G.spawned = 0;
+    /* 特效层：上一只的技能弹道/伤害数字不能飘到下一关 */
+    if (G.fx) G.fx.length = 0;
+    if (G.dmg) G.dmg.length = 0;
+    SK_LIVE.length = 0;   /* 同步清掉技能弹道活引用，否则 G.fx 清空后 SK_LIVE 成悬空 */
+    /* 玩家：回出生点 + 回满血 + 复位到中间纵深 */
+    if (G.player) {
+      G.player.x = playerSpawnX();
+      G.player.lane = MID_LANE;
+      G.player.y = laneOff(MID_LANE);
+      G.player.hp = G.player.maxHp;
+      G.player.hurtT = 0;
+      G.player.attackAnim = false; G.player.skillAnim = false;
+      G.player.attackTarget = null; G.player.skillTarget = null;
+      G.player.atkT = 0;
+      /* 宠物跟随位同一处理：否则它们要从上一关的击杀点一路插值飞回来 */
+      for (const pet of G.pets) if (pet && pet.alive) pet.x = G.player.x + (pet.offsetX || -30);
+    }
   }
   /* ---------- 数值伤害 v7.1: 量纲平衡式 dmg = atk²/(atk+有效防御), 破甲按百分比削减防御 ----------
    * 旧式 100/(100+eff) 分母含常数 100, 怪 def 随境界 ×4 后减伤坍缩到 ≈0(高境打不动);
@@ -2083,6 +2150,10 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
        * ⚠️ v8.2 回退 (勿再改): v8.1 曾把这里的 (nearest - PLAYER_HIT_GAP) 硬卡
        * 改成"按怪半宽刹停", 参与造成了手感变坏。恢复原样 —— 下午的手感就是它。 */
       p.moving = 1; p.walkT += dt*8; p.x += BC.playerSpeed*dt;
+      /* ⚠️ v7.9 擂台化：相机不再跟随，玩家一旦走出右侧就再也没人把他拉回来
+       * （表现：走到屏幕外继续走，画面上只剩空地、永远等不到下一只怪）。
+       * 这里按擂台右缘硬钳住 —— 无怪时玩家停在右侧等刷怪，而不是无限右漂。 */
+      p.x = Math.min(p.x, arenaLeft() + arenaW() * 0.88);
       let nearest = Infinity;
       for (const e of G.enemies) {
         if (e.alive && e.dying <= 0 && e.x > p.x - 1 && e.x < nearest) nearest = e.x;
@@ -2600,8 +2671,21 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
     }
   }
   function updateCamera(dt) {
-    const targetCam = G.player.x - stageW()*0.42;   // 玩家锁屏中间偏左: 右侧留出更多来怪空间, 推进感更强
-    G.camX += (targetCam-G.camX)*Math.min(1, dt*20);   /* v4.4: 平滑系数6→20, 相机更紧密跟随玩家, 背景滚动与玩家移动同步 */
+    /* ══════════════════════════════════════════════════════════════════
+     *  v7.9（勿回退）：相机【不再跟随玩家】，camX 恒为 0。
+     * ══════════════════════════════════════════════════════════════════
+     *  旧的跟拍式 `camX = player.x - stageW()*0.42` 是为「连续推进的横版跑图」
+     *  设计的；现在每一关是一屏擂台（左出生 / 右来怪 / 打完重置），画面本身
+     *  就该是固定的舞台。相机再去追玩家，玩家一往前走整个场景跟着平移，
+     *  既丢掉「从左往右跑」的位移读数，又让重置时的回退变成一次突兀的全屏甩镜。
+     *
+     *  camX 保持「存在且为 0」而不是删掉变量：
+     *    · worldToScreen(wx) = wx - camX  →  退化为恒等映射，世界坐标即屏幕坐标
+     *    · 背景/前景平铺仍然读 camX 算 offset → 天然静止，不再需要改那两处
+     *    · 灵鹰的屏幕钳制 scrMin/scrMax 仍成立（0 与 CW）
+     *  这样改动面最小，也不会出现某处残留 ++camX 把画面推歪。
+     */
+    G.camX = 0;
   }
   let _pushT = 0;
   /* ⚠️ v6: 原「妖潮试炼状态机」已整体拆除 ——
@@ -2613,6 +2697,8 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
     G.enemies.length = 0;
     G.bossActive = false;
     G.spawned = 0;      /* 重来后第一只仍然生成在玩家眼前 */
+    /* v7.9：复活也要把玩家放回擂台出生点（相机不再把他送回来） */
+    if (G.player) { G.player.x = playerSpawnX(); G.player.lane = MID_LANE; G.player.y = laneOff(MID_LANE); }
     G.paused = false;
     updateHUD();
   }
@@ -3990,7 +4076,7 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
 
   function init() {
     if (!initCanvas()) { setTimeout(init, 200); return; }
-    G.player = makePlayer(); G.player.x = 100;
+    G.player = makePlayer(); G.player.x = playerSpawnX();   /* v7.9: 手机尺度的左侧出生点（原硬编码 100px） */
     /* ═══ 默认宠物: 灵狐(跟随+拾取+施法) / 灵鹰(独立攻击) ═══
      * ⚠️ v8.5 二者彻底解耦(用户明确要求): 灵鹰不绑玩家、不拾取、不施法。
      * 因此灵鹰【不再带 offsetX/offsetY】(那是"相对玩家的跟随偏移", 对独立宠无意义),

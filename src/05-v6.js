@@ -170,14 +170,17 @@ export function live(s) {
   const hp = N.mul(base, eb.hp);
   const def = N.mul(base, eb.def);
   const power = N.mul(base, N.mul(eb.atk, eb.aspd));
-  /* v7.1 三乘区：v = 35关/分 × 倍速 × 攻速 × (1 + 跳关) */
-  const rate = R.pushRate(st.gameSpeed, eb.aspd, st.skip);
+  /* v7.9：第三乘区传【期望值】而不是最高档 —— 实际每次跳多少是 rollSkip 决定的，
+   * 这里只负责长期口径正确（详见 00-pet.js 的 rollSkip/skipExpected 注释）。 */
+  const skipExp = P.skipExpected(st.bestStage);
+  const rate = R.pushRate(st.gameSpeed, eb.aspd, skipExp);
   const maxReach = Math.min(S.STAGE_CFG.S_MAX, Math.floor(S.maxStageFor(power)));
   return {
     atk, hp, def, power,
     aspd: eb.aspd,
     gameSpeed: st.gameSpeed,
     skip: st.skip,
+    skipExp,
     rate,
     /* 推进速率理论上是个不大不小的数（三乘区满配 128.6 关/秒），
      * 但类型上仍走大数，避免以后改参数时无声溢出。
@@ -284,7 +287,15 @@ export function tickV6(s, dt) {
    * 正确做法：把「本帧应推进的小数关数」累加进 carry，攒够 1 关才 +1，
    *   并把消耗掉的部分从 carry 里扣掉。这样 rate=0.5 时 2 秒推进 1 关也是对的。
    * carry 同时充当「关卡内进度」——渲染层可据此画更平滑的进度条。 */
-  s.carry = (s.carry || 0) + stats.rateNum * dt;
+  /* ── v7.9 跳关随机化 ──────────────────────────────────────────────
+   * rateNum 用的是【期望】E[skip]（长期可标定），真实手感必须抖：
+   * 本帧按「实际抽到的档 / 期望」等比缩放，使
+   *      E[本帧推进] = rateNum × E[1+roll] / (1+E[skip]) = rateNum
+   * 严格恒等 —— 长期吞吐不变，但玩家会感到时快时慢，
+   * 偶尔一次大跳直接撕掉一截地图。这正是需求方要的「有可能跳」。 */
+  const expMul = 1 + (stats.skipExp || 0);
+  const rollMul = 1 + P.rollSkip(Math.max(s.bestStage || 0, s.maxStage || 0));
+  s.carry = (s.carry || 0) + stats.rateNum * dt * (rollMul / expMul);
   let whole = Math.floor(s.carry);
   if (whole <= 0) {
     return { advanced: 0, stuck: false, reachedCap: false };

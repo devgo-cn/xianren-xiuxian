@@ -60,17 +60,61 @@ t('脏输入（-5 / NaN / undefined）都落到 1',
 
 /* ── 2. 跳关解锁 ─────────────────────────────────────────────── */
 console.log('\n-- 宠物跳关解锁 --');
-t('未到 3000 关无跳关', P.unlockedSkip(0) === 0 && P.unlockedSkip(2999) === 0);
-t('3000 关 → 跳 1', P.unlockedSkip(3000) === 1);
-t('6000 关 → 跳 2', P.unlockedSkip(6000) === 2);
-t('10000 关 → 跳 4', P.unlockedSkip(10000) === 4);
-t('14000 关 → 跳 8', P.unlockedSkip(14000) === 8);
-t('18000 关 → 跳 10', P.unlockedSkip(18000) === 10);
-t('22000 关 → 跳 20', P.unlockedSkip(22000) === 20);
+/* ⚠️ v7.9（用户明确要求）：第一档门槛是 0 —— 从第一关开始就能跳。 */
+t('第 1 关就能跳（最高档 = 1）', P.unlockedSkip(0) === 1 && P.unlockedSkip(1) === 1,
+  'got ' + P.unlockedSkip(0));
+t('3000 关 → 最高档 2', P.unlockedSkip(3000) === 2, 'got ' + P.unlockedSkip(3000));
+t('6000 关 → 最高档 4', P.unlockedSkip(6000) === 4, 'got ' + P.unlockedSkip(6000));
+t('10000 关 → 最高档 8', P.unlockedSkip(10000) === 8, 'got ' + P.unlockedSkip(10000));
+t('14000 关 → 最高档 10', P.unlockedSkip(14000) === 10, 'got ' + P.unlockedSkip(14000));
+t('18000 关 → 最高档 20', P.unlockedSkip(18000) === 20, 'got ' + P.unlockedSkip(18000));
 t('满图后仍是 20（封顶）', P.unlockedSkip(30000) === 20);
 t('倍速与跳关在同一表内互不串台',
-  P.petAssetsFor(3000).skip === 1 && Math.abs(P.petAssetsFor(3000).gameSpeed - 2.0) < 1e-9,
+  P.petAssetsFor(3000).skip === 2 && Math.abs(P.petAssetsFor(3000).gameSpeed - 2.0) < 1e-9,
   JSON.stringify(P.petAssetsFor(3000)));
+
+/* ── 2b. 随机抽档（v7.9：不是固定跳，是那几个档里随机） ─────────── */
+console.log('\n-- 跳关随机化 --');
+{
+  const t3000 = P.unlockedSkipTiers(3000);
+  t('3000 关的档位池 = [0,1,2]', t3000.join(',') === '0,1,2', JSON.stringify(t3000));
+  t('池子里一定有 0（有可能不跳）', P.unlockedSkipTiers(30000).indexOf(0) === 0);
+  t('未解锁档位不会出现在池里',
+    P.unlockedSkipTiers(3000).every((x) => P.SKIP_TIERS.indexOf(x) >= 0 && x <= 2));
+
+  /* 抽样分布：所有档都要能抽到，且不能抽到池外的值 */
+  const seen = new Set(); let outside = 0;
+  for (let i = 0; i < 4000; i++) {
+    const r = P.rollSkip(30000);
+    if (P.SKIP_TIERS.indexOf(r) < 0) outside++;
+    seen.add(r);
+  }
+  t('抽样 4000 次全部落在合法档位内', outside === 0, 'outside=' + outside);
+  t('七个档全部出现过（0/1/2/4/8/10/20）', seen.size === 7,
+    'seen=' + [...seen].sort((a, b) => a - b).join(','));
+  t('不是固定值（抽样出现多于一种结果）', seen.size > 1);
+
+  /* 随机≠失控：实测均值必须收敛到期望值，否则赛程标定无从谈起 */
+  const N_SAMP = 200000;
+  let acc = 0;
+  for (let i = 0; i < N_SAMP; i++) acc += P.rollSkip(30000);
+  const mean = acc / N_SAMP, expv = P.skipExpected(30000);
+  console.log('  20 万次抽样均值 = ' + mean.toFixed(4) + ' / 理论期望 = ' + expv.toFixed(4));
+  t('抽样均值收敛到理论期望（±3%）', Math.abs(mean / expv - 1) < 0.03,
+    'mean=' + mean.toFixed(4) + ' exp=' + expv.toFixed(4));
+
+  /* 期望必须是「中位数以上但远低于最高档」——太高等于变相固定给最高档 */
+  t('期望 < 最高档的一半（保留不确定性）', expv < P.unlockedSkip(30000) / 2,
+    'exp=' + expv.toFixed(3) + ' max=' + P.unlockedSkip(30000));
+  t('期望随最高关单调递增',
+    P.skipExpected(0) < P.skipExpected(3000) && P.skipExpected(3000) < P.skipExpected(6000)
+    && P.skipExpected(6000) < P.skipExpected(30000));
+  t('第一关的期望 = 0.5（只在 0/1 两档之间掷）', Math.abs(P.skipExpected(0) - 0.5) < 1e-9,
+    'got ' + P.skipExpected(0));
+  /* v7.9：第一档门槛为 0，所以【任何输入】都至少能掷出 0/1 两档 */
+  const bad = [P.rollSkip(-1), P.rollSkip(0), P.rollSkip(NaN), P.rollSkip(undefined)];
+  t('脏输入也只出合法档位', bad.every((x) => P.SKIP_TIERS.indexOf(x) >= 0), JSON.stringify(bad));
+}
 
 /* 归一化：脏值必须向【保守】方向收敛（宁可少给，不能白送） */
 t('normSkipTier(0)=0', P.normSkipTier(0) === 0);
@@ -195,8 +239,8 @@ console.log('\n-- 起始关进 v6 状态机 --');
   t('applyRebirth 从起始关出发（5000 → 3500）', s.stage === 3500, 'got ' + s.stage);
   t('applyRebirth 回报 startStage', out.startStage === 3500, 'got ' + out.startStage);
   t('起始关后历史最高关并入 5000', s.bestStage === 5000, 'got ' + s.bestStage);
-  /* 起始关 ≥ 3000 → 宠物跳关同步解锁（跳 1），且立刻作用在速率上 */
-  t('起始关同步解锁宠物跳关', s.skip === 1, 'got ' + s.skip);
+  /* 起始关 ≥ 3000 → 宠物跳关同步解锁（5000 关 → 最高档 2），且立刻作用在速率上 */
+  t('起始关同步解锁宠物跳关', s.skip === 2, 'got ' + s.skip);
   const lv = V.live(s);
   t('跳关已计入速率（第三乘区 ×2）',
     Math.abs(N.toNumber(lv.rate) / ((35 / 60) * lv.gameSpeed) - 2) < 1e-9,

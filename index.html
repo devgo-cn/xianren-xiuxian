@@ -46,16 +46,14 @@
     font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
     background:linear-gradient(90deg, rgba(4,8,16,.62) 0%, rgba(4,8,16,.42) 68%, rgba(4,8,16,0) 100%);
     pointer-events:none}
-  .res-bar .spirit,.res-bar .rate{display:flex;align-items:center;gap:4px;white-space:nowrap;
+  /* v7.9: 原为 `.res-bar .spirit,.res-bar .rate{...}`, 删除 .rate 后要把选择器收回到 .spirit,
+     否则这三行变成无主声明, 浏览器会整段丢弃、灵石那块失去 flex 布局 */
+  .res-bar .spirit{display:flex;align-items:center;gap:4px;white-space:nowrap;
     flex:none;line-height:1.2;font-weight:700;
     text-shadow:0 1px 5px rgba(0,0,0,.9),0 0 10px rgba(0,0,0,.55)}
   .res-bar .spirit{color:#9ed7b8;font-size:13px}
-  .res-bar .rate{color:#c2c9d6;font-weight:600;font-size:11px}
-  .res-bar .rate b{color:#b9c6dd;font-weight:700;font-size:13px}
-  .res-bar .rate .rl{color:#8d97a9;font-size:10.5px;font-weight:500}
   /* 数字定宽居中: 位数变化只在预留框内伸缩, 图标/单位位置恒定 */
   .res-bar .spirit #spirit{display:inline-block;box-sizing:border-box;text-align:center;width:5.4ch}
-  .res-bar .rate #rateText{display:inline-block;box-sizing:border-box;text-align:center;width:4.6ch}
   /* v7.5 窄屏(≤375px): 字号微降 + 数字预留收窄, 保证一行不折 */
   /* v8.1 死亡面板: 同转生面板骨架, 换暗红基调 */
   #deathPanel .rb-card{border-color:rgba(255,90,60,.45)}
@@ -66,11 +64,7 @@
     .res-bar{left:9px;bottom:8px;gap:9px;max-width:68%}
     .res-bar .spirit{gap:3px;font-size:12px}
     .res-bar .spirit .sico{width:13px;height:13px}
-    .res-bar .rate{gap:2px;font-size:10px}
-    .res-bar .rate b{font-size:12px}
-    .res-bar .rate .rl{font-size:10px}
     .res-bar .spirit #spirit{width:4.6ch}
-    .res-bar .rate #rateText{width:3.8ch}
     .realm-badge{min-width:96px}
     .hud-icons-slot{width:52px}
     .hud-row{gap:6px 5px}
@@ -783,8 +777,11 @@
   </div>
   <!-- v7.5 资源栏(灵石 + 修为): 战斗区左下角裸文字, 与右下大图标同一水平带 -->
   <div class="res-bar">
+    <!-- ⚠️ v7.9（用户明确要求，勿恢复）：这里原本还有一块「修为 X/秒」。
+     * 它显示的是在线瞬时收益，但现在【只有转生结算才知道这一轮能拿多少修为】
+     * ——玩家还没到结算点，任何修为读数都是凭空外插，会误导他去刷不划算的关卡。
+     * 转生面板（rbPanel）才是修为收益的唯一权威出口。 -->
     <div class="spirit" title="灵石"><span class="sico" aria-hidden="true" style="display:inline-block;width:12px;height:12px;line-height:12px;font-size:11px;text-align:center;color:#67c9ab;text-shadow:0 0 6px rgba(103,201,171,.55)">◆</span><span id="spirit">0</span></div>
-    <div class="rate"><span class="rl">修为</span><b id="rateText">0</b><span class="rl">/秒</span></div>
   </div>
   <div class="big-icons">
   </div>

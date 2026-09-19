@@ -351,9 +351,10 @@ setTimeout(function () {
        * 否则 realmPlot 的 pos 恒 0 → 剧情永远停在每大境第一段。 */
       st.exp = Number.MAX_SAFE_INTEGER;
     });
-    /* ── 阶段5: #rateText（修为/秒）的数据源改由 v6 提供 ──
-     * 旧 rateNow() 随打坐体系删除。这里注入 v6 的产出速率口径，
-     * 供 30-systems.js 的 updateHUD 显示。 */
+    /* ── 阶段5 → v7.9: #rateText（修为/秒）节点已从 index.html 整体删除 ──
+     * 旧 rateNow() 随打坐体系删除，v6 侧的写入也已在 v7.9 移除。
+     * 原因：在线瞬时修为收益是【不可知的】——只有转生结算才知道这一轮能拿多少，
+     * 中途外插出来的读数只会误导玩家。修为收益的唯一权威出口是转生面板。 */
     /* initV6 内部：S6 = fromLegacy(window.state) —— 若存档里有 v6 数据，
      * fromLegacy 会直接读出来，所以这里无需再调 loadV6。 */
     NS_src_06_v6ui_js.initV6(typeof window !== 'undefined' ? window.state : null);
