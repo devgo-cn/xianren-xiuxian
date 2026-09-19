@@ -22,6 +22,7 @@ import * as E from './00-equip.js';
 import * as R from './00-rebirth.js';
 import * as RM from './00-realm.js';
 import * as A from './00-anchor.js';
+import * as P from './00-pet.js';   // v7.1：Buff 宠物（倍速 + 跳关，永久资产）
 
 /* ─────────────────────────────────────────────────────────────
  *  1. 大数 ↔ 存档
@@ -72,11 +73,14 @@ export function newV6() {
     bestStage: 0,           // 历史最高关
     rebirths: 0,            // 转生次数
 
-    /* 双乘区（设计文档 §7）
-     *  gameSpeed: 游戏倍速，来源=宠物 Buff，上限 3.5，转生【保留】
-     *  attackSpeed: 装备第 4 格（攻速）加成，上限 10.9，转生【清零】
-     *  ⚠️ 两者是独立乘区，不能合并成一个 —— 需求方明确要求两条路线。 */
+    /* 三乘区（v7.1 设计文档 §4.3 / §7）
+     *  gameSpeed: 游戏倍速，来源=Buff 宠物，上限 3.5，转生【保留】
+     *  skip:      宠物跳关档位 0/1/2/4/8/10/20，来源=Buff 宠物，转生【保留】
+     *  attackSpeed: 装备第 4 格（攻速）加成，上限 3.0，转生【清零】
+     *  ⚠️ 三者是独立乘区，不能合并 —— 需求方明确要求几条路线分别抓：
+     *     倍速/跳关 = 跨轮永久底速，攻速 = 本轮爬升动力。 */
     gameSpeed: 1,
+    skip: 0,                // 宠物跳关档位（见 00-pet.js 的解锁门控表）
 
     /* 本轮战斗计时 */
     runT: 0,                // 本轮已用秒数（用于展示「推关速率」）
@@ -98,6 +102,11 @@ export function normV6(s) {
   o.bestStage = Math.max(o.maxStage, Math.floor(+s.bestStage || 0));
   o.rebirths = Math.max(0, Math.floor(+s.rebirths || 0));
   o.gameSpeed = Math.max(1, Math.min(R.RATE_CFG.SPD_CAP, +s.gameSpeed || 1));
+  /* 宠物跳关：只对【合法档位】放行（0/1/2/4/8/10/20）。
+   * ⚠️ 这里不做「按历史最高关重算」—— 那是 syncPetAssets 的活。
+   *    normV6 必须是纯归一化，否则外部显式设的 3.5 倍速（验收脚本用）
+   *    会被 bestStage=0 悄悄压回 1，A/B 对照就不可复现了。 */
+  o.skip = P.normSkipTier(s.skip);
   o.runT = Math.max(0, +s.runT || 0);
   o.lastTick = Math.max(0, +s.lastTick || 0);
   /* carry ∈ [0, 1)：小数进度，超过 1 说明状态被外部写脏了，归零更安全 */
@@ -119,6 +128,7 @@ export function packV6(s) {
     bs: o.bestStage,
     rb: o.rebirths,
     gs: o.gameSpeed,
+    sk: o.skip,               // v7.1：宠物跳关档位（永久资产，必须落盘）
     /* carry 保留 3 位小数即可（精度损失不可感知，省存档体积） */
     ca: o.carry ? +o.carry.toFixed(3) : 0,
   };
@@ -137,6 +147,7 @@ export function unpackV6(p) {
     bestStage: p.bs,
     rebirths: p.rb,
     gameSpeed: p.gs,
+    skip: p.sk,               // 老存档没有这一位 → undefined → normV6 归 0（无跳关）
     carry: p.ca,
   });
 }
@@ -159,15 +170,17 @@ export function live(s) {
   const hp = N.mul(base, eb.hp);
   const def = N.mul(base, eb.def);
   const power = N.mul(base, N.mul(eb.atk, eb.aspd));
-  const rate = R.pushRate(st.gameSpeed, eb.aspd);
+  /* v7.1 三乘区：v = 35关/分 × 倍速 × 攻速 × (1 + 跳关) */
+  const rate = R.pushRate(st.gameSpeed, eb.aspd, st.skip);
   const maxReach = Math.min(S.STAGE_CFG.S_MAX, Math.floor(S.maxStageFor(power)));
   return {
     atk, hp, def, power,
     aspd: eb.aspd,
     gameSpeed: st.gameSpeed,
+    skip: st.skip,
     rate,
-    /* 推进速率已是大数（装备攻速上限 1.99e4 → 速率 6.97e4，
-     * 仍能精确放进 Number，但类型上不再保证）。
+    /* 推进速率理论上是个不大不小的数（三乘区满配 128.6 关/秒），
+     * 但类型上仍走大数，避免以后改参数时无声溢出。
      * 关卡推进与展示都只需要 Number 精度，统一在这里降级一次，
      * 下游（tickV6 / 离线结算 / UI）不再各自 toNumber。 */
     rateNum: N.toNumber(rate),
@@ -176,14 +189,56 @@ export function live(s) {
 }
 
 /* ─────────────────────────────────────────────────────────────
- *  4. 推进（每帧调用）
+ *  4. Buff 宠物授予（v7.1）
+ * ───────────────────────────────────────────────────────────── */
+
+/**
+ * 按【历史最高关】把还没拿到的宠物资产补发到状态里。
+ *
+ * ══════════════════════════════════════════════════════════════
+ *  ⚠️ 棘轮式：只增不减
+ * ══════════════════════════════════════════════════════════════
+ *  为什么不允许「按当前 bestStage 重算」？
+ *    · 旧存档迁移时 bestStage 可能归零/丢失，重算会把玩家已经
+ *      打通 20000 关拿到的 ×3.5 倍速、20 档跳关一夜清空 ——
+ *      这类「资产倒退」比数值失衡更伤玩家。
+ *    · 验收脚本会显式设 gameSpeed=3.5 做 A/B 对照，重算会破坏可复现性。
+ *  所以这里只做「该有的 ≥ 现有的，就写进去」。
+ *
+ *  副作用：曾经给出去的东西收不回来。这是有意为之 —— 门控表只会往前调。
+ *
+ * @param {object} s v6 状态（会被就地修改）
+ * @returns {boolean} 是否发生了变化（UI 可以据此弹「宠物解锁」提示）
+ */
+export function syncPetAssets(s) {
+  if (!s || typeof s !== 'object') return false;
+  const best = Math.max(+s.bestStage || 0, +s.maxStage || 0, (+s.stage || 1) - 1);
+  const gift = P.petAssetsFor(best);
+  let changed = false;
+  if (gift.gameSpeed > (+s.gameSpeed || 1)) { s.gameSpeed = gift.gameSpeed; changed = true; }
+  if (gift.skip > P.normSkipTier(s.skip)) { s.skip = gift.skip; changed = true; }
+  return changed;
+}
+
+/**
+ * 下一档宠物奖励还差多少关（UI 钩子）。
+ * @param {object} s v6 状态
+ * @returns {?{at:number, kind:string, value:number, remain:number}}
+ */
+export function nextPetUnlock(s) {
+  const st = normV6(s);
+  return P.nextUnlock(st.bestStage);
+}
+
+/* ─────────────────────────────────────────────────────────────
+ *  5. 推进（每帧调用）
  * ───────────────────────────────────────────────────────────── */
 
 /**
  * 推进 dt 秒。
  *
  * ── 推进模型（对应设计文档 §3.3 / 约束 2）──────────────────────
- *   速率 v = 游戏倍速 × 攻速          ← 两条路线相乘
+ *   速率 v = 35关/分 × 游戏倍速 × 攻速 × (1 + 宠物跳关)  ← 三条路线独立相乘
  *   本帧推进关数 = v × dt
  *
  * ⚠️ 这里有一处必须讲清的设计决策：
@@ -206,11 +261,17 @@ export function tickV6(s, dt) {
   const cur = s.stage;
   /* 已经打不过当前关 → 卡住 */
   if (cur > stats.maxReach) {
+    s.carry = 0;
     return { advanced: 0, stuck: true, reachedCap: false };
   }
   /* 下一关就打不过 → 停在当前关（不再前进），但仍算「未卡死」直到超过 maxReach */
   const target = Math.min(S.STAGE_CFG.S_MAX, stats.maxReach);
   if (cur >= target) {
+    /* v7.1：推关速率已降到「关/秒」量级（初始 0.583 关/秒），撞顶时最后一步
+     * 刚好卡满、走不到 `whole > room` 分支，会残留一个 <1 的 carry（实测 0.25）。
+     * 这与本函数「撞顶不留余量」的既有约定冲突——残留余量会在玩家升级装备后
+     * 立刻兑现成免费关数。因此两个封顶出口统一清零 carry。 */
+    s.carry = 0;
     return { advanced: 0, stuck: true, reachedCap: cur >= S.STAGE_CFG.S_MAX };
   }
 
@@ -244,6 +305,11 @@ export function tickV6(s, dt) {
   if (next > s.maxStage) s.maxStage = next;
   if (next > s.bestStage) s.bestStage = next;
 
+  /* ── v7.1：宠物资产随【历史最高关】解锁 ─────────────────────────
+   * 这里是唯一的自动授予点。放在 stage 更新之后，保证「刚跨过门槛的那一帧」
+   * 立刻生效；用棘轮（只增不减）保证外部显式设定的值不被覆盖。 */
+  syncPetAssets(s);
+
   return {
     advanced: whole,
     stuck: next >= target,
@@ -252,7 +318,7 @@ export function tickV6(s, dt) {
 }
 
 /* ─────────────────────────────────────────────────────────────
- *  5. 灵石掉落
+ *  6. 灵石掉落
  * ───────────────────────────────────────────────────────────── */
 
 /**
@@ -329,7 +395,7 @@ export const SPIRIT_GROWTH = Math.pow(E.EQ_CFG.COST_GROWTH, 0.95);
 export const SPIRIT_INC0 = E.EQ_CFG.COST_BASE;
 
 /* ─────────────────────────────────────────────────────────────
- *  6. 升级装备
+ *  7. 升级装备
  * ───────────────────────────────────────────────────────────── */
 
 /**
@@ -357,7 +423,7 @@ export function upgradeSlot(s, key, steps) {
 }
 
 /* ─────────────────────────────────────────────────────────────
- *  7. 转生
+ *  8. 转生
  * ───────────────────────────────────────────────────────────── */
 
 /**
@@ -397,12 +463,15 @@ export function previewRebirth(s) {
 }
 
 /**
- * 执行转生（就地修改）。清零装备/灵石/关数，突破境界。
- * ✅ 保留：境界、累计修为点、游戏倍速（宠物给的）、技能/配方/宠物
- * ❌ 清零：4 格装备等级、灵石、当前关、本轮最高关
+ * 执行转生（就地修改）。
+ *
+ * ✅ 保留：境界、累计修为点、宠物资产（游戏倍速 + 跳关档位）、技能/配方
+ * ❌ 清零：4 格装备等级、灵石、本轮最高关
+ * ↩️ 重置：当前关回到【起始关】（v7.1：历史最高关 > 3000 时 = 最高关 − 1500，
+ *    否则仍是第 1 关 —— 见 R.startStageFor）
  *
  * @param {object} s v6 状态
- * @returns {{gain:object, realmGain:number, realm:number, prevMax:number}}
+ * @returns {{gain:object, realmGain:number, realm:number, prevMax:number, startStage:number}}
  */
 export function applyRebirth(s) {
   const pv = previewRebirth(s);
@@ -411,7 +480,6 @@ export function applyRebirth(s) {
   s.realm = pv.realmNext;
   s.equip = E.newEquip();
   s.spirit = N.ZERO;
-  s.stage = 1;
   s.maxStage = 0;
   s.runT = 0;
   s.carry = 0;              // 累加器随关卡归零，否则转生后立刻多推一关
@@ -420,11 +488,61 @@ export function applyRebirth(s) {
    * 且 rebirthText 的「本轮最高关」用的也是它兜底。
    * 转生时把本轮最高关并入历史最高，否则转生后历史记录会被抹掉。 */
   if (pv.maxStage > s.bestStage) s.bestStage = pv.maxStage;
-  return { gain: pv.gain, realmGain: pv.realmGain, realm: pv.realmNext, prevMax: pv.maxStage };
+
+  /* ── v7.1 起始关：不再从【第 1 关】出发 ─────────────────────────
+   * history > 3000 时从「历史最高关 − 1500」出发（固定减，不是一半）。
+   * 这一步必须在 bestStage 合并【之后】做，否则本轮刚推的那 1500 关
+   * 不计入起点，玩家每轮都被迫重复推同一段上坡路 —— 那正是需求方
+   * 提出跳关/起始关时要消灭的「巨大时间成本」。 */
+  s.stage = R.startStageFor(s.bestStage);
+  /* 起始关把玩家直接抬到了高关卡区，宠物解锁也在同一时刻重算一次
+   *（正常推进里 tickV6 会授予，但直接调 applyRebirth 的路径不走 tick）。 */
+  syncPetAssets(s);
+
+  return { gain: pv.gain, realmGain: pv.realmGain, realm: pv.realmNext, prevMax: pv.maxStage, startStage: s.stage };
+}
+
+/**
+ * ══════════════════════════════════════════════════════════════════
+ *  通关判定（v7.1 天仙门禁）
+ * ══════════════════════════════════════════════════════════════════
+ *  需求方：游戏只有【到达天仙】才算完成 —— 不是「推满 30000 关」就算。
+ *  所以这里是【且】：关卡推满 30000 【并且】境界已达天仙圆满（第 53 层）。
+ *
+ *  两个条件今天恰好等价，但我们仍然两个都判：
+ *    · 面板 P = BASE0 × Q^R × 装备分，maxReach 由它反解；
+ *    · 实测 Q=27.0464 且装备拉满时：天仙后期 maxReach=29848 < 30000，
+ *      天仙圆满 maxReach=30399 ≥ 30000 —— 即【只有天仙圆满推得满】，
+ *      门禁天然成立，不需要额外拦截；
+ *    · 但 Q 一旦被重调（改天有人想动 Q），这个等价性会【静默失效】：
+ *      推满 30000 却还不是天仙时，只判关卡就等于偷偷放行了。
+ *      双条件把「必须成仙」从数值巧合升级成代码级硬约束。
+ *
+ * @param {object} s v6 状态
+ * @returns {boolean}
+ */
+export function isGameCleared(s) {
+  const st = normV6(s);
+  return S.isCleared(st.stage) && st.realm >= RM.REALM_MAX;
+}
+
+/**
+ * 通关进度快照（UI 用：告诉玩家卡在门口的哪一步）。
+ * @param {object} s v6 状态
+ * @returns {{stagePct:number, realmDone:boolean, cleared:boolean, realmName:string}}
+ */
+export function clearProgress(s) {
+  const st = normV6(s);
+  return {
+    stagePct: Math.min(1, Math.max(0, (st.stage - 1) / S.STAGE_CFG.S_MAX)),
+    realmDone: st.realm >= RM.REALM_MAX,
+    cleared: isGameCleared(st),
+    realmName: RM.nameOf(st.realm),
+  };
 }
 
 /* ─────────────────────────────────────────────────────────────
- *  8. 离线结算
+ *  9. 离线结算
  * ───────────────────────────────────────────────────────────── */
 
 /**
@@ -579,7 +697,7 @@ function autoSpendSpirit(s) {
 }
 
 /* ─────────────────────────────────────────────────────────────
- *  9. 展示辅助（给 DOM 层用）
+ *  10. 展示辅助（给 DOM 层用）
  * ───────────────────────────────────────────────────────────── */
 
 /** 关卡条文案 */

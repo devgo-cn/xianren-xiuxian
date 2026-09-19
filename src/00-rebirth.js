@@ -52,7 +52,7 @@ export const REBIRTH_CFG = {
    *
    *   改这个值必须同步改 00-realm.js 的 Q_REALM_REF，
    *   并重跑 tests/test_realm.mjs（有断言检查两者一致）。 */
-  Q_REALM: 28.3,
+  Q_REALM: 27.0464,   // v7.1 精确标定值（旧值 28.3 为粗估）
 
   /* 玩家初始基础面板（凡人，装备为 0 时） */
   BASE0: 10,
@@ -130,42 +130,107 @@ export function baseStat(R) {
 }
 
 /* ─────────────────────────────────────────────────────────────
+ *  v7.1 §7：起始关机制
+ * ───────────────────────────────────────────────────────────── */
+
+export const START_CFG = {
+  /**
+   * 起始关 = 历史最高关 − 1500（【固定值】，不是一半）。
+   *
+   * 需求方原话：「不是一半，固定减 1500 关，因为后面可能到 3 万关。」
+   * 理由很实在：一半在 3 万关时意味着每轮要从 15000 关起步，
+   * 单轮推进量被线性放大到不可控；固定 1500 让【每轮时长】基本恒定，
+   * 这正是 Λ=114（每境恒定轮数）能成立的前提。
+   */
+  OFFSET: 1500,
+
+  /**
+   * 启用线：历史最高关 > 3000 才生效。
+   *
+   * 前期不启用是为了保住新手体验：3000 关以前每轮本来就只有 1~2 分钟，
+   * 跳过前期等于掐掉了「学会看装备/灵石循环」的那一段。
+   * 3000 这个数与 Buff 宠物【跳关】的第一档门槛相同（见 00-pet.js），
+   * 两条机制在同一节点同时进场，中期的手感变化是「一次性跳变」。
+   */
+  MIN_BEST: 3000,
+};
+
+/**
+ * 计算下一轮的起始关。
+ *
+ * @param {number} bestStage 历史最高关（不含本轮；调用方负责把本轮并入）
+ * @returns {number} 起始关（≥1，且 ≤ 历史最高关）
+ */
+export function startStageFor(bestStage) {
+  const best = Math.max(0, Math.floor(+bestStage || 0));
+  if (best <= START_CFG.MIN_BEST) return 1;
+  const s = best - START_CFG.OFFSET;
+  /* 双重夹取：下限 1（永远合法），上限 best（不许超过自己的历史记录，
+   * 否则可凭空获得「本轮最高关」，进而套出超额的转生点）。 */
+  return Math.max(1, Math.min(best, s));
+}
+
+/* ─────────────────────────────────────────────────────────────
  *  推关速率（双乘区 —— 约束 2 的落地）
  * ───────────────────────────────────────────────────────────── */
 
 export const RATE_CFG = {
-  V_BASE: 1.0,        // 基准推关速率（关/秒）@ 倍速=1, 攻速=1
+  /* v7.1 基准推关速率：35 关/分钟（需求方口径「推到 350 关正好 10 分钟」）。
+   * 本模块内部一律用【关/秒】，所以这里存换算值 35/60。
+   * 注意与旧值 V_BASE=1.0（=60 关/分钟）的区别 —— v7.1 是 35 关/分钟。 */
+  V_BASE: 35 / 60,
   SPD_CAP: 3.5,       // 游戏倍速上限（宠物提供，转生保留）
 
-  /* 攻速上限 = 装备满级加成 = 1.0003^33000 ≈ 1.99e4
+  /* v7.1 §4.3：攻速上限 = 3.0（装备第 4 格）。
    *
-   * ⚠️ 必须走大数。装备加成已从线性 (1+C·L) 改为指数 (1+C)^L
-   *   （原因见 00-equip.slotMult 的注释：线性封顶 10.9 倍，
-   *     远小于境界 2.2^R，会导致玩家没有理由点装备按钮）。
-   * 1.0003^33000 ≈ 2e4 尚在 Number 范围内，但攻速还要与倍速、基准速率
-   * 连乘，统一用大数避免后续改参数时无声溢出。
-   * 由装备系统实际上限派生，勿硬编码「3.0」（旧版设计要求）。 */
-  ASPD_CAP: N.pow(N.from(1 + E.EQ_CFG.C), E.EQ_CFG.MAX_LV),
+   * ⚠️ 与装备口径联动：v7.1 的装备是线性 (1+C·L)，满级 10.9 倍，
+   *    攻速作为其中一格，谷歌口径上限取 3.0（不再取 1.0003^33000 ≈ 1.99e4）。
+   *    保留大数接口是为了不与 v_base / 倍速的连乘处改动撕裂最小。 */
+  ASPD_CAP: N.from(3.0),
+
+  /* v7.1 §4.3：第三乘区 —— 宠物跳关档位 0/1/2/4/8/10/20。
+   * 实际可跳档由 00-stage.js 的 SKIP_GATED(skipTier, bestStage) 按历史最高关
+   * 门控解锁；这里只负责「有档位时怎么乘」。 */
+  SKIP_TIERS: [0, 1, 2, 4, 8, 10, 20],
 };
 
 /**
- * 推关速率：v = k × 游戏倍速 × 攻速
+ * 宠物跳关：把【跳关档位】转成数值（越界收敛到合法档位）。
  *
- * ⚠️ 两条路线是【独立乘区】，相乘叠加（设计文档 §7）
+ * @param {number} tier 期望档位
+ * @returns {number} 合法跳关值（0 / 1 / 2 / 4 / 8 / 10 / 20）
+ */
+export function normSkip(tier) {
+  const t = Math.floor(+tier || 0);
+  const tiers = RATE_CFG.SKIP_TIERS;
+  let best = 0;
+  for (const c of tiers) if (t >= c) best = c;
+  return best;
+}
+
+/**
+ * 推关速率：v7.1 三乘区
+ *
+ *     v = 35 关/分钟 × 游戏倍速 × 攻速 × (1 + 跳关)
+ *
+ * ⚠️ 三条路线是【独立乘区】，相乘叠加（设计文档 §六 约束 4）
  *    游戏倍速 = 永久资产（宠物保留）→ 长期底速
  *    攻速     = 每轮资产（装备清零）→ 每轮爬升动力
+ *    宠物跳关 = 永久资产（宠物保留）→ v7 新增第三乘区
  *
- * ⚠️ 返回值是【大数】。因为攻速上限已从 10.9 变成 ~1.99e4，
- *   不能再假设结果能用原生 Number 表示。
+ * ⚠️ 返回值是【大数】。三个乘区连乘后仍可能超出 Number 安全表示，
+ *   统一走大数避免后续改参数时无声溢出。
  *
  * @param {number} gameSpeed 游戏倍速 [1, 3.5]
- * @param {object} aspdMult 装备攻速倍率（大数，[1, 1.99e4]）
- * @returns {object} 推关速率（大数）
+ * @param {object} aspdMult 装备攻速倍率（大数，[1, 3.0]）
+ * @param {number} [skip] 宠物跳关档位（0/1/2/4/8/10/20，缺省 0）
+ * @returns {object} 推关速率（大数，关/秒）
  */
-export function pushRate(gameSpeed, aspdMult) {
+export function pushRate(gameSpeed, aspdMult, skip) {
   const gs = clamp(gameSpeed, 1, RATE_CFG.SPD_CAP);
   const as = clampBig(aspdMult);
-  return N.mulNum(N.mulNum(as, RATE_CFG.V_BASE), gs);
+  const sk = normSkip(skip);
+  return N.mulNum(N.mulNum(N.mulNum(as, RATE_CFG.V_BASE), gs), 1 + sk);
 }
 
 function clamp(v, lo, hi) {
@@ -287,11 +352,13 @@ function spiritIncome(from, to, P) {
 /**
  * 执行转生：把「最高关」兑换成转生点，尝试突破境界。
  *
- * ⚠️ 转生后清零：装备、灵石、关数
- * ✅ 转生后保留：境界（地基）、技能、配方、宠物
+ * ⚠️ 转生后清零：装备、灵石、本轮最高关
+ * ⚠️ 关数【不归 1】：v7.1 起始关机制 —— 历史最高关 > 3000 时，
+ *    新一轮从「最高关 − 1500」出发（见 START_CFG）。
+ * ✅ 转生后保留：境界（地基）、累计修为、技能、配方、宠物（倍速/跳关）
  *
- * @param {object} state {realm, equip, spirit, stage, maxStage, totalPoints, rebirths}
- * @returns {{state:object, gainedPoints:object, newRealms:number, realmGain:number}}
+ * @param {object} state {realm, equip, spirit, stage, maxStage, bestStage, totalPoints, rebirths}
+ * @returns {{state:object, gainedPoints:object, newRealms:number, realmGain:number, startStage:number}}
  */
 export function doRebirth(state) {
   const maxStage = Math.max(state.maxStage || 0, state.stage || 1);
@@ -299,6 +366,9 @@ export function doRebirth(state) {
   const total = N.add(state.totalPoints || N.ZERO, gained);
   const newRealm = realmsFrom(total);
   const realmGain = Math.max(0, newRealm - state.realm);
+  /* 历史最高关：本轮成绩并入后再算起始关，否则本轮白推的那 1500 关不算数 */
+  const bestStage = Math.max(state.bestStage || 0, maxStage);
+  const startStage = startStageFor(bestStage);
 
   return {
     state: {
@@ -306,14 +376,16 @@ export function doRebirth(state) {
       realm: newRealm,
       equip: E.newEquip(),        // 装备清零
       spirit: N.ZERO,             // 灵石清零
-      stage: 1,                   // 关数归 1
+      stage: startStage,          // v7.1：从起始关出发（早期仍是 1）
       maxStage: 0,
+      bestStage,                  // 历史最高关（永久）
       totalPoints: total,
       rebirths: (state.rebirths || 0) + 1,
     },
     gainedPoints: gained,
     newRealms: newRealm,
     realmGain,
+    startStage,
   };
 }
 
