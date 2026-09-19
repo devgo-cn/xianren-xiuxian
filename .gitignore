@@ -8,3 +8,6 @@ tools/refactor/package-lock.json
 *~
 node_modules/
 .playwright-cli/
+
+# core dumps
+core.*
