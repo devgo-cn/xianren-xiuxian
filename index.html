@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<script>window.APP_VER="5.42";</script>
+<script>window.APP_VER="5.43";</script>
 <title>闲人修仙</title>
 <meta name="description" content="闲人修仙：主身巡猎斗法、分身云游寻宝，离线亦在成长。">
 <link rel="icon" href="data:,">
@@ -88,16 +88,14 @@
   .stage-bar .sb-rec b{color:#9ed7b8}
 
   /* ── v7.6 装备行: 战斗带【正下方】的 4 槽横排 ──
-     原来压在视口最底部, 被打坐立绘挡得只剩一半(实测截图)。移到战斗带下沿的空隙里,
-     与推关联动最紧: 盯着战斗区时就能顺手点。每槽底下挂一个独立步长下拉,
-     替掉旧的共用「档位」按钮行(用户: 决定这一格一级一级升, 还是一百级一百级升)。 */
-  .equip-bar{position:fixed;left:0;right:0;bottom:calc(44vh + 14px);z-index:6;
-    display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 10px;pointer-events:none}
-  /* 偏移 14px 的由来: 按钮压扁后装备带高约 86px, 战斗带底边在 44vh+130px、
-     立绘头顶约在 44vh+120px 之上 —— 恰好放进两者之间的空区, 上下各留 ~30px */
-  .equip-bar .eq-slot{display:flex;flex-direction:column;gap:4px;min-width:0;pointer-events:auto}
+     每槽固定 80px 宽、space-evenly 均匀分布 —— 宽度不随内容/屏宽变(用户: 别自适应, 好丑)。
+     每槽底下挂一个独立步长下拉, 替掉旧的共用「档位」按钮行。 */
+  .equip-bar{position:fixed;left:0;right:0;bottom:calc(var(--cult-h) + 42px);z-index:6;
+    display:flex;justify-content:space-evenly;max-width:600px;margin:0 auto;pointer-events:none}
+  /* 锚定立绘高: 道号悬在头顶上方 38px, 再留 4px —— 装备带永远悬在立绘与战斗区之间 */
+  .equip-bar .eq-slot{width:80px;flex:none;display:flex;flex-direction:column;gap:4px;pointer-events:auto}
   /* v7.6c: 槽名(攻击/血量/防御/速度)放按钮上方小字, 按钮本体只显示等级(用户: 简化, 别成竖条) */
-  .eq-slot .elbl{font-size:10px;color:#a9b4c6;letter-spacing:1px;text-align:center;line-height:1;
+  .eq-slot .elbl{font-size:10px;color:#d3dcea;letter-spacing:1px;text-align:center;line-height:1;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .up-btn{position:relative;display:flex;align-items:center;justify-content:center;
     padding:8px 2px 7px;cursor:pointer;overflow:hidden;font-family:inherit;
@@ -352,8 +350,9 @@
     50%{filter:brightness(1.45) saturate(1.2) drop-shadow(0 0 5px rgba(232,197,107,.7))}}
 
   /* 主角（略微缩小以腾出战斗区空间） */
+  :root{--cult-h:min(44vh,350px)}  /* 立绘高, 唯一定义: 装备带锚它悬在立绘上方 */
   .stage{position:fixed;inset:0;z-index:5;display:flex;align-items:flex-end;justify-content:center;pointer-events:none}
-  .cult{position:relative;height:min(44vh,350px);aspect-ratio:825/835}
+  .cult{position:relative;height:var(--cult-h);aspect-ratio:825/835}
   /* v5.14: 道号悬于打坐角色头顶 —— 书法字+金描边+柔光呼吸。
    * v5.14b: 上移离头皮 38px, 字号 19→16; 未定名时显示淡色"✎ 定道号"引导(顶栏按钮已删, 此处是唯一入口) */
   .cult-pname{position:absolute;left:50%;top:-38px;transform:translateX(-50%);z-index:3;
@@ -688,7 +687,7 @@
     box-shadow:0 2px 10px rgba(0,0,0,.55);cursor:grab;touch-action:none}
   .dim-knob svg{width:20px;height:20px;display:block}
 </style>
-<link rel="stylesheet" href="dt-theme.css?v=5.42">
+<link rel="stylesheet" href="dt-theme.css?v=5.43">
 </head>
 <body>
 <!-- v1.7.58 开屏页: 品牌 + 进度 + 健康游戏忠告(load 完成或点击后淡出) -->

@@ -461,7 +461,7 @@
     "assets/ui_icons/icon_treasure.webp": "fe0b83d8ece23ab09b23a013e18299de7335ba1917666a7970726e00b7eb7e17",
     "dt-theme.css": "29d551e261cc34a698f262b2e25174ef96d35bc9031dc200313b7ef4d862292d",
     "fx2d.js": "ab4794f036fc4e9976392e336e004bcef13d83976e78d719415da6c7bc10ad0d",
-    "index.html": "9b6bda61d89433b1e88e679e73def1369e4882a64f6555cc3d0cc81e0e52f79b",
+    "index.html": "d901fb3aa38e3a05313768aaea2f6a53137926e90de6b202c61bca07ed54383b",
     "src/00-anchor.js": "005f12324c83a9e845e3915173dfe8208b93844969ba26c5c11e06c806dc30eb",
     "src/00-equip.js": "46546259300803690c3505188c7841c6b61a4dc8995fa31165a6e5739b5ae34a",
     "src/00-num.js": "e570d5a46ac333a5916d7ac97ceb3e33b3f99d4431689ecc9d230eaffe401040",
@@ -479,6 +479,6 @@
     "src/60-stage.js": "a098e6f38e898ff3fee4c6a1f79e652373f15cf791e344813fa3d76ddd521c5b",
     "src/main.js": "a190417d98bccfe60d384fab44271f7365ea12723975217dbc564254cbe0974c"
   },
-  "rev": "9240aa8251c6f70a",
-  "version": "5.42"
+  "rev": "8afc40256de9ff0a",
+  "version": "5.43"
 }
