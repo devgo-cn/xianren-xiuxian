@@ -6,8 +6,8 @@
  *      1. 总层数 = 54（12 大境：凡人1 + 炼气13 + 其余10境×4）
  *      2. 命名规则与旧版 BIGS/SEG_META 一致（炼气是「X层」不是「前期」）
  *      3. Q_REALM_REF 与 00-rebirth.REBIRTH_CFG.Q_REALM 一致
- *      4. 54 层走完 30000 关（第 53 层正好推到 30000）
- *      5. 全程轮数落在 75 天附近（2~3 个月）
+ *      4. 天仙门禁：第 53 层【推不满】30000，第 54 层（天仙）才够到 30000
+ *      5. 全程轮数 = Λ×53（v7.1 恒定节奏；毕业天数由 model.py 的休闲档口径验证）
  *      6. 门槛单调递增、反向求解可逆
  */
 import * as RM from '../src/00-realm.js';
@@ -74,8 +74,8 @@ t('Q_REALM_REF == REBIRTH_CFG.Q_REALM',
 
 /* 装备倍率：00-realm 内部常量必须与 00-equip 的实际值一致 */
 const eqMult = E.EQUIP_MAX_BONUS;
-t('装备满级倍率 ≈ 19900（指数公式）',
-  Math.abs(eqMult - 19900.8) < 1, 'got ' + eqMult.toFixed(1));
+t('装备满级倍率 = 10.9（v7.1 线性公式 1+C·L）',
+  Math.abs(eqMult - 10.9) < 0.01, 'got ' + eqMult.toFixed(2));
 
 /* ── 4. 54 层走完 30000 关 ── */
 console.log('\n=== 走完全图 ===');
@@ -88,8 +88,12 @@ function yieldAt(realmLv) {
   const s = Math.min(30000, 1 + Math.log(base / 1.0055) / Math.log(1.006));
   return { stage: s, pts: Math.pow(s / 10, 1.5) };
 }
-const top = yieldAt(53);       // 第 53 层（天仙圆满）时刷本轮
-t('第 53 层能推满 30000 关', top.stage >= 30000 - 1, 'stage=' + top.stage.toFixed(0));
+const top = yieldAt(53);       // 第 53 层（渡劫末期，未成天仙）时刷本轮
+/* v7.1 门禁：R53 必须【够不到】30000 —— 天仙才是通关的唯一门票。
+ * 缓冲越大越安全：当前 Q=27.0464 留 551 关，玩家靠宠物跳关/离线补课
+ * 也翻不过去。若这里改回 >= 30000，等于「不用成仙也能通关」，直接违背需求方。 */
+t('第 53 层推不满 30000 关（天仙门禁成立）', top.stage < 30000 - 100,
+  'stage=' + top.stage.toFixed(0) + ' 距顶 ' + (30000 - top.stage).toFixed(0) + ' 关');
 const below = yieldAt(45);
 t('第 45 层还没到顶（后期确实更难）', below.stage < 30000, 'stage=' + below.stage.toFixed(0));
 
@@ -114,16 +118,21 @@ console.log('\n=== 轮数曲线 ===');
 t('第 1 层轮数 ≈ ROUNDS_BASE（±10%）',
   Math.abs(RM.roundsFor(1) / RM.ROUNDS_BASE - 1) < 0.1,
   'got ' + RM.roundsFor(1).toFixed(2) + ' base=' + RM.ROUNDS_BASE);
-t('末层轮数 = ROUNDS_BASE × ESCALATE',
+t('末层轮数 = Λ × 1（v7.1 恒定）',
   Math.abs(RM.roundsFor(RM.REALM_MAX) - RM.ROUNDS_BASE * RM.ESCALATE) < 0.01,
   'got ' + RM.roundsFor(RM.REALM_MAX).toFixed(2));
 let totalRounds = 0;
 for (let r = 1; r <= RM.REALM_MAX; r++) totalRounds += RM.roundsFor(r);
 const days = totalRounds * RM.ROUND_MINUTES / 1440;
-t('全程轮数在 2500~5000（合理）', totalRounds > 2500 && totalRounds < 5000,
-  'rounds=' + totalRounds.toFixed(0));
-t('全程时长落在 2~3 个月（60~95 天）', days >= 60 && days <= 95,
-  'days=' + days.toFixed(1));
+/* v7.1：同形成本下【每境轮数恒定】，所以总轮数必须精确等于 Λ×层数。
+ * 这条取代了旧版「按每轮 30 分钟估天数」的口径 —— 那个口径没算离线收益，
+ * 与 v7.1 的休闲档（每天 2 次在线 + 2×11h 离线）33 天毕业不是一回事。
+ * 真正的毕业天数由附录脚本 model.py 的 casual_sim 验证。 */
+t('全程轮数 = Λ × 层数（v7.1 恒定节奏）',
+  Math.abs(totalRounds - RM.ROUNDS_BASE * RM.REALM_MAX) < 1e-6,
+  'rounds=' + totalRounds.toFixed(0) + ' expect=' + (RM.ROUNDS_BASE * RM.REALM_MAX));
+t('全程轮数落在 Λ 量级（6000 上下）', totalRounds > 5500 && totalRounds < 6600,
+  'rounds=' + totalRounds.toFixed(0) + ' days(纯在线折算)=' + days.toFixed(1));
 
 /* ── 7. 反向求解可逆 ── */
 console.log('\n=== levelFrom / tryBreakthrough ===');
@@ -185,16 +194,21 @@ t('realmTable 每行有 name/cum/levelCost',
   t('门槛与推关能力自洽（全 53 层偏差 < 2%）', worst < 0.02,
     '最大偏差 ' + (worst * 100).toFixed(2) + '% @ 第 ' + worstAt + ' 层 ' + RM.nameOf(worstAt));
 
-  /* 全程时长落在「两三个月」目标区间 */
+  /* v7.1：这里锁【总轮数结构】，不再锁「60~95 天」——
+   * 纯在线折算的天数（125.9 天）不含离线收益，不是玩家的真实体感。
+   * 休闲档 33 天是「每天 2 次在线 + 2×11h 离线」的口径，
+   * 由设计文档附录 model.py 的 casual_sim() 负责验证。 */
   let totalRounds = 0;
   for (let r = 1; r <= RM.REALM_MAX; r++) totalRounds += RM.roundsFor(r);
   const days = totalRounds * RM.ROUND_MINUTES / 60 / 24;
-  t('全程 ' + totalRounds.toFixed(0) + ' 轮 ≈ ' + days.toFixed(1) + ' 天（60~95 天）',
-    days > 60 && days < 95, 'days=' + days.toFixed(1));
+  t('全程 ' + totalRounds.toFixed(0) + ' 轮（= Λ×' + RM.REALM_MAX + '）',
+    Math.abs(totalRounds - RM.ROUNDS_BASE * RM.REALM_MAX) < 1e-6,
+    '纯在线折算 ' + days.toFixed(1) + ' 天（不含离线，非玩家体感）');
 
-  /* 单轮跨度：装备把玩家从「裸装」推进到 Round 水平，且不能替代境界 */
-  t('满装备单轮跨度 ≈ 1655 关（全场 5.5%）', true,
-    '见 test_rebirth 的专项断言');
+  /* 单轮跨度：v7.1 线性装备下 ≈399 关（log(10.9)/log(1.006)），
+   * 旧版指数装备是 ≈1655 关。具体断言见 test_rebirth。 */
+  t('v7.1 线性装备口径已生效（满级 10.9 倍）', Math.abs(RM.EQ_MULT - 10.9) < 0.01,
+    '见 00-equip.EQUIP_MAX_BONUS = ' + RM.EQ_MULT);
 }
 
 console.log('\n通过 ' + pass + ' / ' + (pass + fail) + '\n');

@@ -17,6 +17,7 @@
 
 import * as N from './00-num.js';
 import * as E from './00-equip.js';
+import * as R from './00-rebirth.js';   // v7.1：起始关 startStageFor
 import * as RM from './00-realm.js';
 import * as V from './05-v6.js';
 
@@ -198,11 +199,20 @@ export function render6(force) {
     }
   }
 
-  /* ── 战斗 HUD 的倍速显示（旧节点，复用）── */
+  /* ── 战斗 HUD 的倍速显示（旧节点，复用）──
+   * v7.1：把宠物跳关也挂在同一行，两者同属「Buff 宠物」给的永久资产，
+   * 玩家看到的是一句话：「×3.5 倍速 ／ 跳 2」= 第三乘区已开到 ×3。 */
   const spd = el('battleSpeed');
   if (spd) {
-    spd.style.display = S6.gameSpeed > 1 ? '' : 'none';
-    if (S6.gameSpeed > 1) setText('battleSpeed', '×' + (+S6.gameSpeed.toFixed(2)) + ' 倍速');
+    const sk = V.normV6(S6).skip || 0;
+    const on = S6.gameSpeed > 1 || sk > 0;
+    spd.style.display = on ? '' : 'none';
+    if (on) {
+      const parts = [];
+      if (S6.gameSpeed > 1) parts.push('×' + (+S6.gameSpeed.toFixed(2)) + ' 倍速');
+      if (sk > 0) parts.push('跳 ' + sk + ' 关');
+      setText('battleSpeed', parts.join(' ／ '));
+    }
   }
 
   /* ── 战斗状态文案 ── */
@@ -333,7 +343,7 @@ function resumeFromDeath() {
   if (BA && typeof BA.respawn === 'function') BA.respawn();
 }
 
-/** 死亡面板·转生: 直接结算(修为点/境界/清装备灵石), 回第 1 关 */
+/** 死亡面板·转生: 直接结算(修为点/境界/清装备灵石), 回【起始关】(v7.1: 最高关−1500) */
 export function deathChooseRebirth() {
   const p = el('deathPanel');
   if (p) p.classList.remove('on');
@@ -350,12 +360,18 @@ export function deathChooseRebirth() {
   resumeFromDeath();
 }
 
-/** 死亡面板·从头开始: 修为/境界/装备保留, 只把关卡拉回第 1 关 */
+/**
+ * 死亡面板·从头开始: 修为/境界/装备保留, 把关卡拉回【起始关】。
+ *
+ * ⚠️ v7.1：这里不能再写死 stage=1 —— 那会让「从头开始」在新中后期变成
+ *    一次 12 分钟的纯重复劳动，正是起始关机制要消灭的东西。
+ *    拉回起始关（历史最高关 − 1500）才是设计意图。
+ */
 export function deathChooseRestart() {
   const p = el('deathPanel');
   if (p) p.classList.remove('on');
-  if (S6) { S6.stage = 1; render6(true); }
-  toast('从头开始', 2400);
+  if (S6) { S6.stage = R.startStageFor(V.normV6(S6).bestStage); S6.carry = 0; render6(true); }
+  toast('回到起始关', 2400);
   resumeFromDeath();
 }
 

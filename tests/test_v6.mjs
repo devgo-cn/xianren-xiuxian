@@ -52,25 +52,24 @@ var sl = V.newV6();
 var L0 = V.live(sl);
 console.log('  初始：power=' + N.sci(L0.power) + ' rate=' + L0.rateNum.toFixed(2) + ' maxReach=' + L0.maxReach);
 t('初始 power = BASE0 = 10', Math.abs(N.toNumber(L0.power) - 10) < 1e-9);
-t('初始 rate = 1', Math.abs(L0.rateNum - 1) < 1e-9);
-t('初始 maxReach ≈ 385', L0.maxReach >= 380 && L0.maxReach <= 390, 'got ' + L0.maxReach);
+t('初始 rate = 35关/分 = 0.5833 关/秒（v7.1 基准）',
+  Math.abs(L0.rateNum - 35/60) < 1e-9, 'got ' + L0.rateNum);
 
-/* 装备加成是【指数】而不是线性 —— 这是「玩家为什么要点装备按钮」的根据。
- * 线性 (1+C·L) 封顶 10.9 倍，被境界 2.2^R 碾压；指数 (1+C)^L 满级 ≈ 1.99e4 倍。 */
-console.log('  装备满级加成 = ' + N.sci(E.slotMult(33000)) + '（旧线性版只有 10.9 倍）');
-t('装备满级加成 ≈ 1.99e4（指数）', Math.abs(N.log10(E.slotMult(33000)) - 4.3) < 0.05,
-  'got ' + N.sci(E.slotMult(33000)));
-t('装备满级加成 > 1000 倍（碾压旧线性上限 10.9）',
-  N.gt(E.slotMult(33000), N.from(1000)), 'got ' + N.sci(E.slotMult(33000)));
+/* v7.1 口径：装备加成是【线性】(1+C·L)，满级 10.9 倍。
+ * ⚠️ 代价已知：装备不再是推关主力（单轮跨度 1655→399 关），
+ *   推关主要靠境界面板。Można若改回指数，必须同步改 Q_REALM 与 Λ。 */
+console.log('  装备满级加成 = ' + N.sci(E.slotMult(33000)) + '（v7.1 线性口径）');
+t('装备满级加成 = 10.9（v7.1 线性公式 1+C·L）',
+  Math.abs(N.toNumber(E.slotMult(33000)) - 10.9) < 1e-9, 'got ' + N.sci(E.slotMult(33000)));
 
 /* 两条路线独立：倍速与攻速各自都能提升 rate */
 var sA = V.newV6(); sA.gameSpeed = 3.5;
 var sB = V.newV6(); sB.equip = { atk: 0, hp: 0, def: 0, aspd: 33000 };
 var LA = V.live(sA), LB = V.live(sB);
-t('倍速3.5 → rate=3.5', Math.abs(LA.rateNum - 3.5) < 1e-9, 'got ' + LA.rateNum);
-t('攻速满级 → rate≈1.99e4', Math.abs(LB.rateNum / 19900 - 1) < 0.01, 'got ' + LB.rateNum.toFixed(0));
-t('两条路线相乘 rate≈6.97e4',
-  Math.abs(V.live((function(){var x=V.newV6();x.gameSpeed=3.5;x.equip={atk:0,hp:0,def:0,aspd:33000};return x;})()).rateNum / 69650 - 1) < 0.01);
+t('倍速3.5 → rate = 35/60×3.5 = 2.0417', Math.abs(LA.rateNum - 35/60*3.5) < 1e-9, 'got ' + LA.rateNum);
+t('攻速满级(3.0) → rate = 35/60×3.0 = 1.75', Math.abs(LB.rateNum - 35/60*3.0) < 1e-9, 'got ' + LB.rateNum.toFixed(4));
+t('两条路线独立相乘 rate = 35/60×3.5×3.0 = 6.125',
+  Math.abs(V.live((function(){var x=V.newV6();x.gameSpeed=3.5;x.equip={atk:0,hp:0,def:0,aspd:33000};return x;})()).rateNum / (35/60*3.5*3.0) - 1) < 1e-9);
 
 /* rate 输出的是大数，rateNum 是同值原生数 —— 两者必须一致 */
 t('rate 是大数且与 rateNum 同值',
@@ -83,11 +82,11 @@ t('rate 是大数且与 rateNum 同值',
  * 攻速格放大 rate（推得快），但不参与 maxReach 的判定时，
  * 天花板由其它格单独控制。 */
 
-/* 1) 小速率下逐帧推进的换算精度（rate=1，最贴近真实前期体验） */
+/* 1) 小速率下逐帧推进的换算精度（初始 rate=0.5833，最贴近真实前期体验） */
 var spRate = V.newV6();
 var advHalf = 0;
-for (var hi = 0; hi < 50; hi++) advHalf += V.tickV6(spRate, 0.1).advanced;   // 5 秒 @ rate=1
-t('rate=1 时 5 秒推进 5 关（0.1s 步长）', Math.abs(advHalf - 5) <= 1, 'advanced=' + advHalf);
+for (var hi = 0; hi < 50; hi++) advHalf += V.tickV6(spRate, 0.1).advanced;   // 5 秒 @ rate=35/60
+t('5 秒推进 ≈ 2.92 关（rate=35关/分, 0.1s 步长）', Math.abs(advHalf - 35/60*5) <= 1, 'advanced=' + advHalf);
 
 /* 2) 满攻速的 rate 必须真的换算成关数 —— 用「面板远超天花板」的
  *    极端局面：把 realm 抬到 maxReach 足够大，让 rate 成为唯一约束。
@@ -97,11 +96,11 @@ spBig.realm = 30;
 var bigRate = V.live(spBig).rateNum;
 var bigReach = V.live(spBig).maxReach;
 console.log('  满攻速档：rate=' + bigRate.toFixed(0) + ' 关/秒, maxReach=' + bigReach + ' 关');
-/* 推 0.02 秒（量级 ≈ 1393 关）以确保不撞顶，验证的是换算本身 */
-var r1 = V.tickV6(spBig, 0.02);
+/* 推 2 秒（v7.1 三乘区下 ≈ 12.25 关）以确保不撞顶，验证的是换算本身 */
+var r1 = V.tickV6(spBig, 2);
 t('满攻速按速率推进（未撞顶时 = rate×dt）',
-  Math.abs(r1.advanced - Math.round(bigRate * 0.02)) <= 2,
-  'advanced=' + r1.advanced + ' expect=' + Math.round(bigRate * 0.02));
+  Math.abs(r1.advanced - Math.floor(bigRate * 2)) <= 1,
+  'advanced=' + r1.advanced + ' expect=' + Math.floor(bigRate * 2));
 t('stage 前进', spBig.stage > 1, 'got ' + spBig.stage);
 t('maxStage 同步', spBig.maxStage === spBig.stage && spBig.bestStage === spBig.stage);
 
@@ -190,7 +189,11 @@ t('转生后灵石清零', N.isZero(sr.spirit));
 t('转生后境界=预演值', sr.realm === pv.realmNext);
 t('转生后累计点数入账', N.eq(sr.totalPoints, pv.gain));
 t('转生次数+1', sr.rebirths === 1);
-t('转生后 gameSpeed 保留', sr.gameSpeed === 1);
+/* v7.1：宠物资产按【历史最高关】解锁，且跨轮保留（设计文档 §1 第 18 条）。
+ * bestStage=2039 → 触发 500/2000 两档中的最高一档 → 倍速 2.0；跳关要 3000 关，还没到。 */
+t('转生后宠物倍速保留（bestStage 2039 → ×2.0）', Math.abs(sr.gameSpeed - 2.0) < 1e-9,
+  'got ' + sr.gameSpeed);
+t('bestStage 2039 未解锁跳关（门槛 3000）', sr.skip === 0, 'got ' + sr.skip);
 
 /* 转生后 maxReach 应回到起点附近（装备清零 = 本轮推进器重置）。
  * ⚠️ 转生【清零装备】，所以转生瞬间面板反而比「刷满装备时」小 ——
@@ -282,18 +285,16 @@ var sf = V.newV6();
 var adv5 = 0;
 for (var fi = 0; fi < 25; fi++) adv5 += V.tickV6(sf, 0.2).advanced;   // 25×0.2s = 5 秒
 console.log('  5秒内 25 次 0.2s tick（rate=1）→ 推进 ' + adv5 + ' 关, stage=' + sf.stage);
-t('小步长推进 5 秒 ≈ 5 关', Math.abs(adv5 - 5) <= 1, 'advanced=' + adv5);
+t('小步长推进 5 秒 ≈ 2.92 关（rate=35关/分）', Math.abs(adv5 - 35/60*5) <= 1, 'advanced=' + adv5);
 t('小步长后 stage 确实前进', sf.stage > 1, 'stage=' + sf.stage);
 t('carry 保持在 [0,1)', sf.carry >= 0 && sf.carry < 1, 'carry=' + sf.carry);
 
-/* 低速档（rate=1，若面板弱）也要能推进 —— 用小步长跑满 12 秒。
- * ⚠️ 注意：初始面板 maxReach=384，rate=1 时 12 秒只推 12 关，离顶还很远，
- * 这里验证的就是「12 关能被正确累积出来」。 */
+/* 低速档也要能推进：rate=0.5833 关/秒，12 秒推 7 关。 */
 var slowRate = V.newV6();
 var advSlow = 0;
-for (var si = 0; si < 60; si++) advSlow += V.tickV6(slowRate, 0.2).advanced;   // 12 秒 @ rate=1
-console.log('  12秒 @ rate=1 小步长 → 推进 ' + advSlow + ' 关');
-t('12秒 @ rate=1 → 约12关', Math.abs(advSlow - 12) <= 2, 'advanced=' + advSlow);
+for (var si = 0; si < 60; si++) advSlow += V.tickV6(slowRate, 0.2).advanced;   // 12 秒 @ rate=35/60
+console.log('  12秒 @ rate=35/60 小步长 → 推进 ' + advSlow + ' 关');
+t('12秒 @ rate=35/60 → 约7关', Math.abs(advSlow - 35/60*12) <= 2, 'advanced=' + advSlow);
 
 /* carry 存档往返 */
 var sc = V.newV6();

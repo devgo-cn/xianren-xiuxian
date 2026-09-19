@@ -57,11 +57,13 @@ var minR = Math.min.apply(null, realRounds);
 var maxR = Math.max.apply(null, realRounds);
 console.log('  真实每层轮数：最少 '+minR.toFixed(1)+' 轮（炼气一层）→ 最多 '+maxR.toFixed(1)+' 轮（天仙圆满）');
 t('每层都需 >10 轮（转生 ≠ 突破）', minR > 10, 'min='+minR.toFixed(1));
-t('炼气一层需 15~25 轮（开局手感）', realRounds[0] > 15 && realRounds[0] < 25,
-  'got '+realRounds[0].toFixed(1));
-t('天仙圆满需 >120 轮（终局极熬）', maxR > 120, 'max='+maxR.toFixed(1));
-t('末层轮数 / 首层轮数 > 5（明显递增）', maxR / minR > 5,
-  (maxR/minR).toFixed(1)+'x');
+/* v7.1：每境【恒定】Λ=114 轮（同形成本），不再递增 —— 旧版 18→162 递增作废。 */
+t('炼气一层需 ~Λ 轮（v7.1 恒定节奏）', Math.abs(realRounds[0] - RM.ROUNDS_BASE) < RM.ROUNDS_BASE * 0.05,
+  'got '+realRounds[0].toFixed(1)+' Λ='+RM.ROUNDS_BASE);
+t('天仙圆满也需 ~Λ 轮（终局不再额外拉长）', Math.abs(maxR - RM.ROUNDS_BASE) < RM.ROUNDS_BASE * 0.05,
+  'max='+maxR.toFixed(1));
+t('末层轮数 / 首层轮数 = 1（v7.1 恒定）', Math.abs(maxR / minR - 1) < 0.02,
+  (maxR/minR).toFixed(2)+'x');
 
 /* 打满全场是【天仙玩家】才有的成绩，那时他的门槛也最高 */
 var pFull = R.rebirthPoints(30000);
@@ -94,11 +96,15 @@ console.log('  第10境累计门槛 = '+N.fmt(cc10)+'（≈'+(N.toNumber(cc10)/N
 
 // 基础属性 —— Q_REALM 由 2.2 反解为 28.3（详见 00-rebirth.js 的推导注释）
 t('第0境基础 = 10', N.toNumber(R.baseStat(0))===10);
-t('第1境基础 = 10*28.3 = 283', Math.abs(N.toNumber(R.baseStat(1))-283)<1e-9, 'got '+N.toNumber(R.baseStat(1)));
+t('第1境基础 = 10*27.0464 = 270.464',
+  Math.abs(N.toNumber(R.baseStat(1)) - 10 * R.REBIRTH_CFG.Q_REALM) < 1e-9,
+  'got '+N.toNumber(R.baseStat(1)));
 var b53 = R.baseStat(53);
 console.log('  第53境（天仙圆满）基础 = '+N.sci(b53));
-t('第53境基础 ≈ 1e78（正好够到第30000关的怪）',
-  Math.abs(N.log10(b53) - 78) < 1.0, 'log10='+N.log10(b53).toFixed(2));
+/* v7.1：第53境（未成天仙）【够不到】30000 关的怪 —— 这是天仙门禁的本意。
+ * 面板 ×满装备后可达 ~29449 关，比旧口径（推满 30000）低约 1 个量级的零头。 */
+t('第53境基础 < 第30000关的怪（天仙门禁）',
+  N.log10(b53) < 78 && N.log10(b53) > 74, 'log10='+N.log10(b53).toFixed(2));
 t('基础属性随境界严格单调递增', N.gt(R.baseStat(53), R.baseStat(10)) && N.gt(R.baseStat(10), R.baseStat(1)));
 
 // 玩家面板
@@ -111,8 +117,8 @@ t('0境0装备 面板 = 10', Math.abs(N.toNumber(ps.power)-10)<1e-9, 'got '+N.to
 var mx = E.slotMult(E.EQ_CFG.MAX_LV);
 var ps2 = R.playerStats(0, {atk:33000,hp:0,def:0,aspd:33000});
 console.log('  0境满装备 面板(攻×速) = '+N.sci(ps2.power)+'（满级单格 '+N.sci(mx)+' 倍）');
-t('0境满装备 面板 = 10×1.99e4×1.99e4 ≈ 3.96e9',
-  Math.abs(N.toNumber(ps2.power) / (10 * Math.pow(1.0003,33000) * Math.pow(1.0003,33000)) - 1) < 1e-6,
+t('0境满装备 面板 = 10×10.9×10.9 ≈ 1.19e3（v7.1 线性）',
+  Math.abs(N.toNumber(ps2.power) / (10 * E.EQUIP_MAX_BONUS * E.EQUIP_MAX_BONUS) - 1) < 1e-9,
   'got '+N.sci(ps2.power));
 t('0境满装备面板用大数返回（不再溢出/失真）', typeof ps2.power === 'object' && isFinite(N.log10(ps2.power)));
 
@@ -142,7 +148,7 @@ t('满级装备面板 > 0境裸装面板（点装备是有意义的）',
  * 全场 30000 关的 5.5%，想毕业还得靠几十上百轮攒修为。 */
 var spanWithEquip = N.log10(N.from(E.EQUIP_MAX_BONUS)) / N.log10(N.from(1.006));
 console.log('  满级装备单轮跨度 = '+spanWithEquip.toFixed(0)+' 关（全场 30000 关的 '+(spanWithEquip/30000*100).toFixed(1)+'%）');
-t('装备单轮跨度 1500~1800 关', spanWithEquip > 1500 && spanWithEquip < 1800,
+t('装备单轮跨度 ≈399 关（v7.1 线性装备）', spanWithEquip > 350 && spanWithEquip < 450,
   'span='+spanWithEquip.toFixed(0));
 t('装备跨度 < 全场的 1/10（装备不能替代境界）', spanWithEquip < 3000,
   ((spanWithEquip/30000)*100).toFixed(1)+'%');
@@ -152,12 +158,18 @@ t('满级装备面板 > 0境裸装面板（点装备是有意义的）',
 
 /* 推关速率（约束2）—— 已改为返回大数 */
 var pOnes = R.pushRate(1, E.slotMult(0));
-t('速率(1.0, 攻速0级) = 1', Math.abs(N.toNumber(pOnes)-1)<1e-9, 'got '+N.sci(pOnes));
+t('速率(倍速1, 攻速1, 无跳关) = 35关/分 = 0.583关/秒',
+  Math.abs(N.toNumber(pOnes) - 35/60) < 1e-9, 'got '+N.sci(pOnes));
 var pFast = R.pushRate(3.5, E.slotMult(33000));
 console.log('  速率(倍速3.5, 攻速满级) = '+N.sci(pFast));
-t('速率(3.5, 攻速满级) = 3.5 × 1.99e4 ≈ 6.97e4',
-  Math.abs(N.toNumber(pFast) / (3.5 * Math.pow(1.0003,33000)) - 1) < 1e-9,
+t('速率(3.5, 攻速满级3.0) = 35/60 × 3.5 × 3.0 = 6.125 关/秒',
+  Math.abs(N.toNumber(pFast) / (35/60 * 3.5 * 3.0) - 1) < 1e-9,
   'got '+N.sci(pFast));
+/* v7.1 第三乘区：宠物跳关 20 档 ⇒ ×21 再叠满 → 128.6 关/秒 */
+var pSkip = R.pushRate(3.5, E.slotMult(33000), 20);
+t('宠物跳关拉满（×20）是独立第三乘区 ×21',
+  Math.abs(N.toNumber(pSkip) / (N.toNumber(pFast) * 21) - 1) < 1e-9,
+  'got '+N.sci(pSkip)+' vs 无跳关 '+N.sci(pFast));
 t('速率上限封顶（倍速与攻速双双越界）',
   N.lte(pFast, R.RATE_CFG.ASPD_CAP) === false || Math.abs(N.toNumber(R.pushRate(99, E.slotMult(99999))) / N.toNumber(pFast) - 1) < 1e-9,
   'got '+N.sci(R.pushRate(99, E.slotMult(99999))));
@@ -183,7 +195,7 @@ console.log('  第1轮（凡人，装备刷满）推到 '+life.reached+' 关');
 /* 转生后装备清零，但一轮内会刷满装备再转生；
  * 满装备倍率 ≈ 19900 → 单轮跨度 log(19900)/log(1.006) ≈ 1655 关，
  * 起点 384 → 终点约 2039 关（见 00-realm 的 ROUND 注释）。 */
-t('第1轮推到 2000~2100 关', life.reached>=2000 && life.reached<=2100, 'got '+life.reached);
+t('第1轮推到 ~784 关（v7.1 线性装备口径）', Math.abs(life.reached-784)<=5, 'got '+life.reached);
 
 // 转生
 var reb = R.doRebirth({...st, stage: life.reached, maxStage: life.reached});
@@ -192,9 +204,9 @@ t('转生后装备清零', E.SLOT_KEYS.every(function(k){return reb.state.equip[
 t('转生后灵石清零', N.isZero(reb.state.spirit));
 t('转生后关数归1', reb.state.stage===1);
 t('转生次数+1', reb.state.rebirths===1);
-/* ⚠️ 第 1 轮【不应该】突破 —— 炼气一层需要 ~19 轮（roundsFor(1)=18.8）。
+/* ⚠️ 第 1 轮【不应该】突破 —— v7.1 下炼气一层需要 ~114 轮（Λ=114）。
  * 这正是需求方要的「转生 ≠ 突破，有些境界要几十上百次转生」。 */
-t('第1轮不突破（需约19轮）', reb.newRealms === 0, 'realm='+reb.newRealms);
+t('第1轮不突破（需约114轮）', reb.newRealms === 0, 'realm='+reb.newRealms);
 t('第1轮累计修为接近一层门槛', reb.state.totalPoints && N.gt(reb.state.totalPoints, N.ZERO), N.fmt(reb.state.totalPoints));
 t('累计点数保留', !N.isZero(reb.state.totalPoints));
 
@@ -211,8 +223,14 @@ for (var i=0;i<400;i++){
   if (lf.reached >= 30000) { console.log('    -> 通关!'); break; }
   prev = lf.reached;
 }
-t('多轮循环不卡死（400轮内突破到筑基以上）', s2.realm > 13,
+/* v7.1 每境恒定 Λ=114 轮 ⇒ 400 轮约推过 3 境（炼气三层）。
+ * 旧口径「400 轮内到筑基」是基于 ROUNDS_BASE=18 的递增曲线，已不适用。
+ * 这里真正要锁的不变量是：不发散、不卡死、境界确实在往前涨。 */
+t('多轮循环不卡死（400轮内推进过炼气，≥3 境）', s2.realm >= 3,
   'realm='+s2.realm+' = '+RM.nameOf(s2.realm)+' ('+s2.rebirths+' 轮)');
+t('每境节奏 ≈ Λ 轮（400 轮 ≈ 3.5 境）',
+  Math.abs(s2.rebirths / Math.max(1, s2.realm) - RM.ROUNDS_BASE) < RM.ROUNDS_BASE * 0.5,
+  '实测 ' + (s2.rebirths / Math.max(1, s2.realm)).toFixed(1) + ' 轮/境 vs Λ=' + RM.ROUNDS_BASE);
 t('突破后境界名可读', RM.nameOf(s2.realm).length > 0, RM.nameOf(s2.realm));
 
 console.log('');

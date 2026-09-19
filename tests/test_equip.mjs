@@ -11,26 +11,39 @@ t('空装备四格为0', E.SLOT_KEYS.every(function(k){return eq[k]===0;}));
 t('4 个格子', E.SLOTS.length===4);
 t('格子顺序 攻/血/防/速', E.SLOT_KEYS.join(',')==='atk,hp,def,aspd', E.SLOT_KEYS.join(','));
 
-/* ── 加成公式：(1+C)^L 的指数式 ──────────────────────────────────
- * ⚠️ 这里曾经是线性 (1+C·L)，封顶 10.9 倍。
- * 改成指数是必须的：境界加成是 2.2^R 无上限，线性的 10.9 倍完全被碾压，
- * 实测「装备拉满 33000 级」还不如「境界升 10 级」，玩家没有理由点装备。
- * 指数式满级 = 1.0003^33000 ≈ 1.99e4 倍，装备才成为本轮推关的主力。 */
+/* ── 加成公式：v7.1 线性式 (1+C·L)，封顶 10.9 倍 ─────────────────
+ * ⚠️ 口径沿革（别再凭直觉改回去）：
+ *   v6 中期：线性 → 改成指数 (1+C)^L，当时的理由是「境界加成 28^R 碾压
+ *     线性装备，玩家不点装备」。那时境界是【无限层 × 每层指数涨价】模型。
+ *   v7.0/v7.1：境界重做成【有限 54 层 + 层价 Λ×M(s(R−1)) 同形】，
+ *     推关速率重做成 35关/分 三乘区。此时若装备仍保留 1.0003^33000≈1.99e4，
+ *     装备乘区会比面板模型 P0×Q^(R−1)×(1+0.0003L) 大 1800 倍，
+ *     导致 lvToBeat / maxReach / ascCost 三处口径互相打架（自习偏差一度 76%）。
+ *   结论：装备回到线性，且【只能有一个口径】——EQUIP_MAX_BONUS 必须由
+ *     slotMult(MAX_LV) 推导，严禁再出现第二份 Math.pow(1+C, MAX_LV) 硬编码。
+ *   回滚开关：src/00-equip.js 的 EQ_CFG.LINEAR=false，并且必须重算
+ *     src/00-realm.js 的 Q_REALM_REF（它是按装备满分 10.9 反解出来的）。 */
 t('0级加成 = 1（大数）', N.eq(E.slotMult(0), N.ONE));
 var mx = E.slotMult(33000);
-console.log('  满级加成 = ' + N.sci(mx) + '（指数 1.0003^33000；旧线性版 10.9）');
-t('满级加成 ≈ 1.99e4', Math.abs(N.log10(mx) - Math.log10(Math.pow(1.0003, 33000))) < 1e-9,
+console.log('  满级加成 = ' + N.sci(mx) + '（v7.1 线性 1+0.0003×33000 = 10.9）');
+t('满级加成 ≈ 10.9', Math.abs(N.toNumber(mx) - (1 + E.EQ_CFG.C * E.EQ_CFG.MAX_LV)) < 1e-9,
   'got ' + N.sci(mx));
-t('满级加成 = (1+C)^MAX_LV 精确值',
-  Math.abs(N.toNumber(mx) / Math.pow(1 + E.EQ_CFG.C, E.EQ_CFG.MAX_LV) - 1) < 1e-9);
-t('满级加成 > 1000（线性上限 10.9 已被淘汰）', N.gt(mx, N.from(1000)), 'got ' + N.sci(mx));
+t('满级加成 = 1+C·MAX_LV 精确值',
+  Math.abs(N.toNumber(mx) / (1 + E.EQ_CFG.C * E.EQ_CFG.MAX_LV) - 1) < 1e-12);
+t('满级加成 ≤ 11（线性口径，不再是 1.99e4）', N.toNumber(mx) <= 11, 'got ' + N.sci(mx));
 t('超出上限被夹（等价于满级）', N.eq(E.slotMult(99999), mx));
 t('负数等级夹到 0', N.eq(E.slotMult(-5), N.ONE));
 
-/* 指数式必须比线性式陡：同一等级下指数加成更大（L≥2 时） */
-t('指数式在 L=1000 时远超线性式',
-  N.gt(E.slotMult(1000), N.from(1 + E.EQ_CFG.C * 1000)),
-  'exp=' + N.sci(E.slotMult(1000)) + ' lin=' + (1 + E.EQ_CFG.C * 1000).toFixed(3));
+/* 线性式的代价：中期加成远小于旧指数式 —— 这正是 v7.1 想要的，
+ * 成长被压回「境界 + 轮数」双轴，配合 Λ=114 才标定出 33 天毕业。 */
+t('线性式在 L=1000 时 = 1.3 倍',
+  Math.abs(N.toNumber(E.slotMult(1000)) - (1 + E.EQ_CFG.C * 1000)) < 1e-12,
+  'lin=' + N.sci(E.slotMult(1000)));
+
+/* ★ 单一事实源：常量必须由公式推导，不允许出现第二份手写值 */
+t('EQUIP_MAX_BONUS 与 slotMult(MAX_LV) 同源',
+  Math.abs(E.EQUIP_MAX_BONUS - N.toNumber(E.slotMult(E.EQ_CFG.MAX_LV))) < 1e-12,
+  'const=' + E.EQUIP_MAX_BONUS);
 
 var bonus = E.equipBonus({atk:33000,hp:1000,def:0,aspd:33000});
 t('equipBonus 结构（大数）',
