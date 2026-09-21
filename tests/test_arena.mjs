@@ -166,11 +166,73 @@ t('无目标时玩家位置被钳在擂台内（不会向右跑出画）',
   /p\.x\s*=\s*Math\.min\(p\.x,\s*arenaLeft\(\)\s*\+\s*arenaW\(\)\s*\*\s*0\.88\)/.test(BATTLE));
 
 /* ────────────────────────────────────────────────────────────
- * 6. 战斗区不再显示「修为/秒」
+ * 6. 单轴对撞 + 移速同档（实测反馈：怪与玩家不同轴 / 怪太快）
  * ──────────────────────────────────────────────────────────── */
+console.log('');
+console.log('-- 单轴对撞与移速 --');
+{
+  const B = stripComments(BATTLE);
+  const mk = B.match(/function makeEnemyFrom\([^)]*\)\s*\{[\s\S]*?\n  \}/);
+  t('存在 makeEnemyFrom', !!mk);
+  const body = mk ? mk[0] : '';
+  t('【核心】怪 lane 固定为 MID_LANE（不再 Math.random 连续随机）',
+    /const lane = MID_LANE;/.test(body), body.match(/const lane = [^;]*;/));
+  t('lane 赋值处不再出现 Math.random', !/const lane = Math\.random/.test(body));
+  t('怪 y 由 laneOff(lane) 推导（与玩家用同一套纵深换算）', /y:laneOff\(lane\)/.test(body));
+  t('【核心】怪移速基准 = BC.playerSpeed（与玩家同速）',
+    /speed:\s*BC\.playerSpeed\s*\*/.test(body), (body.match(/speed:[^,]*/) || [''])[0]);
+  t('怪移速不再取 def.speed（各怪种自带 120/76/88 已废弃）', !/speed:\s*def\.speed/.test(body));
+  t('全文件已无 def.speed 参与移速', !/speed:\s*def\.speed/.test(B), '仍有残留');
+  /* 个体差异必须压在 1.0 以下：任何怪都不该比玩家跑得快 */
+  const mul = body.match(/BC\.playerSpeed \* \(([^)]*)\)/);
+  t('个体差异系数上限 ≤ 1.0（怪不会比玩家快）',
+    !!mul && /0\.9[0-9]\s*\+/.test(mul[1]) && !/\+\s*Math\.random\(\)\s*\*\s*0\.1[1-9]/.test(mul[1]),
+    JSON.stringify(mul && mul[1]));
+  const spd = num('playerSpeed');
+  t('玩家基础移速 42px/s（BC 常量）', spd === 42, 'got ' + spd);
+  t('怪物模板表已标注 speed 字段废弃', /speed 字段【已废弃】|已废弃/.test(BATTLE));
+}
 console.log('');
 console.log('-- 战斗区「修为/秒」已移除 --');
 const CSS = stripComments(HTML);   /* HTML 里的 /*...*\/ 注释同样会提到被删的老选择器 */
+
+/* ── HUD 去重与所有权（实测反馈：三个关卡 / 读数跳来跳去）── */
+console.log('');
+console.log('-- HUD 去重与所有权 --');
+{
+  const B = stripComments(BATTLE);
+  const U = stripComments(V6UI);
+  t('index.html 已删除重复的 #battleTrial 节点', !/id="battleTrial"/.test(HTML));
+  t('index.html 已删除为空的 #battleSpirit 锚点', !/id="battleSpirit"/.test(HTML));
+  t('关卡读数在页面内唯一（只有一处 "第 <b id=sbStage>"）',
+    (HTML.match(/id="sbStage"/g) || []).length === 1 &&
+    (HTML.match(/第 <b id="sbStage">/g) || []).length === 1,
+    'sbStage 出现 ' + (HTML.match(/id="sbStage"/g) || []).length + ' 次');
+  t('推进状态已并入关卡行（#battleState 落在 .sb-main 内）',
+    /sb-main[\s\S]{0,320}id="battleState"/.test(HTML));
+  t('顶部 HUD 改 flex-end（旧的 space-between 会把唯一项甩到画面正中）',
+    /\.battle-hud\{[^}]*justify-content:flex-end/.test(CSS));
+  t('.battle-hud 只剩一条定义（无重复声明）',
+    (CSS.match(/\.battle-hud\{/g) || []).length === 1,
+    '出现 ' + (CSS.match(/\.battle-hud\{/g) || []).length + ' 次');
+  t('已删除 .battle-hud .trial 死样式', !/\.battle-hud \.trial/.test(CSS));
+
+  /* ★ 双写防线：一个节点只能有一个模块负责 */
+  t('【核心】50-battle.js 不再写 #battleSpeed（交还 06-v6ui）',
+    !/getElementById\('battleSpeed'\)/.test(B));
+  t('【核心】06-v6ui.js 不再碰 #battleBuff（战斗内临时 buff 归 50-battle）',
+    !/battleBuff/.test(U));
+  t('50-battle.js 负责写 #battleBuff（身法剩余秒）',
+    /getElementById\('battleBuff'\)/.test(B));
+  t('06-v6ui.js 负责写 #battleSpeed（宠物永久倍速）', /el\('battleSpeed'\)/.test(U));
+  t('06-v6ui.js 负责写 #battleSkip（跳关档位）', /el\('battleSkip'\)/.test(U));
+  t('两模块写的节点集合无交集', !/battleBuff/.test(U) && !/battleSkip/.test(B));
+  t('跳关显示为「跳 ≤N」（与实际随机抽档语义一致，不谎称固定跳 N）',
+    /'跳 ≤'/.test(U));
+  t('50-battle.js 不再自行渲染关卡文案（权威归 stage-bar）',
+    !/battleTrial/.test(B));
+}
+
 t('index.html 中 #rateText 节点已删除', !/id="rateText"/.test(HTML));
 t('index.html 中 .res-bar 内只剩灵石一项', (HTML.match(/class="res-bar">[\s\S]*?<\/div>\s*<\/div>/) || [''])[0].split('<div class=').length - 1 === 1);
 t('index.html 已无 .res-bar .rate 规则', !/\.res-bar \.rate[^\w]/.test(CSS));

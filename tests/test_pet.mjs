@@ -60,27 +60,33 @@ t('脏输入（-5 / NaN / undefined）都落到 1',
 
 /* ── 2. 跳关解锁 ─────────────────────────────────────────────── */
 console.log('\n-- 宠物跳关解锁 --');
-/* ⚠️ v7.9（用户明确要求）：第一档门槛是 0 —— 从第一关开始就能跳。 */
+/* ⚠️ v7.9（用户明确要求）：第一档门槛是 0 —— 从第一关开始就能跳。
+ * ⚠️ v7.10（实测反馈"永远只跳一关"）：六档门槛整体压缩到前 2000 关内。
+ *    旧表第二档要 3000 关，导致 best<3000 时可选集合恒为 {0,1}，
+ *    那段赛程里"随机档位"在体感上等于没实现。 */
 t('第 1 关就能跳（最高档 = 1）', P.unlockedSkip(0) === 1 && P.unlockedSkip(1) === 1,
   'got ' + P.unlockedSkip(0));
-t('3000 关 → 最高档 2', P.unlockedSkip(3000) === 2, 'got ' + P.unlockedSkip(3000));
-t('6000 关 → 最高档 4', P.unlockedSkip(6000) === 4, 'got ' + P.unlockedSkip(6000));
-t('10000 关 → 最高档 8', P.unlockedSkip(10000) === 8, 'got ' + P.unlockedSkip(10000));
-t('14000 关 → 最高档 10', P.unlockedSkip(14000) === 10, 'got ' + P.unlockedSkip(14000));
-t('18000 关 → 最高档 20', P.unlockedSkip(18000) === 20, 'got ' + P.unlockedSkip(18000));
+t('120 关 → 最高档 2', P.unlockedSkip(120) === 2, 'got ' + P.unlockedSkip(120));
+t('300 关 → 最高档 4', P.unlockedSkip(300) === 4, 'got ' + P.unlockedSkip(300));
+t('700 关 → 最高档 8', P.unlockedSkip(700) === 8, 'got ' + P.unlockedSkip(700));
+t('1200 关 → 最高档 10', P.unlockedSkip(1200) === 10, 'got ' + P.unlockedSkip(1200));
+t('2000 关 → 最高档 20', P.unlockedSkip(2000) === 20, 'got ' + P.unlockedSkip(2000));
 t('满图后仍是 20（封顶）', P.unlockedSkip(30000) === 20);
+/* ⚠️ 这条是本次反馈的核心回归防线：实测玩家卡在 207 关，必须能掷出【多于一档】 */
+t('207 关（实测卡点）已解锁 0/1/2 三档', P.unlockedSkipTiers(207).join(',') === '0,1,2',
+  JSON.stringify(P.unlockedSkipTiers(207)));
 t('倍速与跳关在同一表内互不串台',
-  P.petAssetsFor(3000).skip === 2 && Math.abs(P.petAssetsFor(3000).gameSpeed - 2.0) < 1e-9,
-  JSON.stringify(P.petAssetsFor(3000)));
+  P.petAssetsFor(500).skip === 4 && Math.abs(P.petAssetsFor(500).gameSpeed - 1.5) < 1e-9,
+  JSON.stringify(P.petAssetsFor(500)));
 
 /* ── 2b. 随机抽档（v7.9：不是固定跳，是那几个档里随机） ─────────── */
 console.log('\n-- 跳关随机化 --');
 {
-  const t3000 = P.unlockedSkipTiers(3000);
-  t('3000 关的档位池 = [0,1,2]', t3000.join(',') === '0,1,2', JSON.stringify(t3000));
+  const t207 = P.unlockedSkipTiers(207);
+  t('207 关的档位池 = [0,1,2]', t207.join(',') === '0,1,2', JSON.stringify(t207));
   t('池子里一定有 0（有可能不跳）', P.unlockedSkipTiers(30000).indexOf(0) === 0);
   t('未解锁档位不会出现在池里',
-    P.unlockedSkipTiers(3000).every((x) => P.SKIP_TIERS.indexOf(x) >= 0 && x <= 2));
+    t207.every((x) => P.SKIP_TIERS.indexOf(x) >= 0 && x <= 2));
 
   /* 抽样分布：所有档都要能抽到，且不能抽到池外的值 */
   const seen = new Set(); let outside = 0;
@@ -93,6 +99,17 @@ console.log('\n-- 跳关随机化 --');
   t('七个档全部出现过（0/1/2/4/8/10/20）', seen.size === 7,
     'seen=' + [...seen].sort((a, b) => a - b).join(','));
   t('不是固定值（抽样出现多于一种结果）', seen.size > 1);
+
+  /* ★ 本次反馈的直接回归：207 关不能再出现「永远只跳 1 关」 */
+  const seen207 = new Set();
+  for (let i = 0; i < 3000; i++) seen207.add(P.rollSkip(207));
+  t('207 关能掷出 0/1/2 三种结果（不再恒定）', seen207.size === 3,
+    'seen=' + [...seen207].sort((a, b) => a - b).join(','));
+  const cnt = {};
+  for (let i = 0; i < 30000; i++) { const v = P.rollSkip(207); cnt[v] = (cnt[v] || 0) + 1; }
+  t('207 关三档分布均匀（各占 1/3 ±8%）',
+    Object.keys(cnt).length === 3 && Object.values(cnt).every((c) => Math.abs(c / 30000 - 1 / 3) < 0.08),
+    JSON.stringify(cnt));
 
   /* 随机≠失控：实测均值必须收敛到期望值，否则赛程标定无从谈起 */
   const N_SAMP = 200000;
@@ -107,8 +124,8 @@ console.log('\n-- 跳关随机化 --');
   t('期望 < 最高档的一半（保留不确定性）', expv < P.unlockedSkip(30000) / 2,
     'exp=' + expv.toFixed(3) + ' max=' + P.unlockedSkip(30000));
   t('期望随最高关单调递增',
-    P.skipExpected(0) < P.skipExpected(3000) && P.skipExpected(3000) < P.skipExpected(6000)
-    && P.skipExpected(6000) < P.skipExpected(30000));
+    P.skipExpected(0) < P.skipExpected(300) && P.skipExpected(300) < P.skipExpected(2000)
+    && P.skipExpected(2000) <= P.skipExpected(30000));
   t('第一关的期望 = 0.5（只在 0/1 两档之间掷）', Math.abs(P.skipExpected(0) - 0.5) < 1e-9,
     'got ' + P.skipExpected(0));
   /* v7.9：第一档门槛为 0，所以【任何输入】都至少能掷出 0/1 两档 */
@@ -127,12 +144,14 @@ t('normSkipTier(-3 / undefined)→0', P.normSkipTier(-3) === 0 && P.normSkipTier
 console.log('\n-- 解锁进度 --');
 {
   const nx = P.nextUnlock(0);
-  t('0 关时下一档是 500 关处的倍速 1.5',
-    nx && nx.at === 500 && nx.kind === 'speed' && nx.value === 1.5, JSON.stringify(nx));
-    const nx2 = P.nextUnlock(2999);
-  t('2999 关时下一档是 3000 关处的跳关 1',
-    nx2 && nx2.at === 3000 && nx2.kind === 'skip', JSON.stringify(nx2));
-  t('remain 计算正确', nx2 && nx2.remain === 1, JSON.stringify(nx2));
+  /* v7.10: 门槛压缩后，跳关首档(120 关)已经排在倍速首档(500 关)之前 */
+  t('0 关时下一档是 120 关处的跳关 2',
+    nx && nx.at === 120 && nx.kind === 'skip' && nx.value === 2, JSON.stringify(nx));
+  t('remain = 距下一档还差多少关', nx && nx.remain === 120, JSON.stringify(nx));
+  const nx2 = P.nextUnlock(2999);
+  t('2999 关时下一档是 6000 关处的倍速 2.5',
+    nx2 && nx2.at === 6000 && nx2.kind === 'speed', JSON.stringify(nx2));
+  t('remain 计算正确（6000−2999）', nx2 && nx2.remain === 3001, JSON.stringify(nx2));
   t('全部解锁后返回 null', P.nextUnlock(30000) === null);
   t('petSummary 可读', P.petSummary(22000).indexOf('跳关 20') >= 0, P.petSummary(22000));
 }
@@ -153,9 +172,24 @@ console.log('\n-- 三乘区纯净性 --');
   t('满配 = 35/60 × 3.5 × 3.0 × 21 ≈ 128.6 关/秒',
     Math.abs(full - (35 / 60) * 3.5 * 3.0 * 21) < 1e-6, 'got ' + full);
   t('满配 ≈ 7718 关/分（设计文档 §4.3）', Math.abs(full * 60 - 7718) < 2, 'got ' + (full * 60).toFixed(1));
-  /* 三个乘区必须是独立相乘，不能是相加：1+1+1 只有 3 倍，相乘是 6 倍 */
+  /* 三个乘区必须是独立相乘，不能是相加：1+1+1 只有 3 倍，相乘是 8 倍 */
   const both = N.toNumber(R.pushRate(2.0, N.from(2.0), 1));
   t('乘区是相乘不是相加（2×2×2=8）', Math.abs(both / base - 8) < 1e-9, 'got ' + (both / base));
+
+  /* ★ v7.10 回归防线：第三乘区必须接受【小数期望值】，不能被 normSkip 折成档位。
+   * 曾经的 bug：pushRate 内部对参数调 normSkip，把 E[skip]=6.4286 折成合法档位 4，
+   * 于是第三乘区从 7.4286 静默缩到 5 —— 跳关收益凭空少 33%，而 UI 照常显示「跳 ≤20」，
+   * 不看数字根本发现不了。这条断言就是钉死这个坑。 */
+  const frac = N.toNumber(R.pushRate(1, ONE, 6.4286));
+  t('第三乘区接受小数期望值（不被折成档位）',
+    Math.abs(frac / base - 7.4286) < 1e-6, 'ratio=' + (frac / base).toFixed(6));
+  t('期望 6.4286 不再被折叠成档位 4（那会让乘区变成 5）',
+    Math.abs(frac / base - 5) > 1, 'ratio=' + (frac / base).toFixed(6));
+  const half = N.toNumber(R.pushRate(1, ONE, 0.5));
+  t('期望 0.5（仅解锁 0/1 两档）→ 乘区 1.5', Math.abs(half / base - 1.5) < 1e-9, 'got ' + (half / base));
+  t('负数期望被夹到 0（不产生负速率）', Math.abs(N.toNumber(R.pushRate(1, ONE, -3)) / base - 1) < 1e-9);
+  t('脏期望值不产生 NaN', isFinite(N.toNumber(R.pushRate(1, ONE, NaN))) &&
+    isFinite(N.toNumber(R.pushRate(1, ONE, undefined))));
 }
 
 /* ── 5. 授予：棘轮式，只增不减 ───────────────────────────────── */
@@ -239,12 +273,19 @@ console.log('\n-- 起始关进 v6 状态机 --');
   t('applyRebirth 从起始关出发（5000 → 3500）', s.stage === 3500, 'got ' + s.stage);
   t('applyRebirth 回报 startStage', out.startStage === 3500, 'got ' + out.startStage);
   t('起始关后历史最高关并入 5000', s.bestStage === 5000, 'got ' + s.bestStage);
-  /* 起始关 ≥ 3000 → 宠物跳关同步解锁（5000 关 → 最高档 2），且立刻作用在速率上 */
-  t('起始关同步解锁宠物跳关', s.skip === 2, 'got ' + s.skip);
+  /* 起始关 ≥ 门槛 → 宠物跳关同步解锁。5000 关：跳关已满档 20，倍速到 ×2 */
+  t('起始关同步解锁宠物跳关', s.skip === 20 && Math.abs(s.gameSpeed - 2) < 1e-9,
+    'got skip=' + s.skip + ' spd=' + s.gameSpeed);
   const lv = V.live(s);
-  t('跳关已计入速率（第三乘区 ×2）',
-    Math.abs(N.toNumber(lv.rate) / ((35 / 60) * lv.gameSpeed) - 2) < 1e-9,
+  /* 速率第三乘区必须用【期望】E[skip] 而不是最高档：
+   * 5000 关七档全开 → E = (0+1+2+4+8+10+20)/7 = 6.4286，故 ×7.4286 */
+  const expMul = 1 + P.skipExpected(5000);
+  t('跳关已计入速率（第三乘区按期望 ×' + expMul.toFixed(4) + '）',
+    Math.abs(N.toNumber(lv.rate) / ((35 / 60) * lv.gameSpeed) - expMul) < 1e-9,
     'rate=' + N.toNumber(lv.rate).toFixed(4) + ' spd=' + lv.gameSpeed);
+  t('速率用的是期望值而非最高档 20（否则会 ×21）',
+    Math.abs(N.toNumber(lv.rate) / ((35 / 60) * lv.gameSpeed) - 21) > 1,
+    'ratio=' + (N.toNumber(lv.rate) / ((35 / 60) * lv.gameSpeed)).toFixed(4));
 }
 
 /* ── 8. 天仙门禁 ─────────────────────────────────────────────── */

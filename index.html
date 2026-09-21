@@ -85,6 +85,9 @@
     text-overflow:ellipsis;white-space:nowrap}
   .stage-bar .sb-rec{color:#8d97a9;font-size:11px;white-space:nowrap}
   .stage-bar .sb-rec b{color:#9ed7b8}
+  /* v7.10 推关状态并入关卡行: 卡住时才变色提示, 平时低调不入眼 */
+  .stage-bar .sb-state{color:#7f8a9c;font-size:11px;white-space:nowrap;flex:none}
+  .stage-bar .sb-state.stuck{color:#ff7a5c;font-weight:700}
 
   /* ── v7.6 装备行: 战斗带【正下方】的 4 槽横排 ──
      每槽固定 80px 宽、space-evenly 均匀分布 —— 宽度不随内容/屏宽变(用户: 别自适应, 好丑)。
@@ -275,12 +278,19 @@
      position:absolute 相对于 .battle-ui(fixed) 定位，top:0 即战斗横带顶部，
      几何与原位置完全一致；脱离战斗内容层层叠上下文，避免 #battleGL 的 CSS
      filter 在移动端 WebView 触发合成层排序异常后盖住 HUD。 */
-  .battle-hud{position:absolute;left:0;right:0;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:3px 10px;font-size:10px;color:#c8d4e8;pointer-events:none !important;text-shadow:0 1px 3px rgba(0,0,0,.8)}
-  .battle-hud .kills{color:#e8c56b;font-weight:700}
-  .battle-hud .speed{color:#ff8a4a;font-weight:700}
-  /* v3.9 妖潮试炼 HUD: 倒计时+波次档位; boosted=离线加成生效中(金光) */
-  .battle-hud .trial{color:#9fd0ff;font-weight:700}
-  .battle-hud .trial.boosted{color:#ffd76b;text-shadow:0 0 6px rgba(255,215,107,.55)}
+  /* ⚠️ v7.10: .trial(重复关卡读数) 与 .kills(旧灵石, 已迁至 res-bar) 一并删除。
+     HUD 改为【单一资产组】: 倍速 / 跳关 / 身法 各自独立节点、固定靠右顺序,
+     谁没生效谁隐藏 —— 不再互相抢占同一个 span。
+     justify-content 由 space-between 改为 flex-end: 旧写法会把唯一可见项甩到
+     画面正中, 看着像第三个关卡读数。 */
+  .battle-hud{position:absolute;left:0;right:0;top:0;z-index:2;pointer-events:none !important;
+    display:flex;justify-content:flex-end;align-items:center;padding:3px 10px;font-size:10px;
+    color:#c8d4e8;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+  .battle-hud .bh-assets{display:flex;align-items:center;gap:7px}
+  .battle-hud .speed{color:#ff8a4a;font-weight:700;white-space:nowrap}
+  .battle-hud .skip{color:#7fd3ff;font-weight:700;white-space:nowrap}
+  .battle-hud .buff{color:#c58cff;font-weight:700;white-space:nowrap}
+  /* 资源栏: 战斗区左下角裸文字, 与右下大图标(bottom:6px)同一水平带 */
 
   /* 战斗区UI图标层：大图标(地板右下) + 小图标(右上角) */
   .battle-ui{position:fixed;left:0;right:0;top:92px;bottom:calc(44vh + 130px);z-index:4;pointer-events:none}
@@ -766,16 +776,27 @@
 
 <!-- 战斗区UI图标层：大图标(地板右下) + 顶部HUD(击杀/妖潮/倍速/状态) + 资源栏(左下裸文字) -->
 <div class="battle-ui" id="battleUI">
+  <!-- ⚠️ v7.10 HUD 改版（勿回退）
+       原先这里同时挂着 #battleTrial「第 N 关」，而下方 stage-bar 里还有 #sbStage
+       「第 N 关」——同一个关卡在屏幕上出现两次，玩家数出「三个关卡」。
+       关卡显示的唯一权威是 stage-bar，这里的重复节点连同 .trial 样式一并删除。
+       同理 #battleState「推进中」原先被 space-between 甩到画面正中，看着像第三个
+       动态关卡读数，现已并入 stage-bar 的关卡行，与关卡同一个视觉分组。
+
+       ⚠️ 另一个坑：#battleSpeed 原先被两个模块同时写——
+         · 50-battle.js 写「临时倍速 + 身法剩余秒」
+         · 06-v6ui.js 写「永久倍速 + 跳关」
+       两者逐帧互相覆盖，就是那个「跳来跳去」的现象。
+       现在按所有权拆开：永久资产（倍速/跳关）归 06-v6ui.js，
+       战斗内临时 buff(身法) 归 50-battle.js，各写各的节点。 -->
   <div class="battle-hud">
-    <!-- v7.6: 击杀/杀怪显示已删(用户: 现在推关, 不显示杀怪)。
-         灵石已迁到战斗区左下角资源栏, 此处仅留隐藏锚点(供旧逻辑引用), 不再显示 -->
-    <span class="kills" style="display:none" aria-hidden="true">灵石 <b id="battleSpirit">0</b></span>
-    <!-- v7.6: 怪物血量已删(用户: 左边已显示关卡)。顶部仅保留当前推关进度 -->
-    <span class="trial" id="battleTrial">第 1 关</span>
-    <span class="speed" id="battleSpeed" style="display:none">×2 倍速</span>
-    <span id="battleState">推进中</span>
+    <span class="bh-assets">
+      <span class="speed" id="battleSpeed" style="display:none"></span>
+      <span class="skip" id="battleSkip" style="display:none"></span>
+      <span class="buff" id="battleBuff" style="display:none"></span>
+    </span>
   </div>
-  <!-- v7.5 资源栏(灵石 + 修为): 战斗区左下角裸文字, 与右下大图标同一水平带 -->
+  <!-- v7.5 资源栏(灵石): 战斗区左下角裸文字, 与右下大图标同一水平带 -->
   <div class="res-bar">
     <!-- ⚠️ v7.9（用户明确要求，勿恢复）：这里原本还有一块「修为 X/秒」。
      * 它显示的是在线瞬时收益，但现在【只有转生结算才知道这一轮能拿多少修为】
@@ -791,6 +812,8 @@
     <div class="sb-main">
       <span class="sb-stage">第 <b id="sbStage">1</b> 关</span>
       <span class="sb-mob" id="sbMob">—</span>
+      <!-- v7.10: 推不动了/推进中 并入关卡行, 不再单挂在顶部被甩到画面正中 -->
+      <span class="sb-state" id="battleState">推进中</span>
       <span class="sb-rec">最高 <b id="sbBest">0</b></span>
     </div>
     <!-- v7.6: 旧「境界行 + 距下一境进度条」已删(用户: 那条杠不需要)。

@@ -159,10 +159,12 @@ export function render6(force) {
   setText('sbMob', st.mobName);
   setText('sbBest', String(st.best));
 
-  /* ── 灵石（复用旧 HUD 的 #spirit 节点，避免两个数字打架）── */
+  /* ── 灵石 ──
+   * v7.10: 原本还写过 #battleSpirit（顶部 HUD 那个隐藏锚点），
+   * 但它早在 v7.6 就已经 display:none 且从未显示，纯为兼容旧逻辑留的空壳。
+   * 现在节点连同它的 .kills 容器一并删除，灵石的唯一出口就是左下资源栏的 #spirit。 */
   const spiritTxt = N.fmt(S6.spirit);
   setText('spirit', spiritTxt);
-  setText('battleSpirit', spiritTxt);
 
   /* ── 4 个升级按钮（v7.6c: 按钮只显示等级, 槽名在按钮上方小字, 费用靠 no/ready 变色表达）── */
   for (const slot of E.SLOTS) {
@@ -199,27 +201,43 @@ export function render6(force) {
     }
   }
 
-  /* ── 战斗 HUD 的倍速显示（旧节点，复用）──
-   * v7.1：把宠物跳关也挂在同一行，两者同属「Buff 宠物」给的永久资产，
-   * 玩家看到的是一句话：「×3.5 倍速 ／ 跳 2」= 第三乘区已开到 ×3。 */
-  const spd = el('battleSpeed');
-  if (spd) {
+  /* ── Buff 宠物永久资产：倍速 / 跳关（两个独立节点，勿再塞回同一个 span）──
+   *
+   * ⚠️ v7.10 所有权治理（勿回退）：
+   *   这三个读数以前全挤在 #battleSpeed 一个节点里，而且【两个模块都在写它】——
+   *   50-battle.js 每帧写「临时倍速+身法」，本函数每帧写「永久倍速+跳关」，
+   *   谁后跑到帧尾就留下谁的内容，玩家看到的就是文字来回跳变。
+   *   现在按"谁的数据谁负责"拆开：
+   *     #battleSpeed ← 本函数(Math) 宠物永久倍速  (战斗中不含身法, 身法是临时 buff)
+   *     #battleSkip  ← 本函数(Math) 宠物跳关档位
+   *     #battleBuff  ← 50-battle.js  身法剩余秒数(仅战斗内临时生效)
+   */
+  const spdEl = el('battleSpeed');
+  const skpEl = el('battleSkip');
+  if (spdEl) {
+    const gs = +S6.gameSpeed || 1;
+    const on = gs > 1;
+    spdEl.style.display = on ? '' : 'none';
+    if (on) setText('battleSpeed', '×' + gs.toFixed(2).replace(/\.?0+$/, '') + ' 倍速');
+  }
+  if (skpEl) {
     const sk = V.normV6(S6).skip || 0;
-    const on = S6.gameSpeed > 1 || sk > 0;
-    spd.style.display = on ? '' : 'none';
-    if (on) {
-      const parts = [];
-      if (S6.gameSpeed > 1) parts.push('×' + (+S6.gameSpeed.toFixed(2)) + ' 倍速');
-      if (sk > 0) parts.push('跳 ' + sk + ' 关');
-      setText('battleSpeed', parts.join(' ／ '));
-    }
+    /* 显示已解锁的【最高档】: 实际每次掷骰在 0…该档之间随机(见 rollSkip),
+     * 写成「跳 ≤N」才不会让人以为每次固定撕 N 关。 */
+    skpEl.style.display = sk > 0 ? '' : 'none';
+    if (sk > 0) setText('battleSkip', '跳 ≤' + sk + ' 关');
   }
 
-  /* ── 战斗状态文案 ── */
-  const bs = el('battleState');
-  if (bs) {
-    const txt = st.stuck ? '推不动了' : '推进中';
-    if (bs.textContent !== txt) bs.textContent = txt;
+  /* ── 推关状态（v7.10: 从顶部 HUD 挪进 stage-bar，与关卡同一视觉分组）──
+   * 以前它是 .battle-hud 里唯一可见的元素，被 justify-content:space-between
+   * 一把甩到画面正中，看着像第三个关卡读数。 */
+  const stEl = el('battleState');
+  if (stEl) {
+    /* ⚠️ cleared 不在 stageText 里 —— 它在 clearProgress(s) 上，别串用 */
+    const done = V.clearProgress(S6).cleared;
+    const txt = done ? '已通关' : (st.stuck ? '推不动了' : '推进中');
+    if (stEl.textContent !== txt) stEl.textContent = txt;
+    stEl.classList.toggle('stuck', !!st.stuck);
   }
 
   /* ⚠️ v7.9（用户明确要求，勿恢复）：这里原本每帧刷新资源栏上的「修为 X/秒」。

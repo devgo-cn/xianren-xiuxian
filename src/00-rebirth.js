@@ -223,13 +223,23 @@ export function normSkip(tier) {
  *
  * @param {number} gameSpeed 游戏倍速 [1, 3.5]
  * @param {object} aspdMult 装备攻速倍率（大数，[1, 3.0]）
- * @param {number} [skip] 宠物跳关档位（0/1/2/4/8/10/20，缺省 0）
+ * @param {number} [skip] 跳关的【期望跳数】E[skip]（可以是小数，如 6.4286）
  * @returns {object} 推关速率（大数，关/秒）
  */
 export function pushRate(gameSpeed, aspdMult, skip) {
   const gs = clamp(gameSpeed, 1, RATE_CFG.SPD_CAP);
   const as = clampBig(aspdMult);
-  const sk = normSkip(skip);
+  /* ⚠️ v7.10 修 bug（勿回退）：这里【不能】再走 normSkip。
+   *
+   * normSkip 的语义是「把脏值向下折到最近的合法档位」，它只接受
+   * 0/1/2/4/8/10/20 这些【档位】。而 v7.9 把本参数改成了【期望值】——
+   * 期望值天然是小数（七档全开时是 6.4286），一旦过 normSkip 就被
+   * 折成 4，第三乘区从 7.4286 悄悄缩到 5，速率凭空少了 33%。
+   * 症状很隐蔽：UI 上「跳 ≤20」照常显示，只有速率偏慢，不看数根本发现不了。
+   *
+   * 期望值只需保证「有限且非负」，不需要是合法档位 —— 上限由解锁阀值
+   * 天然约束（最高档 20 → 期望最大 6.4286），无需再 clamp 到档位表。 */
+  const sk = Math.max(0, +skip || 0);
   return N.mulNum(N.mulNum(N.mulNum(as, RATE_CFG.V_BASE), gs), 1 + sk);
 }
 

@@ -4,6 +4,7 @@ import * as E from '../src/00-equip.js';
 import * as R from '../src/00-rebirth.js';
 import * as V from '../src/05-v6.js';
 import * as A from '../src/00-anchor.js';
+import * as P from '../src/00-pet.js';
 
 var pass = 0, fail = 0;
 function t(n, c, e) { if (c) { pass++; console.log('  PASS ' + n); } else { fail++; console.log('  FAIL ' + n + '  ' + (e || '')); } }
@@ -52,8 +53,14 @@ var sl = V.newV6();
 var L0 = V.live(sl);
 console.log('  初始：power=' + N.sci(L0.power) + ' rate=' + L0.rateNum.toFixed(2) + ' maxReach=' + L0.maxReach);
 t('初始 power = BASE0 = 10', Math.abs(N.toNumber(L0.power) - 10) < 1e-9);
-t('初始 rate = 35关/分 = 0.5833 关/秒（v7.1 基准）',
-  Math.abs(L0.rateNum - 35/60) < 1e-9, 'got ' + L0.rateNum);
+/* ⚠️ v7.9/v7.10：速率是【三乘区】，第三乘区自开局起就不是 1 ——
+ * 跳关首档门槛为 0（从第一关就能跳），起手即解锁 0/1 两档 → E[skip]=0.5。
+ * 所以裸速率 = 35/60 × 1.5 = 0.875，不再是纯 35/60。
+ * 断言里显式写出 1.5，避免以后有人把"基准"错当成无跳关的裸值。 */
+const SKIP_OPEN = 1 + P.skipExpected(0);   // = 1.5
+t('初始 rate = 35关/分 × 起手跳关乘区 1.5',
+  Math.abs(L0.rateNum - (35/60) * SKIP_OPEN) < 1e-9, 'got ' + L0.rateNum);
+t('起手跳关期望 = 0.5（仅 0/1 两档）', Math.abs(P.skipExpected(0) - 0.5) < 1e-9);
 
 /* v7.1 口径：装备加成是【线性】(1+C·L)，满级 10.9 倍。
  * ⚠️ 代价已知：装备不再是推关主力（单轮跨度 1655→399 关），
@@ -66,10 +73,12 @@ t('装备满级加成 = 10.9（v7.1 线性公式 1+C·L）',
 var sA = V.newV6(); sA.gameSpeed = 3.5;
 var sB = V.newV6(); sB.equip = { atk: 0, hp: 0, def: 0, aspd: 33000 };
 var LA = V.live(sA), LB = V.live(sB);
-t('倍速3.5 → rate = 35/60×3.5 = 2.0417', Math.abs(LA.rateNum - 35/60*3.5) < 1e-9, 'got ' + LA.rateNum);
-t('攻速满级(3.0) → rate = 35/60×3.0 = 1.75', Math.abs(LB.rateNum - 35/60*3.0) < 1e-9, 'got ' + LB.rateNum.toFixed(4));
-t('两条路线独立相乘 rate = 35/60×3.5×3.0 = 6.125',
-  Math.abs(V.live((function(){var x=V.newV6();x.gameSpeed=3.5;x.equip={atk:0,hp:0,def:0,aspd:33000};return x;})()).rateNum / (35/60*3.5*3.0) - 1) < 1e-9);
+t('倍速3.5 → rate = 35/60×3.5×1.5（含起手跳关乘区）',
+  Math.abs(LA.rateNum - 35/60*3.5*SKIP_OPEN) < 1e-9, 'got ' + LA.rateNum);
+t('攻速满级(3.0) → rate = 35/60×3.0×1.5',
+  Math.abs(LB.rateNum - 35/60*3.0*SKIP_OPEN) < 1e-9, 'got ' + LB.rateNum.toFixed(4));
+t('两条路线独立相乘 rate = 35/60×3.5×3.0×1.5',
+  Math.abs(V.live((function(){var x=V.newV6();x.gameSpeed=3.5;x.equip={atk:0,hp:0,def:0,aspd:33000};return x;})()).rateNum / (35/60*3.5*3.0*SKIP_OPEN) - 1) < 1e-9);
 
 /* rate 输出的是大数，rateNum 是同值原生数 —— 两者必须一致 */
 t('rate 是大数且与 rateNum 同值',
@@ -82,11 +91,12 @@ t('rate 是大数且与 rateNum 同值',
  * 攻速格放大 rate（推得快），但不参与 maxReach 的判定时，
  * 天花板由其它格单独控制。 */
 
-/* 1) 小速率下逐帧推进的换算精度（初始 rate=0.5833，最贴近真实前期体验） */
+/* 1) 小速率下逐帧推进的换算精度（初始 rate=0.875=35/60×1.5，最贴近真实前期体验） */
 var spRate = V.newV6();
 var advHalf = 0;
-for (var hi = 0; hi < 50; hi++) advHalf += V.tickV6(spRate, 0.1).advanced;   // 5 秒 @ rate=35/60
-t('5 秒推进 ≈ 2.92 关（rate=35关/分, 0.1s 步长）', Math.abs(advHalf - 35/60*5) <= 1, 'advanced=' + advHalf);
+for (var hi = 0; hi < 50; hi++) advHalf += V.tickV6(spRate, 0.1).advanced;   // 5 秒 @ rate=(35/60)×1.5
+t('5 秒推进 ≈ ' + (35/60*5*SKIP_OPEN).toFixed(2) + ' 关（含起手跳关乘区, 0.1s 步长）',
+  Math.abs(advHalf - 35/60*5*SKIP_OPEN) <= 1.5, 'advanced=' + advHalf);
 
 /* 2) 满攻速的 rate 必须真的换算成关数 —— 用「面板远超天花板」的
  *    极端局面：把 realm 抬到 maxReach 足够大，让 rate 成为唯一约束。
@@ -208,8 +218,11 @@ t('转生次数+1', sr.rebirths === 1);
  * bestStage=2039 → 触发 500/2000 两档中的最高一档 → 倍速 2.0；跳关要 3000 关，还没到。 */
 t('转生后宠物倍速保留（bestStage 2039 → ×2.0）', Math.abs(sr.gameSpeed - 2.0) < 1e-9,
   'got ' + sr.gameSpeed);
-/* v7.9：第一关起就能跳，2039 关已解锁最高档 1（第二档要 3000 关） */
-t('bestStage 2039 已解锁跳关档 1', sr.skip === 1, 'got ' + sr.skip);
+/* v7.10：跳关六档门槛压缩到前 2000 关内，2039 关已解锁【满档 20】。
+ * （旧表 2039 关只能到档 1，那是实测"永远只跳一关"的根源之一。） */
+t('bestStage 2039 已解锁跳关满档 20', sr.skip === 20, 'got ' + sr.skip);
+t('跳关期望值随之上到 6.43（速率第三乘区按期望）', Math.abs(P.skipExpected(2039) - 6.4286) < 1e-3,
+  'got ' + P.skipExpected(2039));
 
 /* 转生后 maxReach 应回到起点附近（装备清零 = 本轮推进器重置）。
  * ⚠️ 转生【清零装备】，所以转生瞬间面板反而比「刷满装备时」小 ——
@@ -301,16 +314,18 @@ var sf = V.newV6();
 var adv5 = 0;
 for (var fi = 0; fi < 25; fi++) adv5 += V.tickV6(sf, 0.2).advanced;   // 25×0.2s = 5 秒
 console.log('  5秒内 25 次 0.2s tick（rate=1）→ 推进 ' + adv5 + ' 关, stage=' + sf.stage);
-t('小步长推进 5 秒 ≈ 2.92 关（rate=35关/分）', Math.abs(adv5 - 35/60*5) <= 1, 'advanced=' + adv5);
+t('小步长推进 5 秒 ≈ ' + (35/60*5*SKIP_OPEN).toFixed(2) + ' 关（含起手跳关乘区）',
+  Math.abs(adv5 - 35/60*5*SKIP_OPEN) <= 1.5, 'advanced=' + adv5);
 t('小步长后 stage 确实前进', sf.stage > 1, 'stage=' + sf.stage);
 t('carry 保持在 [0,1)', sf.carry >= 0 && sf.carry < 1, 'carry=' + sf.carry);
 
-/* 低速档也要能推进：rate=0.5833 关/秒，12 秒推 7 关。 */
+/* 低速档也要能推进：rate=(35/60)×1.5 关/秒，12 秒推约 10 关。 */
 var slowRate = V.newV6();
 var advSlow = 0;
-for (var si = 0; si < 60; si++) advSlow += V.tickV6(slowRate, 0.2).advanced;   // 12 秒 @ rate=35/60
-console.log('  12秒 @ rate=35/60 小步长 → 推进 ' + advSlow + ' 关');
-t('12秒 @ rate=35/60 → 约7关', Math.abs(advSlow - 35/60*12) <= 2, 'advanced=' + advSlow);
+for (var si = 0; si < 60; si++) advSlow += V.tickV6(slowRate, 0.2).advanced;   // 12 秒
+console.log('  12秒 小步长 → 推进 ' + advSlow + ' 关');
+t('12秒 → 约' + Math.round(35/60*12*SKIP_OPEN) + '关',
+  Math.abs(advSlow - 35/60*12*SKIP_OPEN) <= 2, 'advanced=' + advSlow);
 
 /* carry 存档往返 */
 var sc = V.newV6();

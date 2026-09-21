@@ -48,6 +48,10 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
     /* ⚠️ enemySpawnOffset 自 v7.8 起【已废弃】: 它当年用于把怪生成在屏外
      * (camX+stageW()+offset), 造成"进游戏要等好几秒才看到怪"。
      * 现在生成点改为可视区右缘内侧 stageW()*0.92。保留字段仅为兼容旧引用, 勿再用于生成。 */
+    /* ⚠️ v7.10（勿回退）：下面各怪种的 speed 字段【已废弃】。
+     * 全体怪现在统一按 BC.playerSpeed 定速，与玩家同轴同速（见 makeEnemyFrom 的 speed 行）。
+     * 留着这些数字只是历史痕迹 —— 改它们不会有任何效果，
+     * 要调动怪物机动性请改 makeEnemyFrom 里那一处，或调 BC.playerSpeed。 */
     enemies: {
       /* hpK/atkK/defK: 按玩家境界(lv)线性成长 —— 怪只随境界长, 玩家随境界+装备长, 换装即提速。
        * hpK 定"一轮两剑能否收掉": 妖卒约一轮一只(收草手感), 水灵约两轮(略厚)。
@@ -682,17 +686,14 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
   const WATER_SPRITE = { cols:10, fw:240, fh:128, walkStart:0, walkCount:32, attackStart:32, attackCount:33, hurtStart:65, hurtCount:13, fps:24 };
   const PET_SPRITE = { cols:8, fw:96, fh:80 };
 
-  /* v6.14: 战斗层数字格式化同步全局 fmt——万/亿, 超过万亿走科学计数法 */
+  /* ── 战斗层数字格式化 ──
+   * ⚠️ v7.10：原先这里自有一套 fmtNum（万/亿，≥1e12 走科学计数），
+   *   与 00-num.js 的 N.fmt 口径不一致——同一个灵石数在顶部 HUD 与左下资源栏
+   *   会显示成两个样子（一个是"416万"，一个是"4.16e6"）。
+   *   现在整份实现委托给 N.fmt（万/亿/兆/京…），统一为单一事实源，此处不再自有分支。 */
   function fmtNum(n) {
-    n = Math.round(n || 0);
-    if (n < 0) return '-' + fmtNum(-n);
-    if (n >= 1e12) {
-      const exp = Math.floor(Math.log10(n));
-      return (n / Math.pow(10, exp)).toFixed(2) + 'e' + exp;
-    }
-    if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿';
-    if (n >= 1e4) return (n / 1e4).toFixed(n >= 1e6 ? 0 : 1) + '万';
-    return String(n);
+    try { return NS_NUM.fmt(NS_NUM.from(Math.round(n || 0))); }
+    catch (e) { return String(Math.round(n || 0)); }
   }
   /* ---------- 技能读取: 等级与数值的唯一来源是主游戏 SkillAPI ---------- */
   function skVal(id)  { const api = window.SkillAPI; return api ? api.val(id) : null; }   // v6: 返回 SKILL_DEFS 常量，非插值
@@ -1228,7 +1229,12 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
     let atk = Math.round(proto.entry.atk * (def.atkK || 1));
     const dfn = Math.round(proto.entry.def * (def.defK || 1));
     if (elite) { hp = Math.round(hp*DROP.eliteHp); atk = Math.round(atk*1.2); }
-    const lane = Math.random();   /* v5.0: 纵深比例 0~1 连续随机(无道) */
+    /* ⚠️ v7.10（勿回退）：敌人一律生成在【玩家所在的同一条轴】上。
+     * 原来是 Math.random() 连续随机纵深 —— 每只怪换一个高度，玩家就得
+     * 上下追着跑（"怪生成位置和玩家生成位置放一个轴上"这条反馈的出处）。
+     * 现在单轴对撞：开火门限 e.lane === p.lane 天然满足，
+     * 表现变成纯粹的左右对撞，站位稳定、不再自己给自己添堵。 */
+    const lane = MID_LANE;
     /* v4.6 全局减速旋钮: window.__enemySpeedMul(默认 1) 统一作用于所有怪的移速 ——
      * 走这条构造路径的怪(手配 + 骨骼池)全都会吃到, 调试时改一个数即可。 */
     const spdMul = (typeof window !== 'undefined' && window.__enemySpeedMul) || 1;
@@ -1239,7 +1245,15 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
       dodge: Math.min(60, Math.round((def.dodge||0)*(elite?1.3:1)*10)/10),
       pen: Math.min(90, Math.round((def.pen||0)*(elite?1.3:1))),
       critRes: Math.min(90, Math.round((def.critRes||0)*(elite?1.3:1))),
-      atkRange:def.atkRange, speed:def.speed*(0.9+Math.random()*0.2)*(elite?0.85:1)*spdMul, color:def.color,
+      atkRange:def.atkRange,
+      /* ⚠️ v7.10（勿回退）：怪物移速基准改为【玩家的 BC.playerSpeed】同一个数。
+       * 旧表里各怪种自带 120/76/88 —— 是玩家的 2~3 倍，玩家还没走到跟前就被贴脸，
+       * 根本不存在"边跑边打"的余地。现在同轴同速，战斗是纯正的左右对撞。
+       * 保留 ±6% 个体差异只为避免所有怪动作像复制粘贴，且上限压在 1.0 以下 ——
+       * 任何情况下怪都不会反过来比玩家快。
+       * 远程怪不必靠"走得慢"拉开梯队：它们的 atkRange 本就更远，stopX 站得更远。 */
+      speed: BC.playerSpeed * (0.94 + Math.random() * 0.06) * (elite ? 0.88 : 1) * spdMul,
+      color:def.color,
       atkT:Math.random()*0.6, anim:0,hurtT:0, alive:true,dying:0, animFrame:0, animTimer:0, moving:false };
     /* 骨骼怪: 工厂就绪时建一只独立骨架实例(每只怪动画独立推进) */
     if (def.bone) {
@@ -1659,8 +1673,9 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
   function dropRarityColor(q) { return QUALITY_COLOR[Math.max(0, Math.min(5, q | 0))] || '#aab2c0'; }
   function hudTarget() {                          // 灵石飞入锚点 = 战斗区左下角资源栏的数字位置(canvas 局部坐标)
     /* ⚠️ v7.5 (勿回退): 资源栏已从顶部统计区迁到战斗区左下角, 锚点随之改为 #spirit(总灵石)。
-     * #battleSpirit 现在是 .battle-hud 里 display:none 的隐藏重复元素, 指向它会算到错误坐标。 */
-    const el = document.getElementById('spirit') || document.getElementById('battleSpirit');
+     * v7.10: 旧的 #battleSpirit 隐藏锚点节点已随 .kills 容器一并删除,
+     *        只认 #spirit 一个目标, 不再留双写时代的 fallback。 */
+    const el = document.getElementById('spirit');
     if (el && cv) { const r = el.getBoundingClientRect(), c = cv.getBoundingClientRect(); return { x: r.left + r.width / 2 - c.left, y: r.top + r.height / 2 - c.top }; }
     return { x: CW * 0.5, y: 20 };
   }
@@ -3974,39 +3989,29 @@ import * as NS_NUM from './00-num.js';       /* v6: 大数层 —— 怪血量�
   }
 
   function updateHUD() {
-    const speedEl = document.getElementById('battleSpeed');
-    const stateEl = document.getElementById('battleState');
-    const spEl = document.getElementById('battleSpirit');
-    const trEl = document.getElementById('battleTrial');
-    const _st = G.state === 'fight' ? '战斗中' : '推进中';
-    if (stateEl && stateEl.textContent !== _st) stateEl.textContent = _st;
-    /* v5.13 PERF: 同值跳写 —— textContent 赋值即使值相同也会走失效检查, 挂机期
-     * spirit/state 大多帧不变, 同值判断直接省掉无效 DOM 写。
-     * v7.6: 击杀显示已删(用户: 现在推关, 不显示杀怪)。 */
-    if (spEl) { const s = fmtNum(G.spirit); if (spEl.textContent !== s) spEl.textContent = s; }
-    if (speedEl) {
-      /* v6: 这个位置改显示【游戏倍速】与【身法 buff】两条信息。
-       * 倍速来源只剩 Buff 宠物（上限 3.5），技能不再授予倍速，所以不再有"档位"概念，
-       * 直接读 G.speedMult 原值。身法 buff 生效时并列显示其剩余秒数。 */
-      const parts = [];
-      if (G.speedMultTimer > 0) parts.push('×' + G.speedMult.toFixed(2).replace(/\.?0+$/, '') + ' 倍速');
+    const buffEl = document.getElementById('battleBuff');
+    /* ⚠️ v7.10 所有权拆分（勿回退）——这里曾经是「三个读数互相打架」的现场：
+     *   · #battleTrial  与 stage-bar 的 #sbStage 重复显示关卡（屏幕上三个关卡）
+     *     → 重复节点已删，关卡的唯一权威是 stage-bar。
+     *   · #battleSpeed  被两个模块双写：本文件写「倍速+身法」，06-v6ui.js 写「倍速+跳关」，
+     *     两者每帧互相覆盖 → 那个"跳来跳去"的现象。
+     *     → 现在【本文件只写战斗内的临时状态】，永久资产一律归 06-v6ui.js：
+     *         battleBuff  ← 本文件（身法剩余秒，战斗临时 buff）
+     *         battleSpeed ← 06-v6ui.js（宠物永久倍速）
+     *         battleSkip  ← 06-v6ui.js（宠物跳关）
+     * 战斗层已经没有自己的倍速概念了（v6 起倍速只剩 Buff 宠物），
+     * 原先这里读的 G.speedMult 是废弃的旧遗留，故一并去掉，避免与真实倍速打架。 */
+    if (buffEl) {
       const bs = buffStats();
       if (bs.any) {
         let left = 0;
         for (const k in G.skillBuff) { const b = G.skillBuff[k]; if (b.durLeft > left) left = b.durLeft; }
-        parts.push('身法 ' + left.toFixed(1) + 's');
+        buffEl.style.display = '';
+        const t = '身法 ' + left.toFixed(1) + 's';
+        if (buffEl.textContent !== t) buffEl.textContent = t;
+      } else if (buffEl.style.display !== 'none') {
+        buffEl.style.display = 'none';
       }
-      if (parts.length) { speedEl.style.display = ''; speedEl.textContent = parts.join(' · '); }
-      else speedEl.style.display = 'none';
-    }
-    /* ⚠️ v6: 妖潮倒计时 HUD 已随试炼系统拆除(#battleTrial 节点已重新用作关卡显示)。
-     * v7.6: 怪血显示已删(用户: 左边已显示关卡), 顶部只留当前推到第几关。 */
-    if (trEl) {
-      const pr = v6Progress();
-      trEl.textContent = `第 ${pr.stage} 关`;
-      try {
-        if (pr.stage > 1) trEl.classList.add('boosted'); else trEl.classList.remove('boosted');
-      } catch (err) {}
     }
   }
 

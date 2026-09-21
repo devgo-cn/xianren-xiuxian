@@ -191,35 +191,67 @@ export function ln(a) {
  * ───────────────────────────────────────────────────────────── */
 
 /**
+ * 中文「万进位」大数单位。
+ *
+ * 每级 ×10⁴：万 → 亿 → 兆 → 京 → …… 这是中文母语玩家唯一不需要换算的读数方式
+ * （"416万"是一眼可得的量级，"4.16e6"要心算两次），题材上也贴修行体系。
+ *
+ * ⚠️ v7.10：本表统一了全游戏的数字口径。此前存在两套互不兼容的实现——
+ *   N.fmt 在 e≥6 直接吐 `4.16e6`，而 50-battle.js 的 fmtNum 却走 万/亿，
+ *   于是同一个灵石数在两个位置显示成两个样子。现在两者都归到这张表。
+ */
+const CN_UNITS = [
+  '万', '亿', '兆', '京', '垓', '秭', '穰', '沟', '涧', '正',
+  '载', '极', '恒河沙', '阿僧祗', '那由他', '不可思议', '无量', '大数',
+];
+
+/**
+ * 尾数定档：让读数既不挤成一坨也不拖着无意义的小数尾巴。
+ *   ≥100 → 取整（"416万"）
+ *   ≥10  → 一位小数（"41.6万"）
+ *   <10  → 两位小数（"4.16万"）
+ */
+function trimMant(v) {
+  const d = v >= 100 ? 0 : (v >= 10 ? 1 : 2);
+  const s = v.toFixed(d);
+  return s.indexOf('.') >= 0 ? s.replace(/\.?0+$/, '') : s;
+}
+
+/**
  * 格式化为显示字符串
  *
- * 阈值策略（对应设计文档 §6）：
- *   |x| < 1e4   → 千分位普通显示（如 "3,250"）
- *   |x| < 1e6   → 万/亿 中文单位（如 "12.5万"）
- *   |x| ≥ 1e6   → 科学计数（如 "1.23e52"）
+ * 阈值策略（v7.10）：
+ *   |x| < 1e4   → 直接数字（如 "3,250" / "1000"）
+ *   1e4 及以上  → 中文万进单位（如 "416万" / "1.23恒河沙"）
+ *   超出单位表  → 回退科学计数（正常玩法够不到，仅防御性兜底）
  *
  * @param {object} a 大数
- * @param {number} digits 有效数字位数（默认 3）
+ * @param {number} digits 有效数字位数（仅科学计数兜底用）
  */
 export function fmt(a, digits = 3) {
   if (isZero(a)) return "0";
   if (!isFinite(a.m)) return a.m > 0 ? "∞" : "-∞";
-  const neg = a.m < 0;
-  const sign = neg ? "-" : "";
+  const sign = a.m < 0 ? "-" : "";
   const abs = Math.abs(a.m);
-  const e = a.e;
 
-  /* 小数值：整数显示 */
-  if (e < 3) {
-    const v = abs * Math.pow(10, e);
+  /* ⚠️ 用 log10 判阈值而不是 i.e —— {m,e} 是否归一化并无保证，
+   * 旧实现对 e===3 直接判「万」，导致 {m:1,e:3}(=1000) 被显示成 "1万"。 */
+  const l10 = log10({ m: abs, e: a.e });
+  if (!isFinite(l10)) return sign + String(abs);
+
+  /* 一万以下：原样显示，保留到分 */
+  if (l10 < 4) {
+    const v = abs * Math.pow(10, a.e);
     return sign + String(Math.round(v * 100) / 100);
   }
-  /* 万级 */
-  if (e === 3) return sign + trim(abs * Math.pow(10, 0)) + "万";
-  if (e === 4) return sign + trim(abs * 10) + "万";
-  if (e === 5) return sign + trim(abs) + "十万";
-  /* 科学计数 */
-  return sign + trim(abs, digits) + "e" + e;
+
+  /* 中文单位：ui = 单位下标，每级覆盖 10⁴ */
+  const ui = Math.floor(l10 / 4) - 1;
+  if (ui >= 0 && ui < CN_UNITS.length) {
+    return sign + trimMant(Math.pow(10, l10 - (ui + 1) * 4)) + CN_UNITS[ui];
+  }
+  /* 兜底：超出单位表时才科学计数 */
+  return sign + trim(abs, digits) + "e" + a.e;
 }
 
 function trim(v, d = 3) {
